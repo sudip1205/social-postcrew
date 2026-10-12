@@ -56,6 +56,7 @@ DEFAULT_CONFIG = {
     },
     "notifications": {
         "desktop": True,                 # macOS / Linux desktop notification
+        "email": False,                  # Gmail; needs gmail_address + gmail_app_password in secrets
         "telegram": False,               # needs telegram_bot_token + telegram_chat_id in secrets
         "warn_days_before_expiry": 7,
     },
@@ -122,4 +123,5 @@ DEFAULT_CONFIG = {
 
 # Secrets live in workspace/secrets.json (chmod 600). These are the keys the Studio knows about.
 SECRET_KEYS = ["linkedin_client_id", "linkedin_client_secret", "linkedin_access_token", "linkedin_token_expires_at",
-               "linkedin_person_urn", "linkedin_name", "telegram_bot_token", "telegram_chat_id"]
+               "linkedin_person_urn", "linkedin_name", "gmail_address", "gmail_app_password", "email_to",
+               "telegram_bot_token", "telegram_chat_id"]

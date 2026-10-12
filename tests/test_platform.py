@@ -11,7 +11,7 @@ from unittest import mock
 from zoneinfo import ZoneInfo
 
 from helpers import FakeLinkedIn, TempWorkspace, claude_ok
-from postcrew import scheduler
+from postcrew import notify, scheduler
 from postcrew.agents import credentials as cred_mod
 from postcrew.defaults import DEFAULT_CONFIG
 from postcrew.llm import ClaudeCode, LLMError
@@ -94,6 +94,56 @@ class CredentialTests(unittest.TestCase):
                     stdout = '{"loggedIn": false}'
                 return R()
             self.assertEqual(cred_mod.check_claude(cfg, runner=logged_out)["state"], "logged_out")
+
+
+class FakeSMTP:
+    sent = []
+
+    def __init__(self, host, port, context=None, timeout=None):
+        self.host, self.port = host, port
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+    def login(self, user, password):
+        if password != "abcdefghijklmnop":
+            raise OSError("535 Username and Password not accepted")
+        self.user = user
+
+    def send_message(self, msg):
+        FakeSMTP.sent.append(msg)
+
+
+class EmailTests(unittest.TestCase):
+    def setUp(self):
+        FakeSMTP.sent = []
+        patcher = mock.patch.object(notify._gmail, "__defaults__", (FakeSMTP,))
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def test_sends_only_when_switched_on_and_configured(self):
+        with TempWorkspace() as ws:
+            ws.update_secrets(gmail_address="me@gmail.com", gmail_app_password="abcd efgh ijkl mnop")
+            notify.notify(ws, "Post ready", "queued")
+            self.assertEqual(FakeSMTP.sent, [])
+            cfg = ws.config()
+            cfg["notifications"].update(email=True, desktop=False)
+            ws.save_config(cfg)
+            notify.notify(ws, "Post ready", "queued for 08:30")
+            msg = FakeSMTP.sent[0]
+            self.assertEqual((msg["To"], msg["Subject"]), ("me@gmail.com", "Postcrew: Post ready"))
+            self.assertIn("queued for 08:30", msg.get_content())
+
+    def test_reports_a_wrong_password_and_hides_it(self):
+        with TempWorkspace() as ws:
+            ws.update_secrets(gmail_address="me@gmail.com", gmail_app_password="wrong", email_to="you@example.com")
+            self.assertIn("535", notify._gmail("me@gmail.com", "wrong", None, "s", "b"))
+            m = ws.masked_secrets()
+            self.assertEqual((m["gmail_address"], m["email_to"], m["gmail_app_password"]),
+                             ("me@gmail.com", "you@example.com", True))
 
 
 class SchedulerTests(unittest.TestCase):
@@ -202,6 +252,17 @@ class StudioTests(unittest.TestCase):
         self.assertEqual(self.ws.secrets()["linkedin_client_secret"], "supersecret")
         code, d = self.req("PUT", "/api/credentials", {"linkedin_access_token": "x"})
         self.assertEqual(code, 400)
+
+    def test_gmail_settings_and_test_email(self):
+        self.assertEqual(self.req("POST", "/api/notifications/test-email")[1]["ok"], False)
+        self.assertEqual(self.req("PUT", "/api/credentials", {"gmail_address": "not-an-email"})[0], 400)
+        code, d = self.req("PUT", "/api/credentials", {"gmail_address": "me@gmail.com",
+                                                       "gmail_app_password": "abcdefghijklmnop"})
+        self.assertEqual(code, 200)
+        self.assertNotIn("abcdefghijklmnop", json.dumps(d))
+        with mock.patch.object(notify._gmail, "__defaults__", (FakeSMTP,)):
+            code, d = self.req("POST", "/api/notifications/test-email")
+        self.assertEqual((d["ok"], d["to"]), (True, "me@gmail.com"))
 
     def test_config_round_trip_and_validation(self):
         _, d = self.req("GET", "/api/config")

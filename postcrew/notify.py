@@ -1,15 +1,19 @@
-"""Notifications: always shown in the Studio, optionally as a desktop notification and/or Telegram message.
+"""Notifications: always shown in the Studio, optionally as a desktop notification, Gmail email and/or Telegram
+message.
 
 `key` de-duplicates: the same key is not re-sent within `quiet_hours` (e.g. one expiry warning per day).
 """
 import json
 import platform
 import shutil
+import smtplib
+import ssl
 import subprocess
 import urllib.parse
 import urllib.request
 import uuid
 from datetime import datetime, timedelta, timezone
+from email.message import EmailMessage
 
 
 def _desktop(title, message):
@@ -32,6 +36,20 @@ def _telegram(token, chat, text):
         return str(e)[:200]
 
 
+def _gmail(address, app_password, to, subject, body, smtp=smtplib.SMTP_SSL):
+    """Send through Gmail SMTP. Needs a Google App Password (2-Step Verification on), not the account password."""
+    msg = EmailMessage()
+    msg["From"], msg["To"], msg["Subject"] = address, to or address, subject[:150]
+    msg.set_content(body)
+    try:
+        with smtp("smtp.gmail.com", 465, context=ssl.create_default_context(), timeout=20) as s:
+            s.login(address, app_password.replace(" ", ""))
+            s.send_message(msg)
+        return None
+    except Exception as e:
+        return str(e)[:200]
+
+
 def notify(ws, title, message, level="info", key=None, action=None, quiet_hours=20):
     """level: info | success | warning | error. action: {"label", "tab"} shown as a button in the Studio."""
     items = ws.state("notifications", {"items": []})["items"]
@@ -49,6 +67,11 @@ def notify(ws, title, message, level="info", key=None, action=None, quiet_hours=
     if cfg.get("desktop"):
         _desktop(f"Postcrew: {title}", message)
     s = ws.secrets()
+    if cfg.get("email") and s.get("gmail_address") and s.get("gmail_app_password"):
+        err = _gmail(s["gmail_address"], s["gmail_app_password"], s.get("email_to"), f"Postcrew: {title}",
+                     f"{message}\n\nDetails are in the Postcrew Studio.")
+        if err:
+            n["email_error"] = err
     if cfg.get("telegram") and s.get("telegram_bot_token") and s.get("telegram_chat_id"):
         err = _telegram(s["telegram_bot_token"], s["telegram_chat_id"], f"Postcrew - {title}\n{message}")
         if err:

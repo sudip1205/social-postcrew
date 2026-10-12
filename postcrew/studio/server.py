@@ -131,7 +131,8 @@ class Studio:
                 "redirect_uri": self.redirect_uri, "scopes": linkedin.SCOPE}
 
     def save_credentials(self, body):
-        allowed = {"linkedin_client_id", "linkedin_client_secret", "telegram_bot_token", "telegram_chat_id"}
+        allowed = {"linkedin_client_id", "linkedin_client_secret", "gmail_address", "gmail_app_password", "email_to",
+                   "telegram_bot_token", "telegram_chat_id"}
         changes = {k: (v.strip() if isinstance(v, str) else v) for k, v in body.items() if k in allowed}
         if any(k not in allowed for k in body):
             raise ValueError(f"only these can be set here: {sorted(allowed)}")
@@ -141,8 +142,20 @@ class Studio:
         cid = changes.get("linkedin_client_id")
         if cid and not re.fullmatch(r"[A-Za-z0-9]{8,40}", cid):
             raise ValueError("linkedin_client_id should be the 8-40 letter/digit Client ID from the app's Auth tab")
+        for k in ("gmail_address", "email_to"):
+            if changes.get(k) and not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", changes[k]):
+                raise ValueError(f"{k} should be an email address")
         self.ws.update_secrets(**{k: v for k, v in changes.items()})
         return self.credentials()
+
+    def test_email(self):
+        """Send one email now, whether or not email notifications are switched on, and report the result."""
+        s = self.ws.secrets()
+        if not (s.get("gmail_address") and s.get("gmail_app_password")):
+            return {"ok": False, "error": "save the Gmail address and App Password first"}
+        err = notify_mod._gmail(s["gmail_address"], s["gmail_app_password"], s.get("email_to"), "Postcrew: test email",
+                                "If you can read this, Postcrew can email you notifications.")
+        return {"ok": not err, "error": err, "to": s.get("email_to") or s["gmail_address"]}
 
     def oauth_start(self):
         s = self.ws.secrets()
@@ -308,6 +321,7 @@ def make_handler(studio):
                                                                   {"ok": True})[1],
                     ("POST", "/api/notifications/test"): lambda: notify_mod.notify(
                         ws, "Test notification", "If you can read this, notifications work.", level="info"),
+                    ("POST", "/api/notifications/test-email"): lambda: studio.test_email(),
                     ("POST", "/api/pause"): lambda: self.pause(),
                 }
                 fn = routes.get((method, p))

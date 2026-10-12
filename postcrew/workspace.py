@@ -180,7 +180,8 @@ class Workspace:
     def masked_secrets(self):
         """What the browser may see: whether each secret is set, never its value (except harmless ids)."""
         s = self.secrets()
-        visible = {"linkedin_client_id", "linkedin_token_expires_at", "linkedin_name", "telegram_chat_id"}
+        visible = {"linkedin_client_id", "linkedin_token_expires_at", "linkedin_name", "gmail_address", "email_to",
+                   "telegram_chat_id"}
         return {k: (s[k] if k in visible else bool(s[k])) if k in s else None for k in SECRET_KEYS}
 
     # ---------- queue & history ----------

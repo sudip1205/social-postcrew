@@ -83,10 +83,10 @@ you turn that off.
 | Workflow | live graph of the crew (state, tries, cost per agent, sent-back arrows), the Supervisor's decisions, each agent's output and rendered media, the full event log |
 | Queue | LinkedIn-style preview of every queued post: approve, edit, veto, publish now; the published history |
 | Settings | the configurator: profile, schedule and days, categories and their briefs, models and limits per agent, quality thresholds, notifications |
-| Credentials | LinkedIn app and OAuth connect/reconnect, token status, Claude Code login test, Telegram |
+| Credentials | LinkedIn app and OAuth connect/reconnect, token status, Claude Code login test, Gmail, Telegram |
 
-Notifications (bell icon) appear in the Studio and, if enabled, as desktop notifications and Telegram
-messages: token expiring or invalid, a day with no post and why, a post ready or published, failures.
+Notifications (bell icon) appear in the Studio and, if enabled, as desktop notifications, Gmail emails and
+Telegram messages: token expiring or invalid, a day with no post and why, a post ready or published, failures.
 
 ## Configuration
 
@@ -95,7 +95,7 @@ Everything lives in one workspace folder (`./workspace`, or set `POSTCREW_HOME`)
 ```
 workspace/
   config.json     settings from the Studio (no secrets)
-  secrets.json    LinkedIn app + token, Telegram (mode 600, never commit it)
+  secrets.json    LinkedIn app + token, Gmail App Password, Telegram (mode 600, never commit it)
   queue.json      posts that passed review
   history.json    what was published (used to avoid repeats)
   media/          queued posters and videos

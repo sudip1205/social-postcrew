@@ -364,6 +364,7 @@ async function renderSettings() {
   </div></div>
   <div class="panel section"><h2>Notifications</h2><div class="row">
     <label class="checkline"><input type="checkbox" data-k="notifications.desktop" ${c.notifications.desktop ? "checked" : ""}> Desktop notifications</label>
+    <label class="checkline"><input type="checkbox" data-k="notifications.email" ${c.notifications.email ? "checked" : ""}> Gmail email (set it up in Credentials)</label>
     <label class="checkline"><input type="checkbox" data-k="notifications.telegram" ${c.notifications.telegram ? "checked" : ""}> Telegram (set the bot in Credentials)</label>
     <label class="f" style="width:220px">Warn this many days before the LinkedIn token expires${inp("notifications.warn_days_before_expiry", c.notifications.warn_days_before_expiry, "number", 'min="1" max="30"')}</label>
     <button id="test-notify">Send a test notification</button></div></div>
@@ -466,6 +467,14 @@ async function renderCredentials() {
     <p>${esc(cl.message || "Not checked yet.")}</p>
     <div class="row"><button id="test-claude">Test with a tiny call</button><span class="muted small" id="claude-result"></span></div>
     <p class="muted small">Not logged in? Run <span class="mono">claude</span> once in a terminal and log in. No API key is needed.</p>
+    <h3>Gmail notifications (optional)</h3>
+    <ol class="muted small"><li>Turn on <a href="https://myaccount.google.com/signinoptions/two-step-verification" target="_blank" rel="noopener">2-Step Verification</a> for the Gmail account.</li>
+      <li>Create an <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener">App Password</a> (name it "Postcrew") and paste the 16 characters below. Never use your normal Gmail password.</li></ol>
+    <div class="grid g2"><label class="f">Gmail address ${set(s.gmail_address)}<input id="gm-addr" type="email" value="${esc(s.gmail_address || "")}" placeholder="you@gmail.com"></label>
+      <label class="f">App password ${set(s.gmail_app_password)}<input id="gm-pass" type="password" placeholder="${s.gmail_app_password ? "•••••••• (saved)" : "16 characters"}" autocomplete="new-password"></label>
+      <label class="f">Send to (optional) ${set(s.email_to)}<input id="gm-to" type="email" value="${esc(s.email_to || "")}" placeholder="same as the Gmail address"></label></div>
+    <div class="row" style="margin-top:10px"><button id="save-gm">Save Gmail</button><button id="test-gm">Send a test email</button><span class="muted small" id="gm-result"></span></div>
+    <p class="muted small">Turn on Gmail email in Settings > Notifications after saving.</p>
     <h3>Telegram notifications (optional)</h3>
     <div class="grid g2"><label class="f">Bot token ${set(s.telegram_bot_token)}<input id="tg-token" type="password" placeholder="${s.telegram_bot_token ? "•••••••• (saved)" : "from @BotFather"}" autocomplete="new-password"></label>
       <label class="f">Chat id ${set(s.telegram_chat_id)}<input id="tg-chat" value="${esc(s.telegram_chat_id || "")}"></label></div>
@@ -476,6 +485,15 @@ async function renderCredentials() {
   $("#save-app").onclick = async () => {
     const body = { linkedin_client_id: $("#cid").value.trim() }; if ($("#csecret").value) body.linkedin_client_secret = $("#csecret").value.trim();
     try { await api("/api/credentials", { method: "PUT", body }); toast("App details saved"); renderCredentials(); } catch (e) { toast(e.message, true); }
+  };
+  $("#save-gm").onclick = async () => {
+    const body = { gmail_address: $("#gm-addr").value.trim(), email_to: $("#gm-to").value.trim() }; if ($("#gm-pass").value) body.gmail_app_password = $("#gm-pass").value.trim();
+    try { await api("/api/credentials", { method: "PUT", body }); toast("Gmail saved"); renderCredentials(); } catch (e) { toast(e.message, true); }
+  };
+  $("#test-gm").onclick = async () => {
+    const b = $("#test-gm"); b.disabled = true; $("#gm-result").textContent = "sending…";
+    const r = await post("/api/notifications/test-email").catch(e => ({ ok: false, error: e.message }));
+    $("#gm-result").textContent = r.ok ? `Sent to ${r.to}. Check the inbox (and spam).` : `Failed: ${r.error}`; b.disabled = false;
   };
   $("#save-tg").onclick = async () => {
     const body = { telegram_chat_id: $("#tg-chat").value.trim() }; if ($("#tg-token").value) body.telegram_bot_token = $("#tg-token").value.trim();
