@@ -139,6 +139,7 @@ class TempWorkspace:
         cfg = ws.config()
         cfg["notifications"]["desktop"] = False
         cfg["profile"]["handle"] = "example.com/test"
+        cfg["llm"]["claude_path"] = "/nonexistent/claude"  # a test that forgets to fake the LLM fails, never calls Claude
         ws.save_config(cfg)
         self.ws = ws
         return ws

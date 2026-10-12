@@ -153,16 +153,20 @@ class SchedulerTests(unittest.TestCase):
             calls = []
             kw = dict(runner=lambda ws_, d: calls.append(("run", d.isoformat())),
                       publisher=lambda ws_: calls.append(("publish",)) or [],
-                      checker=lambda ws_: calls.append(("check",)))
+                      checker=lambda ws_: calls.append(("check",)),
+                      planner=lambda ws_, d: calls.append(("plan", d.isoformat())))
             scheduler.tick(ws, datetime(2026, 10, 12, 8, 0, tzinfo=tz), **kw)    # Monday 08:00: nothing yet
             self.assertEqual(calls, [])
             scheduler.tick(ws, datetime(2026, 10, 12, 9, 5, tzinfo=tz), **kw)    # after post_time + check time
             self.assertEqual(calls, [("check",), ("publish",)])
+            scheduler.tick(ws, datetime(2026, 10, 12, 10, 1, tzinfo=tz), **kw)   # Monday 10:00: plan next week
+            self.assertIn(("plan", "2026-10-12"), calls)
             scheduler.tick(ws, datetime(2026, 10, 12, 19, 1, tzinfo=tz), **kw)   # generate Tuesday's post
             self.assertIn(("run", "2026-10-13"), calls)
             n = len(calls)
             scheduler.tick(ws, datetime(2026, 10, 12, 19, 2, tzinfo=tz), **kw)   # no duplicates a minute later
             self.assertEqual(len(calls), n)
+            self.assertEqual(calls.count(("plan", "2026-10-12")), 1)
 
     def test_pause_stops_everything(self):
         with TempWorkspace() as ws:
@@ -189,6 +193,10 @@ class LLMTests(unittest.TestCase):
         with self.assertRaises(LLMError) as e:
             self.run_with(json.dumps({"subtype": "error_max_budget_usd", "is_error": True, "total_cost_usd": 1.0}))
         self.assertEqual(e.exception.kind, "budget")
+        with self.assertRaises(LLMError) as e:  # Claude Code reports a used-up plan limit as "success" + is_error
+            self.run_with(json.dumps({"subtype": "success", "is_error": True,
+                                      "result": "You've hit your session limit · resets 3:40am (America/Chicago)"}))
+        self.assertEqual(e.exception.kind, "limit")
         with self.assertRaises(LLMError) as e:
             self.run_with("", 1, "Please run /login")
         self.assertEqual(e.exception.kind, "auth")
@@ -252,6 +260,28 @@ class StudioTests(unittest.TestCase):
         self.assertEqual(self.ws.secrets()["linkedin_client_secret"], "supersecret")
         code, d = self.req("PUT", "/api/credentials", {"linkedin_access_token": "x"})
         self.assertEqual(code, 400)
+
+    def test_plan_edit_suggest_and_clear(self):
+        from helpers import ScriptedLLM
+        from postcrew.agents import planner
+        code, d = self.req("GET", "/api/plan")
+        self.assertEqual(code, 200)
+        row = next(r for r in d["days"] if r["category"] == "dev-tip")
+        day = row["date"]
+        code, d = self.req("PUT", f"/api/plan/{day}", {"topic": "Python walrus operator", "angle": "when := helps"})
+        e = next(r for r in d["days"] if r["date"] == day)["entry"]
+        self.assertEqual((e["topic"], e["source"]), ("Python walrus operator", "manual"))
+        self.assertEqual(self.req("PUT", f"/api/plan/{day}", {"topic": "x"})[0], 400)
+        llm = ScriptedLLM({"planner": [{"days": [{"date": day, "topic": "Git bisect in five minutes", "angle": "find "
+                                                  "the bad commit", "search_queries": []}]}]})
+        with mock.patch("postcrew.llm.make_backend", return_value=llm):
+            code, d = self.req("POST", f"/api/plan/{day}/suggest", {"hint": "something about git"})
+        e = next(r for r in d["days"] if r["date"] == day)["entry"]
+        self.assertEqual((e["topic"], e["rejected"]), ("Git bisect in five minutes", ["Python walrus operator"]))
+        self.assertIn("something about git", llm.calls[0]["prompt"])
+        self.req("PUT", f"/api/plan/{day}", {"topic": ""})
+        self.assertNotIn(day, planner.load_plan(self.ws))
+        self.assertEqual(self.req("PUT", "/api/plan/2020-01-01", {"topic": "Old day topic"})[0], 400)
 
     def test_gmail_settings_and_test_email(self):
         self.assertEqual(self.req("POST", "/api/notifications/test-email")[1]["ok"], False)

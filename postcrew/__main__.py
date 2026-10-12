@@ -7,6 +7,8 @@
   python3 -m postcrew check                check LinkedIn + Claude credentials
   python3 -m postcrew doctor               check everything needed is installed and configured
   python3 -m postcrew status               queue and recent runs
+  python3 -m postcrew plan                 let the Week Planner draft next week's topics now
+  python3 -m postcrew import FILE          add posts you published elsewhere, so they are never repeated
 """
 import argparse
 import json
@@ -44,6 +46,27 @@ def cmd_doctor(ws):
     return 0 if all(ok for _, ok, _ in rows[:5]) else 1
 
 
+def cmd_import(ws, path):
+    """FILE: JSON list of posts, or {"posts": [...]}; each needs "date" and "topic" ("text", "category" optional)."""
+    with open(path) as f:
+        data = json.load(f)
+    posts = data.get("posts", []) if isinstance(data, dict) else data
+    have = {(p.get("date"), p.get("topic")) for p in ws.history()}
+    added = 0
+    for p in posts:
+        if not (isinstance(p, dict) and p.get("date") and p.get("topic")):
+            print(f"  skipped (needs date and topic): {str(p)[:60]}")
+            continue
+        if (p["date"], p["topic"]) in have:
+            continue
+        ws.add_history({"id": p.get("id") or f"import-{p['date']}", "date": p["date"], "topic": p["topic"],
+                        "category": p.get("category", ""), "text": p.get("text", ""), "imported": True})
+        have.add((p["date"], p["topic"]))
+        added += 1
+    print(f"Imported {added} post(s) into the history; the crew will not repeat them.")
+    return 0
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="postcrew", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--workspace", help="workspace folder (default: $POSTCREW_HOME or ./workspace)")
@@ -61,6 +84,9 @@ def main(argv=None):
     sub.add_parser("check")
     sub.add_parser("doctor")
     sub.add_parser("status")
+    sub.add_parser("plan")
+    im = sub.add_parser("import")
+    im.add_argument("file")
     a = ap.parse_args(argv)
 
     ws = Workspace(a.workspace).init()
@@ -98,6 +124,14 @@ def main(argv=None):
         res = run_crew(ws, a.date, a.category, dry_run=a.dry_run, echo=True)
         print(json.dumps({k: res.get(k) for k in ("ok", "run_id", "reason", "failed_step", "cost_usd")}, indent=2))
         return 0 if res.get("ok") else 1
+    if a.cmd == "import":
+        return cmd_import(ws, a.file)
+    if a.cmd == "plan":
+        from .agents.planner import plan_week
+        from .crew import local_now
+        for d, e in sorted(plan_week(ws, local_now(ws.config()).date()).items()):
+            print(f"  {d}  {e.get('topic') or 'FAILED: ' + e.get('error', '')}")
+        return 0
     if a.cmd == "status":
         from .crew import list_runs
         for p in ws.queue():

@@ -16,6 +16,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from .. import __version__, crew, linkedin, notify as notify_mod
+from ..agents import planner as planner_mod
 from ..agents.credentials import run_check
 from ..agents.publisher import publish_one, scheduled_at
 from ..agents.supervisor import CREW, Supervisor
@@ -57,7 +58,7 @@ class Studio:
     def agents(self):
         cfg = self.ws.config()
         rows = []
-        for a in CREW + [Supervisor()]:
+        for a in [planner_mod.PlannerAgent()] + CREW + [Supervisor()]:
             rows.append({"id": a.id, "title": a.title, "role": a.role, "uses_llm": getattr(a, "uses_llm", True),
                          "llm": agent_settings(cfg, a.id) if getattr(a, "uses_llm", True) else None})
         return {"agents": rows, "steps": STEPS}
@@ -90,6 +91,65 @@ class Studio:
                 notify_mod.notify(self.ws, "Crew run crashed", str(e)[:300], level="error")
         threading.Thread(target=go, daemon=True).start()
         return {"run_id": run_id}
+
+    # ---------- week plan ----------
+    def plan(self):
+        """Every day from today to the end of next week: category, planned topic, and whether it is written yet."""
+        cfg = self.ws.config()
+        today = crew.local_now(cfg).date()
+        last = planner_mod.next_week(today)[-1]
+        entries = planner_mod.load_plan(self.ws)
+        queue = {p["date"]: p for p in self.ws.queue() if p.get("status") != "vetoed"}
+        hist = {p.get("date"): p for p in self.ws.history() if not p.get("imported")}
+        rows = []
+        for i in range((last - today).days + 1):
+            d = today + timedelta(days=i)
+            iso, cat = d.isoformat(), cfg["schedule"]["days"].get(planner_mod.WEEKDAYS[d.weekday()]) or ""
+            c = cfg["categories"].get(cat, {})
+            done = hist.get(iso) or queue.get(iso)
+            rows.append({"date": iso, "weekday": d.strftime("%A"), "category": cat, "label": c.get("label", ""),
+                         "plan_ahead": c.get("plan_ahead", True), "fixed": c.get("media") == "animation" or cat == "week-recap",
+                         "entry": entries.get(iso) if (entries.get(iso) or {}).get("category") == cat else None,
+                         "written": ({"status": "published" if iso in hist else done.get("status"),
+                                      "topic": done.get("topic", "")} if done else None)})
+        return {"days": rows, "planning": cfg["planning"], "next_week": [planner_mod.next_week(today)[0].isoformat(),
+                                                                         last.isoformat()]}
+
+    def _plan_day(self, day):
+        datetime.strptime(day, "%Y-%m-%d")
+        row = next((r for r in self.plan()["days"] if r["date"] == day), None)
+        if not row or not row["category"]:
+            raise ValueError(f"{day} has no post scheduled (or is outside the plan)")
+        if row["written"]:
+            raise ValueError(f"the {day} post is already written ({row['written']['status']}); edit it in the Queue")
+        return row
+
+    def plan_edit(self, day, body):
+        row = self._plan_day(day)
+        topic, angle = (body.get("topic") or "").strip(), (body.get("angle") or "").strip()
+        if not topic:
+            planner_mod.set_entry(self.ws, day, None)
+            return self.plan()
+        if not 5 <= len(topic) <= 90 or len(angle) > 400:
+            raise ValueError("the topic must be 5-90 characters and the angle under 400")
+        old = row["entry"] or {}
+        planner_mod.set_entry(self.ws, day, {"category": row["category"], "topic": topic, "angle": angle,
+                                             "search_queries": [] if topic != old.get("topic") else
+                                             old.get("search_queries", []),
+                                             "source": "manual", "rejected": old.get("rejected", [])})
+        return self.plan()
+
+    def plan_suggest(self, day, body):
+        self._plan_day(day)
+        out = planner_mod.PlannerAgent().plan(self.ws, [datetime.strptime(day, "%Y-%m-%d").date()],
+                                              hint=(body.get("hint") or "").strip()[:300], force=True)
+        if out.get(day, {}).get("error"):
+            raise ValueError(f"the planner could not find a new topic: {out[day]['error']}")
+        return self.plan()
+
+    def plan_fill(self):
+        planner_mod.plan_week(self.ws, crew.local_now(self.ws.config()).date())
+        return self.plan()
 
     def queue_action(self, pid, action, body):
         posts = self.ws.queue()
@@ -299,11 +359,17 @@ def make_handler(studio):
                         return self.file(ws.runs_dir / run_id / name, ws.runs_dir / run_id)
                     d = studio.run_detail(run_id, float(q.get("after", 0)))
                     return self.send(200, d) if d else self.send(404, {"error": "no such run"})
+                m = re.match(r"^/api/plan/(\d{4}-\d{2}-\d{2})(?:/(suggest))?$", p)
+                if m and method in ("PUT", "POST"):
+                    fn = studio.plan_suggest if m.group(2) else studio.plan_edit
+                    return self.send(200, fn(m.group(1), self.body()))
                 m = re.match(r"^/api/queue/([^/]+)/(approve|veto|restore|publish_now|edit|delete)$", p)
                 if method == "POST" and m:
                     return self.send(200, studio.queue_action(m.group(1), m.group(2), self.body()))
                 routes = {
                     ("GET", "/api/overview"): lambda: studio.overview(),
+                    ("GET", "/api/plan"): lambda: studio.plan(),
+                    ("POST", "/api/plan/fill"): lambda: studio.plan_fill(),
                     ("GET", "/api/agents"): lambda: studio.agents(),
                     ("GET", "/api/runs"): lambda: {"runs": crew.list_runs(ws)},
                     ("POST", "/api/runs"): lambda: studio.start_run(self.body()),

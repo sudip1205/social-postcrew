@@ -1,5 +1,5 @@
-"""Built-in scheduler (runs inside `postcrew serve`): generate in the evening, publish in the morning,
-check credentials daily. Uses the times in config.json; state survives restarts (state/scheduler.json).
+"""Built-in scheduler (runs inside `postcrew serve`): plan next week's topics once a week, generate in the
+evening, publish in the morning, check credentials daily. Uses the times in config.json; state survives restarts (state/scheduler.json).
 
 If you prefer cron/systemd, use the CLI instead: `postcrew run`, `postcrew publish`, `postcrew check`.
 """
@@ -9,9 +9,11 @@ import traceback
 from datetime import datetime, timedelta, timezone
 
 from .agents.credentials import run_check
+from .agents.planner import plan_week
 from .agents.publisher import publish_due
 from .crew import category_for, local_now, run_crew, target_date
 from .notify import notify
+from .workspace import WEEKDAYS
 
 TICK_S = 30
 PUBLISH_EVERY_S = 15 * 60
@@ -22,7 +24,7 @@ def _passed(now, hhmm):
     return (now.hour, now.minute) >= (hh, mm)
 
 
-def tick(ws, now=None, runner=run_crew, publisher=publish_due, checker=run_check):
+def tick(ws, now=None, runner=run_crew, publisher=publish_due, checker=run_check, planner=plan_week):
     """One scheduler step. Returns the list of things it did (for logs and tests)."""
     if ws.paused():
         return ["paused"]
@@ -37,6 +39,14 @@ def tick(ws, now=None, runner=run_crew, publisher=publish_due, checker=run_check
         ws.save_state("scheduler", st)
         checker(ws)
         did.append("credentials")
+
+    pn = cfg["planning"]
+    if (pn["enabled"] and WEEKDAYS[now.weekday()] == pn["weekday"] and _passed(now, pn["time"])
+            and st.get("planned_on") != today):
+        st["planned_on"] = today
+        ws.save_state("scheduler", st)
+        planner(ws, now.date())
+        did.append("plan next week")
 
     target = target_date(cfg, now)
     if (_passed(now, cfg["schedule"]["generate_time"]) and st.get("generated_for") != target.isoformat()

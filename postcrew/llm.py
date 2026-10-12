@@ -7,6 +7,7 @@ isolated: --restricted (no code-running tools, your user/project settings and ho
 To add another backend later, implement `call()` with the same signature and register it in BACKENDS.
 """
 import json
+import re
 import shutil
 import subprocess
 import time
@@ -14,7 +15,8 @@ from dataclasses import dataclass, field
 
 
 class LLMError(RuntimeError):
-    """kind: timeout | auth | budget | invalid_output | not_installed | failed"""
+    """kind: timeout | auth | budget | limit | invalid_output | not_installed | failed
+    (limit = the Claude plan's usage limit is used up; retrying before it resets cannot help)"""
 
     def __init__(self, message, kind="failed", cost_usd=0.0):
         super().__init__(message)
@@ -82,8 +84,10 @@ class ClaudeCode:
         if out.get("is_error") or out.get("subtype") != "success":
             sub = out.get("subtype", "")
             text = str(out.get("result") or out.get("api_error_status") or sub)[:400]
-            kind = "budget" if "budget" in sub else ("auth" if "auth" in text.lower() or "login" in text.lower()
-                                                     else "failed")
+            low = text.lower()
+            if re.search(r"(session|usage|weekly|rate) limit|limit .*resets", low):
+                raise LLMError(f"your Claude usage limit is used up: {text}", kind="limit", cost_usd=cost)
+            kind = "budget" if "budget" in sub else ("auth" if "auth" in low or "login" in low else "failed")
             raise LLMError(f"claude reported {sub or 'an error'}: {text}", kind=kind, cost_usd=cost)
         data = out.get("structured_output")
         if not isinstance(data, dict):

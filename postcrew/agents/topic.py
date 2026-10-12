@@ -4,6 +4,7 @@ from datetime import timedelta
 from ..checks import repeat_problem
 from ..render import tracers
 from .base import Agent, AgentError, guidance_block, recent_block
+from .planner import planned_for
 
 SCHEMA = {
     "type": "object",
@@ -25,6 +26,9 @@ class TopicAgent(Agent):
     role = "Picks today's topic from the schedule, avoiding anything already posted."
 
     def run(self, ctx, guidance):
+        planned = None if guidance else planned_for(ctx.ws, ctx.day, ctx.category)
+        if planned:  # the Week Planner or the owner already chose this day's topic
+            return self._planned(ctx, planned)
         if ctx.cat["media"] == "animation":
             return self._algorithm(ctx)
         if ctx.category == "week-recap":
@@ -38,6 +42,26 @@ class TopicAgent(Agent):
                   + guidance_block(guidance))
         tools = ["WebSearch"] if ctx.cat.get("research") == "required" else []
         return self.ask(ctx, system, prompt, SCHEMA, tools)
+
+    def _planned(self, ctx, e):
+        out = {"topic": e["topic"], "angle": e.get("angle") or e["topic"], "why_now": "from the week plan",
+               "search_queries": e.get("search_queries", []), "planned": e.get("source", "planner")}
+        if e.get("algo") in tracers.TRACERS:
+            return dict(out, algo=e["algo"])
+        if ctx.category == "week-recap":
+            return dict(self._recap(ctx), planned="auto")
+        if ctx.cat["media"] == "animation":
+            return self._algorithm(ctx)
+        if ctx.cat.get("research") != "off" and not out["search_queries"]:
+            # a topic typed by hand has no search queries yet: ask for them, keep the topic
+            system = self.prompt(ctx, category=ctx.cat["label"], brief=ctx.cat["brief"],
+                                 research=ctx.cat.get("research", "optional"))
+            got = self.ask(ctx, system, f"THE TOPIC IS ALREADY CHOSEN by the owner. Keep it exactly.\n"
+                                        f"Topic: {e['topic']}\nAngle: {out['angle']}\nPost date: {ctx.day.isoformat()}\n"
+                                        f"Give why_now and the search_queries for this topic.", SCHEMA,
+                           ["WebSearch"] if ctx.cat.get("research") == "required" else [])
+            out.update(why_now=got.get("why_now", out["why_now"]), search_queries=got.get("search_queries", []))
+        return out
 
     def _algorithm(self, ctx):
         texts = [f"{p.get('topic', '')} {p.get('text', '')}" for p in ctx.recent(200)]
@@ -64,7 +88,7 @@ class TopicAgent(Agent):
             problems.append(f"topic must be 5-90 characters (got {len(topic)})")
         if not (out.get("angle") or "").strip():
             problems.append("angle is empty: say what the reader will learn or be able to do")
-        if ctx.category != "week-recap":
+        if ctx.category != "week-recap" and out.get("planned") != "manual":  # the owner's own choice stands
             dup = repeat_problem(topic, "", ctx.recent(60))
             if dup:
                 problems.append(dup + "; pick a different topic")

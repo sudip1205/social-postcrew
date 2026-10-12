@@ -35,6 +35,7 @@ flowchart LR
 
 | Agent | Does | Validated by |
 |---|---|---|
+| Week Planner | once a week, drafts the topic for every day of next week so you can edit any day or ask for another | no repeats of published, planned or rejected topics |
 | Credential Monitor | LinkedIn token valid and not expiring? Claude Code logged in? | free API check, `claude auth status` |
 | Topic Scout | picks the topic for the day's category, never a repeat | length, similarity to the last 60 posts |
 | Researcher | chooses primary sources with WebSearch, the program downloads them, then quotes them verbatim | every quote must be on the downloaded page; every fact needs a quote; recency |
@@ -79,6 +80,7 @@ you turn that off.
 
 | Tab | What you can do |
 |---|---|
+| Plan | every day until the end of next week: edit a topic, or ask the Week Planner for a different one (with an optional hint) |
 | Overview | next post and run, LinkedIn status, start a run or rehearsal, pause the schedule, recent runs |
 | Workflow | live graph of the crew (state, tries, cost per agent, sent-back arrows), the Supervisor's decisions, each agent's output and rendered media, the full event log |
 | Queue | LinkedIn-style preview of every queued post: approve, edit, veto, publish now; the published history |
@@ -134,6 +136,8 @@ The Studio listens on `127.0.0.1` only. On a remote machine, reach it with an SS
 python3 -m postcrew init | serve | doctor | check | status
 python3 -m postcrew run [--date YYYY-MM-DD] [--category ai-news] [--dry-run]
 python3 -m postcrew publish
+python3 -m postcrew plan                 # draft next week's topics now
+python3 -m postcrew import posts.json    # posts published elsewhere ({"posts": [{"date", "topic", "text"}]}), never repeated
 ```
 
 ## Costs

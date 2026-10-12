@@ -89,7 +89,7 @@ class Agent:
             res = ctx.llm.call(self.id, system, prompt, schema, tools=tools, cwd=str(ctx.run.dir))
         except LLMError as e:
             ctx.run.add_cost(self.id, e.cost_usd)
-            raise AgentError(f"LLM {e.kind}: {e}", fatal=e.kind in ("not_installed", "auth"))
+            raise AgentError(f"LLM {e.kind}: {e}", fatal=e.kind in ("not_installed", "auth", "limit"))
         ctx.run.add_cost(self.id, res.cost_usd)
         ctx.run.event(self.id, "llm", f"{res.model or 'model'} answered in {res.duration_s}s "
                                       f"(${res.cost_usd:.4f}, {res.turns} turns)",
@@ -105,5 +105,8 @@ def guidance_block(guidance):
 
 
 def recent_block(ctx, n=15):
-    rows = [f"- {p.get('date', '')} [{p.get('category', '')}] {p.get('topic', '')}" for p in ctx.recent(n)]
+    def hook(p):
+        line = next((s.strip() for s in (p.get("text") or "").splitlines() if s.strip()), "")
+        return f' - "{line[:110]}"' if line else ""
+    rows = [f"- {p.get('date', '')} [{p.get('category') or '?'}] {p.get('topic', '')}{hook(p)}" for p in ctx.recent(n)]
     return "\n".join(rows) or "- (no posts yet)"

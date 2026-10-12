@@ -44,7 +44,7 @@ function setTab(tab) {
   S.tab = tab;
   document.querySelectorAll("#tabs a").forEach(a => a.classList.toggle("active", a.dataset.tab === tab));
   clearInterval(S.poll); S.poll = null;
-  ({ overview: renderOverview, workflow: renderWorkflow, queue: renderQueue, settings: renderSettings,
+  ({ overview: renderOverview, plan: renderPlan, workflow: renderWorkflow, queue: renderQueue, settings: renderSettings,
      credentials: renderCredentials }[tab] || renderOverview)();
 }
 window.addEventListener("hashchange", () => setTab(location.hash.slice(1).split("/")[0] || "overview"));
@@ -314,6 +314,53 @@ async function editPost(id) {
   };
 }
 
+/* ---------- week plan ---------- */
+async function renderPlan() {
+  const d = await api("/api/plan");
+  const src = { planner: ["queued", "Planner"], manual: ["approved", "You"], auto: ["ok", "Automatic"] };
+  const row = r => {
+    if (!r.category) return `<tr class="muted"><td><b>${esc(r.weekday)}</b><div class="small">${esc(r.date)}</div></td><td colspan="3" class="small">No post scheduled</td></tr>`;
+    const head = `<td><b>${esc(r.weekday)}</b><div class="small muted">${esc(r.date)}</div></td><td class="small">${esc(r.label)}</td>`;
+    if (r.written) return `<tr>${head}<td><b>${esc(r.written.topic)}</b><div class="small muted">Already written. Change it in the Queue.</div></td><td>${chip(r.written.status)}</td></tr>`;
+    const e = r.entry, s = e ? src[e.source] || ["queued", e.source] : null;
+    const note = e ? (e.rejected?.length ? `Rejected before: ${e.rejected.map(esc).join("; ")}` : "")
+      : r.fixed ? "Chosen automatically when the plan is made." : r.plan_ahead ? "Not planned yet." : "Fresh news: the Topic Scout picks it the day before. Type a topic to choose it yourself.";
+    return `<tr data-day="${esc(r.date)}">${head}
+      <td><input class="p-topic" value="${esc(e?.topic || "")}" placeholder="${r.plan_ahead || r.fixed ? "Topic" : "Picked the day before (or type one)"}" maxlength="90">
+        <input class="p-angle small" style="margin-top:6px" value="${esc(e?.angle || "")}" placeholder="Angle: what the reader will learn (optional)" maxlength="400">
+        ${note ? `<div class="small muted" style="margin-top:4px">${note}</div>` : ""}
+        <div class="row" style="margin-top:6px"><input class="p-hint small" style="flex:1;min-width:180px" placeholder="Optional: what you'd like instead" maxlength="300">
+          <button class="p-suggest">Suggest another</button><button class="p-save primary">Save</button>${e ? `<button class="p-clear">Clear</button>` : ""}</div></td>
+      <td>${s ? chip(s[0], s[1]) : chip("pending", "open")}</td></tr>`;
+  };
+  $("#view").innerHTML = `<h1>Plan</h1><p class="sub">The topic for every day until the end of next week. The Week Planner drafts next week every
+    ${esc(DAY_NAMES[d.planning.weekday])} at ${esc(d.planning.time)}${d.planning.enabled ? "" : " (switched off in Settings)"}. Change any topic, or ask for a different one;
+    the Topic Scout writes about whatever is here.</p>
+    <div class="row" style="margin-bottom:12px"><button class="primary" id="p-fill">Plan open days now</button><span class="muted small" id="p-state">Next week: ${esc(d.next_week[0])} to ${esc(d.next_week[1])}</span></div>
+    <div class="panel"><table><thead><tr><th style="width:120px">Day</th><th style="width:180px">Category</th><th>Topic</th><th style="width:110px">From</th></tr></thead>
+    <tbody>${d.days.map(row).join("")}</tbody></table></div>`;
+  const busy = (b, on, label) => { document.querySelectorAll("#view button").forEach(x => x.disabled = on); if (label) $("#p-state").textContent = label; };
+  $("#p-fill").onclick = async () => {
+    busy(null, true, "The Week Planner is working (about a minute)…");
+    try { await post("/api/plan/fill"); toast("Plan updated"); } catch (e) { toast(e.message, true); }
+    renderPlan(); refreshOverview();
+  };
+  document.querySelectorAll("tr[data-day]").forEach(tr => {
+    const day = tr.dataset.day, q = s => tr.querySelector(s);
+    const save = async topic => {
+      try { await api(`/api/plan/${day}`, { method: "PUT", body: { topic, angle: topic ? q(".p-angle").value : "" } }); toast(topic ? "Saved" : "Cleared"); renderPlan(); }
+      catch (e) { toast(e.message, true); }
+    };
+    q(".p-save").onclick = () => save(q(".p-topic").value.trim());
+    if (q(".p-clear")) q(".p-clear").onclick = () => save("");
+    q(".p-suggest").onclick = async () => {
+      busy(null, true, `Asking the Week Planner for a new ${day} topic…`);
+      try { await post(`/api/plan/${day}/suggest`, { hint: q(".p-hint").value.trim() }); toast("New topic suggested"); } catch (e) { toast(e.message, true); }
+      renderPlan();
+    };
+  });
+}
+
 /* ---------- settings (configurator) ---------- */
 async function renderSettings() {
   const [{ config }, { agents }] = await Promise.all([api("/api/config"), api("/api/agents")]);
@@ -337,6 +384,10 @@ async function renderSettings() {
     <label class="f">Post is published at${inp("schedule.post_time", c.schedule.post_time, "time")}</label>
     <label class="f">Write how many days ahead${inp("schedule.lead_days", c.schedule.lead_days, "number", 'min="0" max="7"')}</label>
     <label class="f">Credential check at${inp("schedule.credential_check_time", c.schedule.credential_check_time, "time")}</label>
+  </div><h3>Week Planner</h3><div class="grid g4">
+    <label class="checkline" style="margin-top:20px"><input type="checkbox" data-k="planning.enabled" ${c.planning.enabled ? "checked" : ""}> Plan next week's topics automatically</label>
+    <label class="f">Plan on${sel("planning.weekday", c.planning.weekday, WEEKDAYS.map(d => [d, DAY_NAMES[d]]))}</label>
+    <label class="f">Plan at${inp("planning.time", c.planning.time, "time")}</label>
   </div><h3>What to post each day</h3><div class="days">${WEEKDAYS.map(d => `<label class="f">${DAY_NAMES[d]}${sel("schedule.days." + d, c.schedule.days[d] || "", [["", "No post"], ...cats.map(id => [id, c.categories[id].label])])}</label>`).join("")}</div>
   <datalist id="tzs">${(Intl.supportedValuesOf ? Intl.supportedValuesOf("timeZone") : []).map(z => `<option value="${esc(z)}">`).join("")}</datalist></div>
   <div class="panel section"><h2>Publishing</h2><div class="grid g3">
@@ -399,6 +450,7 @@ function drawCats() {
       <label class="f">Sources must be newer than (days)<input type="number" data-c="max_source_age_days" value="${esc(k.max_source_age_days ?? "")}" placeholder="any age"></label>
     </div>
     <label class="checkline" style="margin-top:8px"><input type="checkbox" data-c="fact_check" ${k.fact_check ? "checked" : ""}> Every number in the post must appear in a verified source</label>
+    <label class="checkline" style="margin-top:8px"><input type="checkbox" data-c="plan_ahead" ${k.plan_ahead !== false ? "checked" : ""}> Plan this topic a week ahead (untick for fresh news, picked the day before)</label>
     <label class="f" style="margin-top:8px">Brief: what this kind of post must contain<textarea data-c="brief">${esc(k.brief)}</textarea></label></div>`).join("");
   document.querySelectorAll("[data-delcat]").forEach(b => b.onclick = () => {
     if (!confirm(`Remove category ${b.dataset.delcat}?`)) return;

@@ -4,7 +4,7 @@ Everything here can be changed in the Studio (Settings tab) or by editing config
 Secrets (LinkedIn app, tokens, Telegram) never live here; they go to workspace/secrets.json.
 """
 
-AGENT_IDS = ["topic", "research", "writer", "media", "editor", "formatter", "publisher", "supervisor", "credentials"]
+AGENT_IDS = ["planner", "topic", "research", "writer", "media", "editor", "formatter", "publisher", "supervisor", "credentials"]
 
 DEFAULT_CONFIG = {
     "version": 1,
@@ -25,6 +25,12 @@ DEFAULT_CONFIG = {
         "days": {"mon": "algorithm", "tue": "ai-news", "wed": "build-guide", "thu": "tool-spotlight",
                  "fri": "security", "sat": "dev-tip", "sun": "week-recap"},
     },
+    "planning": {
+        # The Week Planner drafts next week's topics on this day, so you can review and change them.
+        "enabled": True,
+        "weekday": "mon",
+        "time": "10:00",
+    },
     "publishing": {
         # auto_with_veto: queued posts go out at post_time unless you veto them.
         # manual: nothing is published until you click Approve.  immediate: publish as soon as it passes review.
@@ -38,6 +44,7 @@ DEFAULT_CONFIG = {
         "claude_path": "claude",
         "defaults": {"model": "sonnet", "timeout_s": 600, "max_budget_usd": 1.0},
         "agents": {
+            "planner": {"model": "sonnet", "timeout_s": 600, "max_budget_usd": 1.0},
             "topic": {"model": "sonnet", "timeout_s": 300, "max_budget_usd": 0.5},
             "research": {"model": "sonnet", "timeout_s": 900, "max_budget_usd": 1.5},
             "writer": {"model": "sonnet", "timeout_s": 600, "max_budget_usd": 1.0},
@@ -73,7 +80,7 @@ DEFAULT_CONFIG = {
         "ai-news": {
             "label": "Latest AI news", "media": "poster", "layouts": ["points"], "kicker": "AI NEWS",
             "research": "required", "max_source_age_days": 10, "min_chars": 500, "max_chars": 1800,
-            "fact_check": True,
+            "fact_check": True, "plan_ahead": False,  # news a week old is stale: picked the day before
             "brief": "The most useful AI development of the last 7 days for working professionals. Hook with the key "
                      "fact; what happened (facts from the sources only); 'What it means in real life'; 2-3 concrete "
                      "things the reader could try, written as suggestions; a question; hashtags. first_comment = the "

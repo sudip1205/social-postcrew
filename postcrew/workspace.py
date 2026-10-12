@@ -100,6 +100,11 @@ def validate_config(cfg):
             errs.append(f"{where}: need 50 <= min_chars < max_chars <= 3000 (LinkedIn's limit)")
         if not str(c.get("brief", "")).strip():
             errs.append(f"{where}.brief: describe what this kind of post should contain")
+    pn = cfg.get("planning", {})
+    if pn.get("weekday") not in WEEKDAYS:
+        errs.append(f"planning.weekday must be one of {WEEKDAYS}")
+    if not TIME_RE.match(str(pn.get("time", ""))):
+        errs.append("planning.time must be HH:MM (24h)")
     p = cfg.get("publishing", {})
     if p.get("approval") not in APPROVAL_MODES:
         errs.append(f"publishing.approval must be one of {APPROVAL_MODES}")
