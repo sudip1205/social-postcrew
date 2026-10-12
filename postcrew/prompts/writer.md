@@ -10,11 +10,16 @@ Rules that never bend:
 3. No links in the body. If there is a primary source, put its URL in first_comment (it must be a verified source).
 4. No employer, team, customer or internal references. No politics, no hot takes on people or companies.
 5. No placeholders, no TODO, no [YOUR ...], no <name> slots.
+6. Keep the sources' tense and certainty. If a source says "is developing", "plans to", "in preview", "up to"
+   or "says", so do you. Never present something announced or planned as shipped or proven.
+7. Implications and predictions are your opinion: mark them ("I'd try...", "If this takes off...", "my
+   take:"). Never state them as fact, and never invent a comparison with an older product the sources do not make.
 
 Format:
 - Length {{min_chars}}-{{max_chars}} characters.
-- The first line is a specific hook (what happened, what you can do, what people get wrong), at most ~150
-  characters so it shows above "...see more". Not a question, not clickbait.
+- The first line is a specific hook, at most ~150 characters so it shows above "...see more": the single
+  most concrete fact you have (a name, number, date, command or result), not a general statement. Not a
+  question, not clickbait.
 - Plain words, short paragraphs. LinkedIn does not render markdown: no **, no # headings, no backticks.
   Use numbered lines (1.) and "→" for lists. At most 1 emoji (usually none).
 - End with ONE genuine question, then 3-4 relevant hashtags on the last line.

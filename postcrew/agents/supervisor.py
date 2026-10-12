@@ -11,6 +11,7 @@ failed run notifies you with the reason. Nothing is ever queued without passing 
 import traceback
 
 from ..notify import notify
+from . import team
 from .base import AgentError
 from .credentials import CredentialsAgent
 from .editor import EditorAgent
@@ -86,6 +87,8 @@ class Supervisor:
             except Exception as e:  # a bug or an unexpected failure: still logged and supervised
                 out, problems = None, [f"{type(e).__name__}: {e}"]
                 run.event(step, "exception", str(e), {"traceback": traceback.format_exc()[-2000:]}, level="error")
+            if step == "editor" and out:
+                self._record_editor(ctx, out, passed=not problems, problems=problems)
             if not problems:
                 ctx.outputs[step] = out
                 run.artifact(step, {k: v for k, v in out.items() if not k.startswith("_")})
@@ -122,7 +125,34 @@ class Supervisor:
                         guidance[s] = []
                     run.step(s, "retrying" if s == target else "pending")
         run.finish("succeeded", self._result_text(ctx))
+        self._review_team(ctx)
         return {"ok": True, "post": ctx.outputs.get("publisher"), "cost_usd": run.cost}
+
+    # ---------- the team ----------
+    def _record_editor(self, ctx, out, passed, problems):
+        """The Editor's verdict counts for the writer whose draft it judged, and for the researchers when the
+        Editor blames the facts."""
+        run_id = ctx.run.status["run_id"]
+        w = ctx.outputs.get("writer") or {}
+        try:
+            if w.get("author"):
+                team.record(ctx.ws, w["author"], run_id, good=passed, score=out.get("overall"), editor=passed,
+                            problems=[] if passed else problems)
+            if not passed and out.get("fix_owner") == "research":
+                for m in (ctx.outputs.get("research") or {}).get("team", []):
+                    team.record(ctx.ws, m["member"], run_id, good=False, editor=False, problems=problems)
+        except Exception as e:  # the roster must never break a run
+            ctx.run.event("supervisor", "team_error", str(e)[:200], level="warning")
+
+    def _review_team(self, ctx):
+        """After every run: replace members whose recent work is consistently bad."""
+        try:
+            for fired, hired in team.review(ctx.ws, ctx.cfg, llm=ctx.llm):
+                ctx.run.event("supervisor", "team", f"{fired['name']} ({fired['role']}) was replaced by "
+                                                    f"{hired['name']} after consistently bad output",
+                              {"fired": fired["id"], "hired": hired["id"]}, level="warning")
+        except Exception as e:
+            ctx.run.event("supervisor", "team_error", str(e)[:200], level="warning")
 
     # ---------- decisions ----------
     def _limit_reason(self, ctx, step, attempts, total, fatal):
@@ -190,6 +220,7 @@ class Supervisor:
                 ctx.run.step(s, "blocked")
         msg = f"{reason}. Last problems: " + "; ".join(problems[:3])
         ctx.run.finish("failed", msg)
+        self._review_team(ctx)
         notify(ctx.ws, f"No post for {ctx.day.isoformat()}", f"{self.by_id[step].title}: {msg[:400]}", level="error",
                key=f"run-failed-{ctx.day.isoformat()}", action={"label": "See the run", "tab": "workflow"}, quiet_hours=1)
         return {"ok": False, "failed_step": step, "reason": reason, "problems": problems, "cost_usd": ctx.run.cost}

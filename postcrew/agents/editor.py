@@ -30,8 +30,9 @@ SCHEMA = {
 }
 
 
-def review_material(ctx):
-    w, m, r = ctx.outputs["writer"], ctx.outputs.get("media") or {}, ctx.outputs.get("research") or {}
+def review_material(ctx, draft=None):
+    """draft: review this writer output instead of the accepted one (the writer team's pre-review)."""
+    w, m, r = draft or ctx.outputs["writer"], ctx.outputs.get("media") or {}, ctx.outputs.get("research") or {}
     parts = [f"CATEGORY: {ctx.cat['label']} (length target {ctx.cat['min_chars']}-{ctx.cat['max_chars']} chars)",
              f"WHAT THIS CATEGORY NEEDS: {ctx.cat['brief']}", "", "<draft>", "POST TEXT:", w["text"], "",
              f"FIRST COMMENT: {w.get('first_comment') or '(none)'}", "",

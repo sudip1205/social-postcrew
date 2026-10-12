@@ -66,12 +66,22 @@ class ScriptedLLM:
         self.script = {k: list(v) for k, v in script.items()}
         self.calls = []
         self.cost = cost
+        self.lock = __import__("threading").Lock()
 
-    def call(self, agent_id, system, prompt, schema, tools=(), cwd=None):
-        self.calls.append({"agent": agent_id, "prompt": prompt, "tools": list(tools), "system": system})
+    def call(self, agent_id, system, prompt, schema, tools=(), cwd=None, model=None, member=None):
+        with self.lock:
+            return self._call(agent_id, system, prompt, schema, tools, model, member)
+
+    def _call(self, agent_id, system, prompt, schema, tools, model, member):
+        self.calls.append({"agent": agent_id, "prompt": prompt, "tools": list(tools), "system": system,
+                           "model": model, "member": member})
         key = agent_id
+        if member and f"{agent_id}@{member}" in self.script:   # an answer for one team member
+            key = f"{agent_id}@{member}"
         if agent_id == "research" and "candidates" in schema.get("properties", {}):
             key = "research_search"  # phase 1 of research: choosing pages
+            if member and f"research_search@{member}" in self.script:
+                key = f"research_search@{member}"
         q = self.script.get(key) or ([{"candidates": [{"url": PAGE_URL, "title": "Acme", "why": "launch"}],
                                        "notes": ""}] if key == "research_search" else None)
         if not q:
@@ -139,6 +149,7 @@ class TempWorkspace:
         cfg = ws.config()
         cfg["notifications"]["desktop"] = False
         cfg["profile"]["handle"] = "example.com/test"
+        cfg["team"].update(research=1, writer=1, pre_review=False)  # the crew tests use one of each
         cfg["llm"]["claude_path"] = "/nonexistent/claude"  # a test that forgets to fake the LLM fails, never calls Claude
         ws.save_config(cfg)
         self.ws = ws

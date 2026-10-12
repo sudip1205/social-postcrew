@@ -4,7 +4,7 @@ Everything here can be changed in the Studio (Settings tab) or by editing config
 Secrets (LinkedIn app, tokens, Telegram) never live here; they go to workspace/secrets.json.
 """
 
-AGENT_IDS = ["planner", "topic", "research", "writer", "media", "editor", "formatter", "publisher", "supervisor", "credentials"]
+AGENT_IDS = ["planner", "topic", "research", "writer", "reviewer", "media", "editor", "formatter", "publisher", "supervisor", "credentials"]
 
 DEFAULT_CONFIG = {
     "version": 1,
@@ -49,18 +49,27 @@ DEFAULT_CONFIG = {
             "topic": {"model": "sonnet", "timeout_s": 300, "max_budget_usd": 0.5},
             "research": {"model": "sonnet", "timeout_s": 900, "max_budget_usd": 1.5},
             "writer": {"model": "sonnet", "timeout_s": 600, "max_budget_usd": 1.0},
+            "reviewer": {"model": "haiku", "timeout_s": 300, "max_budget_usd": 0.3},
             "media": {"model": "haiku", "timeout_s": 300, "max_budget_usd": 0.3},
             "editor": {"model": "haiku", "timeout_s": 300, "max_budget_usd": 0.3},
             "supervisor": {"model": "haiku", "timeout_s": 180, "max_budget_usd": 0.2},
         },
     },
     "pipeline": {
-        "max_attempts_per_step": 3,     # tries per agent before the supervisor gives up on it
-        "max_total_attempts": 10,       # tries across the whole run (rewinds included)
+        "max_attempts_per_step": 4,     # tries per agent before the supervisor gives up on it
+        "max_total_attempts": 16,       # tries across the whole run (rewinds included)
         "max_run_budget_usd": 5.0,      # hard stop for one post
         "review_runs": 3,               # the editor reviews this many times and keeps the worst score
         "min_overall": 80,
         "min_subscore": 70,
+    },
+    "team": {
+        # Several Researchers and Writers work on each post; the best combination goes to the Editor.
+        "research": 2,                  # researchers per post; their verified sources are combined
+        "writer": 2,                    # writers per post; the best draft is chosen
+        "pre_review": True,             # score every draft (and polish the best one) before the Editor sees it
+        "fire_window": 6,               # judge a member on their last N posts ...
+        "fire_min_success": 0.34,       # ... and replace them if fewer than this share were good
     },
     "notifications": {
         "desktop": True,                 # macOS / Linux desktop notification
@@ -82,10 +91,13 @@ DEFAULT_CONFIG = {
             "label": "Latest AI news", "media": "poster", "layouts": ["points"], "kicker": "AI NEWS",
             "research": "required", "max_source_age_days": 10, "min_chars": 500, "max_chars": 1800,
             "fact_check": True, "plan_ahead": False,  # news a week old is stale: picked the day before
-            "brief": "The most useful AI development of the last 7 days for working professionals. Hook with the key "
-                     "fact; what happened (facts from the sources only); 'What it means in real life'; 2-3 concrete "
-                     "things the reader could try, written as suggestions; a question; hashtags. first_comment = the "
-                     "primary source URL.",
+            "brief": "The most useful AI development of the last 7 days for working professionals. Hook: the single "
+                     "most concrete sourced fact (a name, number, date or capability), not a general statement. What "
+                     "happened: facts from the sources only, in the sources' own tense and with their qualifiers "
+                     "(announced, plans to, in preview, says). 'What it means in real life': clearly your opinion "
+                     "('I'd try...', 'If this takes off...') or a quoted fact, never a prediction stated as fact. 2-3 "
+                     "concrete things the reader could try, written as suggestions; a question; hashtags. "
+                     "first_comment = the primary source URL.",
         },
         "build-guide": {
             "label": "Complete how-to: build something cool", "media": "poster", "layouts": ["steps"],

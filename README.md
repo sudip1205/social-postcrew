@@ -38,12 +38,17 @@ flowchart LR
 | Week Planner | drafts the topic for every remaining day of the current week so you can edit any day or ask for another | no repeats of published, planned or rejected topics |
 | Credential Monitor | LinkedIn token valid and not expiring? Claude Code logged in? | free API check, `claude auth status` |
 | Topic Scout | picks the topic for the day's category, never a repeat | length, similarity to the last 60 posts |
-| Researcher | chooses primary sources with WebSearch, the program downloads them, then quotes them verbatim | every quote must be on the downloaded page; every fact needs a quote; recency |
-| Writer | writes the post from verified facts only, in your voice | length, hook, no markdown, no hype words, no placeholders, no invented experience, unsourced numbers, stray links |
+| Research team | 2 researchers (by default) each choose primary sources with WebSearch; the program downloads them; each quotes them verbatim; their verified work is combined | every quote must be on the downloaded page; every fact needs a quote; recency |
+| Writer team | 2 writers (by default) each draft the post from verified facts only, in your voice and their own style; a pre-review scores each draft like the Editor; the best is polished once and goes on | length, hook, no markdown, no hype words, no placeholders, no invented experience, unsourced numbers, stray links |
 | Visual Designer | poster spec (rendered with Pillow) or algorithm animation (ffmpeg) | it renders and fits, layout allowed, code parses, numbers sourced |
 | Editor Review | scores accuracy, clarity, hook, value, tone, format; flags real problems | worst of 3 reviews must reach your thresholds with no red flag |
 | Formatter | LinkedIn formatting: hook above "...see more", links to the first comment, hashtags last | 3,000-character limit, fold length |
 | Publisher | queues for post time (or your approval) and posts with native image/video | credentials re-checked right before posting |
+
+**The team learns.** Every member's work is recorded on the roster. A member whose recent posts are
+consistently bad (by default fewer than a third of their last 6) is replaced; the team writes down what went
+wrong as short lessons, and the new hire and every colleague in that role follow them from then on. See the
+**Team** tab to watch scores, replace or hire members, and edit the lessons.
 
 When a step fails, the Supervisor reads the problems and the outputs so far and decides: **retry** with
 specific instructions, **rewind** to an earlier agent (for example: the Editor found an unsupported claim →
@@ -80,6 +85,7 @@ you turn that off.
 
 | Tab | What you can do |
 |---|---|
+| Team | the researchers and writers, their recent results, who is at risk; replace or hire members; the lessons learned from past mistakes |
 | Plan | this week, Monday to Sunday: edit any topics and save them together, or ask the Week Planner for a different one (with an optional hint) |
 | Overview | next post and run, LinkedIn status, start a run or rehearsal, pause the schedule, recent runs |
 | Workflow | live graph of the crew (state, tries, cost per agent, sent-back arrows), the Supervisor's decisions, each agent's output and rendered media, the full event log |

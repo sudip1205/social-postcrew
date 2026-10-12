@@ -84,16 +84,22 @@ class Agent:
             text = text.replace("{{" + k + "}}", str(v))
         return text
 
-    def ask(self, ctx, system, prompt, schema, tools=()):
+    def ask(self, ctx, system, prompt, schema, tools=(), member=None, agent_id=None):
+        """member: a team member dict (their model, if any, overrides the agent's). agent_id: settings to use."""
+        aid = agent_id or self.id
+        kw = {"member": member["id"]} if member else {}
+        if member and member.get("model"):
+            kw["model"] = member["model"]
         try:
-            res = ctx.llm.call(self.id, system, prompt, schema, tools=tools, cwd=str(ctx.run.dir))
+            res = ctx.llm.call(aid, system, prompt, schema, tools=tools, cwd=str(ctx.run.dir), **kw)
         except LLMError as e:
             ctx.run.add_cost(self.id, e.cost_usd)
             raise AgentError(f"LLM {e.kind}: {e}", fatal=e.kind in ("not_installed", "auth", "limit"))
         ctx.run.add_cost(self.id, res.cost_usd)
-        ctx.run.event(self.id, "llm", f"{res.model or 'model'} answered in {res.duration_s}s "
+        who = f"{member['name']}: " if member else ""
+        ctx.run.event(self.id, "llm", f"{who}{res.model or 'model'} answered in {res.duration_s}s "
                                       f"(${res.cost_usd:.4f}, {res.turns} turns)",
-                      {"cost_usd": res.cost_usd, "model": res.model, "turns": res.turns})
+                      {"cost_usd": res.cost_usd, "model": res.model, "turns": res.turns, "member": kw.get("member")})
         return res.data
 
 

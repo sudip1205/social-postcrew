@@ -104,6 +104,12 @@ def validate_config(cfg):
         if not (isinstance(ideas, list) and len(ideas) <= 60 and all(isinstance(i, str) and 3 <= len(i) <= 150
                                                                      for i in ideas)):
             errs.append(f"{where}.ideas: up to 60 topic ideas, each 3-150 characters")
+    tm = cfg.get("team", {})
+    for k, lo, hi in (("research", 1, 4), ("writer", 1, 4), ("fire_window", 3, 20)):
+        if not (isinstance(tm.get(k), int) and lo <= tm[k] <= hi):
+            errs.append(f"team.{k} must be a whole number {lo}-{hi}")
+    if not (isinstance(tm.get("fire_min_success"), (int, float)) and 0 <= tm["fire_min_success"] <= 1):
+        errs.append("team.fire_min_success must be between 0 and 1")
     pn = cfg.get("planning", {})
     if pn.get("weekday") not in WEEKDAYS:
         errs.append(f"planning.weekday must be one of {WEEKDAYS}")

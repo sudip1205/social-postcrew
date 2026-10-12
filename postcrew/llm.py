@@ -50,8 +50,10 @@ class ClaudeCode:
     def available(self):
         return shutil.which(self.binary) is not None
 
-    def command(self, agent_id, system, schema, tools):
+    def command(self, agent_id, system, schema, tools, model=None):
         s = agent_settings(self.cfg, agent_id)
+        if model:
+            s["model"] = model
         cmd = [self.binary, "-p", "--output-format", "json", "--no-session-persistence",
                "--restricted", "--strict-mcp-config",
                "--model", str(s.get("model", "sonnet")),
@@ -63,11 +65,12 @@ class ClaudeCode:
             cmd += ["--allowedTools", ",".join(tools)]
         return cmd, int(s.get("timeout_s", 600))
 
-    def call(self, agent_id, system, prompt, schema, tools=(), cwd=None):
+    def call(self, agent_id, system, prompt, schema, tools=(), cwd=None, model=None, member=None):
+        """model: override the agent's model (a team member's own model). member: for logs and test doubles."""
         if not self.available():
             raise LLMError(f"Claude Code CLI '{self.binary}' not found. Install it (https://claude.com/claude-code) "
                            f"and run `claude` once to log in.", kind="not_installed")
-        cmd, timeout = self.command(agent_id, system, schema, list(tools))
+        cmd, timeout = self.command(agent_id, system, schema, list(tools), model)
         t0 = time.time()
         try:
             r = self.runner(cmd, input=prompt, capture_output=True, text=True, timeout=timeout, cwd=cwd)

@@ -316,6 +316,25 @@ class StudioTests(unittest.TestCase):
         self.assertEqual(self.req("POST", "/api/history/remove", {"id": h["id"], "date": h["date"],
                                                                   "topic": h["topic"]})[0], 404)
 
+    def test_team_view_replace_hire_and_lessons(self):
+        from postcrew.agents import team
+        code, d = self.req("GET", "/api/team")
+        self.assertEqual(code, 200)
+        self.assertEqual([m["name"] for m in d["members"]], ["Ada", "Ravi", "Maya", "Leo"])
+        self.assertEqual([m["working"] for m in d["members"] if m["role"] == "research"], [True, False])  # 1 per post
+        team.record(self.ws, "writer-leo", "r1", good=False, problems=["vague hook"])
+        with mock.patch("postcrew.llm.make_backend", side_effect=RuntimeError("offline")):
+            code, d = self.req("POST", "/api/team/fire", {"id": "writer-leo"})
+        self.assertEqual(code, 200)
+        self.assertEqual([m["name"] for m in d["members"] if m["role"] == "writer"], ["Maya", "Nora"])
+        self.assertEqual(d["lessons"]["writer"], ["Avoid this past problem: vague hook"])
+        code, d = self.req("POST", "/api/team/hire", {"role": "writer"})
+        self.assertEqual(len([m for m in d["members"] if m["role"] == "writer"]), 3)
+        self.assertEqual(self.ws.config()["team"]["writer"], 2)          # one more works on each post
+        code, d = self.req("POST", "/api/team/lesson-remove", {"role": "writer", "index": 0})
+        self.assertEqual(d["lessons"]["writer"], [])
+        self.assertEqual(self.req("POST", "/api/team/hire", {"role": "boss"})[0], 400)
+
     def test_gmail_settings_and_test_email(self):
         self.assertEqual(self.req("POST", "/api/notifications/test-email")[1]["ok"], False)
         self.assertEqual(self.req("PUT", "/api/credentials", {"gmail_address": "not-an-email"})[0], 400)

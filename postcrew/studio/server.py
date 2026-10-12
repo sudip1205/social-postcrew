@@ -17,6 +17,7 @@ from urllib.parse import parse_qs, urlparse
 
 from .. import __version__, crew, linkedin, notify as notify_mod
 from ..agents import planner as planner_mod
+from ..agents import team as team_mod
 from ..agents.credentials import run_check
 from ..agents.publisher import publish_one, scheduled_at
 from ..agents.supervisor import CREW, Supervisor
@@ -61,6 +62,10 @@ class Studio:
         for a in [planner_mod.PlannerAgent()] + CREW + [Supervisor()]:
             rows.append({"id": a.id, "title": a.title, "role": a.role, "uses_llm": getattr(a, "uses_llm", True),
                          "llm": agent_settings(cfg, a.id) if getattr(a, "uses_llm", True) else None})
+            if a.id == "writer":
+                rows.append({"id": "reviewer", "title": "Pre-reviewer", "uses_llm": True,
+                             "role": "Scores every draft the way the Editor will, so the best one goes on.",
+                             "llm": agent_settings(cfg, "reviewer")})
         return {"agents": rows, "steps": STEPS}
 
     def run_detail(self, run_id, after):
@@ -176,6 +181,40 @@ class Studio:
         else:
             planner_mod.plan_week(self.ws, crew.local_now(self.ws.config()).date())
         return self.plan()
+
+    # ---------- team ----------
+    def team(self):
+        cfg = self.ws.config()
+        data = team_mod.load(self.ws)
+        size = {r: cfg["team"][r] for r in team_mod.ROLES}
+        rows = []
+        for m in data["members"]:
+            same = [x["id"] for x in data["members"] if x["role"] == m["role"]]
+            v = team_mod.verdicts(m, cfg["team"]["fire_window"])
+            rows.append(dict(m, working=same.index(m["id"]) < size[m["role"]], at_risk=len(v) >= 3 and
+                             sum(v) / len(v) < cfg["team"]["fire_min_success"], window=v))
+        return {"members": rows, "fired": data["fired"][::-1], "lessons": data["lessons"], "size": size,
+                "rules": {k: cfg["team"][k] for k in ("fire_window", "fire_min_success", "pre_review")}}
+
+    def team_action(self, action, body):
+        role = body.get("role")
+        if action == "fire":
+            team_mod.fire(self.ws, body.get("id", ""), self.ws.config(),
+                          reason=(body.get("reason") or "replaced from the Studio")[:200])
+        elif action == "hire":
+            if role not in team_mod.ROLES:
+                raise ValueError("role must be research or writer")
+            if sum(1 for m in team_mod.load(self.ws)["members"] if m["role"] == role) >= 4:
+                raise ValueError("a team has at most 4 members; replace one instead")
+            team_mod.hire(self.ws, role)
+            cfg = self.ws.config()
+            cfg["team"][role] = min(4, cfg["team"][role] + 1)
+            self.ws.save_config(cfg)
+        elif action == "lesson-remove":
+            team_mod.remove_lesson(self.ws, role, int(body.get("index", -1)))
+        else:
+            raise ValueError(f"unknown action {action}")
+        return self.team()
 
     # ---------- published list ----------
     def history_add(self, body):
@@ -408,6 +447,9 @@ def make_handler(studio):
                         return self.file(ws.runs_dir / run_id / name, ws.runs_dir / run_id)
                     d = studio.run_detail(run_id, float(q.get("after", 0)))
                     return self.send(200, d) if d else self.send(404, {"error": "no such run"})
+                m = re.match(r"^/api/team/(fire|hire|lesson-remove)$", p)
+                if m and method == "POST":
+                    return self.send(200, studio.team_action(m.group(1), self.body()))
                 m = re.match(r"^/api/plan/(\d{4}-\d{2}-\d{2})(?:/(suggest))?$", p)
                 if m and method in ("PUT", "POST"):
                     fn = studio.plan_suggest if m.group(2) else studio.plan_edit
@@ -418,6 +460,7 @@ def make_handler(studio):
                 routes = {
                     ("GET", "/api/overview"): lambda: studio.overview(),
                     ("GET", "/api/plan"): lambda: studio.plan(),
+                    ("GET", "/api/team"): lambda: studio.team(),
                     ("PUT", "/api/plan"): lambda: studio.plan_save(self.body()),
                     ("POST", "/api/plan/fill"): lambda: studio.plan_fill(self.body()),
                     ("GET", "/api/agents"): lambda: studio.agents(),

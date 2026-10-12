@@ -44,7 +44,7 @@ function setTab(tab) {
   S.tab = tab;
   document.querySelectorAll("#tabs a").forEach(a => a.classList.toggle("active", a.dataset.tab === tab));
   clearInterval(S.poll); S.poll = null;
-  ({ overview: renderOverview, plan: renderPlan, workflow: renderWorkflow, queue: renderQueue, settings: renderSettings,
+  ({ overview: renderOverview, plan: renderPlan, team: renderTeam, workflow: renderWorkflow, queue: renderQueue, settings: renderSettings,
      credentials: renderCredentials }[tab] || renderOverview)();
 }
 window.addEventListener("hashchange", () => setTab(location.hash.slice(1).split("/")[0] || "overview"));
@@ -407,6 +407,49 @@ async function renderPlan() {
   });
 }
 
+/* ---------- team ---------- */
+async function renderTeam() {
+  const d = await api("/api/team");
+  const ROLE = { research: "Researchers", writer: "Writers" };
+  const dots = m => m.window.map(g => `<span class="dot-${g ? "ok" : "bad"}" title="${g ? "good" : "bad"}"></span>`).join("") || `<span class="muted small">no posts yet</span>`;
+  const card = m => {
+    const s = m.stats, last = m.recent.at(-1);
+    return `<div class="topic member${m.working ? "" : " bench"}">
+      <div class="row"><b style="font-size:15px">${esc(m.name)}</b>${m.working ? chip("ok", "working") : chip("pending", "on the bench")}
+        ${m.at_risk ? chip("warning", "at risk") : ""}<span class="spacer"></span>
+        <button class="danger small" data-fire="${esc(m.id)}" data-name="${esc(m.name)}">Replace</button></div>
+      <p class="small" style="margin:6px 0">${esc(m.persona)}</p>
+      <div class="row small"><span class="muted">Last ${d.rules.fire_window} posts:</span> ${dots(m)}</div>
+      <div class="small muted" style="margin-top:4px">${s.tries} post(s) · ${s.good} good${m.role === "writer" ? ` · chosen ${s.chosen}× · Editor passed ${s.editor_passed}, failed ${s.editor_failed}` : ""}
+        ${m.model ? ` · model ${esc(m.model)}` : ""} · joined ${esc(fmtTime(m.hired_at))}</div>
+      ${last && !last.good && last.problems?.length ? `<div class="small" style="margin-top:6px;color:var(--bad)">Last problem: ${esc(last.problems[0].slice(0, 180))}</div>` : ""}
+    </div>`;
+  };
+  $("#view").innerHTML = `<h1>Team</h1><p class="sub">Several researchers and writers work on every post. Researchers' verified sources are combined;
+    writers compete, ${d.rules.pre_review ? "every draft is pre-reviewed and the best is polished, " : ""}and only the best goes to the Editor.
+    A member is replaced automatically when fewer than ${Math.round(d.rules.fire_min_success * 100)}% of their last ${d.rules.fire_window} posts were good;
+    the new hire learns from the mistakes.</p>
+    ${["research", "writer"].map(r => `<div class="panel section"><div class="row"><h2 style="margin:0">${ROLE[r]}</h2>
+      <span class="muted small">${d.size[r]} work on each post</span><span class="spacer"></span><button data-hire="${r}">Hire another</button></div>
+      <div class="grid g2" style="margin-top:12px">${d.members.filter(m => m.role === r).map(card).join("")}</div>
+      <h3>Lessons every ${r === "research" ? "researcher" : "writer"} follows</h3>
+      ${(d.lessons[r] || []).length ? `<ul class="lessons">${d.lessons[r].map((l, i) => `<li><span>${esc(l)}</span> <button class="small" data-lesson="${r}:${i}">Remove</button></li>`).join("")}</ul>`
+        : `<p class="muted small">None yet. When a member is replaced, the team writes down what went wrong.</p>`}</div>`).join("")}
+    <div class="panel section"><h2>Former members</h2>${d.fired.length ? `<table><thead><tr><th>Name</th><th>Role</th><th>Left</th><th>Why</th><th>Lessons they left</th></tr></thead><tbody>${
+      d.fired.map(f => `<tr><td><b>${esc(f.name)}</b></td><td class="small">${esc(f.role)}</td><td class="small">${esc(fmtTime(f.fired_at))}</td>
+        <td class="small">${esc(f.reason)}</td><td class="small">${(f.lessons || []).map(esc).join("<br>")}</td></tr>`).join("")}</tbody></table>`
+      : `<div class="empty">Nobody has been replaced.</div>`}</div>`;
+  const act = async (path, body, msg) => { try { await post(path, body); toast(msg); } catch (e) { toast(e.message, true); } renderTeam(); };
+  document.querySelectorAll("[data-fire]").forEach(b => b.onclick = () => {
+    if (!confirm(`Replace ${b.dataset.name}? A new member is hired with lessons from ${b.dataset.name}'s mistakes.`)) return;
+    b.disabled = true; act("/api/team/fire", { id: b.dataset.fire }, `${b.dataset.name} was replaced`);
+  });
+  document.querySelectorAll("[data-hire]").forEach(b => b.onclick = () => act("/api/team/hire", { role: b.dataset.hire }, "Hired"));
+  document.querySelectorAll("[data-lesson]").forEach(b => b.onclick = () => {
+    const [role, index] = b.dataset.lesson.split(":"); act("/api/team/lesson-remove", { role, index: +index }, "Lesson removed");
+  });
+}
+
 /* ---------- settings (configurator) ---------- */
 async function renderSettings() {
   const [{ config }, { agents }, planInfo] = await Promise.all([api("/api/config"), api("/api/agents"), api("/api/plan")]);
@@ -477,6 +520,13 @@ async function renderSettings() {
       <label class="f">Tries per agent${inp("pipeline.max_attempts_per_step", c.pipeline.max_attempts_per_step, "number", 'min="1" max="10"')}</label>
       <label class="f">Tries per post (all agents)${inp("pipeline.max_total_attempts", c.pipeline.max_total_attempts, "number", 'min="1" max="40"')}</label>
       <label class="f">Max $ per post${inp("pipeline.max_run_budget_usd", c.pipeline.max_run_budget_usd, "number", 'step="0.5" min="0.5" max="100"')}</label>
+    </div>
+    <h3>Team</h3><div class="grid g3">
+      <label class="f">Researchers per post${inp("team.research", c.team.research, "number", 'min="1" max="4"')}</label>
+      <label class="f">Writers per post${inp("team.writer", c.team.writer, "number", 'min="1" max="4"')}</label>
+      <div style="padding-top:22px">${check("team.pre_review", c.team.pre_review, "Pre-review and polish drafts before the Editor")}</div>
+      <label class="f">Judge members on their last (posts)${inp("team.fire_window", c.team.fire_window, "number", 'min="3" max="20"')}</label>
+      <label class="f">Replace a member below (share of good posts, 0-1)${inp("team.fire_min_success", c.team.fire_min_success, "number", 'step="0.05" min="0" max="1"')}</label>
     </div>
     <h3>Other</h3><div class="grid g3">
       <label class="f">Write how many days ahead${inp("schedule.lead_days", c.schedule.lead_days, "number", 'min="0" max="7"')}</label>

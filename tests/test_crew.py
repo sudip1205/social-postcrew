@@ -122,7 +122,7 @@ class CrewTests(unittest.TestCase):
             self.assertFalse(res["ok"])
             self.assertEqual(res["failed_step"], "writer")
             st = status(ws, res["run_id"])
-            self.assertEqual(st["steps"]["writer"]["attempts"], 3)
+            self.assertEqual(st["steps"]["writer"]["attempts"], ws.config()["pipeline"]["max_attempts_per_step"])
             self.assertEqual(st["steps"]["publisher"]["state"], "blocked")
             self.assertEqual(ws.queue(), [])
             notes = ws.state("notifications")["items"]
