@@ -26,7 +26,7 @@ DEFAULT_CONFIG = {
                  "fri": "security", "sat": "dev-tip", "sun": "week-recap"},
     },
     "planning": {
-        # The Week Planner drafts next week's topics on this day, so you can review and change them.
+        # The Week Planner drafts the rest of this week's topics on this day, so you can review and change them.
         "enabled": True,
         "weekday": "mon",
         "time": "10:00",

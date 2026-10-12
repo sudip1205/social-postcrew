@@ -1,5 +1,5 @@
-"""Week Planner: drafts the topic for every day of next week, a week ahead, so you can review, edit or swap any
-of them before the crew writes the post. The plan lives in state/plan.json; the Topic Scout uses a day's planned
+"""Week Planner: drafts the topic for every remaining day of the current week (Monday-Sunday), so you can review,
+edit or swap any of them before the crew writes the post. The plan lives in state/plan.json; the Topic Scout uses a day's planned
 topic instead of picking one itself.
 
 Each plan entry: {"category", "topic", "angle", "search_queries", "source": planner|manual|auto, "rejected": [...]}.
@@ -56,10 +56,15 @@ def planned_for(ws, day, category):
     return e if e and e.get("category") == category and e.get("topic") else None
 
 
-def next_week(today):
-    """Monday-Sunday of the week after the one `today` is in."""
-    start = today + timedelta(days=7 - today.weekday())
+def this_week(today):
+    """Monday-Sunday of the week `today` is in."""
+    start = today - timedelta(days=today.weekday())
     return [start + timedelta(days=i) for i in range(7)]
+
+
+def days_left(today):
+    """The days still to plan this week: tomorrow to Sunday (today's post is already being written)."""
+    return [d for d in this_week(today) if d > today]
 
 
 def idea_status(ws, cfg=None):
@@ -97,7 +102,7 @@ def taken_dates(ws):
 class PlannerAgent(Agent):
     id = "planner"
     title = "Week Planner"
-    role = "Drafts every topic for next week a week ahead; you can edit any day or ask for a different topic."
+    role = "Drafts the topic for every remaining day of this week; you can edit any day or ask for another topic."
 
     def plan(self, ws, days, llm=None, hint="", force=False, replan=False):
         """Plan `days` (dates). force=True also plans fresh-news days and replaces existing entries, rejecting
@@ -235,14 +240,13 @@ def d_iso(item):
 
 
 def plan_week(ws, today, llm=None):
-    """The scheduler's weekly job: plan next week plus any unplanned day before it."""
-    days = [today + timedelta(days=i) for i in range(1, (next_week(today)[-1] - today).days + 1)]
-    out = PlannerAgent().plan(ws, days, llm=llm)
+    """The scheduler's weekly job: plan the open days left in the current week."""
+    out = PlannerAgent().plan(ws, days_left(today), llm=llm)
     if not out:
         return out
     bad = {k: e["error"] for k, e in out.items() if "error" in e}
     from ..notify import notify
-    notify(ws, "Next week's topics are ready" if not bad else "Some topics could not be planned",
+    notify(ws, "This week's topics are ready" if not bad else "Some topics could not be planned",
            f"{len(out) - len(bad)} day(s) planned" + (f"; {len(bad)} failed: {next(iter(bad.values()))}" if bad else "")
            + ". Review or change them in the Plan tab.", level="warning" if bad else "info",
            action={"label": "Open the plan", "tab": "plan"})

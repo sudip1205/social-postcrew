@@ -1,4 +1,4 @@
-"""Built-in scheduler (runs inside `postcrew serve`): plan next week's topics once a week, generate in the
+"""Built-in scheduler (runs inside `postcrew serve`): plan the week's topics once a week, generate in the
 evening, publish in the morning, check credentials daily. Uses the times in config.json; state survives restarts (state/scheduler.json).
 
 If you prefer cron/systemd, use the CLI instead: `postcrew run`, `postcrew publish`, `postcrew check`.
@@ -46,7 +46,7 @@ def tick(ws, now=None, runner=run_crew, publisher=publish_due, checker=run_check
         st["planned_on"] = today
         ws.save_state("scheduler", st)
         planner(ws, now.date())
-        did.append("plan next week")
+        did.append("plan this week")
 
     target = target_date(cfg, now)
     if (_passed(now, cfg["schedule"]["generate_time"]) and st.get("generated_for") != target.isoformat()

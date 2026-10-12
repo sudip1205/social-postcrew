@@ -94,16 +94,15 @@ class Studio:
 
     # ---------- week plan ----------
     def plan(self):
-        """Every day from today to the end of next week: category, planned topic, and whether it is written yet."""
+        """Monday-Sunday of the current week: category, planned topic, and whether it is written or past."""
         cfg = self.ws.config()
         today = crew.local_now(cfg).date()
-        last = planner_mod.next_week(today)[-1]
+        week = planner_mod.this_week(today)
         entries = planner_mod.load_plan(self.ws)
         queue = {p["date"]: p for p in self.ws.queue() if p.get("status") != "vetoed"}
         hist = {p.get("date"): p for p in self.ws.history() if not p.get("imported")}
         rows = []
-        for i in range((last - today).days + 1):
-            d = today + timedelta(days=i)
+        for d in week:
             iso, cat = d.isoformat(), cfg["schedule"]["days"].get(planner_mod.WEEKDAYS[d.weekday()]) or ""
             c = cfg["categories"].get(cat, {})
             done = hist.get(iso) or queue.get(iso)
@@ -111,33 +110,52 @@ class Studio:
                          "plan_ahead": c.get("plan_ahead", True), "fixed": c.get("media") == "animation" or cat == "week-recap",
                          "entry": entries.get(iso) if (entries.get(iso) or {}).get("category") == cat else None,
                          "written": ({"status": "published" if iso in hist else done.get("status"),
-                                      "topic": done.get("topic", "")} if done else None)})
-        return {"days": rows, "planning": cfg["planning"], "ideas": planner_mod.idea_status(self.ws, cfg), "next_week": [planner_mod.next_week(today)[0].isoformat(),
-                                                                         last.isoformat()]}
+                                      "topic": done.get("topic", "")} if done else None),
+                         "past": d <= today})
+        return {"days": rows, "planning": cfg["planning"], "ideas": planner_mod.idea_status(self.ws, cfg),
+                "week": [week[0].isoformat(), week[-1].isoformat()], "today": today.isoformat()}
 
     def _plan_day(self, day):
         datetime.strptime(day, "%Y-%m-%d")
         row = next((r for r in self.plan()["days"] if r["date"] == day), None)
         if not row or not row["category"]:
-            raise ValueError(f"{day} has no post scheduled (or is outside the plan)")
+            raise ValueError(f"{day} has no post scheduled (or is outside this week)")
+        if row["past"]:
+            raise ValueError(f"{day} is today or already past; its post is already being written")
         if row["written"]:
             raise ValueError(f"the {day} post is already written ({row['written']['status']}); edit it in the Queue")
         return row
 
+    def plan_save(self, body):
+        """Save several days at once: {"days": {date: {"topic", "angle"}}}. Checked first, then all saved."""
+        days = body.get("days")
+        if not isinstance(days, dict) or not days:
+            raise ValueError("nothing to save")
+        checked = []
+        for day, v in days.items():
+            row = self._plan_day(day)
+            topic, angle = (v.get("topic") or "").strip(), (v.get("angle") or "").strip()
+            if topic and (not 5 <= len(topic) <= 90 or len(angle) > 400):
+                raise ValueError(f"{row['weekday']}: the topic must be 5-90 characters and the angle under 400")
+            checked.append((day, row, topic, angle))
+        for day, row, topic, angle in checked:
+            self._set_topic(day, row, topic, angle)
+        return self.plan()
+
     def plan_edit(self, day, body):
-        row = self._plan_day(day)
-        topic, angle = (body.get("topic") or "").strip(), (body.get("angle") or "").strip()
+        return self.plan_save({"days": {day: body}})
+
+    def _set_topic(self, day, row, topic, angle):
+        old = row["entry"] or {}
         if not topic:
             planner_mod.set_entry(self.ws, day, None)
-            return self.plan()
-        if not 5 <= len(topic) <= 90 or len(angle) > 400:
-            raise ValueError("the topic must be 5-90 characters and the angle under 400")
-        old = row["entry"] or {}
+            return
+        if topic == old.get("topic") and angle == old.get("angle", ""):
+            return  # unchanged: keep who chose it
         planner_mod.set_entry(self.ws, day, {"category": row["category"], "topic": topic, "angle": angle,
                                              "search_queries": [] if topic != old.get("topic") else
                                              old.get("search_queries", []),
                                              "source": "manual", "rejected": old.get("rejected", [])})
-        return self.plan()
 
     def plan_suggest(self, day, body):
         self._plan_day(day)
@@ -151,8 +169,7 @@ class Studio:
         """Plan the open days; replan=True also replaces the planner's own topics (yours are kept)."""
         if (body or {}).get("replan"):
             today = crew.local_now(self.ws.config()).date()
-            days = [today + timedelta(days=i) for i in range(1, (planner_mod.next_week(today)[-1] - today).days + 1)]
-            out = planner_mod.PlannerAgent().plan(self.ws, days, replan=True)
+            out = planner_mod.PlannerAgent().plan(self.ws, planner_mod.days_left(today), replan=True)
             bad = [e["error"] for e in out.values() if "error" in e]
             if bad:
                 raise ValueError(f"{len(bad)} day(s) could not be re-planned: {bad[0]}")
@@ -378,6 +395,7 @@ def make_handler(studio):
                 routes = {
                     ("GET", "/api/overview"): lambda: studio.overview(),
                     ("GET", "/api/plan"): lambda: studio.plan(),
+                    ("PUT", "/api/plan"): lambda: studio.plan_save(self.body()),
                     ("POST", "/api/plan/fill"): lambda: studio.plan_fill(self.body()),
                     ("GET", "/api/agents"): lambda: studio.agents(),
                     ("GET", "/api/runs"): lambda: {"runs": crew.list_runs(ws)},

@@ -37,8 +37,8 @@ const fmtPost = s => esc(s).replace(/(^|\s)(#\w+)/g, '$1<span class="tag">$2</sp
 
 /* ---------- router ---------- */
 function setTab(tab) {
-  if (S.dirty && S.tab === "settings" && tab !== "settings" && !confirm("You have unsaved settings. Leave anyway?")) {
-    location.hash = "settings"; return;
+  if (S.dirty && ["settings", "plan"].includes(S.tab) && tab !== S.tab && !confirm("You have unsaved changes. Leave anyway?")) {
+    location.hash = S.tab; return;
   }
   S.dirty = false;
   S.tab = tab;
@@ -317,45 +317,68 @@ async function editPost(id) {
 /* ---------- week plan ---------- */
 async function renderPlan() {
   const d = await api("/api/plan");
+  S.dirty = false;
   const src = { planner: ["queued", "Planner"], manual: ["approved", "You"], auto: ["ok", "Automatic"] };
+  const fmtDay = iso => new Date(iso + "T12:00").toLocaleDateString([], { month: "short", day: "numeric" });
   const row = r => {
-    if (!r.category) return `<tr class="muted"><td><b>${esc(r.weekday)}</b><div class="small">${esc(r.date)}</div></td><td colspan="3" class="small">No post scheduled</td></tr>`;
-    const head = `<td><b>${esc(r.weekday)}</b><div class="small muted">${esc(r.date)}</div></td><td class="small">${esc(r.label)}</td>`;
-    if (r.written) return `<tr>${head}<td><b>${esc(r.written.topic)}</b><div class="small muted">Already written. Change it in the Queue.</div></td><td>${chip(r.written.status)}</td></tr>`;
+    const head = `<td><b>${esc(r.weekday)}</b><div class="small muted">${esc(fmtDay(r.date))}${r.date === d.today ? " · today" : ""}</div></td>`;
+    if (!r.category) return `<tr class="muted">${head}<td colspan="3" class="small">No post scheduled</td></tr>`;
+    const label = `<td class="small">${esc(r.label)}</td>`;
+    if (r.written) return `<tr>${head}${label}<td><b>${esc(r.written.topic)}</b><div class="small muted">Already written. Change it in the Queue.</div></td><td>${chip(r.written.status)}</td></tr>`;
+    if (r.past) return `<tr class="muted">${head}${label}<td class="small">${esc(r.entry?.topic || "")}${r.entry ? " · " : ""}Being written or past</td><td></td></tr>`;
     const e = r.entry, s = e ? src[e.source] || ["queued", e.source] : null;
     const note = e ? (e.rejected?.length ? `Rejected before: ${e.rejected.map(esc).join("; ")}` : "")
-      : r.fixed ? "Chosen automatically when the plan is made." : r.plan_ahead ? "Not planned yet." : "Fresh news: the Topic Scout picks it the day before. Type a topic to choose it yourself.";
-    return `<tr data-day="${esc(r.date)}">${head}
+      : r.fixed ? "Chosen automatically when you plan." : r.plan_ahead ? "Not planned yet." : "Fresh news: picked the day before, unless you type a topic.";
+    return `<tr data-day="${esc(r.date)}" data-topic="${esc(e?.topic || "")}" data-angle="${esc(e?.angle || "")}">${head}${label}
       <td><input class="p-topic" value="${esc(e?.topic || "")}" placeholder="${r.plan_ahead || r.fixed ? "Topic" : "Picked the day before (or type one)"}" maxlength="90">
         <input class="p-angle small" style="margin-top:6px" value="${esc(e?.angle || "")}" placeholder="Angle: what the reader will learn (optional)" maxlength="400">
         ${note ? `<div class="small muted" style="margin-top:4px">${note}</div>` : ""}
         <div class="row" style="margin-top:6px"><input class="p-hint small" style="flex:1;min-width:180px" placeholder="Optional: what you'd like instead" maxlength="300">
-          <button class="p-suggest">Suggest another</button><button class="p-save primary">Save</button>${e ? `<button class="p-clear">Clear</button>` : ""}</div></td>
+          <button class="p-suggest">Suggest another</button></div></td>
       <td>${s ? chip(s[0], s[1]) : chip("pending", "open")}</td></tr>`;
   };
-  $("#view").innerHTML = `<h1>Plan</h1><p class="sub">The topic for every day until the end of next week. The Week Planner drafts next week every
-    ${esc(DAY_NAMES[d.planning.weekday])} at ${esc(d.planning.time)}${d.planning.enabled ? "" : " (switched off in Settings)"}. Change any topic, or ask for a different one;
-    the Topic Scout writes about whatever is here.</p>
-    <div class="row" style="margin-bottom:12px"><button class="primary" id="p-fill">Plan open days now</button><span class="muted small" id="p-state">Next week: ${esc(d.next_week[0])} to ${esc(d.next_week[1])}</span></div>
-    <div class="panel"><table><thead><tr><th style="width:120px">Day</th><th style="width:180px">Category</th><th>Topic</th><th style="width:110px">From</th></tr></thead>
-    <tbody>${d.days.map(row).join("")}</tbody></table></div>`;
-  const busy = (b, on, label) => { document.querySelectorAll("#view button").forEach(x => x.disabled = on); if (label) $("#p-state").textContent = label; };
+  $("#view").innerHTML = `<h1>Plan</h1><p class="sub">This week's topics, ${esc(fmtDay(d.week[0]))} to ${esc(fmtDay(d.week[1]))}. Type over any topic (or empty it to let the
+    Topic Scout choose the day before), then save. The crew writes about whatever is here.</p>
+    <div class="row" style="margin-bottom:12px"><button id="p-fill">Plan open days</button><span class="muted small" id="p-state">The Week Planner also runs every
+      ${esc(DAY_NAMES[d.planning.weekday])} at ${esc(d.planning.time)}${d.planning.enabled ? "" : " (switched off in Settings)"}.</span></div>
+    <div class="panel"><table><thead><tr><th style="width:120px">Day</th><th style="width:180px">Topic type</th><th>Topic</th><th style="width:110px">From</th></tr></thead>
+    <tbody>${d.days.map(row).join("")}</tbody></table></div>
+    <div class="savebar"><span id="save-state" class="muted small">No changes</span><span class="spacer"></span>
+      <button id="p-reset">Discard changes</button><button class="primary" id="p-save">Save plan</button></div>`;
+  const changes = () => {
+    const out = {};
+    document.querySelectorAll("tr[data-day]").forEach(tr => {
+      const topic = tr.querySelector(".p-topic").value.trim(), angle = tr.querySelector(".p-angle").value.trim();
+      if (topic !== tr.dataset.topic || angle !== tr.dataset.angle) out[tr.dataset.day] = { topic, angle: topic ? angle : "" };
+    });
+    return out;
+  };
+  const savePlan = async () => {
+    const days = changes();
+    if (!Object.keys(days).length) { toast("Nothing to save"); return true; }
+    try { await api("/api/plan", { method: "PUT", body: { days } }); S.dirty = false; toast(`Saved ${Object.keys(days).length} day(s)`); return true; }
+    catch (e) { toast(e.message, true); return false; }
+  };
+  const busy = label => { document.querySelectorAll("#view button").forEach(x => x.disabled = true); $("#p-state").textContent = label; };
+  $("#view").addEventListener("input", e => {
+    if (!e.target.matches(".p-topic, .p-angle")) return;
+    const n = Object.keys(changes()).length; S.dirty = n > 0;
+    $("#save-state").textContent = n ? `${n} unsaved change(s)` : "No changes";
+  });
+  $("#p-save").onclick = async () => { if (await savePlan()) renderPlan(); };
+  $("#p-reset").onclick = () => renderPlan();
   $("#p-fill").onclick = async () => {
-    busy(null, true, "The Week Planner is working (about a minute)…");
+    if (S.dirty && !(await savePlan())) return;
+    busy("The Week Planner is working (about a minute)…");
     try { await post("/api/plan/fill"); toast("Plan updated"); } catch (e) { toast(e.message, true); }
     renderPlan(); refreshOverview();
   };
   document.querySelectorAll("tr[data-day]").forEach(tr => {
-    const day = tr.dataset.day, q = s => tr.querySelector(s);
-    const save = async topic => {
-      try { await api(`/api/plan/${day}`, { method: "PUT", body: { topic, angle: topic ? q(".p-angle").value : "" } }); toast(topic ? "Saved" : "Cleared"); renderPlan(); }
-      catch (e) { toast(e.message, true); }
-    };
-    q(".p-save").onclick = () => save(q(".p-topic").value.trim());
-    if (q(".p-clear")) q(".p-clear").onclick = () => save("");
-    q(".p-suggest").onclick = async () => {
-      busy(null, true, `Asking the Week Planner for a new ${day} topic…`);
-      try { await post(`/api/plan/${day}/suggest`, { hint: q(".p-hint").value.trim() }); toast("New topic suggested"); } catch (e) { toast(e.message, true); }
+    const day = tr.dataset.day;
+    tr.querySelector(".p-suggest").onclick = async () => {
+      if (S.dirty && !(await savePlan())) return;
+      busy(`Asking the Week Planner for a new ${tr.querySelector("b").textContent} topic…`);
+      try { await post(`/api/plan/${day}/suggest`, { hint: tr.querySelector(".p-hint").value.trim() }); toast("New topic suggested"); } catch (e) { toast(e.message, true); }
       renderPlan();
     };
   });
@@ -386,12 +409,12 @@ async function renderSettings() {
       <label class="f">Write it the day before at${inp("schedule.generate_time", c.schedule.generate_time, "time")}</label>
       <label class="f">Time zone${inp("schedule.timezone", c.schedule.timezone, "text", 'list="tzs"')}</label>
     </div>
-    <div class="row inline-fields" style="margin-top:14px">${check("planning.enabled", c.planning.enabled, "Plan next week's topics every")}
+    <div class="row inline-fields" style="margin-top:14px">${check("planning.enabled", c.planning.enabled, "Plan this week's topics every")}
       ${sel("planning.weekday", c.planning.weekday, WEEKDAYS.map(d => [d, DAY_NAMES[d]]))} <span>at</span> ${inp("planning.time", c.planning.time, "time")}</div>
     <label class="f" style="margin-top:12px">Focus for the next plan (optional)<input data-k="planning.focus" value="${esc(c.planning.focus || "")}" maxlength="600"
       placeholder="e.g. This week is about Kubernetes; keep examples in Python"></label>
     <div class="row" style="margin-top:12px"><button class="primary" id="ideas-plan">Save and plan open days</button>
-      <button id="ideas-replan">Save and re-plan next week</button><a class="small" href="#plan">Open the Plan</a>
+      <button id="ideas-replan">Save and re-plan this week</button><a class="small" href="#plan">Open the Plan</a>
       <span class="muted small" id="ideas-state">Re-plan replaces the planner's topics; topics you typed in the Plan are kept.</span></div>
     <datalist id="tzs">${(Intl.supportedValuesOf ? Intl.supportedValuesOf("timeZone") : []).map(z => `<option value="${esc(z)}">`).join("")}</datalist></div>
 

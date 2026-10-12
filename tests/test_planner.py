@@ -1,4 +1,4 @@
-"""Week Planner: plans next week ahead, never repeats, and the Topic Scout follows the plan."""
+"""Week Planner: plans the rest of the week, never repeats, and the Topic Scout follows the plan."""
 import json
 import tempfile
 import unittest
@@ -12,7 +12,7 @@ from postcrew.agents.base import RunContext
 from postcrew.agents.topic import TopicAgent
 from postcrew.runlog import RunLog
 
-MONDAY = date(2026, 10, 12)          # next week = 2026-10-19 .. 2026-10-25
+MONDAY = date(2026, 10, 12)          # this week = 2026-10-12 .. 2026-10-18
 
 
 def day_answer(d, topic, queries=()):
@@ -20,27 +20,24 @@ def day_answer(d, topic, queries=()):
 
 
 class PlannerTests(unittest.TestCase):
-    def test_plans_next_week_and_leaves_fresh_news_for_the_day_before(self):
+    def test_plans_the_rest_of_this_week_and_leaves_fresh_news_for_the_day_before(self):
         with TempWorkspace() as ws:
             ws.add_history({"date": "2026-10-05", "topic": "Quick Sort in Java", "text": "Quick Sort in 12 lines"})
-            # days 13-18 of this week are planned too (they had no plan); only the LLM categories are asked
-            dates = ["2026-10-14", "2026-10-15", "2026-10-16", "2026-10-17", "2026-10-21", "2026-10-22",
-                     "2026-10-23", "2026-10-24"]
-            topics = ["Git worktrees", "OAuth PKCE flow", "Python walrus operator", "Docker layer caching",
-                      "Kafka consumer groups", "Passkeys vs passwords", "SQL window functions", "Redis eviction"]
+            dates = ["2026-10-14", "2026-10-15", "2026-10-16", "2026-10-17"]
+            topics = ["Git worktrees", "OAuth PKCE flow", "Python walrus operator", "Docker layer caching"]
             llm = ScriptedLLM({"planner": [{"days": [day_answer(d, t, ["q"]) for d, t in zip(dates, topics)]}]})
             out = planner.plan_week(ws, MONDAY, llm=llm)
             plan = planner.load_plan(ws)
-            self.assertNotIn("2026-10-20", plan)                       # Tuesday ai-news: plan_ahead false
-            self.assertNotIn("2026-10-13", plan)
-            self.assertEqual(plan["2026-10-19"]["source"], "auto")      # Monday algorithm, no LLM needed
-            self.assertNotIn("Quick Sort", plan["2026-10-19"]["topic"])  # already posted
-            self.assertEqual(plan["2026-10-25"]["topic"], "Week in review 2026-10-25")
-            self.assertEqual(plan["2026-10-21"]["topic"], "Kafka consumer groups")
+            self.assertEqual(sorted(plan), dates + ["2026-10-18"])          # Tue-Sun of this week, nothing later
+            self.assertNotIn("2026-10-13", plan)                           # Tuesday ai-news: plan_ahead false
+            self.assertNotIn("2026-10-12", plan)                           # today's post is already being written
+            self.assertEqual(plan["2026-10-18"]["topic"], "Week in review 2026-10-18")
+            self.assertEqual(plan["2026-10-16"]["topic"], "Python walrus operator")
             self.assertEqual(len(llm.calls), 1)
             self.assertTrue(all("error" not in e for e in out.values()))
             self.assertEqual(ws.state("notifications")["items"][-1]["action"]["tab"], "plan")
             self.assertEqual(planner.plan_week(ws, MONDAY, llm=llm), {})  # nothing left to plan
+            self.assertEqual(planner.days_left(date(2026, 10, 18)), [])    # Sunday: the week is over
 
     def test_repeats_are_sent_back_and_rejected_topics_never_return(self):
         with TempWorkspace() as ws:

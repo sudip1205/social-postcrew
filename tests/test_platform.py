@@ -159,7 +159,7 @@ class SchedulerTests(unittest.TestCase):
             self.assertEqual(calls, [])
             scheduler.tick(ws, datetime(2026, 10, 12, 9, 5, tzinfo=tz), **kw)    # after post_time + check time
             self.assertEqual(calls, [("check",), ("publish",)])
-            scheduler.tick(ws, datetime(2026, 10, 12, 10, 1, tzinfo=tz), **kw)   # Monday 10:00: plan next week
+            scheduler.tick(ws, datetime(2026, 10, 12, 10, 1, tzinfo=tz), **kw)   # Monday 10:00: plan the week
             self.assertIn(("plan", "2026-10-12"), calls)
             scheduler.tick(ws, datetime(2026, 10, 12, 19, 1, tzinfo=tz), **kw)   # generate Tuesday's post
             self.assertIn(("run", "2026-10-13"), calls)
@@ -266,8 +266,25 @@ class StudioTests(unittest.TestCase):
         from postcrew.agents import planner
         code, d = self.req("GET", "/api/plan")
         self.assertEqual(code, 200)
-        row = next(r for r in d["days"] if r["category"] == "dev-tip")
-        day = row["date"]
+        self.assertEqual(len(d["days"]), 7)                                  # Monday-Sunday of this week only
+        cfg = self.ws.config()
+        cfg["schedule"]["days"] = {k: "dev-tip" for k in cfg["schedule"]["days"]}   # every day open for edits
+        self.ws.save_config(cfg)
+        d = self.req("GET", "/api/plan")[1]
+        open_days = [r["date"] for r in d["days"] if not r["past"]]
+        if len(open_days) < 2:
+            self.skipTest("run on Saturday or Sunday: too few days left this week")
+        day, day2 = open_days[:2]
+        code, d = self.req("PUT", "/api/plan", {"days": {day: {"topic": "Python walrus operator"},
+                                                         day2: {"topic": "Git stash in 2 minutes"}}})
+        self.assertEqual(code, 200)
+        self.assertEqual(planner.load_plan(self.ws)[day2]["topic"], "Git stash in 2 minutes")
+        code, _ = self.req("PUT", "/api/plan", {"days": {day: {"topic": "Docker tips"}, day2: {"topic": "x"}}})
+        self.assertEqual(code, 400)                                           # one bad day: nothing saved
+        self.assertEqual(planner.load_plan(self.ws)[day]["topic"], "Python walrus operator")
+        past = next((r["date"] for r in d["days"] if r["past"]), None)
+        if past:
+            self.assertEqual(self.req("PUT", "/api/plan", {"days": {past: {"topic": "Too late topic"}}})[0], 400)
         code, d = self.req("PUT", f"/api/plan/{day}", {"topic": "Python walrus operator", "angle": "when := helps"})
         e = next(r for r in d["days"] if r["date"] == day)["entry"]
         self.assertEqual((e["topic"], e["source"]), ("Python walrus operator", "manual"))

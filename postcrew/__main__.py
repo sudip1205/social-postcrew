@@ -7,7 +7,7 @@
   python3 -m postcrew check                check LinkedIn + Claude credentials
   python3 -m postcrew doctor               check everything needed is installed and configured
   python3 -m postcrew status               queue and recent runs
-  python3 -m postcrew plan                 let the Week Planner draft next week's topics now
+  python3 -m postcrew plan                 let the Week Planner draft the rest of this week's topics now
   python3 -m postcrew import FILE          add posts you published elsewhere, so they are never repeated
 """
 import argparse
