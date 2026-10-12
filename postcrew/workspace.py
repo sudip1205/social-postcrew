@@ -211,6 +211,17 @@ class Workspace:
             h.append(post)
             write_json(self.root / "history.json", {"posts": h})
 
+    def remove_history(self, match):
+        """Remove the first entry for which match(entry) is true. Returns it, or None."""
+        with _lock:
+            h = self.history()
+            i = next((i for i, p in enumerate(h) if match(p)), None)
+            if i is None:
+                return None
+            gone = h.pop(i)
+            write_json(self.root / "history.json", {"posts": h})
+            return gone
+
     def recent_posts(self, n=30):
         """Published + queued posts, oldest first: what the crew must not repeat."""
         items = [dict(p, status="published") for p in self.history()] + [p for p in self.queue()

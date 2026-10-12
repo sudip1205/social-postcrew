@@ -300,6 +300,22 @@ class StudioTests(unittest.TestCase):
         self.assertNotIn(day, planner.load_plan(self.ws))
         self.assertEqual(self.req("PUT", "/api/plan/2020-01-01", {"topic": "Old day topic"})[0], 400)
 
+    def test_published_list_add_and_remove(self):
+        from postcrew.checks import repeat_problem
+        code, d = self.req("POST", "/api/history", {"date": "2026-10-01", "topic": "Kafka consumer groups",
+                                                    "category": "dev-tip"})
+        self.assertEqual(code, 200)
+        h = d["history"][-1]
+        self.assertTrue(h["added_by_hand"])
+        self.assertTrue(repeat_problem("Kafka consumer groups", "", self.ws.recent_posts(60)))  # now a repeat
+        self.assertEqual(self.req("POST", "/api/history", {"date": "2026-10-01", "topic": "x"})[0], 400)
+        self.assertEqual(self.req("POST", "/api/history", {"date": "yesterday", "topic": "Kafka again"})[0], 400)
+        code, d = self.req("POST", "/api/history/remove", {"id": h["id"], "date": h["date"], "topic": h["topic"]})
+        self.assertEqual((code, d["history"]), (200, []))
+        self.assertIsNone(repeat_problem("Kafka consumer groups", "", self.ws.recent_posts(60)))  # allowed again
+        self.assertEqual(self.req("POST", "/api/history/remove", {"id": h["id"], "date": h["date"],
+                                                                  "topic": h["topic"]})[0], 404)
+
     def test_gmail_settings_and_test_email(self):
         self.assertEqual(self.req("POST", "/api/notifications/test-email")[1]["ok"], False)
         self.assertEqual(self.req("PUT", "/api/credentials", {"gmail_address": "not-an-email"})[0], 400)

@@ -177,6 +177,29 @@ class Studio:
             planner_mod.plan_week(self.ws, crew.local_now(self.ws.config()).date())
         return self.plan()
 
+    # ---------- published list ----------
+    def history_add(self, body):
+        """Add a post you published yourself, so the crew never repeats its topic."""
+        topic, text = (body.get("topic") or "").strip(), (body.get("text") or "").strip()
+        day = (body.get("date") or "").strip()
+        datetime.strptime(day, "%Y-%m-%d")
+        if not 3 <= len(topic) <= 150 or len(text) > 3000:
+            raise ValueError("the topic must be 3-150 characters (and the text under 3,000)")
+        cat = body.get("category") or ""
+        if cat and cat not in self.ws.config()["categories"]:
+            raise ValueError(f"unknown topic type {cat!r}")
+        self.ws.add_history({"id": "manual-" + pysecrets.token_hex(4), "date": day, "topic": topic, "category": cat,
+                             "text": text, "imported": True, "added_by_hand": True})
+        return {"history": self.ws.history()}
+
+    def history_remove(self, body):
+        """Forget a published entry (its topic may then be used again). Never touches LinkedIn."""
+        key = (body.get("id"), body.get("date"), body.get("topic"))
+        gone = self.ws.remove_history(lambda p: (p.get("id"), p.get("date"), p.get("topic")) == key)
+        if not gone:
+            raise KeyError("that entry is not in the published list")
+        return {"history": self.ws.history()}
+
     def queue_action(self, pid, action, body):
         posts = self.ws.queue()
         post = next((p for p in posts if p["id"] == pid), None)
@@ -400,7 +423,9 @@ def make_handler(studio):
                     ("GET", "/api/agents"): lambda: studio.agents(),
                     ("GET", "/api/runs"): lambda: {"runs": crew.list_runs(ws)},
                     ("POST", "/api/runs"): lambda: studio.start_run(self.body()),
-                    ("GET", "/api/queue"): lambda: {"queue": ws.queue(), "history": ws.history()[-30:]},
+                    ("GET", "/api/queue"): lambda: {"queue": ws.queue(), "history": ws.history()},
+                    ("POST", "/api/history"): lambda: studio.history_add(self.body()),
+                    ("POST", "/api/history/remove"): lambda: studio.history_remove(self.body()),
                     ("GET", "/api/config"): lambda: {"config": ws.config()},
                     ("PUT", "/api/config"): lambda: self.save_config(),
                     ("POST", "/api/config/validate"): lambda: {"errors": validate_config(self.body().get("config", {}))},

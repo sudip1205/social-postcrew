@@ -83,7 +83,7 @@ you turn that off.
 | Plan | this week, Monday to Sunday: edit any topics and save them together, or ask the Week Planner for a different one (with an optional hint) |
 | Overview | next post and run, LinkedIn status, start a run or rehearsal, pause the schedule, recent runs |
 | Workflow | live graph of the crew (state, tries, cost per agent, sent-back arrows), the Supervisor's decisions, each agent's output and rendered media, the full event log |
-| Queue | LinkedIn-style preview of every queued post: approve, edit, veto, publish now; the published history |
+| Queue | LinkedIn-style preview of every queued post: approve, edit, veto, publish now; the published list (add posts you published yourself, remove one to allow its topic again) |
 | Settings | **Topic ideas** (your own list per kind of post, plus a focus for the whole plan; then plan or re-plan the week), and the configurator: profile, schedule and days, categories and their briefs, models and limits per agent, quality thresholds, notifications |
 | Credentials | LinkedIn app and OAuth connect/reconnect, token status, Claude Code login test, Gmail, Telegram |
 

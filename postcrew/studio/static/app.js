@@ -264,15 +264,38 @@ function drawTimeline() {
 
 /* ---------- queue ---------- */
 async function renderQueue() {
-  const { queue, history } = await api("/api/queue");
+  const [{ queue, history }, { config }] = await Promise.all([api("/api/queue"), api("/api/config")]);
+  const cats = config.categories;
   const live = queue.filter(p => p.status !== "vetoed").sort((a, b) => a.scheduled_at.localeCompare(b.scheduled_at));
   const vetoed = queue.filter(p => p.status === "vetoed");
   $("#view").innerHTML = `<h1>Queue</h1><p class="sub">Posts that passed the Editor Review. Approve, edit, veto or publish them here.</p>
     <div class="cards">${live.map(postCard).join("") || `<div class="panel empty">The queue is empty.</div>`}</div>
     ${vetoed.length ? `<h2 style="margin-top:28px">Vetoed</h2><div class="cards">${vetoed.map(postCard).join("")}</div>` : ""}
-    <div class="panel" style="margin-top:28px"><h2>Published</h2>${history.length ? `<table><thead><tr><th>Date</th><th>Topic</th><th>Category</th><th>LinkedIn</th></tr></thead><tbody>${
-      history.slice().reverse().map(h => `<tr><td>${esc(h.date)}</td><td>${esc(h.topic)}</td><td>${esc(h.category)}</td><td class="mono small">${esc(h.urn || "")}</td></tr>`).join("")}</tbody></table>`
+    <div class="panel" style="margin-top:28px" id="published"><h2>Published</h2>
+      <p class="muted small">Every topic here counts as already posted, so the crew never repeats it. Add posts you published yourself;
+        remove one to allow its topic again. Removing only changes this list, never LinkedIn.</p>
+      <div class="row" style="margin-bottom:12px"><input type="date" id="h-date" value="${new Date().toISOString().slice(0, 10)}" style="width:auto">
+        <input id="h-topic" placeholder="Topic of a post you published, e.g. Kafka consumer groups" maxlength="150" style="flex:1;min-width:240px">
+        <select id="h-cat" style="width:auto"><option value="">Topic type (optional)</option>${Object.entries(cats).map(([id, k]) => `<option value="${esc(id)}">${esc(k.label)}</option>`).join("")}</select>
+        <button class="primary" id="h-add">Add to published</button></div>
+      ${history.length ? `<table><thead><tr><th style="width:110px">Date</th><th>Topic</th><th>Topic type</th><th>LinkedIn</th><th style="width:90px"></th></tr></thead><tbody>${
+      history.map((h, i) => [h, i]).sort((a, b) => (b[0].date || "").localeCompare(a[0].date || "")).map(([h, i]) => `<tr><td>${esc(h.date)}</td><td>${esc(h.topic)}</td>
+        <td class="small">${esc(cats[h.category]?.label || h.category || "")}</td>
+        <td class="mono small">${h.urn ? esc(h.urn) : `<span class="muted">${h.added_by_hand ? "added by you" : h.imported ? "imported" : ""}</span>`}</td>
+        <td><button class="danger small" data-hrm="${i}">Remove</button></td></tr>`).join("")}</tbody></table>`
       : `<div class="empty">Nothing published yet.</div>`}</div>`;
+  $("#h-add").onclick = async () => {
+    const topic = $("#h-topic").value.trim(); if (!topic) return $("#h-topic").focus();
+    try { await post("/api/history", { date: $("#h-date").value, topic, category: $("#h-cat").value }); toast("Added to published"); renderQueue(); }
+    catch (e) { toast(e.message, true); }
+  };
+  $("#h-topic").onkeydown = e => { if (e.key === "Enter") $("#h-add").click(); };
+  document.querySelectorAll("[data-hrm]").forEach(b => b.onclick = async () => {
+    const h = history[+b.dataset.hrm];
+    if (!confirm(`Remove "${h.topic}" from the published list? The crew may then write about it again.${h.urn ? " The post stays on LinkedIn." : ""}`)) return;
+    try { await post("/api/history/remove", { id: h.id, date: h.date, topic: h.topic }); toast("Removed"); renderQueue(); }
+    catch (e) { toast(e.message, true); }
+  });
   document.querySelectorAll("[data-q]").forEach(b => b.onclick = () => queueAction(b.dataset.id, b.dataset.q, b));
 }
 function postCard(p) {
