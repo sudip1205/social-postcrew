@@ -364,124 +364,168 @@ async function renderPlan() {
 /* ---------- settings (configurator) ---------- */
 async function renderSettings() {
   const [{ config }, { agents }, planInfo] = await Promise.all([api("/api/config"), api("/api/agents"), api("/api/plan")]);
-  S.config = config;
-  const c = config, cats = Object.keys(c.categories);
+  S.config = config; S.ideaUse = planInfo.ideas;
+  const c = config;
   const sel = (id, val, opts) => `<select data-k="${id}">${opts.map(([v, l]) => `<option value="${esc(v)}" ${v === val ? "selected" : ""}>${esc(l)}</option>`).join("")}</select>`;
   const inp = (id, val, type = "text", extra = "") => `<input data-k="${id}" type="${type}" value="${esc(val)}" ${extra}>`;
-  $("#view").innerHTML = `<h1>Settings</h1><p class="sub">Everything the crew needs to know. Saved to <span class="mono">config.json</span> (no secrets here).</p>
+  const check = (id, val, label) => `<label class="checkline"><input type="checkbox" data-k="${id}" ${val ? "checked" : ""}> ${label}</label>`;
+  $("#view").innerHTML = `<h1>Settings</h1><p class="sub">Three steps: choose your topics, pick which topic goes on which day, and tell the crew about you.</p>
   <div id="cfg-errors"></div>
-  <div class="panel section"><h2>You</h2><div class="grid g2">
-    <label class="f">Name${inp("profile.name", c.profile.name)}</label>
-    <label class="f">Handle printed on posters${inp("profile.handle", c.profile.handle, "text", 'placeholder="linkedin.com/in/your-name"')}</label>
-    <label class="f">Audience${inp("profile.audience", c.profile.audience)}</label>
-    <label class="f">Voice${inp("profile.voice", c.profile.voice)}</label>
-    <label class="f">True facts about you (one per line). The writer never invents experience; it may only use these.<textarea data-k="profile.about" data-list="1">${esc(c.profile.about.join("\n"))}</textarea></label>
-    <label class="f">Blocked phrases (one per line). A post containing any of them is rejected.<textarea data-k="profile.blocklist" data-list="1">${esc(c.profile.blocklist.join("\n"))}</textarea></label>
-  </div></div>
-  <div class="panel section"><h2>Schedule</h2><div class="grid g4">
-    <label class="f">Time zone${inp("schedule.timezone", c.schedule.timezone, "text", 'list="tzs"')}</label>
-    <label class="f">Crew writes at${inp("schedule.generate_time", c.schedule.generate_time, "time")}</label>
-    <label class="f">Post is published at${inp("schedule.post_time", c.schedule.post_time, "time")}</label>
-    <label class="f">Write how many days ahead${inp("schedule.lead_days", c.schedule.lead_days, "number", 'min="0" max="7"')}</label>
-    <label class="f">Credential check at${inp("schedule.credential_check_time", c.schedule.credential_check_time, "time")}</label>
-  </div><h3>Week Planner</h3><div class="grid g4">
-    <label class="checkline" style="margin-top:20px"><input type="checkbox" data-k="planning.enabled" ${c.planning.enabled ? "checked" : ""}> Plan next week's topics automatically</label>
-    <label class="f">Plan on${sel("planning.weekday", c.planning.weekday, WEEKDAYS.map(d => [d, DAY_NAMES[d]]))}</label>
-    <label class="f">Plan at${inp("planning.time", c.planning.time, "time")}</label>
-  </div><h3>What to post each day</h3><div class="days">${WEEKDAYS.map(d => `<label class="f">${DAY_NAMES[d]}${sel("schedule.days." + d, c.schedule.days[d] || "", [["", "No post"], ...cats.map(id => [id, c.categories[id].label])])}</label>`).join("")}</div>
-  <datalist id="tzs">${(Intl.supportedValuesOf ? Intl.supportedValuesOf("timeZone") : []).map(z => `<option value="${esc(z)}">`).join("")}</datalist></div>
-  <div class="panel section" id="ideas"><h2>Topic ideas</h2>
-    <p class="muted small">Give the Week Planner your own ideas, one per line, for each kind of post. It uses an unused idea before
-      inventing one; a used idea is marked with the date it was posted or planned. Then plan the week from here.</p>
-    <label class="f">Focus for the plan (optional, applies to every day)<textarea data-k="planning.focus" rows="2" maxlength="600"
-      placeholder="e.g. This week is about Kubernetes; keep examples in Python; avoid OpenAI news">${esc(c.planning.focus || "")}</textarea></label>
-    <div class="grid g2" style="margin-top:12px">${[...new Set(WEEKDAYS.map(d => c.schedule.days[d]).filter(Boolean))].concat(cats.filter(id => !WEEKDAYS.some(d => c.schedule.days[d] === id)))
-      .map(id => { const k = c.categories[id], days = WEEKDAYS.filter(d => c.schedule.days[d] === id).map(d => DAY_NAMES[d]);
-        const used = (planInfo.ideas[id] || []).filter(x => x.used_on);
-        const fixed = k.media === "animation" || id === "week-recap";
-        return `<label class="f">${esc(k.label)} <span class="muted small">${days.length ? days.join(", ") : "not scheduled"}${k.plan_ahead === false ? " · picked the day before" : ""}</span>
-          <textarea data-ideas="${esc(id)}" rows="4" ${fixed ? "disabled" : ""} placeholder="${fixed ? "Chosen automatically" : "One idea per line, e.g. Kafka consumer groups"}">${esc((k.ideas || []).join("\n"))}</textarea>
-          ${used.length ? `<span class="small muted">Used: ${used.map(x => `${esc(x.idea)} (${esc(x.used_on)})`).join("; ")}</span>` : ""}</label>`; }).join("")}</div>
+
+  <div class="panel section" id="ideas"><div class="step"><span class="num">1</span><div class="grow"><h2>Topics</h2>
+    <p class="muted small">The kinds of posts you want. Under each one, list your own ideas (one per line); the Week Planner uses them before inventing its own.</p></div></div>
+    <div class="grid g2" id="topics"></div>
+    <div class="row" style="margin-top:12px"><input id="new-topic" placeholder="New topic, e.g. Career advice" style="max-width:320px" maxlength="60">
+      <button id="add-topic">Add topic</button></div></div>
+
+  <div class="panel section"><div class="step"><span class="num">2</span><div class="grow"><h2>Weekly schedule</h2>
+    <p class="muted small">Which topic goes out on each day. The menus list the topics from step 1.</p></div></div>
+    <div class="days" id="days"></div>
+    <div class="grid g4" style="margin-top:16px">
+      <label class="f">Publish at${inp("schedule.post_time", c.schedule.post_time, "time")}</label>
+      <label class="f">Write it the day before at${inp("schedule.generate_time", c.schedule.generate_time, "time")}</label>
+      <label class="f">Time zone${inp("schedule.timezone", c.schedule.timezone, "text", 'list="tzs"')}</label>
+    </div>
+    <div class="row inline-fields" style="margin-top:14px">${check("planning.enabled", c.planning.enabled, "Plan next week's topics every")}
+      ${sel("planning.weekday", c.planning.weekday, WEEKDAYS.map(d => [d, DAY_NAMES[d]]))} <span>at</span> ${inp("planning.time", c.planning.time, "time")}</div>
+    <label class="f" style="margin-top:12px">Focus for the next plan (optional)<input data-k="planning.focus" value="${esc(c.planning.focus || "")}" maxlength="600"
+      placeholder="e.g. This week is about Kubernetes; keep examples in Python"></label>
     <div class="row" style="margin-top:12px"><button class="primary" id="ideas-plan">Save and plan open days</button>
       <button id="ideas-replan">Save and re-plan next week</button><a class="small" href="#plan">Open the Plan</a>
-      <span class="muted small" id="ideas-state">Re-plan replaces the planner's topics; topics you typed in the Plan are kept.</span></div></div>
-  <div class="panel section"><h2>Publishing</h2><div class="grid g3">
-    <label class="f">After a post passes review${sel("publishing.approval", c.publishing.approval, [["auto_with_veto", "Publish at post time unless I veto (default)"], ["manual", "Wait for my approval"], ["immediate", "Publish immediately"]])}</label>
-    <label class="f">LinkedIn API version (YYYYMM)${inp("publishing.linkedin_api_version", c.publishing.linkedin_api_version)}</label>
-    <label class="checkline" style="margin-top:20px"><input type="checkbox" data-k="publishing.dry_run" ${c.publishing.dry_run ? "checked" : ""}> Dry run: log what would be published, send nothing</label>
-  </div></div>
-  <div class="panel section"><h2>AI models (Claude Code)</h2>
-    <p class="muted small">Every agent runs through your Claude Code login (<span class="mono">claude -p</span>), isolated from your own settings, with only the tools it needs.
-      Model: <span class="mono">haiku</span>, <span class="mono">sonnet</span>, <span class="mono">opus</span> or a full model id. Budget is a hard stop per call.</p>
-    <div class="grid g3"><label class="f">Claude Code command${inp("llm.claude_path", c.llm.claude_path)}</label></div>
-    <table style="margin-top:10px"><thead><tr><th>Agent</th><th>What it does</th><th>Model</th><th>Timeout (s)</th><th>Max $ per call</th></tr></thead><tbody>${
+      <span class="muted small" id="ideas-state">Re-plan replaces the planner's topics; topics you typed in the Plan are kept.</span></div>
+    <datalist id="tzs">${(Intl.supportedValuesOf ? Intl.supportedValuesOf("timeZone") : []).map(z => `<option value="${esc(z)}">`).join("")}</datalist></div>
+
+  <div class="panel section"><div class="step"><span class="num">3</span><div class="grow"><h2>About you</h2>
+    <p class="muted small">The writer only claims what you list here about yourself.</p></div></div>
+    <div class="grid g2">
+      <label class="f">Your name${inp("profile.name", c.profile.name)}</label>
+      <label class="f">Profile link printed on posters${inp("profile.handle", c.profile.handle, "text", 'placeholder="linkedin.com/in/your-name"')}</label>
+      <label class="f">Who reads your posts${inp("profile.audience", c.profile.audience)}</label>
+      <label class="f">How you write${inp("profile.voice", c.profile.voice)}</label>
+      <label class="f" style="grid-column:1/-1">True facts about you (one per line)<textarea data-k="profile.about" data-list="1" rows="3" placeholder="e.g. 10 years building Java backends">${esc(c.profile.about.join("\n"))}</textarea></label>
+    </div></div>
+
+  <div class="panel section"><h2>Publishing and alerts</h2><div class="grid g2">
+    <label class="f">When a post is ready${sel("publishing.approval", c.publishing.approval, [["auto_with_veto", "Publish at post time unless I veto it"], ["manual", "Wait for my approval"], ["immediate", "Publish right away"]])}</label>
+    <div style="padding-top:22px">${check("publishing.dry_run", c.publishing.dry_run, "<b>Practice mode</b>: write posts but never send them to LinkedIn")}</div></div>
+    <div class="row" style="margin-top:14px"><span class="muted small">Alert me by:</span>
+      ${check("notifications.desktop", c.notifications.desktop, "Desktop")}
+      ${check("notifications.email", c.notifications.email, "Gmail")}
+      ${check("notifications.telegram", c.notifications.telegram, "Telegram")}
+      <button id="test-notify" class="small">Send a test</button><span class="muted small">Gmail and Telegram are set up in Credentials.</span></div></div>
+
+  <details class="panel section adv"><summary><h2 style="display:inline">Advanced</h2> <span class="muted small">AI models, quality bar, limits. The defaults work.</span></summary>
+    <h3>AI models</h3>
+    <p class="muted small">Each agent runs through your Claude Code login. Model: <span class="mono">haiku</span> (cheapest), <span class="mono">sonnet</span> or <span class="mono">opus</span>.
+      "Max $" stops a single call.</p>
+    <table><thead><tr><th>Agent</th><th>What it does</th><th>Model</th><th>Timeout (s)</th><th>Max $ per call</th></tr></thead><tbody>${
       agents.filter(a => a.uses_llm).map(a => { const s = c.llm.agents[a.id] || {}; return `<tr><td><b>${esc(a.title)}</b></td><td class="small muted">${esc(a.role)}</td>
-        <td>${inp(`llm.agents.${a.id}.model`, s.model ?? c.llm.defaults.model, "text", 'list="models" style="width:140px"')}</td>
-        <td>${inp(`llm.agents.${a.id}.timeout_s`, s.timeout_s ?? c.llm.defaults.timeout_s, "number", 'min="30" max="3600" style="width:100px"')}</td>
-        <td>${inp(`llm.agents.${a.id}.max_budget_usd`, s.max_budget_usd ?? c.llm.defaults.max_budget_usd, "number", 'step="0.05" min="0.05" max="20" style="width:100px"')}</td></tr>`; }).join("")}</tbody></table>
-    <datalist id="models"><option value="haiku"><option value="sonnet"><option value="opus"></datalist></div>
-  <div class="panel section"><h2>Quality gate &amp; limits</h2><div class="grid g3">
-    <label class="f">Reviews per post (worst score counts)${inp("pipeline.review_runs", c.pipeline.review_runs, "number", 'min="1" max="5"')}</label>
-    <label class="f">Minimum overall score${inp("pipeline.min_overall", c.pipeline.min_overall, "number", 'min="0" max="100"')}</label>
-    <label class="f">Minimum sub-score${inp("pipeline.min_subscore", c.pipeline.min_subscore, "number", 'min="0" max="100"')}</label>
-    <label class="f">Tries per agent${inp("pipeline.max_attempts_per_step", c.pipeline.max_attempts_per_step, "number", 'min="1" max="10"')}</label>
-    <label class="f">Tries per run (all agents)${inp("pipeline.max_total_attempts", c.pipeline.max_total_attempts, "number", 'min="1" max="40"')}</label>
-    <label class="f">Max $ per post${inp("pipeline.max_run_budget_usd", c.pipeline.max_run_budget_usd, "number", 'step="0.5" min="0.5" max="100"')}</label>
-  </div></div>
-  <div class="panel section"><h2>Notifications</h2><div class="row">
-    <label class="checkline"><input type="checkbox" data-k="notifications.desktop" ${c.notifications.desktop ? "checked" : ""}> Desktop notifications</label>
-    <label class="checkline"><input type="checkbox" data-k="notifications.email" ${c.notifications.email ? "checked" : ""}> Gmail email (set it up in Credentials)</label>
-    <label class="checkline"><input type="checkbox" data-k="notifications.telegram" ${c.notifications.telegram ? "checked" : ""}> Telegram (set the bot in Credentials)</label>
-    <label class="f" style="width:220px">Warn this many days before the LinkedIn token expires${inp("notifications.warn_days_before_expiry", c.notifications.warn_days_before_expiry, "number", 'min="1" max="30"')}</label>
-    <button id="test-notify">Send a test notification</button></div></div>
-  <div class="panel section"><div class="row"><h2 style="margin:0">Post categories</h2><span class="spacer"></span><button id="add-cat">Add category</button></div>
-    <p class="muted small">What each kind of post contains. The brief is given to the Topic Scout, Writer and Editor.</p><div id="cats"></div></div>
+        <td>${inp(`llm.agents.${a.id}.model`, s.model ?? c.llm.defaults.model, "text", 'list="models" style="width:120px"')}</td>
+        <td>${inp(`llm.agents.${a.id}.timeout_s`, s.timeout_s ?? c.llm.defaults.timeout_s, "number", 'min="30" max="3600" style="width:90px"')}</td>
+        <td>${inp(`llm.agents.${a.id}.max_budget_usd`, s.max_budget_usd ?? c.llm.defaults.max_budget_usd, "number", 'step="0.05" min="0.05" max="20" style="width:90px"')}</td></tr>`; }).join("")}</tbody></table>
+    <datalist id="models"><option value="haiku"><option value="sonnet"><option value="opus"></datalist>
+    <h3>Quality bar and limits</h3><div class="grid g3">
+      <label class="f">Minimum review score${inp("pipeline.min_overall", c.pipeline.min_overall, "number", 'min="0" max="100"')}</label>
+      <label class="f">Minimum score on any single criterion${inp("pipeline.min_subscore", c.pipeline.min_subscore, "number", 'min="0" max="100"')}</label>
+      <label class="f">Reviews per post (worst counts)${inp("pipeline.review_runs", c.pipeline.review_runs, "number", 'min="1" max="5"')}</label>
+      <label class="f">Tries per agent${inp("pipeline.max_attempts_per_step", c.pipeline.max_attempts_per_step, "number", 'min="1" max="10"')}</label>
+      <label class="f">Tries per post (all agents)${inp("pipeline.max_total_attempts", c.pipeline.max_total_attempts, "number", 'min="1" max="40"')}</label>
+      <label class="f">Max $ per post${inp("pipeline.max_run_budget_usd", c.pipeline.max_run_budget_usd, "number", 'step="0.5" min="0.5" max="100"')}</label>
+    </div>
+    <h3>Other</h3><div class="grid g3">
+      <label class="f">Write how many days ahead${inp("schedule.lead_days", c.schedule.lead_days, "number", 'min="0" max="7"')}</label>
+      <label class="f">Check credentials daily at${inp("schedule.credential_check_time", c.schedule.credential_check_time, "time")}</label>
+      <label class="f">Warn days before the LinkedIn token expires${inp("notifications.warn_days_before_expiry", c.notifications.warn_days_before_expiry, "number", 'min="1" max="30"')}</label>
+      <label class="f">Claude Code command${inp("llm.claude_path", c.llm.claude_path)}</label>
+      <label class="f">LinkedIn API version (YYYYMM)${inp("publishing.linkedin_api_version", c.publishing.linkedin_api_version)}</label>
+      <label class="f">Blocked phrases (one per line)<textarea data-k="profile.blocklist" data-list="1" rows="3">${esc(c.profile.blocklist.join("\n"))}</textarea></label>
+    </div></details>
+
   <div class="savebar"><span id="save-state" class="muted small">No changes</span><span class="spacer"></span>
     <button id="reset">Discard changes</button><button class="primary" id="save">Save settings</button></div>`;
-  drawCats();
-  $("#view").addEventListener("input", () => { S.dirty = true; $("#save-state").textContent = "Unsaved changes"; });
-  $("#view").addEventListener("change", () => { S.dirty = true; $("#save-state").textContent = "Unsaved changes"; });
+  drawTopics(); drawDays();
+  const dirty = () => { S.dirty = true; $("#save-state").textContent = "Unsaved changes"; };
+  $("#view").addEventListener("input", e => { dirty(); if (e.target.dataset.c === "label") drawDays(); });
+  $("#view").addEventListener("change", e => { dirty(); if (e.target.closest("#days")) drawTopicDays(); });
   $("#save").onclick = saveSettings;
   const planFromIdeas = replan => async () => {
     if (!(await saveSettings())) return;
-    document.querySelectorAll("#ideas button").forEach(b => b.disabled = true);
+    document.querySelectorAll("#ideas-plan, #ideas-replan").forEach(b => b.disabled = true);
     $("#ideas-state").textContent = "The Week Planner is working (about a minute)…";
     try { await post("/api/plan/fill", { replan }); toast("Plan updated"); location.hash = "plan"; }
-    catch (e) { toast(e.message, true); document.querySelectorAll("#ideas button").forEach(b => b.disabled = false);
+    catch (e) { toast(e.message, true); document.querySelectorAll("#ideas-plan, #ideas-replan").forEach(b => b.disabled = false);
       $("#ideas-state").textContent = e.message; }
   };
   $("#ideas-plan").onclick = planFromIdeas(false);
   $("#ideas-replan").onclick = planFromIdeas(true);
   $("#reset").onclick = () => { S.dirty = false; renderSettings(); };
-  $("#add-cat").onclick = () => {
-    const id = prompt("Category id (lowercase letters, digits, dashes), e.g. career-tip"); if (!id) return;
-    collectSettings(); S.config.categories[id] = { label: id, media: "poster", layouts: ["points"], kicker: id.toUpperCase().slice(0, 26),
-      research: "optional", min_chars: 500, max_chars: 1800, fact_check: false, brief: "" }; drawCats(); S.dirty = true;
+  const addTopic = () => {
+    const name = $("#new-topic").value.trim(); if (!name) return $("#new-topic").focus();
+    collectSettings();
+    let id = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 28) || "topic";
+    for (let n = 2; S.config.categories[id]; n++) id = id.replace(/-\d+$/, "") + "-" + n;
+    S.config.categories[id] = { label: name, media: "poster", layouts: ["points"], kicker: name.toUpperCase().slice(0, 26), research: "optional",
+      min_chars: 500, max_chars: 1800, fact_check: false, ideas: [],
+      brief: `A useful post about ${name}: a hook, the key points a reader can act on, a question, and 3-4 hashtags.` };
+    $("#new-topic").value = ""; drawTopics(); drawDays(); dirty();
+    $(`[data-cat="${id}"] [data-c="ideas"]`).focus();
   };
+  $("#add-topic").onclick = addTopic;
+  $("#new-topic").onkeydown = e => { if (e.key === "Enter") addTopic(); };
   $("#test-notify").onclick = async () => { await post("/api/notifications/test"); toast("Sent"); refreshOverview(); };
 }
-function drawCats() {
+function isFixedTopic(id, k) { return k.media === "animation" || id === "week-recap"; }
+function drawTopics() {
   const c = S.config;
-  $("#cats").innerHTML = Object.entries(c.categories).map(([id, k]) => `<div class="panel" style="margin-bottom:12px" data-cat="${esc(id)}">
-    <div class="row"><b class="mono">${esc(id)}</b><span class="spacer"></span><button class="danger small" data-delcat="${esc(id)}">Remove</button></div>
-    <div class="grid g4" style="margin-top:8px">
-      <label class="f">Label<input data-c="label" value="${esc(k.label)}"></label>
-      <label class="f">Media<select data-c="media">${["poster", "animation", "none"].map(m => `<option ${m === k.media ? "selected" : ""}>${m}</option>`).join("")}</select></label>
-      <label class="f">Poster layouts (comma separated)<input data-c="layouts" value="${esc((k.layouts || []).join(", "))}" placeholder="points, steps, code, flow"></label>
-      <label class="f">Kicker (poster pill)<input data-c="kicker" value="${esc(k.kicker || "")}" maxlength="26"></label>
-      <label class="f">Research<select data-c="research">${["required", "optional", "off"].map(m => `<option ${m === (k.research || "optional") ? "selected" : ""}>${m}</option>`).join("")}</select></label>
-      <label class="f">Min characters<input type="number" data-c="min_chars" value="${k.min_chars}"></label>
-      <label class="f">Max characters<input type="number" data-c="max_chars" value="${k.max_chars}" max="3000"></label>
-      <label class="f">Sources must be newer than (days)<input type="number" data-c="max_source_age_days" value="${esc(k.max_source_age_days ?? "")}" placeholder="any age"></label>
-    </div>
-    <label class="checkline" style="margin-top:8px"><input type="checkbox" data-c="fact_check" ${k.fact_check ? "checked" : ""}> Every number in the post must appear in a verified source</label>
-    <label class="checkline" style="margin-top:8px"><input type="checkbox" data-c="plan_ahead" ${k.plan_ahead !== false ? "checked" : ""}> Plan this topic a week ahead (untick for fresh news, picked the day before)</label>
-    <label class="f" style="margin-top:8px">Brief: what this kind of post must contain<textarea data-c="brief">${esc(k.brief)}</textarea></label></div>`).join("");
+  const opt = (f, val, opts) => `<select data-c="${f}">${opts.map(([v, l]) => `<option value="${v}" ${v === val ? "selected" : ""}>${l}</option>`).join("")}</select>`;
+  $("#topics").innerHTML = Object.entries(c.categories).map(([id, k]) => {
+    const fixed = isFixedTopic(id, k), used = (S.ideaUse?.[id] || []).filter(x => x.used_on);
+    return `<div class="topic" data-cat="${esc(id)}">
+      <div class="row"><input data-c="label" value="${esc(k.label)}" class="topic-name" maxlength="60" aria-label="Topic name">
+        <button class="danger small" data-delcat="${esc(id)}" title="Remove this topic">Remove</button></div>
+      <div class="small muted topic-days" style="margin:4px 0 6px"></div>
+      ${fixed ? `<div class="muted small fixed">${k.media === "animation" ? "Picks the next algorithm from the built-in library automatically." : "Sums up the week's posts automatically."}</div>`
+        : `<textarea data-c="ideas" rows="4" placeholder="Your ideas, one per line&#10;e.g. Kafka consumer groups">${esc((k.ideas || []).join("\n"))}</textarea>`}
+      ${used.length ? `<div class="small muted" style="margin-top:4px">Already used: ${used.map(x => `${esc(x.idea)} (${esc(x.used_on)})`).join("; ")}</div>` : ""}
+      <details class="more"><summary class="small">More options</summary><div class="grid g2" style="margin-top:8px">
+        <label class="f">Picture${opt("media", k.media, [["poster", "Poster image"], ["animation", "Algorithm video"], ["none", "No picture"]])}</label>
+        <label class="f">Research${opt("research", k.research || "optional", [["required", "Always, with sources"], ["optional", "When useful"], ["off", "None"]])}</label>
+        <label class="f">Poster style<input data-c="layouts" value="${esc((k.layouts || []).join(", "))}" placeholder="points, steps, code, flow"></label>
+        <label class="f">Label on the poster<input data-c="kicker" value="${esc(k.kicker || "")}" maxlength="26"></label>
+        <label class="f">Shortest post (characters)<input type="number" data-c="min_chars" value="${k.min_chars}"></label>
+        <label class="f">Longest post (characters)<input type="number" data-c="max_chars" value="${k.max_chars}" max="3000"></label>
+        <label class="f">Sources newer than (days)<input type="number" data-c="max_source_age_days" value="${esc(k.max_source_age_days ?? "")}" placeholder="any age"></label>
+        <div style="padding-top:20px"><label class="checkline"><input type="checkbox" data-c="plan_ahead" ${k.plan_ahead !== false ? "checked" : ""}> Plan a week ahead</label>
+          <label class="checkline"><input type="checkbox" data-c="fact_check" ${k.fact_check ? "checked" : ""}> Every number needs a source</label></div>
+      </div><label class="f" style="margin-top:8px">What this kind of post must contain<textarea data-c="brief" rows="3">${esc(k.brief)}</textarea></label></details>
+    </div>`; }).join("");
   document.querySelectorAll("[data-delcat]").forEach(b => b.onclick = () => {
-    if (!confirm(`Remove category ${b.dataset.delcat}?`)) return;
-    collectSettings(); delete S.config.categories[b.dataset.delcat];
-    WEEKDAYS.forEach(d => { if (S.config.schedule.days[d] === b.dataset.delcat) S.config.schedule.days[d] = ""; });
-    drawCats(); S.dirty = true;
+    const id = b.dataset.delcat;
+    if (!confirm(`Remove the topic "${S.config.categories[id].label}"? Days that use it will have no post.`)) return;
+    collectSettings(); delete S.config.categories[id];
+    WEEKDAYS.forEach(d => { if (S.config.schedule.days[d] === id) S.config.schedule.days[d] = ""; });
+    drawTopics(); drawDays(); S.dirty = true; $("#save-state").textContent = "Unsaved changes";
+  });
+  drawTopicDays();
+}
+function topicNames() {
+  const out = {};
+  document.querySelectorAll("#topics [data-cat]").forEach(box => out[box.dataset.cat] = box.querySelector('[data-c="label"]').value.trim() || box.dataset.cat);
+  return out;
+}
+function drawDays() {
+  // the day menus are rebuilt from the topic cards, keeping each day's choice
+  const names = topicNames(), cur = {};
+  WEEKDAYS.forEach(d => { const el = $(`#days [data-k="schedule.days.${d}"]`); cur[d] = el ? el.value : (S.config.schedule.days[d] || ""); });
+  $("#days").innerHTML = WEEKDAYS.map(d => `<label class="f">${DAY_NAMES[d]}<select data-k="schedule.days.${d}">
+    <option value="">No post</option>${Object.entries(names).map(([id, n]) => `<option value="${esc(id)}" ${id === cur[d] ? "selected" : ""}>${esc(n)}</option>`).join("")}</select></label>`).join("");
+  drawTopicDays();
+}
+function drawTopicDays() {
+  document.querySelectorAll("#topics [data-cat]").forEach(box => {
+    const id = box.dataset.cat, days = WEEKDAYS.filter(d => ($(`#days [data-k="schedule.days.${d}"]`)?.value ?? S.config.schedule.days[d]) === id);
+    box.querySelector(".topic-days").innerHTML = days.length ? `Posted on ${days.map(d => DAY_NAMES[d]).join(", ")}`
+      : `<span style="color:var(--warn)">Not on the schedule yet. Pick it for a day in step 2.</span>`;
   });
 }
 function setPath(obj, path, val) { const ks = path.split("."); let o = obj; ks.slice(0, -1).forEach(k => o = o[k] ??= {}); o[ks.at(-1)] = val; }
@@ -493,15 +537,12 @@ function collectSettings() {
     else if (el.type === "number") v = el.step && el.step.includes(".") ? parseFloat(v) : parseInt(v, 10);
     setPath(cfg, el.dataset.k, v);
   });
-  document.querySelectorAll("[data-ideas]").forEach(el => {
-    const k = cfg.categories[el.dataset.ideas]; if (!k || el.disabled) return;
-    k.ideas = el.value.split("\n").map(s => s.trim()).filter(Boolean);
-  });
   document.querySelectorAll("[data-cat]").forEach(box => {
-    const k = cfg.categories[box.dataset.cat];
+    const k = cfg.categories[box.dataset.cat]; if (!k) return;
     box.querySelectorAll("[data-c]").forEach(el => {
       const f = el.dataset.c; let v = el.type === "checkbox" ? el.checked : el.value;
       if (f === "layouts") v = v.split(",").map(s => s.trim()).filter(Boolean);
+      if (f === "ideas") v = v.split("\n").map(s => s.trim()).filter(Boolean);
       if (["min_chars", "max_chars"].includes(f)) v = parseInt(v, 10);
       if (f === "max_source_age_days") { if (v === "") { delete k[f]; return; } v = parseInt(v, 10); }
       k[f] = v;
