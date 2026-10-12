@@ -1,0 +1,20 @@
+# Linux: run the Studio + scheduler as a user service (no root needed).
+#   mkdir -p ~/.config/systemd/user && cp deploy/systemd/postcrew.service ~/.config/systemd/user/
+#   edit WorkingDirectory below, then:
+#   systemctl --user daemon-reload && systemctl --user enable --now postcrew
+#   loginctl enable-linger $USER     # keep it running when you are logged out
+#   journalctl --user -u postcrew -f # logs
+[Unit]
+Description=Postcrew Studio and scheduler
+After=network-online.target
+
+[Service]
+WorkingDirectory=%h/postcrew
+Environment=POSTCREW_HOME=%h/postcrew/workspace
+Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/usr/bin/python3 -m postcrew serve
+Restart=on-failure
+RestartSec=30
+
+[Install]
+WantedBy=default.target

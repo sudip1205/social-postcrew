@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  macOS: keep the Studio + scheduler running and restart it after login or a crash.
+  1. Replace /PATH/TO/postcrew (twice) and, if needed, the python3 path (run `which python3`).
+  2. cp deploy/launchd/com.postcrew.studio.plist ~/Library/LaunchAgents/
+  3. launchctl load ~/Library/LaunchAgents/com.postcrew.studio.plist
+  Logs: ~/Library/Logs/postcrew.log. Stop: launchctl unload ~/Library/LaunchAgents/com.postcrew.studio.plist
+  PATH must include the folder that contains `claude` (often /Users/YOU/.local/bin; launchd does not expand ~) and ffmpeg.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.postcrew.studio</string>
+  <key>ProgramArguments</key>
+  <array><string>/usr/bin/python3</string><string>-m</string><string>postcrew</string><string>serve</string></array>
+  <key>WorkingDirectory</key><string>/PATH/TO/postcrew</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key><string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/Users/YOU/.local/bin</string>
+    <key>POSTCREW_HOME</key><string>/PATH/TO/postcrew/workspace</string>
+  </dict>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>StandardOutPath</key><string>/tmp/postcrew.log</string>
+  <key>StandardErrorPath</key><string>/tmp/postcrew.log</string>
+</dict>
+</plist>

@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "postcrew"
+version = "0.1.0"
+description = "A supervised crew of AI agents that writes, fact-checks, designs, reviews and publishes your LinkedIn posts."
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.9"
+dependencies = ["Pillow>=10"]
+classifiers = ["Programming Language :: Python :: 3", "License :: OSI Approved :: MIT License", "Operating System :: POSIX"]
+
+[project.scripts]
+postcrew = "postcrew.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["postcrew*"]
+
+[tool.setuptools.package-data]
+postcrew = ["prompts/*.md", "studio/static/*", "render/fonts/*"]

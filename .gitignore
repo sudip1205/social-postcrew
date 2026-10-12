@@ -1,0 +1,11 @@
+# your data and secrets: never commit
+workspace/
+*.tmp
+PAUSE
+__pycache__/
+*.pyc
+.DS_Store
+.venv/
+dist/
+build/
+*.egg-info/
