@@ -35,8 +35,12 @@ class TopicAgent(Agent):
             return self._recap(ctx)
         system = self.prompt(ctx, category=ctx.cat["label"], brief=ctx.cat["brief"],
                              research=ctx.cat.get("research", "optional"))
+        age = ctx.cat.get("max_source_age_days")
         prompt = (f"Post date: {ctx.day.isoformat()} ({ctx.day.strftime('%A')})\n"
-                  f"Category: {ctx.category} - {ctx.cat['label']}\n"
+                  + (f"Freshness: the story's primary source must be published between "
+                     f"{(ctx.day - timedelta(days=age)).isoformat()} and {ctx.day.isoformat()}. Older news is "
+                     f"rejected.\n" if age else "")
+                  + f"Category: {ctx.category} - {ctx.cat['label']}\n"
                   f"What this category is: {ctx.cat['brief']}\n\n"
                   f"Recent posts (do NOT repeat these topics or angles):\n{recent_block(ctx)}"
                   + guidance_block(guidance))

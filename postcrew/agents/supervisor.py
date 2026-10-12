@@ -12,6 +12,7 @@ import traceback
 
 from ..notify import notify
 from . import team
+from ..checks import STALE
 from .base import AgentError
 from .credentials import CredentialsAgent
 from .editor import EditorAgent
@@ -174,6 +175,11 @@ class Supervisor:
             default_target = out.get("fix_owner") if out.get("fix_owner") in FIXABLE else "writer"
         if step == "formatter":
             default_target = "writer"
+        if step == "research" and any(p.startswith(STALE) for p in problems):
+            # research cannot make an old story new: always go back to the Topic Scout
+            return {"action": "rewind", "target": "topic", "reason": "every source is older than allowed",
+                    "instructions": [p for p in problems if p.startswith(STALE)][:1]
+                    + ["pick a story whose primary source was published inside the window"]}
         fallback = {"action": "retry" if default_target == step else "rewind", "target": default_target,
                     "instructions": problems[:6], "reason": "fixing the reported problems"}
         if step in ("credentials", "publisher"):

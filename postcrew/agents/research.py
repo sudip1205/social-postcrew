@@ -13,7 +13,7 @@ result is recorded on the roster (see team.py).
 import re
 from concurrent.futures import ThreadPoolExecutor
 
-from ..checks import norm, source_problems, verify_sources
+from ..checks import STALE, norm, source_problems, verify_sources
 from ..render import tracers
 from . import team
 from .base import Agent, AgentError, guidance_block
@@ -88,7 +88,8 @@ class ResearchAgent(Agent):
             else:
                 problems = self.validate(ctx, r)
             cands.append((m, r, problems))
-            team.record(ctx.ws, m["id"], ctx.run.status["run_id"], good=not problems, problems=problems)
+            mine = [p for p in problems if not p.startswith(STALE)]   # a stale topic is not the researcher's fault
+            team.record(ctx.ws, m["id"], ctx.run.status["run_id"], good=not mine, problems=mine)
             ctx.run.event(self.id, "member", f"{m['name']}: " + (f"{len(problems)} problem(s): {problems[0][:120]}"
                                                                  if problems else self.summary(r)),
                           {"member": m["id"], "problems": problems}, level="warning" if problems else "info")

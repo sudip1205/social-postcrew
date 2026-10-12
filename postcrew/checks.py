@@ -106,6 +106,9 @@ def verify_sources(sources, fetch=fetch_text, limit=6):
     return out
 
 
+STALE = "the topic is too old for this category: the newest verified source is from"
+
+
 def source_problems(verified, research_mode, max_age_days=None, today=None):
     problems = []
     good = [s for s in verified if s["verified"]]
@@ -114,16 +117,20 @@ def source_problems(verified, research_mode, max_age_days=None, today=None):
         problems.append(f"need at least one verified https source with a verbatim quote ({detail})")
     if research_mode == "required" and max_age_days and good:
         today = today or date.today()
-        fresh = False
+        start = today - timedelta(days=max_age_days)
+        dates = []
         for s in good:
             try:
-                d = datetime.strptime(s["published"][:10], "%Y-%m-%d").date()
-                fresh = fresh or (today - timedelta(days=max_age_days) <= d <= today)
+                dates.append(datetime.strptime(s["published"][:10], "%Y-%m-%d").date())
             except ValueError:
                 pass
-        if not fresh:
-            problems.append(f"need a verified source published within the last {max_age_days} days "
-                            f"(set 'published' to its YYYY-MM-DD date)")
+        if not any(start <= d <= today for d in dates):
+            if dates and max(dates) < start:  # the sources are dated and all too old: the story itself is stale
+                problems.append(f"{STALE} {max(dates).isoformat()}, but sources must be published between "
+                                f"{start.isoformat()} and {today.isoformat()}; choose a newer topic")
+            else:
+                problems.append(f"need a verified source published between {start.isoformat()} and "
+                                f"{today.isoformat()} (set 'published' to the YYYY-MM-DD date shown on the page)")
     return problems
 
 

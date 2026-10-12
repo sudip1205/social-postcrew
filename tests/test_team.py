@@ -154,3 +154,23 @@ class TeamTests(unittest.TestCase):
             maya = next(m for m in team.load(ws)["members"] if m["name"] == "Maya")
             self.assertEqual((maya["stats"]["editor_failed"], maya["stats"]["editor_passed"]), (0, 1))
             self.assertTrue(maya["recent"][-1]["good"])        # the revision passed: the last word counts
+
+    def test_stale_story_goes_back_to_the_topic_scout_and_is_not_the_researchers_fault(self, _):
+        with TempWorkspace() as ws:
+            team_ws(ws, research_n=1, writer_n=1, pre_review=False)
+            fresh = research(published="2026-10-11")
+            llm = ScriptedLLM(base_script(topic=[topic("Acme Model 1 pricing"), topic()],
+                                          research=[research(published="2026-09-01"), fresh],
+                                          supervisor=[{"action": "retry", "target": "research",
+                                                       "instructions": ["try again"], "reason": "wrong"}]))
+            res = run_crew(ws, TUESDAY, llm=llm, fetch=fake_fetch())
+            self.assertTrue(res["ok"], res)
+            evs = [json.loads(l) for l in (ws.runs_dir / res["run_id"] / "events.jsonl").read_text().splitlines()]
+            d = next(e for e in evs if e["kind"] == "decision")
+            self.assertIn("rewind -> topic", d["message"])
+            self.assertIn("2026-09-01", d["data"]["instructions"][0])
+            self.assertEqual([c["agent"] for c in llm.calls].count("supervisor"), 0)  # no model needed to decide
+            ada = next(m for m in team.load(ws)["members"] if m["name"] == "Ada")
+            self.assertTrue(all(r["good"] for r in ada["recent"]))
+            topic_prompt = next(c for c in llm.calls if c["agent"] == "topic")["prompt"]
+            self.assertIn("published between 2026-10-03 and 2026-10-13", topic_prompt)
