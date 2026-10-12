@@ -112,7 +112,7 @@ class Studio:
                          "entry": entries.get(iso) if (entries.get(iso) or {}).get("category") == cat else None,
                          "written": ({"status": "published" if iso in hist else done.get("status"),
                                       "topic": done.get("topic", "")} if done else None)})
-        return {"days": rows, "planning": cfg["planning"], "next_week": [planner_mod.next_week(today)[0].isoformat(),
+        return {"days": rows, "planning": cfg["planning"], "ideas": planner_mod.idea_status(self.ws, cfg), "next_week": [planner_mod.next_week(today)[0].isoformat(),
                                                                          last.isoformat()]}
 
     def _plan_day(self, day):
@@ -147,8 +147,17 @@ class Studio:
             raise ValueError(f"the planner could not find a new topic: {out[day]['error']}")
         return self.plan()
 
-    def plan_fill(self):
-        planner_mod.plan_week(self.ws, crew.local_now(self.ws.config()).date())
+    def plan_fill(self, body=None):
+        """Plan the open days; replan=True also replaces the planner's own topics (yours are kept)."""
+        if (body or {}).get("replan"):
+            today = crew.local_now(self.ws.config()).date()
+            days = [today + timedelta(days=i) for i in range(1, (planner_mod.next_week(today)[-1] - today).days + 1)]
+            out = planner_mod.PlannerAgent().plan(self.ws, days, replan=True)
+            bad = [e["error"] for e in out.values() if "error" in e]
+            if bad:
+                raise ValueError(f"{len(bad)} day(s) could not be re-planned: {bad[0]}")
+        else:
+            planner_mod.plan_week(self.ws, crew.local_now(self.ws.config()).date())
         return self.plan()
 
     def queue_action(self, pid, action, body):
@@ -369,7 +378,7 @@ def make_handler(studio):
                 routes = {
                     ("GET", "/api/overview"): lambda: studio.overview(),
                     ("GET", "/api/plan"): lambda: studio.plan(),
-                    ("POST", "/api/plan/fill"): lambda: studio.plan_fill(),
+                    ("POST", "/api/plan/fill"): lambda: studio.plan_fill(self.body()),
                     ("GET", "/api/agents"): lambda: studio.agents(),
                     ("GET", "/api/runs"): lambda: {"runs": crew.list_runs(ws)},
                     ("POST", "/api/runs"): lambda: studio.start_run(self.body()),

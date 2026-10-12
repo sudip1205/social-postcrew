@@ -3,9 +3,11 @@ of them before the crew writes the post. The plan lives in state/plan.json; the 
 topic instead of picking one itself.
 
 Each plan entry: {"category", "topic", "angle", "search_queries", "source": planner|manual|auto, "rejected": [...]}.
-Categories with "plan_ahead": false (fresh news) are left to the Topic Scout the day before, unless you set a
+Your topic ideas (Settings > Topic ideas: a list per category, plus a focus for the whole plan) come first: the
+planner uses an unused idea before inventing one. Categories with "plan_ahead": false (fresh news) are left to the Topic Scout the day before, unless you set a
 topic for that day yourself or ask the planner for one.
 """
+import re
 import threading
 from datetime import datetime, timedelta, timezone
 
@@ -60,6 +62,31 @@ def next_week(today):
     return [start + timedelta(days=i) for i in range(7)]
 
 
+def idea_status(ws, cfg=None):
+    """{category: [{"idea", "used_on"}]}: used_on = date of the published or planned post that covers the idea."""
+    cfg = cfg or ws.config()
+    plan = load_plan(ws)
+    covered = [{"topic": p.get("topic", ""), "date": p.get("date", "")} for p in ws.recent_posts(200)]
+    covered += [{"topic": e.get("topic", ""), "date": d} for d, e in plan.items() if e.get("topic")]
+    out = {}
+    for cid, c in cfg["categories"].items():
+        rows = []
+        for idea in c.get("ideas", []):
+            hit = next((h for h in covered if idea_matches(idea, h["topic"])), None)
+            rows.append({"idea": idea, "used_on": hit["date"] if hit else None})
+        out[cid] = rows
+    return out
+
+
+def idea_matches(idea, topic):
+    words = lambda s: {w for w in re.findall(r"[a-z0-9+#]+", s.lower()) if len(w) > 2 and w not in STOP}
+    a, b = words(idea), words(topic)
+    return bool(a) and (repeat_problem(idea, "", [{"topic": topic}]) is not None or len(a & b) >= max(1, (len(a) + 1) // 2))
+
+
+STOP = {"the", "and", "for", "with", "how", "why", "what", "you", "your", "into", "from", "explained", "about", "using"}
+
+
 def taken_dates(ws):
     """Dates already written (queued) or published by Postcrew: their topic can no longer be planned.
     Imported posts only count for repeats; their dates came from another tool."""
@@ -72,9 +99,10 @@ class PlannerAgent(Agent):
     title = "Week Planner"
     role = "Drafts every topic for next week a week ahead; you can edit any day or ask for a different topic."
 
-    def plan(self, ws, days, llm=None, hint="", force=False):
-        """Plan `days` (dates). force=True also plans fresh-news days and replaces existing entries (used by
-        'Suggest another'). Returns {date: entry or {"error": ...}}. Logs to plans/<id>/."""
+    def plan(self, ws, days, llm=None, hint="", force=False, replan=False):
+        """Plan `days` (dates). force=True also plans fresh-news days and replaces existing entries, rejecting
+        the old topic ('Suggest another'). replan=True replaces the planner's own entries without rejecting them
+        (after you change your ideas); topics you typed yourself are kept. Returns {date: entry or {"error"}}."""
         from ..llm import make_backend
         cfg = ws.config()
         plan, taken = load_plan(ws), taken_dates(ws)
@@ -83,7 +111,11 @@ class PlannerAgent(Agent):
             iso, cat = d.isoformat(), cfg["schedule"]["days"].get(WEEKDAYS[d.weekday()])
             if not cat or cat not in cfg["categories"] or iso in taken:
                 continue
-            if not force and (iso in plan or not cfg["categories"][cat].get("plan_ahead", True)):
+            e, ahead = plan.get(iso), cfg["categories"][cat].get("plan_ahead", True)
+            if replan:
+                if (e and e.get("source") in ("manual", "auto")) or (not e and not ahead):
+                    continue
+            elif not force and (e or not ahead):
                 continue
             todo.append((d, cat))
         if not todo:
@@ -97,11 +129,13 @@ class PlannerAgent(Agent):
             out[d.isoformat()] = self._fixed(ctx, d, cat, plan, out)
         llm_days = [x for x in todo if d_iso(x) not in out]
         if llm_days:
-            out.update(self._ask_days(ctx, llm_days, plan, hint))
+            focus = cfg["planning"].get("focus", "").strip()
+            out.update(self._ask_days(ctx, llm_days, plan, "\n".join(h for h in (focus, hint) if h), replan))
         for iso, e in out.items():
             if "error" not in e:
                 old = plan.get(iso) or {}
-                rejected = (old.get("rejected", []) + ([old["topic"]] if force and old.get("topic") else []))[-10:]
+                rejected = (old.get("rejected", []) + ([old["topic"]] if force and not replan and old.get("topic")
+                                                       else []))[-10:]
                 set_entry(ws, iso, dict(e, rejected=rejected))
         ok = sum(1 for e in out.values() if "error" not in e)
         run.finish("succeeded" if ok == len(out) else "failed", f"planned {ok} of {len(out)} day(s)")
@@ -122,15 +156,20 @@ class PlannerAgent(Agent):
         return {"category": cat, "topic": f"{algo.title} in Java", "angle": algo.subtitle, "search_queries": [],
                 "algo": algo.id, "source": "auto"}
 
-    def _ask_days(self, ctx, todo, plan, hint):
+    def _ask_days(self, ctx, todo, plan, hint, replan=False):
         cfg, pl = ctx.cfg, ctx.cfg["pipeline"]
         others = {k: e for k, e in plan.items() if k not in {d_iso(x) for x in todo} and e.get("topic")}
+        covered = [p.get("topic", "") for p in ctx.recent(200)] + [e["topic"] for e in others.values()]
         blocks = {}
         for d, cat in todo:
             c, old = cfg["categories"][cat], plan.get(d.isoformat()) or {}
-            avoid = [t for t in old.get("rejected", []) + [old.get("topic", "")] if t]
+            avoid = [t for t in old.get("rejected", []) + ([] if replan else [old.get("topic", "")]) if t]
+            ideas = [i for i in c.get("ideas", []) if not any(idea_matches(i, t) for t in covered + avoid)]
             blocks[d.isoformat()] = (f"DATE {d.isoformat()} ({d.strftime('%A')}) - category {cat}: {c['label']}\n"
                                      f"What it needs: {c['brief']}\nResearch: {c.get('research', 'optional')}"
+                                     + (f"\nTHE OWNER'S TOPIC IDEAS for this category, not used yet: {ideas}. Base this "
+                                        f"day on one of them (the earliest that fits); use each idea once across the plan."
+                                        if ideas else "")
                                      + (f"\nThe owner rejected these, do NOT propose them again: {avoid}" if avoid else ""))
         system = self.prompt(ctx)
         tools = ["WebSearch"] if any(cfg["categories"][c].get("research") == "required" for _, c in todo) else []

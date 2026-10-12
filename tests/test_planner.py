@@ -68,6 +68,42 @@ class PlannerTests(unittest.TestCase):
             self.assertIn("usage limit", out["2026-10-21"]["error"])
             self.assertNotIn("2026-10-21", out["2026-10-21"]["error"])
 
+    def test_owner_ideas_and_focus_reach_the_planner_and_used_ideas_are_left_out(self):
+        with TempWorkspace() as ws:
+            cfg = ws.config()
+            cfg["categories"]["build-guide"]["ideas"] = ["Local RAG with Ollama", "GitHub Actions CI pipeline"]
+            cfg["planning"]["focus"] = "Keep every example in Python"
+            ws.save_config(cfg)
+            ws.add_history({"date": "2026-10-01", "topic": "Build a local RAG over your docs with Ollama"})
+            self.assertEqual([x["used_on"] for x in planner.idea_status(ws)["build-guide"]], ["2026-10-01", None])
+            llm = ScriptedLLM({"planner": [{"days": [day_answer("2026-10-21", "Build a GitHub Actions CI pipeline")]}]})
+            planner.PlannerAgent().plan(ws, [date(2026, 10, 21)], llm=llm)
+            prompt = llm.calls[0]["prompt"]
+            self.assertIn("THE OWNER'S TOPIC IDEAS for this category, not used yet: ['GitHub Actions CI pipeline']", prompt)
+            self.assertIn("Keep every example in Python", prompt)
+            self.assertEqual(planner.idea_status(ws)["build-guide"][1]["used_on"], "2026-10-21")
+
+    def test_replan_replaces_planner_topics_keeps_yours_and_rejects_nothing(self):
+        with TempWorkspace() as ws:
+            planner.set_entry(ws, "2026-10-21", {"category": "build-guide", "topic": "Feature flags done right",
+                                                 "angle": "a", "search_queries": [], "source": "planner"})
+            planner.set_entry(ws, "2026-10-22", {"category": "tool-spotlight", "topic": "Hurl API tests",
+                                                 "angle": "a", "search_queries": ["hurl"], "source": "manual"})
+            llm = ScriptedLLM({"planner": [{"days": [day_answer("2026-10-21", "Docker multi-stage builds")]}]})
+            planner.PlannerAgent().plan(ws, [date(2026, 10, 21), date(2026, 10, 22)], llm=llm, replan=True)
+            plan = planner.load_plan(ws)
+            self.assertEqual((plan["2026-10-21"]["topic"], plan["2026-10-21"]["rejected"]), ("Docker multi-stage builds", []))
+            self.assertEqual(plan["2026-10-22"]["topic"], "Hurl API tests")
+            self.assertIn("Plan these 1 day(s)", llm.calls[0]["prompt"])           # your day is only listed as taken
+            self.assertNotIn("rejected these", llm.calls[0]["prompt"])
+
+    def test_bad_ideas_are_refused(self):
+        from postcrew.workspace import validate_config
+        with TempWorkspace() as ws:
+            cfg = ws.config()
+            cfg["categories"]["dev-tip"]["ideas"] = ["ok idea", "x"]
+            self.assertTrue(any("ideas" in e for e in validate_config(cfg)))
+
     def test_recent_posts_show_their_opening_line(self):
         with TempWorkspace() as ws:
             ws.add_history({"date": "2026-10-01", "topic": "Cheap small models",

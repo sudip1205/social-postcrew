@@ -363,7 +363,7 @@ async function renderPlan() {
 
 /* ---------- settings (configurator) ---------- */
 async function renderSettings() {
-  const [{ config }, { agents }] = await Promise.all([api("/api/config"), api("/api/agents")]);
+  const [{ config }, { agents }, planInfo] = await Promise.all([api("/api/config"), api("/api/agents"), api("/api/plan")]);
   S.config = config;
   const c = config, cats = Object.keys(c.categories);
   const sel = (id, val, opts) => `<select data-k="${id}">${opts.map(([v, l]) => `<option value="${esc(v)}" ${v === val ? "selected" : ""}>${esc(l)}</option>`).join("")}</select>`;
@@ -390,6 +390,21 @@ async function renderSettings() {
     <label class="f">Plan at${inp("planning.time", c.planning.time, "time")}</label>
   </div><h3>What to post each day</h3><div class="days">${WEEKDAYS.map(d => `<label class="f">${DAY_NAMES[d]}${sel("schedule.days." + d, c.schedule.days[d] || "", [["", "No post"], ...cats.map(id => [id, c.categories[id].label])])}</label>`).join("")}</div>
   <datalist id="tzs">${(Intl.supportedValuesOf ? Intl.supportedValuesOf("timeZone") : []).map(z => `<option value="${esc(z)}">`).join("")}</datalist></div>
+  <div class="panel section" id="ideas"><h2>Topic ideas</h2>
+    <p class="muted small">Give the Week Planner your own ideas, one per line, for each kind of post. It uses an unused idea before
+      inventing one; a used idea is marked with the date it was posted or planned. Then plan the week from here.</p>
+    <label class="f">Focus for the plan (optional, applies to every day)<textarea data-k="planning.focus" rows="2" maxlength="600"
+      placeholder="e.g. This week is about Kubernetes; keep examples in Python; avoid OpenAI news">${esc(c.planning.focus || "")}</textarea></label>
+    <div class="grid g2" style="margin-top:12px">${[...new Set(WEEKDAYS.map(d => c.schedule.days[d]).filter(Boolean))].concat(cats.filter(id => !WEEKDAYS.some(d => c.schedule.days[d] === id)))
+      .map(id => { const k = c.categories[id], days = WEEKDAYS.filter(d => c.schedule.days[d] === id).map(d => DAY_NAMES[d]);
+        const used = (planInfo.ideas[id] || []).filter(x => x.used_on);
+        const fixed = k.media === "animation" || id === "week-recap";
+        return `<label class="f">${esc(k.label)} <span class="muted small">${days.length ? days.join(", ") : "not scheduled"}${k.plan_ahead === false ? " · picked the day before" : ""}</span>
+          <textarea data-ideas="${esc(id)}" rows="4" ${fixed ? "disabled" : ""} placeholder="${fixed ? "Chosen automatically" : "One idea per line, e.g. Kafka consumer groups"}">${esc((k.ideas || []).join("\n"))}</textarea>
+          ${used.length ? `<span class="small muted">Used: ${used.map(x => `${esc(x.idea)} (${esc(x.used_on)})`).join("; ")}</span>` : ""}</label>`; }).join("")}</div>
+    <div class="row" style="margin-top:12px"><button class="primary" id="ideas-plan">Save and plan open days</button>
+      <button id="ideas-replan">Save and re-plan next week</button><a class="small" href="#plan">Open the Plan</a>
+      <span class="muted small" id="ideas-state">Re-plan replaces the planner's topics; topics you typed in the Plan are kept.</span></div></div>
   <div class="panel section"><h2>Publishing</h2><div class="grid g3">
     <label class="f">After a post passes review${sel("publishing.approval", c.publishing.approval, [["auto_with_veto", "Publish at post time unless I veto (default)"], ["manual", "Wait for my approval"], ["immediate", "Publish immediately"]])}</label>
     <label class="f">LinkedIn API version (YYYYMM)${inp("publishing.linkedin_api_version", c.publishing.linkedin_api_version)}</label>
@@ -427,6 +442,16 @@ async function renderSettings() {
   $("#view").addEventListener("input", () => { S.dirty = true; $("#save-state").textContent = "Unsaved changes"; });
   $("#view").addEventListener("change", () => { S.dirty = true; $("#save-state").textContent = "Unsaved changes"; });
   $("#save").onclick = saveSettings;
+  const planFromIdeas = replan => async () => {
+    if (!(await saveSettings())) return;
+    document.querySelectorAll("#ideas button").forEach(b => b.disabled = true);
+    $("#ideas-state").textContent = "The Week Planner is working (about a minute)…";
+    try { await post("/api/plan/fill", { replan }); toast("Plan updated"); location.hash = "plan"; }
+    catch (e) { toast(e.message, true); document.querySelectorAll("#ideas button").forEach(b => b.disabled = false);
+      $("#ideas-state").textContent = e.message; }
+  };
+  $("#ideas-plan").onclick = planFromIdeas(false);
+  $("#ideas-replan").onclick = planFromIdeas(true);
   $("#reset").onclick = () => { S.dirty = false; renderSettings(); };
   $("#add-cat").onclick = () => {
     const id = prompt("Category id (lowercase letters, digits, dashes), e.g. career-tip"); if (!id) return;
@@ -468,6 +493,10 @@ function collectSettings() {
     else if (el.type === "number") v = el.step && el.step.includes(".") ? parseFloat(v) : parseInt(v, 10);
     setPath(cfg, el.dataset.k, v);
   });
+  document.querySelectorAll("[data-ideas]").forEach(el => {
+    const k = cfg.categories[el.dataset.ideas]; if (!k || el.disabled) return;
+    k.ideas = el.value.split("\n").map(s => s.trim()).filter(Boolean);
+  });
   document.querySelectorAll("[data-cat]").forEach(box => {
     const k = cfg.categories[box.dataset.cat];
     box.querySelectorAll("[data-c]").forEach(el => {
@@ -486,10 +515,10 @@ async function saveSettings() {
     const r = await api("/api/config", { method: "PUT", body: { config: cfg } });
     if (!r.ok) {
       $("#cfg-errors").innerHTML = `<div class="banner error"><div class="grow"><b>Not saved. Fix these:</b><ul class="err-list">${r.errors.map(e => `<li>${esc(e)}</li>`).join("")}</ul></div></div>`;
-      window.scrollTo({ top: 0, behavior: "smooth" }); return;
+      window.scrollTo({ top: 0, behavior: "smooth" }); return false;
     }
-    S.dirty = false; $("#cfg-errors").innerHTML = ""; $("#save-state").textContent = "Saved"; toast("Settings saved"); refreshOverview();
-  } catch (e) { toast(e.message, true); }
+    S.dirty = false; $("#cfg-errors").innerHTML = ""; $("#save-state").textContent = "Saved"; toast("Settings saved"); refreshOverview(); return true;
+  } catch (e) { toast(e.message, true); return false; }
 }
 
 /* ---------- credentials ---------- */

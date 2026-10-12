@@ -84,7 +84,7 @@ you turn that off.
 | Overview | next post and run, LinkedIn status, start a run or rehearsal, pause the schedule, recent runs |
 | Workflow | live graph of the crew (state, tries, cost per agent, sent-back arrows), the Supervisor's decisions, each agent's output and rendered media, the full event log |
 | Queue | LinkedIn-style preview of every queued post: approve, edit, veto, publish now; the published history |
-| Settings | the configurator: profile, schedule and days, categories and their briefs, models and limits per agent, quality thresholds, notifications |
+| Settings | **Topic ideas** (your own list per kind of post, plus a focus for the whole plan; then plan or re-plan the week), and the configurator: profile, schedule and days, categories and their briefs, models and limits per agent, quality thresholds, notifications |
 | Credentials | LinkedIn app and OAuth connect/reconnect, token status, Claude Code login test, Gmail, Telegram |
 
 Notifications (bell icon) appear in the Studio and, if enabled, as desktop notifications, Gmail emails and

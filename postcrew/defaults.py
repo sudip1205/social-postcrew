@@ -30,6 +30,7 @@ DEFAULT_CONFIG = {
         "enabled": True,
         "weekday": "mon",
         "time": "10:00",
+        "focus": "",                     # optional direction for the whole plan, e.g. "Kubernetes week"
     },
     "publishing": {
         # auto_with_veto: queued posts go out at post_time unless you veto them.
