@@ -43,6 +43,17 @@ SCHEMA = {
 }
 
 
+MEDIA_WORDS = ("media", "poster", "image", "video", "visual", "slide")
+
+
+def _about(problem, step):
+    """Does an Editor point concern this step's work? (Editors label fixes 'Media: ...' or mention the poster.)"""
+    p = problem.lower()
+    if step == "media":
+        return any(w in p for w in MEDIA_WORDS) or "red flag: poster_text_mismatch" in p
+    return True
+
+
 def clip(obj, n=1500):
     s = str(obj)
     return s if len(s) <= n else s[:n] + "...(cut)"
@@ -125,6 +136,13 @@ class Supervisor:
                     if s != target:
                         guidance[s] = []
                     run.step(s, "retrying" if s == target else "pending")
+                if step == "editor" and target != step:
+                    # every agent being redone between the target and the Editor gets the Editor's points for it:
+                    # a rewind to the writer also redoes the poster, which must fix its own problems
+                    for s in self.order[self.order.index(target) + 1:self.order.index(step)]:
+                        if s in FIXABLE:
+                            mine = [p for p in problems if _about(p, s)]
+                            guidance[s] = mine[:6]
         run.finish("succeeded", self._result_text(ctx))
         self._review_team(ctx)
         return {"ok": True, "post": ctx.outputs.get("publisher"), "cost_usd": run.cost}

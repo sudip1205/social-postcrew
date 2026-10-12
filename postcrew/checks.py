@@ -177,6 +177,13 @@ def number_problems(text, media_text, verified):
     return [f"these numbers are not in any verified source: {hard} (remove them or quote the source)"] if hard else []
 
 
+def poster_number_problems(post_text, poster_text):
+    """Numbers on the poster must also be in the post (the Editor flags a mismatch as a red flag)."""
+    in_post = {bare(t) for t in significant_numbers(post_text)}
+    extra = [t for t in dict.fromkeys(significant_numbers(poster_text)) if bare(t) not in in_post]
+    return [f"the poster shows numbers the post does not: {extra}; use only the post's figures"] if extra else []
+
+
 def link_problems(text, first_comment, verified):
     allowed = {norm_url(s["url"]) for s in verified if s["verified"]}
     stray = [u for u in URL.findall((text or "") + "\n" + (first_comment or "")) if norm_url(u) not in allowed]

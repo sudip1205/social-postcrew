@@ -73,7 +73,8 @@ class WriterAgent(Agent):
                 for c, rv in zip(clean, pool.map(lambda c: self._pre_review(ctx, c["out"]), clean)):
                     c["review"] = rv
         best = self._pick(cands, pl)
-        if best and tcfg.get("pre_review") and best["review"] and not self._passes(best["review"], pl):
+        if best and tcfg.get("pre_review") and best["review"] and not self._passes(best["review"], pl,
+                                                                                tcfg.get("pre_review_margin", 5)):
             best = self._polish(ctx, best, guidance, pl) or best
         for c in cands:
             rv = c["review"]
@@ -98,8 +99,10 @@ class WriterAgent(Agent):
         return out
 
     @staticmethod
-    def _passes(rv, pl):
-        return (rv["overall"] >= pl["min_overall"] and not rv["red_flags"]
+    def _passes(rv, pl, margin=0):
+        """margin: the pre-review is one read and the Editor keeps the worst of several, so the best draft is
+        polished until it clears the bar by this much."""
+        return (rv["overall"] >= pl["min_overall"] + margin and not rv["red_flags"]
                 and min(rv["scores"].get(k, 0) for k in CRITERIA) >= pl["min_subscore"])
 
     def _pick(self, cands, pl):

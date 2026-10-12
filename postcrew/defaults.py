@@ -68,6 +68,7 @@ DEFAULT_CONFIG = {
         "research": 2,                  # researchers per post; their verified sources are combined
         "writer": 2,                    # writers per post; the best draft is chosen
         "pre_review": True,             # score every draft (and polish the best one) before the Editor sees it
+        "pre_review_margin": 5,         # polish the best draft unless it beats the passing score by this much
         "fire_window": 6,               # judge a member on their last N posts ...
         "fire_min_success": 0.34,       # ... and replace them if fewer than this share were good
     },

@@ -4,7 +4,7 @@ import json
 import shutil
 from urllib.parse import urlparse
 
-from ..checks import check_code, number_problems
+from ..checks import check_code, number_problems, poster_number_problems
 from ..render import animate, poster, tracers
 from .base import Agent, AgentError, guidance_block
 
@@ -25,12 +25,16 @@ SCHEMA = {
 }
 
 
-def source_footer(research):
-    for s in (research or {}).get("verified", []):
-        u = urlparse(s.get("url", ""))
-        if s.get("verified") and u.netloc:
+def source_footer(research, first_comment=""):
+    """The source line on the poster: the first comment's link (the post's primary source) if it fits whole,
+    otherwise its site name. Never a cut-off address: reviewers rightly flag a link that does not work."""
+    urls = [first_comment] + [s.get("url", "") for s in (research or {}).get("verified", []) if s.get("verified")]
+    for url in urls:
+        u = urlparse((url or "").strip())
+        if u.scheme == "https" and u.netloc:
             host = u.netloc[4:] if u.netloc.startswith("www.") else u.netloc
-            return f"Source: {host}{u.path.rstrip('/')[:28]}"
+            full = f"Source: {host}{u.path.rstrip('/')}"
+            return full if len(full) <= 52 else f"Source: {host} (link in the first comment)"[:70]
     return ""
 
 
@@ -61,13 +65,15 @@ class MediaAgent(Agent):
         system = self.prompt(ctx, layouts=", ".join(ctx.cat["layouts"]), kicker=ctx.cat.get("kicker", ""))
         prompt = (f"Allowed layouts: {ctx.cat['layouts']}\nKicker (pill text): {ctx.cat.get('kicker', '')}\n\n"
                   f"THE POST (the poster must agree with it and add no new claims):\n{ctx.outputs['writer']['text']}"
+                  + "\n\nEvery fact, name and number on the poster must appear in the post above, worded the same way "
+                    "(same qualifiers, same figures). Leave out anything the post does not say."
                   + (f"\n\nYOUR PREVIOUS POSTER SPEC (revise it to match the post above):\n"
                      f"{json.dumps(ctx.previous['media'].get('spec', {}), ensure_ascii=False)}"
                      if ctx.previous.get("media") else "")
                   + guidance_block(guidance))
         spec = self.ask(ctx, system, prompt, SCHEMA)
         spec["kicker"] = spec.get("kicker") or ctx.cat.get("kicker", "")
-        spec["footer_left"] = source_footer(ctx.outputs.get("research"))
+        spec["footer_left"] = source_footer(ctx.outputs.get("research"), ctx.outputs["writer"].get("first_comment", ""))
         path = ctx.run.dir / "poster.png"
         try:
             poster.render_poster(spec, path, handle)
@@ -88,6 +94,8 @@ class MediaAgent(Agent):
             err = check_code(spec["code"], spec.get("language"))
             if err:
                 problems.append(f"the poster code does not parse: {err}")
+        if out["kind"] == "image":
+            problems += poster_number_problems(ctx.outputs["writer"]["text"], out.get("shown_text", ""))
         if ctx.cat.get("fact_check"):
             research = ctx.outputs.get("research") or {}
             verified = [dict(s, page=research.get("_pages", {}).get(s["url"], ""))

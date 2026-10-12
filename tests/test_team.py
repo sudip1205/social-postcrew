@@ -174,3 +174,37 @@ class TeamTests(unittest.TestCase):
             self.assertTrue(all(r["good"] for r in ada["recent"]))
             topic_prompt = next(c for c in llm.calls if c["agent"] == "topic")["prompt"]
             self.assertIn("published between 2026-10-03 and 2026-10-13", topic_prompt)
+
+
+class PosterFixTests(unittest.TestCase):
+    def test_source_line_is_never_a_cut_off_address(self):
+        from postcrew.agents.media import source_footer
+        long_url = "https://sierra.ai/blog/introducing-personal-agent-protocol"
+        r = {"verified": [{"url": long_url, "verified": True}]}
+        self.assertEqual(source_footer(r, long_url), "Source: sierra.ai (link in the first comment)")
+        self.assertEqual(source_footer(r, "https://sierra.ai/blog/poppy"), "Source: sierra.ai/blog/poppy")
+        self.assertEqual(source_footer({"verified": []}, ""), "")
+
+    def test_poster_numbers_must_be_in_the_post(self):
+        from postcrew.checks import poster_number_problems
+        self.assertEqual(poster_number_problems("an additional 35 design partners", "35 partners"), [])
+        self.assertTrue(poster_number_problems("an additional 35 design partners", "40 partners"))
+
+
+@mock.patch.object(cred_mod, "check_claude", return_value={"state": "ok", "message": "logged in"})
+class EditorRewindTests(unittest.TestCase):
+    def test_editor_poster_fixes_reach_the_visual_designer_on_a_rewind(self, _):
+        with TempWorkspace() as ws:
+            team_ws(ws, research_n=1, writer_n=1, pre_review=False)
+            llm = ScriptedLLM(base_script(
+                editor=[review(60, flags=["poster_text_mismatch"], fixes=["Writer: tighten the hook",
+                                                                          "Media: use the post's wording on the poster"])] * 3
+                + [review()],
+                supervisor=[{"action": "rewind", "target": "writer", "instructions": ["tighten the hook"],
+                             "reason": "text"}]))
+            res = run_crew(ws, TUESDAY, llm=llm, fetch=fake_fetch())
+            self.assertTrue(res["ok"], res)
+            media_prompts = [c["prompt"] for c in llm.calls if c["agent"] == "media"]
+            self.assertEqual(len(media_prompts), 2)
+            self.assertIn("Media: use the post's wording on the poster", media_prompts[1])
+            self.assertNotIn("Writer: tighten the hook", media_prompts[1])

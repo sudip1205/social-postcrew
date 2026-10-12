@@ -10,4 +10,6 @@ Common fields: "layout"; "title" (max 90 chars; wrap 1-3 key words in [[double b
   "caption" (one-sentence takeaway), optional "bullets" (max 2 short lines). Python, bash and json must parse.
 - flow (2-6 nodes): "items": [{"label": "Step", "sub": "detail", "tag": "BROWSER", "via": "label on the arrow"}],
   optional "highlight": index of the step to emphasize.
-The poster must agree with the post and add NO new facts or numbers.
+The poster must agree with the post and add NO new facts or numbers. Use the post's own wording for every
+claim: if the post says "an additional 35 design partners" or "a draft standard", the poster says the same,
+and it names the same companies. Do not put links or source lines on the poster; the program adds them.
