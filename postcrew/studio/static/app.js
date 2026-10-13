@@ -5,18 +5,36 @@ const $ = (s, el = document) => el.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const STEP_TITLES = { credentials: "Credential Monitor", topic: "Topic Scout", research: "Researcher", writer: "Writer",
   media: "Visual Designer", editor: "Editor Review", formatter: "Formatter", publisher: "Publisher" };
-const STATE_COLORS = { pending: ["#0f1729", "#2a3a5e", "#8a98b3"], running: ["#1d1640", "#a78bfa", "#c4b5fd"],
-  retrying: ["#1d1640", "#a78bfa", "#c4b5fd"], passed: ["#0c2a24", "#34d399", "#34d399"], failed: ["#2e1020", "#fb7185", "#fb7185"],
-  skipped: ["#0b1222", "#1e2a44", "#5b6b89"], blocked: ["#2a0f1c", "#9f4560", "#fb7185"], waiting: ["#2a2110", "#fbbf24", "#fbbf24"] };
-// every agent's name, and the two colours of its avatar; the research and writing teams show their members' names
-const AGENTS = { supervisor: ["Orion", "#a78bfa", "#38bdf8"], planner: ["Vega", "#f0abfc", "#a78bfa"], credentials: ["Aegis", "#94a3b8", "#38bdf8"],
-  topic: ["Nova", "#38bdf8", "#22d3ee"], research: ["Research team", "#22d3ee", "#34d399"], writer: ["Writing team", "#fbbf24", "#f472b6"],
-  reviewer: ["Iris", "#f472b6", "#a78bfa"], media: ["Pixel", "#f472b6", "#fb7185"], editor: ["Quinn", "#34d399", "#38bdf8"],
-  formatter: ["Kai", "#a3e635", "#22d3ee"], publisher: ["Echo", "#60a5fa", "#a78bfa"] };
+// state -> [ring colour, status text colour]
+const STATE_COLORS = { pending: ["#cbd5e6", "#5b6b85"], running: ["#7c3aed", "#7c3aed"], retrying: ["#7c3aed", "#7c3aed"],
+  passed: ["#059669", "#059669"], failed: ["#e11d48", "#e11d48"], skipped: ["#e1e7f2", "#94a3b8"], blocked: ["#fda4af", "#e11d48"],
+  waiting: ["#f59e0b", "#b45309"] };
+// an agent's colour comes from its team, so the colour tells you who works with whom; the icon tells you who it is
+const TEAMS = { command: ["Command", "#7c3aed", "#a855f7"], plan: ["Planning", "#0284c7", "#06b6d4"], research: ["Research team", "#0d9488", "#10b981"],
+  writing: ["Writing team", "#ea580c", "#f59e0b"], design: ["Design", "#db2777", "#f472b6"], quality: ["Quality", "#4f46e5", "#818cf8"],
+  ops: ["Operations", "#334155", "#64748b"] };
+const AGENTS = { supervisor: ["Orion", "command", "compass"], planner: ["Vega", "plan", "calendar"], topic: ["Nova", "plan", "radar"],
+  research: ["Research team", "research", "search"], writer: ["Writing team", "writing", "pen"], reviewer: ["Iris", "writing", "eye"],
+  media: ["Pixel", "design", "image"], editor: ["Quinn", "quality", "check"], formatter: ["Kai", "quality", "align"],
+  credentials: ["Aegis", "ops", "shield"], publisher: ["Echo", "ops", "send"] };
+const ICONS = { // 24x24 line icons
+  compass: '<circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/>',
+  calendar: '<rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
+  radar: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><path d="M12 12l6.4-6.4"/>',
+  search: '<circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21"/>',
+  pen: '<path d="M4 20l4.2-1 11-11a2.1 2.1 0 0 0-3-3l-11 11z"/><path d="M14.5 6.5l3 3"/>',
+  eye: '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+  image: '<rect x="3" y="4" width="18" height="16" rx="2.5"/><circle cx="9" cy="10" r="1.8"/><path d="M21 16l-5-5-9 9"/>',
+  check: '<rect x="5" y="4" width="14" height="17" rx="2.5"/><path d="M9 3.5h6v3H9zM9 13.5l2 2 4-4.5"/>',
+  align: '<path d="M4 6h16M4 10h10M4 14h16M4 18h8"/>',
+  shield: '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/>',
+  send: '<path d="M21 3L3 10.5l7 2.6L12.6 21z"/><path d="M10 13.1L21 3"/>' };
+const teamOf = id => TEAMS[AGENTS[id]?.[1]] || TEAMS.ops;
+const icon = id => ICONS[AGENTS[id]?.[2]] || ICONS.compass;
 const agentName = id => (S.agents?.[id]?.members?.length ? S.agents[id].members.join(" · ") : null) || AGENTS[id]?.[0] || id;
 const agentTitle = id => id === "supervisor" ? "Supervisor" : S.agents?.[id]?.title || STEP_TITLES[id] || id;
-const avatar = (id, sm) => { const [n, h1, h2] = AGENTS[id] || [id, "#38bdf8", "#a78bfa"];
-  return `<span class="avatar${sm ? " sm" : ""}" style="--h1:${h1};--h2:${h2}" aria-hidden="true">${esc((id === "research" || id === "writer" ? agentTitle(id) : n)[0])}</span>`; };
+const avatar = (id, sm) => { const [team, h1, h2] = teamOf(id);
+  return `<span class="avatar${sm ? " sm" : ""}" style="--h1:${h1};--h2:${h2}" title="${esc(team)}" aria-hidden="true"><svg viewBox="0 0 24 24">${icon(id)}</svg></span>`; };
 const WEEKDAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
 const DAY_NAMES = { mon: "Monday", tue: "Tuesday", wed: "Wednesday", thu: "Thursday", fri: "Friday", sat: "Saturday", sun: "Sunday" };
 
@@ -172,8 +190,7 @@ async function loadRun(reset) {
     ${st.meta?.dry_run ? chip("dry_run", "rehearsal") : ""}<span class="spacer"></span>
     <span class="muted small">started ${fmtTime(st.started_at)} · ${money(st.cost_usd)} · ${st.interventions} supervisor intervention(s)</span>
     ${st.result ? `<div class="small ${st.state === "failed" ? "" : "muted"}" style="flex-basis:100%;${st.state === "failed" ? "color:var(--bad)" : ""}">${esc(st.result)}</div>` : ""}`;
-  $("#wf-graph").innerHTML = graphSvg(st);
-  rebindNodes();
+  drawGraph(reset);
   drawTimeline();
   drawMemory();
   if (S.selected) drawStep();
@@ -194,43 +211,33 @@ function drawMemory() {
 }
 function rebindNodes() {
   document.querySelectorAll(".wf .node").forEach(n => n.onclick = () => { S.selected = n.dataset.step;
-    $("#wf-graph").innerHTML = graphSvg(S.run.status); rebindNodes(); drawStep(); drawTimeline(); });
+    drawGraph(true); drawStep(); drawTimeline(); });
 }
 
 function graphSvg(st) {
-  const steps = Object.keys(STEP_TITLES), W = 150, H = 80, GAP = 34, X0 = 20, Y = 140, SH = 62;
-  const width = X0 * 2 + steps.length * W + (steps.length - 1) * GAP;
-  const supX = width / 2 - 90, supY = 14;
+  const steps = Object.keys(STEP_TITLES), GAP = 150, X0 = 80, CY = 240, R = 34;
+  const width = X0 * 2 + (steps.length - 1) * GAP, SX = width / 2, SY = 62, cx = i => X0 + i * GAP;
   const supState = st ? (st.state === "running" ? "running" : st.state === "failed" ? "failed" : "passed") : "pending";
-  let svg = `<svg class="wf" viewBox="0 0 ${width} 300" role="img" aria-label="Agent workflow">`;
+  const mk = (id, c) => `<marker id="${id}" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="${c}"/></marker>`;
+  let svg = `<svg class="wf" viewBox="0 0 ${width} 400" role="img" aria-label="Agent workflow"><defs>
+    ${Object.entries(TEAMS).map(([k, [, c1, c2]]) => `<linearGradient id="g-${k}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${c1}"/><stop offset="1" stop-color="${c2}"/></linearGradient>`).join("")}
+    ${mk("arr", "#cbd5e6")}${mk("arrd", "#059669")}${mk("arrr", "#e11d48")}</defs>`;
+  steps.forEach((s, i) => { svg += `<path class="sup" d="M ${SX} 158 C ${SX} 190, ${cx(i)} 180, ${cx(i)} ${CY - R - 10}"/>`; });
   steps.forEach((s, i) => {
-    const x = X0 + i * (W + GAP);
-    svg += `<path class="sup" d="M ${supX + 90} ${supY + SH} C ${supX + 90} 100, ${x + W / 2} 100, ${x + W / 2} ${Y}"/>`;
-    if (i < steps.length - 1) {
-      const done = st && st.steps[s] && ["passed", "skipped"].includes(st.steps[s].state);
-      svg += `<path class="edge ${done ? "done" : ""}" d="M ${x + W} ${Y + H / 2} L ${x + W + GAP - 6} ${Y + H / 2}" marker-end="url(#arr${done ? "d" : ""})"/>`;
-    }
+    if (i === steps.length - 1) return;
+    const done = st && ["passed", "skipped"].includes(st.steps[s]?.state), next = st?.steps[steps[i + 1]]?.state;
+    const d = `M ${cx(i) + R + 9} ${CY} L ${cx(i + 1) - R - 13} ${CY}`;
+    svg += `<path class="edge ${done ? "done" : ""}" d="${d}" marker-end="url(#arr${done ? "d" : ""})"/>`;
+    // work being handed over: a pulse travels into the agent that is working now
+    if (done && ["running", "retrying"].includes(next)) svg += `<circle r="4.5" fill="#7c3aed"><animateMotion dur="1.1s" repeatCount="indefinite" path="${d}"/></circle>`;
   });
-  const [sf, ss, stx] = STATE_COLORS[supState];
-  svg += `<defs><marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#5b6b89"/></marker>
-    <marker id="arrd" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#34d399"/></marker></defs>`;
-  svg += `<g class="node ${S.selected === "supervisor" ? "selected" : ""}" data-step="supervisor"><rect x="${supX}" y="${supY}" width="180" height="${SH}" rx="14" fill="${sf}" stroke="${ss}"/>
-    <text class="nm" x="${supX + 90}" y="${supY + 22}" text-anchor="middle" fill="#e6edf7">${esc(agentName("supervisor"))}</text>
-    <text class="ti" x="${supX + 90}" y="${supY + 37}" text-anchor="middle" fill="#38bdf8">Supervisor</text>
-    <text class="st" x="${supX + 90}" y="${supY + 53}" text-anchor="middle" fill="${stx}">${st ? st.interventions + " intervention(s)" : "orchestrates the crew"}</text></g>`;
+  svg += orb("supervisor", SX, SY, 30, supState, st ? `${st.interventions} intervention(s)` : "orchestrates the crew");
   steps.forEach((s, i) => {
-    const x = X0 + i * (W + GAP), info = st?.steps[s] || { state: "pending", attempts: 0 };
-    const [fill, stroke, tc] = STATE_COLORS[info.state] || STATE_COLORS.pending;
-    const label = info.state === "retrying" ? `retrying (try ${info.attempts})` : info.state + (info.attempts > 1 ? ` · ${info.attempts} tries` : "");
-    svg += `<g class="node ${info.state} ${S.selected === s ? "selected" : ""}" data-step="${s}">
-      <rect x="${x}" y="${Y}" width="${W}" height="${H}" rx="14" fill="${fill}" stroke="${stroke}"/>
-      <rect x="${x}" y="${Y}" width="${W}" height="4" rx="2" fill="${(AGENTS[s] || [])[1] || stroke}" opacity=".85"/>
-      <text class="nm" x="${x + W / 2}" y="${Y + 28}" text-anchor="middle" fill="#e6edf7">${esc(agentName(s).length > 19 ? agentName(s).slice(0, 18) + "…" : agentName(s))}</text>
-      <text class="ti" x="${x + W / 2}" y="${Y + 45}" text-anchor="middle" fill="${(AGENTS[s] || [])[1] || "#38bdf8"}">${esc(STEP_TITLES[s])}</text>
-      <text class="st" x="${x + W / 2}" y="${Y + 65}" text-anchor="middle" fill="${tc}">${esc(label)}</text></g>`;
-    if (info.cost_usd) svg += `<text x="${x + W / 2}" y="${Y + H + 18}" text-anchor="middle" font-size="11" font-family="monospace" fill="#8a98b3">${money(info.cost_usd)}</text>`;
+    const info = st?.steps[s] || { state: "pending", attempts: 0 };
+    const label = info.state === "retrying" ? `retrying · try ${info.attempts}` : info.state + (info.attempts > 1 ? ` · ${info.attempts} tries` : "");
+    svg += orb(s, cx(i), CY, R, info.state, label, info.cost_usd);
   });
-  // supervisor rewinds: a return arrow under the graph from the step that failed back to where work restarted
+  // supervisor rewinds: a return arc under the crew from the step that failed back to where work restarted
   const rewinds = {};
   let failing = null;
   S.events.forEach(e => {
@@ -242,13 +249,54 @@ function graphSvg(st) {
   Object.entries(rewinds).forEach(([k, n], idx) => {
     const [from, to] = k.split(">"), i = steps.indexOf(from), j = steps.indexOf(to);
     if (i < 0 || j < 0) return;
-    const x1 = X0 + i * (W + GAP) + W / 2, x2 = X0 + j * (W + GAP) + W / 2, y = Y + H, dip = 34 + idx * 10;
-    svg += `<path d="M ${x1} ${y + 26} C ${x1} ${y + dip + 20}, ${x2} ${y + dip + 20}, ${x2} ${y + 26}" fill="none" stroke="#fb7185"
-      stroke-width="1.8" stroke-dasharray="5 4" marker-end="url(#arrr)"/>
-      <text x="${(x1 + x2) / 2}" y="${y + dip + 22}" text-anchor="middle" font-size="11" font-weight="600" fill="#fb7185">sent back ×${n}</text>`;
+    const x1 = cx(i), x2 = cx(j), y = 352, dip = 26 + idx * 9;
+    svg += `<path d="M ${x1} ${y} C ${x1} ${y + dip}, ${x2} ${y + dip}, ${x2} ${y}" fill="none" stroke="#e11d48" stroke-width="1.8"
+      stroke-dasharray="5 4" marker-end="url(#arrr)"/><text x="${(x1 + x2) / 2}" y="${y + dip * .75 + 4}" text-anchor="middle" font-size="11"
+      font-weight="600" fill="#e11d48">sent back ×${n}</text>`;
   });
-  svg += `<defs><marker id="arrr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#fb7185"/></marker></defs>`;
   return svg + "</svg>";
+}
+
+function orb(id, x, y, r, state, label, cost) {
+  const [, c1] = teamOf(id), [ring, tc] = STATE_COLORS[state] || STATE_COLORS.pending, team = AGENTS[id]?.[1] || "ops";
+  const busy = state === "running" || state === "retrying", members = S.agents?.[id]?.members || [];
+  const name = agentName(id), k = r * 0.9 / 12;
+  let g = `<g class="node ${state} ${S.selected === id ? "selected" : ""}" data-step="${id}"><g class="wobble">
+    <circle class="halo" cx="${x}" cy="${y}" r="${r + 6}" fill="${c1}"/>
+    <g class="orb-shadow"><circle cx="${x}" cy="${y}" r="${r}" fill="url(#g-${team})"/></g>
+    <circle cx="${x}" cy="${y}" r="${r - 6}" fill="none" stroke="#fff" stroke-opacity=".35"/>
+    <g transform="translate(${x - 12 * k} ${y - 12 * k}) scale(${k})" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${icon(id)}</g>
+    <circle class="ring" cx="${x}" cy="${y}" r="${r + 6}" stroke="${ring}"/>`;
+  members.forEach((m, n) => { // team members sit on their team's orb
+    const bx = x - (members.length - 1) * 11 + n * 22, by = y + r + 4;
+    g += `<circle cx="${bx}" cy="${by}" r="10" fill="#fff" stroke="${c1}" stroke-width="2"/>
+      <text x="${bx}" y="${by + 3.5}" text-anchor="middle" font-size="10" font-weight="700" fill="${c1}">${esc(m[0])}</text>`;
+  });
+  const bx = x + r * .74, by = y - r * .74;
+  if (state === "passed") g += `<g class="badge"><circle cx="${bx}" cy="${by}" r="9" fill="#059669" stroke="#fff" stroke-width="2"/>
+    <path d="M ${bx - 4} ${by} l3 3 5-6" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round"/></g>`;
+  if (state === "failed" || state === "blocked") g += `<g class="badge"><circle cx="${bx}" cy="${by}" r="9" fill="#e11d48" stroke="#fff" stroke-width="2"/>
+    <text x="${bx}" y="${by + 4}" text-anchor="middle" font-size="12" font-weight="800" fill="#fff">!</text></g>`;
+  if (busy && id === "supervisor") g += `<g class="orbit"><circle cx="${x}" cy="${y}" r="${r + 14}" fill="none"/><circle cx="${x + r + 14}" cy="${y}" r="4" fill="#7c3aed"/></g>`;
+  g += `</g>`;
+  const ty = y + r + (members.length ? 30 : 24);
+  g += `<text class="nm" x="${x}" y="${ty}" text-anchor="middle" fill="#0f172a">${esc(name.length > 19 ? name.slice(0, 18) + "…" : name)}</text>
+    <text class="ti" x="${x}" y="${ty + 14}" text-anchor="middle" fill="${c1}">${esc(id === "supervisor" ? "Supervisor" : STEP_TITLES[id])}</text>
+    <text class="st" x="${x}" y="${ty + 30}" text-anchor="middle" fill="${tc}">${esc(label)}</text>`;
+  if (busy && id !== "supervisor") g += `<g class="dots">${[0, 1, 2].map(n => `<circle cx="${x - 8 + n * 8}" cy="${ty + 42}" r="2.6" fill="${ring}"/>`).join("")}</g>`;
+  else if (cost) g += `<text x="${x}" y="${ty + 45}" text-anchor="middle" font-size="10.5" font-family="monospace" fill="#5b6b85">${money(cost)}</text>`;
+  return g + "</g>";
+}
+
+/* redraw the graph only when something changed, so the animations keep running between polls */
+function drawGraph(force) {
+  const st = S.run?.status;
+  const key = JSON.stringify([st?.state, st?.interventions, st && Object.values(st.steps).map(x => [x.state, x.attempts, x.cost_usd]),
+    S.selected, S.events.filter(e => e.kind === "decision").length]);
+  if (!force && key === S.graphKey) return;
+  S.graphKey = key;
+  $("#wf-graph").innerHTML = graphSvg(st);
+  rebindNodes();
 }
 
 async function drawStep() {
@@ -448,7 +496,7 @@ async function renderTeam() {
   const card = m => {
     const s = m.stats, last = m.recent.at(-1);
     return `<div class="topic member${m.working ? "" : " bench"}">
-      <div class="row"><b style="font-size:15px">${esc(m.name)}</b>${m.working ? chip("ok", "working") : chip("pending", "on the bench")}
+      <div class="row">${avatar(m.role === "research" ? "research" : "writer", 1)}<b style="font-size:15px">${esc(m.name)}</b>${m.working ? chip("ok", "working") : chip("pending", "on the bench")}
         ${m.at_risk ? chip("warning", "at risk") : ""}<span class="spacer"></span>
         <button class="danger small" data-fire="${esc(m.id)}" data-name="${esc(m.name)}">Replace</button></div>
       <p class="small" style="margin:6px 0">${esc(m.persona)}</p>
@@ -458,10 +506,15 @@ async function renderTeam() {
       ${last && !last.good && last.problems?.length ? `<div class="small" style="margin-top:6px;color:var(--bad)">Last problem: ${esc(last.problems[0].slice(0, 180))}</div>` : ""}
     </div>`;
   };
-  const crew = Object.values(S.agents || {}).map(a => `<div class="agent-card">${avatar(a.id)}<div style="min-width:0">
+  const agentCard = a => `<div class="agent-card" style="--c:${teamOf(a.id)[1]}">${avatar(a.id)}<div style="min-width:0">
       <div class="nm">${esc(agentName(a.id))}</div><div class="ti">${esc(a.title)}</div>
       <div class="small" style="margin-top:4px">${esc(a.role)}</div>
-      ${a.llm ? `<div class="small muted mono" style="margin-top:4px">${esc(a.llm.model || "default model")}</div>` : `<div class="small muted mono" style="margin-top:4px">no AI: rules only</div>`}</div></div>`).join("");
+      ${a.llm ? `<div class="small muted mono" style="margin-top:4px">${esc(a.llm.model || "default model")}</div>` : `<div class="small muted mono" style="margin-top:4px">no AI: rules only</div>`}</div></div>`;
+  const all = Object.values(S.agents || {});
+  const legend = `<div class="legend">${Object.entries(TEAMS).map(([, [n, c]]) => `<span><i style="--c:${c}"></i>${esc(n)}</span>`).join("")}</div>`;
+  const crew = legend + Object.keys(TEAMS).map(t => { const xs = all.filter(a => (AGENTS[a.id]?.[1] || "ops") === t);
+    return xs.length ? `<div class="crew-group"><h3><i style="--c:${TEAMS[t][1]}"></i>${esc(TEAMS[t][0])}</h3><div class="grid g3">${xs.map(agentCard).join("")}</div></div>` : "";
+  }).join("");
   const memRows = Object.entries(memory).flatMap(([step, rows]) => rows.map((r, i) => ({ step, i, ...r }))).reverse();
   const memHtml = memRows.length ? memRows.map(r => `<div class="mem passed"><div class="row"><span class="who">${avatar(r.step, 1)} ${esc(STEP_TITLES[r.step] || r.step)}</span>
       <span class="muted small">${esc(fmtTime(r.at))}</span><span class="spacer"></span><button class="small" data-forget="${esc(r.step)}:${r.i}">Forget</button></div>
@@ -470,7 +523,7 @@ async function renderTeam() {
     : `<div class="empty">Nothing yet. When an agent's work is sent back and then fixed, the crew remembers the problem and the fix.</div>`;
   $("#view").innerHTML = `<h1>Crew</h1><p class="sub">Every agent, its name and its job. Orion, the Supervisor, checks each step and sends work back
     with the reasons it failed.</p>
-    <div class="panel section"><h2>The crew</h2><div class="grid g3">${crew}</div></div>
+    <div class="panel section"><h2>The crew</h2>${crew}</div>
     <h2 style="margin-top:22px">Research and writing teams</h2><p class="sub">Several researchers and writers work on every post. Researchers' verified sources are combined;
     writers compete, ${d.rules.pre_review ? "every draft is pre-reviewed and the best is polished, " : ""}and only the best goes to the Editor.
     A member is replaced automatically when fewer than ${Math.round(d.rules.fire_min_success * 100)}% of their last ${d.rules.fire_window} posts were good;
