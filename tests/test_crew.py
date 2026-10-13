@@ -271,6 +271,33 @@ class PublishTests(unittest.TestCase):
             self.assertEqual(ws.queue(), [])
             self.assertEqual(ws.history()[0]["urn"], "urn:li:share:1")
 
+    def live(self, ws):
+        p = self.queue_one(ws, dry=False)
+        ws.update_secrets(linkedin_client_id="abcdefgh12", linkedin_client_secret="s", linkedin_access_token="good",
+                          linkedin_token_expires_at=(datetime.now(timezone.utc) + timedelta(days=50)).isoformat())
+        FakeLinkedIn.posts, FakeLinkedIn.comments = [], []
+        return datetime.fromisoformat(p["scheduled_at"]) + timedelta(minutes=1)
+
+    def test_first_comment_is_added_after_publishing_and_retried_if_linkedin_refuses(self, _):
+        with TempWorkspace() as ws, mock.patch.object(cred_mod, "LinkedIn", FakeLinkedIn):
+            at, waits = self.live(ws), []
+            FakeLinkedIn.comment_failures = 1                        # not accepted right away; the retry works
+            publish_due(ws, now=at, client_factory=FakeLinkedIn, log=lambda m: None, sleep=waits.append)
+            self.assertEqual(FakeLinkedIn.comments, [{"urn": "urn:li:share:1", "text": PAGE_URL}])
+            self.assertEqual((ws.history()[0]["comment_status"], waits), ("added", [5]))
+
+    def test_failed_first_comment_is_retried_on_the_next_publish_check(self, _):
+        with TempWorkspace() as ws, mock.patch.object(cred_mod, "LinkedIn", FakeLinkedIn):
+            at = self.live(ws)
+            FakeLinkedIn.comment_failures = 3                        # every try in the publish window fails
+            publish_due(ws, now=at, client_factory=FakeLinkedIn, log=lambda m: None, sleep=lambda s: None)
+            h = ws.history()[0]
+            self.assertEqual((h["comment_status"], h["comment_tries"], FakeLinkedIn.comments), ("failed", 1, []))
+            publish_due(ws, now=at + timedelta(minutes=15), client_factory=FakeLinkedIn, log=lambda m: None)
+            self.assertEqual(ws.history()[0]["comment_status"], "added")
+            self.assertEqual(len(FakeLinkedIn.comments), 1)
+            self.assertEqual(len(FakeLinkedIn.posts), 1)             # the post itself is never sent again
+
     def test_manual_mode_waits_for_approval(self, _):
         with TempWorkspace() as ws:
             p = self.queue_one(ws, mode="manual")

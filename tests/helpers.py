@@ -131,8 +131,15 @@ class FakeLinkedIn:
         FakeLinkedIn.posts.append({"owner": owner, "text": text, "media": media_urn})
         return f"urn:li:share:{len(FakeLinkedIn.posts)}"
 
+    comments = []
+    comment_failures = 0  # how many add_comment calls fail before one succeeds
+
     def add_comment(self, owner, urn, text):
-        pass
+        from postcrew.linkedin import LinkedInError
+        if FakeLinkedIn.comment_failures:
+            FakeLinkedIn.comment_failures -= 1
+            raise LinkedInError("HTTP 404 post not found yet", 404)
+        FakeLinkedIn.comments.append({"urn": urn, "text": text})
 
 
 def claude_ok(cmd, **kw):

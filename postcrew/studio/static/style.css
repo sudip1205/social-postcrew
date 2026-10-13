@@ -191,3 +191,4 @@ ul.lessons { margin: 0; padding-left: 18px; } ul.lessons li { margin: 4px 0; } u
 .mem.passed { border-left-color: var(--ok); background: var(--ok-soft); }
 .mem ul { margin: 4px 0 0; padding-left: 18px; } .mem .lbl { font: 600 10px var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
 .memory-list { max-height: 420px; overflow: auto; }
+.bad { color: var(--bad); }

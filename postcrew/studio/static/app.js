@@ -362,7 +362,9 @@ async function renderQueue() {
       ${history.length ? `<table><thead><tr><th style="width:110px">Date</th><th>Topic</th><th>Topic type</th><th>LinkedIn</th><th style="width:90px"></th></tr></thead><tbody>${
       history.map((h, i) => [h, i]).sort((a, b) => (b[0].date || "").localeCompare(a[0].date || "")).map(([h, i]) => `<tr><td>${esc(h.date)}</td><td>${esc(h.topic)}</td>
         <td class="small">${esc(cats[h.category]?.label || h.category || "")}</td>
-        <td class="mono small">${h.urn ? esc(h.urn) : `<span class="muted">${h.added_by_hand ? "added by you" : h.imported ? "imported" : ""}</span>`}</td>
+        <td class="mono small">${h.urn ? esc(h.urn) : `<span class="muted">${h.added_by_hand ? "added by you" : h.imported ? "imported" : ""}</span>`}${
+          h.comment_status === "added" ? `<div class="muted">first comment added</div>`
+          : h.comment_status === "failed" ? `<div class="bad" title="${esc(h.comment_error || "")}">first comment failed${(h.comment_tries || 0) < 3 ? " - will retry" : " - add it by hand"}</div>` : ""}</td>
         <td><button class="danger small" data-hrm="${i}">Remove</button></td></tr>`).join("")}</tbody></table>`
       : `<div class="empty">Nothing published yet.</div>`}</div>`;
   $("#h-add").onclick = async () => {

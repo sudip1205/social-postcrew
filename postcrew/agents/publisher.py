@@ -7,6 +7,7 @@ Approval modes (publishing.approval):
 With publishing.dry_run on, publishing logs exactly what would be sent and sends nothing.
 """
 import shutil
+import time
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
@@ -17,6 +18,8 @@ from .base import Agent, AgentError
 from .credentials import GOOD, run_check
 
 DUE = ("queued", "approved")
+COMMENT_WAITS_S = (5, 20)        # LinkedIn may not accept a comment the moment a post is created
+COMMENT_MAX_TRIES = 3            # later publish checks retry a failed first comment this many times in all
 
 
 def scheduled_at(cfg, day):
@@ -45,7 +48,59 @@ def enqueue(ws, cfg, run_id, day, category, final, review):
     return post
 
 
-def publish_one(ws, post, client_factory=LinkedIn, log=print):
+def add_first_comment(ws, post, li, owner, ev, sleep=time.sleep, waits=COMMENT_WAITS_S):
+    """Add the post's first comment, retrying after short waits. Records comment_status (added | failed) on post."""
+    err = None
+    for wait in (0,) + tuple(waits):
+        if wait:
+            sleep(wait)
+        try:
+            li.add_comment(owner, post["urn"], post["first_comment"])
+            post.update(comment_status="added", comment_error=None,
+                        comment_tries=post.get("comment_tries", 0) + 1)
+            ev("comment", "first comment added")
+            return True
+        except LinkedInError as e:
+            err = e
+    post.update(comment_status="failed", comment_error=str(err), comment_tries=post.get("comment_tries", 0) + 1)
+    ev("warning", f"post is live but the first comment failed: {err}", "warning")  # the post is live; do not lose that
+    if post["comment_tries"] >= COMMENT_MAX_TRIES:
+        notify(ws, "First comment not added", f"{post['topic']}: add it by hand on LinkedIn. {err}"[:300],
+               level="warning", key=f"comment-{post['id']}", action={"label": "Open Queue", "tab": "queue"})
+    return False
+
+
+def retry_comments(ws, client_factory=LinkedIn, log=print, sleep=time.sleep):
+    """Retry first comments that failed on published posts. Returns how many were added."""
+    todo = [h for h in ws.history() if h.get("comment_status") == "failed" and h.get("urn")
+            and h.get("comment_tries", 0) < COMMENT_MAX_TRIES]
+    if not todo or ws.config()["publishing"]["dry_run"]:
+        return 0
+    s = ws.secrets()
+    if not s.get("linkedin_access_token"):
+        return 0
+    li = client_factory(s["linkedin_access_token"], ws.config()["publishing"]["linkedin_api_version"])
+    added = 0
+    for h in todo:
+        run = RunLog(ws.runs_dir / h["run_id"]) if h.get("run_id") and (ws.runs_dir / h["run_id"]).exists() else None
+
+        def ev(kind, msg, level="info"):
+            log(msg)
+            if run:
+                run.event("publisher", kind, msg, level=level)
+        try:
+            owner = s.get("linkedin_person_urn") or li.person_urn()
+        except LinkedInError as e:
+            log(f"first comment retry skipped: {e}")
+            return added
+        post = dict(h)
+        added += add_first_comment(ws, post, li, owner, ev, sleep, waits=())
+        ws.remove_history(lambda p: p.get("id") == h["id"] and p.get("urn") == h["urn"])
+        ws.add_history(post)
+    return added
+
+
+def publish_one(ws, post, client_factory=LinkedIn, log=print, sleep=time.sleep):
     """Publish one queued post. Returns the updated post (status published | dry_run | failed)."""
     cfg = ws.config()
     run = RunLog(ws.runs_dir / post["run_id"]) if post.get("run_id") and (ws.runs_dir / post["run_id"]).exists() else None
@@ -92,25 +147,23 @@ def publish_one(ws, post, client_factory=LinkedIn, log=print):
                 error=None)
     ev("published", f"published {urn}")
     if post.get("first_comment"):
-        try:
-            li.add_comment(owner, urn, post["first_comment"])
-            ev("comment", "first comment added")
-        except LinkedInError as e:  # the post is already live; do not lose that fact
-            ev("warning", f"post is live but the first comment failed: {e}", "warning")
+        add_first_comment(ws, post, li, owner, ev, sleep)
     if run:
         run.step("publisher", "passed", summary=f"published {urn}")
     ws.add_history({k: post.get(k) for k in ("id", "date", "category", "topic", "text", "first_comment", "media",
-                                             "urn", "published_at", "run_id")})
+                                             "urn", "published_at", "run_id", "comment_status", "comment_error",
+                                             "comment_tries")})
     notify(ws, "Posted to LinkedIn", post["topic"], level="success", action={"label": "Open Queue", "tab": "queue"})
     return post
 
 
-def publish_due(ws, now=None, client_factory=LinkedIn, log=print):
+def publish_due(ws, now=None, client_factory=LinkedIn, log=print, sleep=time.sleep):
     now = now or datetime.now(timezone.utc)
+    retry_comments(ws, client_factory, log, sleep)
     results = []
     for p in sorted(ws.queue(), key=lambda p: p["scheduled_at"]):
         if p["status"] in DUE and datetime.fromisoformat(p["scheduled_at"]) <= now:
-            updated = publish_one(ws, dict(p), client_factory, log)
+            updated = publish_one(ws, dict(p), client_factory, log, sleep)
             ws.save_queue([updated if q["id"] == p["id"] else q for q in ws.queue()]
                           if updated["status"] != "published" else [q for q in ws.queue() if q["id"] != p["id"]])
             results.append(updated)
