@@ -49,9 +49,10 @@ DEFAULT_CONFIG = {
             "topic": {"model": "sonnet", "timeout_s": 300, "max_budget_usd": 0.5},
             "research": {"model": "sonnet", "timeout_s": 900, "max_budget_usd": 1.5},
             "writer": {"model": "sonnet", "timeout_s": 600, "max_budget_usd": 1.0},
-            "reviewer": {"model": "haiku", "timeout_s": 300, "max_budget_usd": 0.3},
+            # the Pre-reviewer must predict the Editor, so both use the same, steadier model
+            "reviewer": {"model": "sonnet", "timeout_s": 300, "max_budget_usd": 0.4},
             "media": {"model": "haiku", "timeout_s": 300, "max_budget_usd": 0.3},
-            "editor": {"model": "haiku", "timeout_s": 300, "max_budget_usd": 0.3},
+            "editor": {"model": "sonnet", "timeout_s": 300, "max_budget_usd": 0.4},
             "supervisor": {"model": "haiku", "timeout_s": 180, "max_budget_usd": 0.2},
         },
     },
@@ -69,6 +70,7 @@ DEFAULT_CONFIG = {
         "writer": 2,                    # writers per post; the best draft is chosen
         "pre_review": True,             # score every draft (and polish the best one) before the Editor sees it
         "pre_review_margin": 5,         # polish the best draft unless it beats the passing score by this much
+        "polish_rounds": 2,             # at most this many polishes before the Editor sees the draft
         "fire_window": 6,               # judge a member on their last N posts ...
         "fire_min_success": 0.34,       # ... and replace them if fewer than this share were good
     },

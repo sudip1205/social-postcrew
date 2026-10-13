@@ -84,14 +84,17 @@ class CrewTests(unittest.TestCase):
             st = status(ws, res["run_id"])
             self.assertEqual(st["steps"]["research"]["attempts"], 2)
 
-    def test_supervisor_unavailable_falls_back_to_editor_fix_owner(self, _):
+    def test_editor_fixes_go_straight_to_their_owner_word_for_word(self, _):
         with TempWorkspace() as ws:
             llm = ScriptedLLM(self.script(editor=[review(60, owner="media", fixes=["shorter poster title"])] * 3 + [review()],
                                           supervisor=[LLMError("down", kind="failed")]))
             res = run_crew(ws, TUESDAY, llm=llm, fetch=fake_fetch())
             self.assertTrue(res["ok"], res)
             evs = events(ws, res["run_id"])
-            self.assertTrue(any(e["kind"] == "fallback" for e in evs))
+            self.assertNotIn("supervisor", llm.agents_called())   # nobody re-words the Editor's fixes
+            media2 = [c for c in llm.calls if c["agent"] == "media"][1]["prompt"]
+            self.assertIn("apply each one exactly as written", media2)
+            self.assertIn("- shorter poster title", media2)
             dec = next(e["data"] for e in evs if e["kind"] == "decision")
             self.assertEqual((dec["action"], dec["target"]), ("rewind", "media"))
 
@@ -124,20 +127,32 @@ class CrewTests(unittest.TestCase):
             res = run_crew(ws, TUESDAY, llm=llm, fetch=fake_fetch(), dry_run=True)
             self.assertTrue(res["ok"], res)
             second = [c for c in llm.calls if c["agent"] == "writer"][1]["prompt"]
-            self.assertIn("SENT BACK by Quinn (Editor Review). WHY IT FAILED", second)
-            self.assertIn("shorten the hook", second)                    # the reason, word for word
-            self.assertIn("cut line 1 to 90 characters", second)         # and the Supervisor's instruction
+            self.assertIn("SENT BACK by Quinn (Editor Review).\nWHY IT FAILED:\n- reviewer overall score 60", second)
+            self.assertIn("THE REVIEWER'S FIXES - apply each one exactly as written", second)
+            self.assertIn("- shorten the hook", second)                  # the Editor's fix, word for word
             mem = json.loads((ws.runs_dir / res["run_id"] / "memory.json").read_text())
             self.assertEqual([(m["step"], m["kind"]) for m in mem if m["kind"] == "sent_back"], [("writer", "sent_back")])
-            self.assertTrue(any(r["fix"] == ["cut line 1 to 90 characters"] for r in ws.state("memory", {})["writer"]))
+            self.assertTrue(any(r["fix"] == ["shorten the hook"] for r in ws.state("memory", {})["writer"]))
             # the next run's writer starts with what was learned
             llm2 = ScriptedLLM(self.script())
             res2 = run_crew(ws, TUESDAY + timedelta(days=7), llm=llm2, fetch=fake_fetch(), dry_run=True)
             first = next(c for c in llm2.calls if c["agent"] == "writer")["prompt"]
             self.assertIn("CREW MEMORY", first)
-            self.assertIn("cut line 1 to 90 characters", first)
+            self.assertIn("fixed by: shorten the hook", first)
             self.assertNotIn("WHY IT FAILED", first)
             self.assertTrue(res2["ok"], res2)
+
+    def test_editor_sees_its_previous_rounds(self, _):
+        with TempWorkspace() as ws:
+            llm = ScriptedLLM(self.script(editor=[review(60, fixes=["Replace line 1 with: 'Acme Model 2: $0.10'"])] * 3
+                                          + [review()]))
+            res = run_crew(ws, TUESDAY, llm=llm, fetch=fake_fetch(), dry_run=True)
+            self.assertTrue(res["ok"], res)
+            eds = [c["prompt"] for c in llm.calls if c["agent"] == "editor"]
+            self.assertNotIn("<previous_rounds>", eds[0])
+            self.assertIn("<previous_rounds>", eds[3])
+            self.assertIn("fix asked: Replace line 1 with: 'Acme Model 2: $0.10'", eds[3])
+            self.assertIn("HOW EVERY POST IS SCORED", llm.calls[[c["agent"] for c in llm.calls].index("writer")]["system"])
 
     def test_gives_up_after_max_attempts_and_notifies(self, _):
         with TempWorkspace() as ws:
@@ -295,3 +310,20 @@ class FormatterTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class FixPickingTests(unittest.TestCase):
+    def test_one_fix_per_failing_criterion_lowest_first(self):
+        from postcrew.agents.editor import pick_fixes
+        pl = {"min_overall": 80, "min_subscore": 70}
+        def run(scores, fixes, flags=()):
+            return {"scores": scores, "fixes": [{"criterion": c, "fix": f} for c, f in fixes], "red_flags": list(flags)}
+        base = {"accuracy": 90, "clarity": 76, "hook": 66, "value": 85, "tone": 90, "format": 88}
+        runs = [run(base, [("hook", "hook A"), ("clarity", "clarity A"), ("tone", "tone A")]),
+                run(dict(base, hook=70), [("hook", "hook B"), ("value", "value B")])]
+        scores = {k: min(r["scores"][k] for r in runs) for k in base}
+        # the hook fix comes from the review that scored the hook lowest; passing criteria get no fix
+        self.assertEqual(pick_fixes(runs, scores, pl), ["hook: hook A", "clarity: clarity A"])
+        flagged = runs + [run(base, [("red_flag", "delete the unsupported claim")], flags=["unsupported_claim"])]
+        self.assertEqual(pick_fixes(flagged, scores, pl)[0], "red_flag: delete the unsupported claim")
+        self.assertEqual(pick_fixes(runs, scores, pl, target=86), ["hook: hook A", "clarity: clarity A", "value: value B"])

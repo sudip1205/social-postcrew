@@ -11,7 +11,7 @@ from concurrent.futures import ThreadPoolExecutor
 from ..checks import link_problems, number_problems, repeat_problem, text_problems
 from . import team
 from .base import Agent, AgentError, Feedback, guidance_block, recent_block
-from .editor import CRITERIA, RED_FLAGS, SCHEMA as REVIEW_SCHEMA, review_material
+from .editor import CRITERIA, RED_FLAGS, SCHEMA as REVIEW_SCHEMA, fix_text, pick_fixes, review_material
 
 SCHEMA = {
     "type": "object",
@@ -76,13 +76,19 @@ class WriterAgent(Agent):
         best = self._pick(cands, pl)
         if best and tcfg.get("pre_review") and best["review"] and not self._passes(best["review"], pl,
                                                                                 tcfg.get("pre_review_margin", 5)):
-            best = self._polish(ctx, best, guidance, pl) or best
+            for _ in range(tcfg.get("polish_rounds", 2)):  # cheaper than another Editor round
+                better = self._polish(ctx, best, guidance, pl)
+                if not better:
+                    break
+                best = better
+                if self._passes(best["review"], pl, tcfg.get("pre_review_margin", 5)):
+                    break
         for c in cands:
             rv = c["review"]
             good = bool(c["out"]) and not c["problems"] and (rv is None or self._passes(rv, pl))
             team.record(ctx.ws, c["member"]["id"], ctx.run.status["run_id"], good=good,
                         score=rv["overall"] if rv else None, chosen=c is best,
-                        problems=c["problems"] + ((rv.get("fixes", []) + [f"red flag: {f}" for f in rv["red_flags"]])
+                        problems=c["problems"] + (([fix_text(f) for f in rv.get("fixes", [])] + [f"red flag: {f}" for f in rv["red_flags"]])
                                                   if rv and not self._passes(rv, pl) else []))
             ctx.run.event(self.id, "member", f"{c['member']['name']}: " + (
                 f"{len(c['problems'])} problem(s): {c['problems'][0][:120]}" if c["problems"] else
@@ -127,12 +133,17 @@ class WriterAgent(Agent):
             return None
 
     def _polish(self, ctx, best, guidance, pl):
-        """One revision by the best draft's author with the pre-review's fixes; kept only if it scores higher."""
+        """A revision by the best draft's author with the pre-review's fixes; kept only if it scores higher."""
         rv = best["review"]
-        notes = rv.get("fixes", []) + [f"remove the red flag: {f}" for f in rv["red_flags"]] + [rv.get("reasons", "")]
+        notes = pick_fixes([rv], {k: rv["scores"].get(k, 0) for k in CRITERIA}, pl,
+                           target=pl["min_overall"] + ctx.cfg["team"].get("pre_review_margin", 5)) \
+            or [fix_text(f) for f in rv.get("fixes", [])][:4]
+        if not any(n.startswith("red_flag:") for n in notes):
+            notes += [f"remove the red flag: {f}" for f in rv["red_flags"]]
         try:
-            fb = Feedback([n for n in notes if n][:6] + list(guidance), by="Iris (Pre-reviewer)",
-                          why=[n for n in notes if n][:6], before=getattr(guidance, "why", []) + getattr(guidance, "before", []),
+            fb = Feedback([n for n in notes if n][:4], by="Iris (Pre-reviewer)", exact=True,
+                          why=[f"pre-review {rv['overall']}: {rv.get('reasons', '')[:300]}"],
+                          before=list(guidance) + getattr(guidance, "why", []) + getattr(guidance, "before", []),
                           past=getattr(guidance, "past", []))
             d = self._draft(ctx, fb, best["member"], prev=best["out"])
         except AgentError as e:

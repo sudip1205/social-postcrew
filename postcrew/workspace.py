@@ -105,7 +105,7 @@ def validate_config(cfg):
                                                                      for i in ideas)):
             errs.append(f"{where}.ideas: up to 60 topic ideas, each 3-150 characters")
     tm = cfg.get("team", {})
-    for k, lo, hi in (("research", 1, 4), ("writer", 1, 4), ("fire_window", 3, 20)):
+    for k, lo, hi in (("research", 1, 4), ("writer", 1, 4), ("fire_window", 3, 20), ("polish_rounds", 0, 3)):
         if not (isinstance(tm.get(k), int) and lo <= tm[k] <= hi):
             errs.append(f"team.{k} must be a whole number {lo}-{hi}")
     if not (isinstance(tm.get("fire_min_success"), (int, float)) and 0 <= tm["fire_min_success"] <= 1):

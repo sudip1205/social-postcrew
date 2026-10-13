@@ -22,7 +22,10 @@ SCHEMA = {
         "overall": {"type": "integer", "minimum": 0, "maximum": 100},
         "red_flags": {"type": "array", "items": {"type": "string", "enum": RED_FLAGS}},
         "reasons": {"type": "string"},
-        "fixes": {"type": "array", "items": {"type": "string"}, "maxItems": 4},
+        "fixes": {"type": "array", "maxItems": 4, "items": {
+            "type": "object", "required": ["criterion", "fix"], "additionalProperties": False,
+            "properties": {"criterion": {"type": "string", "enum": CRITERIA + ["red_flag"]},
+                           "fix": {"type": "string", "description": "an exact, minimal edit with the replacement wording"}}}},
         "fix_owner": {"type": "string", "enum": OWNERS, "description": "which agent must change something"},
     },
     "required": ["scores", "overall", "red_flags", "reasons", "fixes", "fix_owner"],
@@ -50,7 +53,41 @@ def review_material(ctx, draft=None):
         parts += ["", "<sources>none</sources>"]
     parts += ["", "<about_the_owner> (the only personal facts the post may claim)",
               "\n".join(ctx.profile.get("about", [])) or "(none)", "</about_the_owner>"]
+    if ctx.reviews:
+        parts += ["", "<previous_rounds> (your earlier reviews of this post in this run; the writer was told to apply "
+                  "these fixes)"]
+        for n, r in enumerate(ctx.reviews[-3:], 1):
+            parts.append(f"Round {n}: overall {r['overall']}, scores {json.dumps(r['scores'])}"
+                         + (f", red flags {r['red_flags']}" if r["red_flags"] else ""))
+            parts += [f"  fix asked: {f}" for f in r["fixes"]]
+        parts.append("</previous_rounds>")
     return "\n".join(parts)
+
+
+def fix_text(f):
+    """Fixes are {criterion, fix}; older or scripted ones are plain strings."""
+    return f"{f['criterion']}: {f['fix']}" if isinstance(f, dict) else str(f)
+
+
+def pick_fixes(runs, scores, pl, n=4, target=None):
+    """One fix per criterion that keeps the post from passing, lowest score first, each taken from the review
+    that scored that criterion lowest; red-flag fixes always come first. Fixes for criteria that already pass are
+    dropped, so the writer gets a short list that does not pull in different directions. target: the score a
+    criterion must reach to need no fix (default: the passing overall score)."""
+    target = target or pl["min_overall"]
+    def of(run, crit):
+        return [f for f in run.get("fixes", []) if isinstance(f, dict) and f["criterion"] == crit]
+    out = [fix_text(f) for r in runs if r.get("red_flags") for f in of(r, "red_flag")][:2]
+    failing = sorted(CRITERIA, key=lambda k: scores[k])
+    failing = [k for k in failing if scores[k] < pl["min_subscore"]] + \
+              [k for k in failing if pl["min_subscore"] <= scores[k] < target]
+    for k in failing:
+        ranked = sorted(runs, key=lambda r: r["scores"].get(k, 0))
+        f = next((f for r in ranked for f in of(r, k)), None)
+        if f:
+            out.append(fix_text(f))
+    out += [fix_text(f) for r in runs for f in r.get("fixes", []) if not isinstance(f, dict)]  # plain-string fixes
+    return list(dict.fromkeys(out))[:n]
 
 
 class EditorAgent(Agent):
@@ -77,8 +114,9 @@ class EditorAgent(Agent):
         worst = min(runs, key=lambda r: r["overall"])
         scores = {k: min(r["scores"].get(k, 0) for r in runs) for k in CRITERIA}
         flags = sorted({f for r in runs for f in r.get("red_flags", [])})
-        fixes = list(dict.fromkeys(fx for r in runs for fx in r.get("fixes", [])))[:6]
         passed = worst["overall"] >= pl["min_overall"] and min(scores.values()) >= pl["min_subscore"] and not flags
+        fixes = [] if passed else pick_fixes(runs, scores, pl)
+        ctx.reviews.append({"overall": worst["overall"], "scores": scores, "red_flags": flags, "fixes": fixes})
         owners = [r["fix_owner"] for r in runs if r["overall"] < pl["min_overall"] or r.get("red_flags")]
         return {"passed": passed, "overall": worst["overall"], "scores": scores, "red_flags": flags,
                 "reasons": worst.get("reasons", ""), "fixes": fixes, "runs": len(runs), "errors": errors,

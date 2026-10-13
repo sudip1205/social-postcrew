@@ -5,8 +5,8 @@ agent's work is sent back, the reasons and the Supervisor's instructions are kep
 sees everything that went wrong with its work earlier in the run, not only the latest round, so a revision does not
 bring back a mistake that was already fixed.
 
-Long-term memory (across runs) lives in state/memory.json. When a run ends, every problem that was fixed in that run
-is kept with the instructions that fixed it, and the next run's agents start with the most recent ones for their step.
+Long-term memory (across runs) lives in state/memory.json. When a run's post passes the Editor, every problem fixed in
+that run is kept with the instructions that fixed it, and the next run's agents start with the most recent ones for their step.
 """
 import json
 import re

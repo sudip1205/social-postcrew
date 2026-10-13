@@ -39,6 +39,7 @@ class RunContext:
     page_cache: dict = field(default_factory=dict)   # pages the researcher downloaded, url -> text
     previous: dict = field(default_factory=dict)     # an agent's last output before it was sent back
     memory: object = None                             # RunMemory: what went wrong earlier in this run
+    reviews: list = field(default_factory=list)       # the Editor's earlier rounds in this run
 
     @property
     def cat(self):
@@ -81,6 +82,9 @@ class Agent:
         base = {"audience": p.get("audience", ""), "voice": p.get("voice", ""),
                 "about": "\n".join(f"- {a}" for a in p.get("about", [])) or "- (nothing listed)",
                 "name": p.get("name", "") or "the account owner"}
+        if "{{rubric}}" in text:  # the scoring guide the Writer writes to and the Editor scores by
+            rubric = Path(ctx.ws.root) / "prompts" / "rubric.md"
+            base["rubric"] = (rubric if rubric.exists() else PROMPTS / "rubric.md").read_text().strip()
         base.update(values)
         for k, v in base.items():
             text = text.replace("{{" + k + "}}", str(v))
@@ -111,33 +115,40 @@ class Feedback(list):
     why    the problems found in this attempt, word for word
     before reasons the same work was sent back earlier in this run (working memory)
     past   problems this step had in earlier runs and what fixed them (long-term memory)
+    exact  the instructions are a reviewer's own minimal edits, to apply word for word
     An empty Feedback is falsy, so a first attempt with only `past` still counts as "no guidance"."""
 
-    def __init__(self, instructions=(), by="", why=(), before=(), past=()):
+    def __init__(self, instructions=(), by="", why=(), before=(), past=(), exact=False):
         super().__init__(instructions)
-        self.by, self.why, self.before, self.past = by, list(why), list(before), list(past)
+        self.by, self.why, self.before, self.past, self.exact = by, list(why), list(before), list(past), exact
 
 
 def guidance_block(guidance):
-    by, why = getattr(guidance, "by", ""), getattr(guidance, "why", [])
-    before = [b for b in getattr(guidance, "before", []) if b not in why]
+    by, instructions = getattr(guidance, "by", ""), list(guidance or [])
+    why = [w for w in getattr(guidance, "why", []) if w not in instructions]  # show each point once
+    before = [b for b in getattr(guidance, "before", []) if b not in why and b not in instructions]
     past = getattr(guidance, "past", [])
     out = ""
     if past:
         out += ("\n\nCREW MEMORY - problems this step had in earlier runs and what fixed them (avoid them from the "
                 "start):\n" + "\n".join(f"- {p['problem']}" + (f" -> fixed by: {'; '.join(p['fix'])}" if p.get("fix") else "")
                                          for p in past))
-    if not (guidance or why or before):
+    if not (instructions or why or before):
         return out
+    if why or instructions:
+        out += f"\n\nYOUR LAST ATTEMPT WAS SENT BACK{' by ' + by if by else ''}."
     if why:
-        out += (f"\n\nYOUR LAST ATTEMPT WAS SENT BACK{' by ' + by if by else ''}. WHY IT FAILED:\n"
-                + "\n".join(f"- {w}" for w in why))
+        out += "\nWHY IT FAILED:\n" + "\n".join(f"- {w}" for w in why)
     if before:
         out += ("\n\nALSO SENT BACK EARLIER IN THIS RUN FOR (already fixed once - do not bring these back):\n"
                 + "\n".join(f"- {b}" for b in before[-8:]))
-    if guidance:
+    if instructions and getattr(guidance, "exact", False):
+        out += ("\n\nTHE REVIEWER'S FIXES - apply each one exactly as written (they are minimal edits; use the "
+                "replacement wording given). Change nothing else: every sentence no fix mentions stays word for word.\n"
+                + "\n".join(f"- {g}" for g in instructions))
+    elif instructions:
         out += ("\n\nA SUPERVISOR REVIEWED YOUR LAST ATTEMPT. Fix every point:\n" +
-                "\n".join(f"- {g}" for g in guidance))
+                "\n".join(f"- {g}" for g in instructions))
     return out
 
 

@@ -132,7 +132,7 @@ class Supervisor:
             target = decision["target"]
             by = self._who(ctx, step, out)
             guidance[target] = self._feedback(ctx, target, decision["instructions"] or problems[:6], by, problems,
-                                              attempts[step])
+                                              attempts[step], exact=step == "editor")
             if out is not None and target == step:
                 ctx.previous[step] = out
             if target != step:  # rewind: redo the target and everything after it
@@ -150,7 +150,7 @@ class Supervisor:
                         if s in FIXABLE:
                             mine = [p for p in problems if _about(p, s)]
                             if mine:
-                                guidance[s] = self._feedback(ctx, s, mine[:6], by, mine, attempts[step])
+                                guidance[s] = self._feedback(ctx, s, mine[:6], by, mine, attempts[step], exact=True)
         run.finish("succeeded", self._result_text(ctx))
         self._remember(ctx)
         self._review_team(ctx)
@@ -176,13 +176,15 @@ class Supervisor:
         except Exception:
             return []
 
-    def _feedback(self, ctx, step, instructions, by, why, attempt):
+    def _feedback(self, ctx, step, instructions, by, why, attempt, exact=False):
         """Send work back to `step` with the reasons it failed, and keep them in the run's working memory."""
-        fb = Feedback(instructions, by=by, why=why[:12], before=ctx.memory.reasons(step), past=self._past(ctx, step))
+        fb = Feedback(instructions, by=by, why=why[:12], before=ctx.memory.reasons(step), past=self._past(ctx, step),
+                      exact=exact)
         ctx.memory.add(step, "sent_back", by=by, why=why, instructions=instructions, attempt=attempt)
         return fb
 
     def _remember(self, ctx):
+        """Only after a run whose post passed the Editor, so only fixes that worked are kept."""
         try:
             n = memory_mod.remember(ctx.ws, ctx.memory, ctx.run.status["run_id"])
             if n:
@@ -243,6 +245,11 @@ class Supervisor:
                     + ["pick a story whose primary source was published inside the window"]}
         fallback = {"action": "retry" if default_target == step else "rewind", "target": default_target,
                     "instructions": problems[:6], "reason": "fixing the reported problems"}
+        if step == "editor" and out:
+            # the Editor already wrote exact, minimal edits and named who must make them: pass them on word for
+            # word. Re-wording them (or adding to them) is what made revisions drift away from what was asked.
+            return {"action": "rewind", "target": default_target, "instructions": out.get("fixes") or problems[:6],
+                    "reason": f"Editor scored {out.get('overall')}; {default_target} applies the Editor's fixes as written"}
         if step in ("credentials", "publisher"):
             return fallback
         upstream = {s: clip({k: v for k, v in (ctx.outputs.get(s) or {}).items() if not k.startswith("_")}, 900)
@@ -294,8 +301,7 @@ class Supervisor:
                 ctx.run.step(s, "blocked")
         msg = f"{reason}. Last problems: " + "; ".join(problems[:3])
         ctx.run.finish("failed", msg)
-        self._remember(ctx)
-        self._review_team(ctx)
+        self._review_team(ctx)  # no long-term memory from a failed run: its "fixes" did not get a post approved
         notify(ctx.ws, f"No post for {ctx.day.isoformat()}", f"{self.by_id[step].title}: {msg[:400]}", level="error",
                key=f"run-failed-{ctx.day.isoformat()}", action={"label": "See the run", "tab": "workflow"}, quiet_hours=1)
         return {"ok": False, "failed_step": step, "reason": reason, "problems": problems, "cost_usd": ctx.run.cost}

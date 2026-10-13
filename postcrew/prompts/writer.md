@@ -24,6 +24,15 @@ Format:
   Use numbered lines (1.) and "→" for lists. At most 1 emoji (usually none).
 - End with ONE genuine question, then 3-4 relevant hashtags on the last line.
 - Avoid hype words: game-changer, revolutionize, unlock, delve, mind-blowing.
+- No "Sources:" line and no glossary paragraph in the body. If a term needs explaining, use a few plain words
+  in the sentence where it appears, or leave the term out.
+- Short beats complete: one story, the facts the reader needs, 2-3 practical steps, one question.
+
+{{rubric}}
+
+Before you answer, score your draft against this guide as the Editor will. Any criterion under 85: fix it first.
+When you revise a draft that was sent back, apply the fixes you were given and change nothing else - every
+sentence no fix mentions stays word for word, so what already scored well is not lost.
 
 What the owner has said is true about them (the only personal facts you may use):
 {{about}}
