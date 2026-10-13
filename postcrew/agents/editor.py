@@ -56,6 +56,7 @@ def review_material(ctx, draft=None):
 class EditorAgent(Agent):
     id = "editor"
     title = "Editor Review"
+    name = "Quinn"
     role = "Scores accuracy, clarity, hook, value, tone and format; any red flag sends the post back."
 
     def run(self, ctx, guidance):

@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from ..checks import link_problems, number_problems, repeat_problem, text_problems
 from . import team
-from .base import Agent, AgentError, guidance_block, recent_block
+from .base import Agent, AgentError, Feedback, guidance_block, recent_block
 from .editor import CRITERIA, RED_FLAGS, SCHEMA as REVIEW_SCHEMA, review_material
 
 SCHEMA = {
@@ -51,6 +51,7 @@ def revision_block(ctx, guidance, prev=None):
 class WriterAgent(Agent):
     id = "writer"
     title = "Writer"
+    name = "Writing team"
     role = "Writes the post from verified facts only, in the owner's voice."
 
     def run(self, ctx, guidance):
@@ -130,7 +131,10 @@ class WriterAgent(Agent):
         rv = best["review"]
         notes = rv.get("fixes", []) + [f"remove the red flag: {f}" for f in rv["red_flags"]] + [rv.get("reasons", "")]
         try:
-            d = self._draft(ctx, [n for n in notes if n][:6] + list(guidance), best["member"], prev=best["out"])
+            fb = Feedback([n for n in notes if n][:6] + list(guidance), by="Iris (Pre-reviewer)",
+                          why=[n for n in notes if n][:6], before=getattr(guidance, "why", []) + getattr(guidance, "before", []),
+                          past=getattr(guidance, "past", []))
+            d = self._draft(ctx, fb, best["member"], prev=best["out"])
         except AgentError as e:
             if e.fatal:
                 raise

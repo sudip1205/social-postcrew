@@ -335,6 +335,18 @@ class StudioTests(unittest.TestCase):
         self.assertEqual(d["lessons"]["writer"], [])
         self.assertEqual(self.req("POST", "/api/team/hire", {"role": "boss"})[0], 400)
 
+    def test_agents_have_names_and_memory_can_be_forgotten(self):
+        code, d = self.req("GET", "/api/agents")
+        names = {a["id"]: a["name"] for a in d["agents"]}
+        self.assertEqual((names["supervisor"], names["editor"], names["reviewer"]), ("Orion", "Quinn", "Iris"))
+        self.assertEqual(next(a for a in d["agents"] if a["id"] == "research")["members"], ["Ada"])  # 1 per post
+        self.ws.save_state("memory", {"writer": [{"problem": "hook too vague", "fix": ["name the product"], "at": "x"}]})
+        code, d = self.req("GET", "/api/memory")
+        self.assertEqual(d["memory"]["writer"][0]["problem"], "hook too vague")
+        code, d = self.req("POST", "/api/memory/forget", {"step": "writer", "index": 0})
+        self.assertEqual((code, d["memory"]["writer"]), (200, []))
+        self.assertEqual(self.req("POST", "/api/memory/forget", {"step": "writer", "index": 5})[0], 404)
+
     def test_gmail_settings_and_test_email(self):
         self.assertEqual(self.req("POST", "/api/notifications/test-email")[1]["ok"], False)
         self.assertEqual(self.req("PUT", "/api/credentials", {"gmail_address": "not-an-email"})[0], 400)

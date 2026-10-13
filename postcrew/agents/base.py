@@ -38,6 +38,7 @@ class RunContext:
     dry_run: bool = False
     page_cache: dict = field(default_factory=dict)   # pages the researcher downloaded, url -> text
     previous: dict = field(default_factory=dict)     # an agent's last output before it was sent back
+    memory: object = None                             # RunMemory: what went wrong earlier in this run
 
     @property
     def cat(self):
@@ -54,6 +55,7 @@ class RunContext:
 class Agent:
     id = "agent"
     title = "Agent"
+    name = ""
     role = ""
     uses_llm = True
 
@@ -103,11 +105,40 @@ class Agent:
         return res.data
 
 
+class Feedback(list):
+    """The Supervisor's instructions for an agent (the list itself), plus why its work was sent back:
+    by     who rejected it ("Quinn, the Editor")
+    why    the problems found in this attempt, word for word
+    before reasons the same work was sent back earlier in this run (working memory)
+    past   problems this step had in earlier runs and what fixed them (long-term memory)
+    An empty Feedback is falsy, so a first attempt with only `past` still counts as "no guidance"."""
+
+    def __init__(self, instructions=(), by="", why=(), before=(), past=()):
+        super().__init__(instructions)
+        self.by, self.why, self.before, self.past = by, list(why), list(before), list(past)
+
+
 def guidance_block(guidance):
-    if not guidance:
-        return ""
-    return ("\n\nA SUPERVISOR REVIEWED YOUR LAST ATTEMPT. Fix every point:\n" +
-            "\n".join(f"- {g}" for g in guidance))
+    by, why = getattr(guidance, "by", ""), getattr(guidance, "why", [])
+    before = [b for b in getattr(guidance, "before", []) if b not in why]
+    past = getattr(guidance, "past", [])
+    out = ""
+    if past:
+        out += ("\n\nCREW MEMORY - problems this step had in earlier runs and what fixed them (avoid them from the "
+                "start):\n" + "\n".join(f"- {p['problem']}" + (f" -> fixed by: {'; '.join(p['fix'])}" if p.get("fix") else "")
+                                         for p in past))
+    if not (guidance or why or before):
+        return out
+    if why:
+        out += (f"\n\nYOUR LAST ATTEMPT WAS SENT BACK{' by ' + by if by else ''}. WHY IT FAILED:\n"
+                + "\n".join(f"- {w}" for w in why))
+    if before:
+        out += ("\n\nALSO SENT BACK EARLIER IN THIS RUN FOR (already fixed once - do not bring these back):\n"
+                + "\n".join(f"- {b}" for b in before[-8:]))
+    if guidance:
+        out += ("\n\nA SUPERVISOR REVIEWED YOUR LAST ATTEMPT. Fix every point:\n" +
+                "\n".join(f"- {g}" for g in guidance))
+    return out
 
 
 def recent_block(ctx, n=15):

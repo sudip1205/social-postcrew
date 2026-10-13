@@ -41,6 +41,7 @@ def source_footer(research, first_comment=""):
 class MediaAgent(Agent):
     id = "media"
     title = "Visual Designer"
+    name = "Pixel"
     role = "Designs the poster (or renders the algorithm animation) and checks it fits and matches the post."
 
     def applies(self, ctx):

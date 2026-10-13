@@ -85,6 +85,7 @@ def run_check(ws, live=True, notify_user=True, client_factory=LinkedIn, runner=s
 class CredentialsAgent(Agent):
     id = "credentials"
     title = "Credential Monitor"
+    name = "Aegis"
     role = "Checks the LinkedIn token and Claude login are valid before any work starts."
     uses_llm = False
 

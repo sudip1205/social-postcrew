@@ -23,6 +23,7 @@ SCHEMA = {
 class TopicAgent(Agent):
     id = "topic"
     title = "Topic Scout"
+    name = "Nova"
     role = "Picks today's topic from the schedule, avoiding anything already posted."
 
     def run(self, ctx, guidance):

@@ -109,11 +109,35 @@ class CrewTests(unittest.TestCase):
     def test_writer_revises_its_previous_draft_after_review(self, _):
         with TempWorkspace() as ws:
             llm = ScriptedLLM(self.script(editor=[review(60, owner="writer", fixes=["shorten the hook"])] * 3 + [review()]))
-            res = run_crew(ws, TUESDAY, llm=llm, fetch=fake_fetch())
+            res = run_crew(ws, TUESDAY, llm=llm, fetch=fake_fetch(), dry_run=True)
             self.assertTrue(res["ok"], res)
             second = [c for c in llm.calls if c["agent"] == "writer"][1]["prompt"]
             self.assertIn("<previous_draft>", second)
             self.assertIn("Acme Model 2 costs $0.10", second)
+
+    def test_sent_back_work_gets_the_reasons_and_the_crew_remembers_them(self, _):
+        with TempWorkspace() as ws:
+            llm = ScriptedLLM(self.script(
+                editor=[review(60, owner="writer", fixes=["shorten the hook"])] * 3 + [review()],
+                supervisor=[{"action": "rewind", "target": "writer", "instructions": ["cut line 1 to 90 characters"],
+                             "reason": "weak hook"}]))
+            res = run_crew(ws, TUESDAY, llm=llm, fetch=fake_fetch(), dry_run=True)
+            self.assertTrue(res["ok"], res)
+            second = [c for c in llm.calls if c["agent"] == "writer"][1]["prompt"]
+            self.assertIn("SENT BACK by Quinn (Editor Review). WHY IT FAILED", second)
+            self.assertIn("shorten the hook", second)                    # the reason, word for word
+            self.assertIn("cut line 1 to 90 characters", second)         # and the Supervisor's instruction
+            mem = json.loads((ws.runs_dir / res["run_id"] / "memory.json").read_text())
+            self.assertEqual([(m["step"], m["kind"]) for m in mem if m["kind"] == "sent_back"], [("writer", "sent_back")])
+            self.assertTrue(any(r["fix"] == ["cut line 1 to 90 characters"] for r in ws.state("memory", {})["writer"]))
+            # the next run's writer starts with what was learned
+            llm2 = ScriptedLLM(self.script())
+            res2 = run_crew(ws, TUESDAY + timedelta(days=7), llm=llm2, fetch=fake_fetch(), dry_run=True)
+            first = next(c for c in llm2.calls if c["agent"] == "writer")["prompt"]
+            self.assertIn("CREW MEMORY", first)
+            self.assertIn("cut line 1 to 90 characters", first)
+            self.assertNotIn("WHY IT FAILED", first)
+            self.assertTrue(res2["ok"], res2)
 
     def test_gives_up_after_max_attempts_and_notifies(self, _):
         with TempWorkspace() as ws:

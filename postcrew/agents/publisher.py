@@ -122,6 +122,7 @@ def publish_due(ws, now=None, client_factory=LinkedIn, log=print):
 class PublisherAgent(Agent):
     id = "publisher"
     title = "Publisher"
+    name = "Echo"
     role = "Queues the approved post for post time (or for your approval) and publishes it to LinkedIn."
     uses_llm = False
 

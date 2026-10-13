@@ -40,6 +40,7 @@ def format_post(text, first_comment=""):
 class FormatterAgent(Agent):
     id = "formatter"
     title = "Formatter"
+    name = "Kai"
     role = "Applies LinkedIn formatting: hook above the fold, links to the first comment, hashtags last."
     uses_llm = False
 

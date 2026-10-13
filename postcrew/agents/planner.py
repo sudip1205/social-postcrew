@@ -102,6 +102,7 @@ def taken_dates(ws):
 class PlannerAgent(Agent):
     id = "planner"
     title = "Week Planner"
+    name = "Vega"
     role = "Drafts the topic for every remaining day of this week; you can edit any day or ask for another topic."
 
     def plan(self, ws, days, llm=None, hint="", force=False, replan=False):

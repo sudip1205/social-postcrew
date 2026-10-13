@@ -10,10 +10,11 @@ failed run notifies you with the reason. Nothing is ever queued without passing 
 """
 import traceback
 
+from .. import memory as memory_mod
 from ..notify import notify
 from . import team
 from ..checks import STALE
-from .base import AgentError
+from .base import AgentError, Feedback
 from .credentials import CredentialsAgent
 from .editor import EditorAgent
 from .formatter import FormatterAgent
@@ -62,6 +63,7 @@ def clip(obj, n=1500):
 class Supervisor:
     id = "supervisor"
     title = "Supervisor"
+    name = "Orion"
     role = "Orchestrates the crew, validates every step, and redirects agents that get stuck."
 
     def __init__(self, crew=None):
@@ -72,7 +74,9 @@ class Supervisor:
     # ---------- the run ----------
     def run(self, ctx):
         run = ctx.run
-        guidance = {s: [] for s in self.order}
+        if ctx.memory is None:
+            ctx.memory = memory_mod.RunMemory(run.dir)
+        guidance = {s: self._fresh(ctx, s) for s in self.order}
         attempts = {s: 0 for s in self.order}
         total, i = 0, 0
         run.event("supervisor", "start", f"crew run for {ctx.day.isoformat()} - {ctx.cat['label']}",
@@ -107,6 +111,7 @@ class Supervisor:
                 summary = agent.summary(out)
                 run.step(step, "passed", summary=summary, errors=[])
                 run.event(step, "passed", summary or "accepted")
+                ctx.memory.add(step, "passed", attempt=attempts[step])
                 i += 1
                 continue
             run.step(step, "retrying", errors=problems)
@@ -125,7 +130,9 @@ class Supervisor:
             if decision["action"] == "abort":
                 return self._fail(ctx, step, f"supervisor stopped the run: {decision['reason']}", problems)
             target = decision["target"]
-            guidance[target] = decision["instructions"] or problems[:6]
+            by = self._who(ctx, step, out)
+            guidance[target] = self._feedback(ctx, target, decision["instructions"] or problems[:6], by, problems,
+                                              attempts[step])
             if out is not None and target == step:
                 ctx.previous[step] = out
             if target != step:  # rewind: redo the target and everything after it
@@ -134,7 +141,7 @@ class Supervisor:
                     if s in ctx.outputs:
                         ctx.previous[s] = ctx.outputs.pop(s)
                     if s != target:
-                        guidance[s] = []
+                        guidance[s] = self._fresh(ctx, s)
                     run.step(s, "retrying" if s == target else "pending")
                 if step == "editor" and target != step:
                     # every agent being redone between the target and the Editor gets the Editor's points for it:
@@ -142,10 +149,46 @@ class Supervisor:
                     for s in self.order[self.order.index(target) + 1:self.order.index(step)]:
                         if s in FIXABLE:
                             mine = [p for p in problems if _about(p, s)]
-                            guidance[s] = mine[:6]
+                            if mine:
+                                guidance[s] = self._feedback(ctx, s, mine[:6], by, mine, attempts[step])
         run.finish("succeeded", self._result_text(ctx))
+        self._remember(ctx)
         self._review_team(ctx)
         return {"ok": True, "post": ctx.outputs.get("publisher"), "cost_usd": run.cost}
+
+    # ---------- feedback and memory ----------
+    def _who(self, ctx, step, out=None):
+        """Who sent the work back, for the agent that has to fix it: 'Quinn (Editor Review)'."""
+        a = self.by_id[step]
+        names = [m.get("name") for m in (out or {}).get("team", []) if m.get("name")] if isinstance(out, dict) else []
+        if step == "writer" and isinstance(out, dict) and out.get("author_name"):
+            names = [out["author_name"]]
+        name = ", ".join(names) or (a.name if a.name and "team" not in a.name else "")
+        return f"{name} ({a.title})" if name else a.title
+
+    def _fresh(self, ctx, step):
+        """First-attempt feedback: what this step got wrong earlier in the run and in earlier runs."""
+        return Feedback(before=ctx.memory.reasons(step) if ctx.memory else [], past=self._past(ctx, step))
+
+    def _past(self, ctx, step):
+        try:
+            return memory_mod.recall(ctx.ws, step)
+        except Exception:
+            return []
+
+    def _feedback(self, ctx, step, instructions, by, why, attempt):
+        """Send work back to `step` with the reasons it failed, and keep them in the run's working memory."""
+        fb = Feedback(instructions, by=by, why=why[:12], before=ctx.memory.reasons(step), past=self._past(ctx, step))
+        ctx.memory.add(step, "sent_back", by=by, why=why, instructions=instructions, attempt=attempt)
+        return fb
+
+    def _remember(self, ctx):
+        try:
+            n = memory_mod.remember(ctx.ws, ctx.memory, ctx.run.status["run_id"])
+            if n:
+                ctx.run.event("supervisor", "memory", f"remembered {n} fixed problem(s) for future runs")
+        except Exception as e:  # memory must never break a run
+            ctx.run.event("supervisor", "memory_error", str(e)[:200], level="warning")
 
     # ---------- the team ----------
     def _record_editor(self, ctx, out, passed, problems):
@@ -207,6 +250,7 @@ class Supervisor:
         prompt = (f"Category: {ctx.cat['label']} - {ctx.cat['brief']}\n"
                   f"Failed step: {step} ({self.by_id[step].role})\nAttempts so far: {attempts}\n"
                   f"Problems found by validation:\n" + "\n".join(f"- {p}" for p in problems) +
+                  self._history(ctx) +
                   f"\n\nThe failed output:\n{clip(out, 2500)}\n\nAccepted outputs so far:\n" +
                   "\n".join(f"[{k}] {v}" for k, v in upstream.items()) +
                   f"\n\nSteps you may send work to: {[s for s in FIXABLE if self.order.index(s) <= self.order.index(step)]}"
@@ -231,6 +275,12 @@ class Supervisor:
             d.update(action="rewind", target=default_target)
         return d
 
+    def _history(self, ctx):
+        rows = [f"- {e['step']} sent back (by {e['by']}): {'; '.join(e['why'][:2])[:300]}"
+                for e in (ctx.memory.entries if ctx.memory else []) if e["kind"] == "sent_back"]
+        return ("\n\nEarlier in this run (do not repeat an instruction that did not work):\n" + "\n".join(rows[-8:])
+                if rows else "")
+
     def _system(self, ctx):
         from .base import PROMPTS
         override = ctx.ws.root / "prompts" / "supervisor.md"
@@ -244,6 +294,7 @@ class Supervisor:
                 ctx.run.step(s, "blocked")
         msg = f"{reason}. Last problems: " + "; ".join(problems[:3])
         ctx.run.finish("failed", msg)
+        self._remember(ctx)
         self._review_team(ctx)
         notify(ctx.ws, f"No post for {ctx.day.isoformat()}", f"{self.by_id[step].title}: {msg[:400]}", level="error",
                key=f"run-failed-{ctx.day.isoformat()}", action={"label": "See the run", "tab": "workflow"}, quiet_hours=1)

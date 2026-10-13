@@ -66,6 +66,7 @@ def page_text(raw):
 class ResearchAgent(Agent):
     id = "research"
     title = "Researcher"
+    name = "Research team"
     role = "Chooses primary sources, downloads them itself, and quotes them verbatim; every quote is re-checked."
 
     def applies(self, ctx):

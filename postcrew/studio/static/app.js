@@ -5,13 +5,22 @@ const $ = (s, el = document) => el.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const STEP_TITLES = { credentials: "Credential Monitor", topic: "Topic Scout", research: "Researcher", writer: "Writer",
   media: "Visual Designer", editor: "Editor Review", formatter: "Formatter", publisher: "Publisher" };
-const STATE_COLORS = { pending: ["#ffffff", "#c9ced6", "#5d6470"], running: ["#f1ecfb", "#6941c6", "#6941c6"],
-  retrying: ["#f1ecfb", "#6941c6", "#6941c6"], passed: ["#e6f4ec", "#0a7d43", "#0a7d43"], failed: ["#fdecea", "#b42318", "#b42318"],
-  skipped: ["#f5f6f8", "#d5d9e0", "#8a919c"], blocked: ["#fdecea", "#f0a39b", "#b42318"], waiting: ["#fdf3e2", "#a15c07", "#a15c07"] };
+const STATE_COLORS = { pending: ["#0f1729", "#2a3a5e", "#8a98b3"], running: ["#1d1640", "#a78bfa", "#c4b5fd"],
+  retrying: ["#1d1640", "#a78bfa", "#c4b5fd"], passed: ["#0c2a24", "#34d399", "#34d399"], failed: ["#2e1020", "#fb7185", "#fb7185"],
+  skipped: ["#0b1222", "#1e2a44", "#5b6b89"], blocked: ["#2a0f1c", "#9f4560", "#fb7185"], waiting: ["#2a2110", "#fbbf24", "#fbbf24"] };
+// every agent's name, and the two colours of its avatar; the research and writing teams show their members' names
+const AGENTS = { supervisor: ["Orion", "#a78bfa", "#38bdf8"], planner: ["Vega", "#f0abfc", "#a78bfa"], credentials: ["Aegis", "#94a3b8", "#38bdf8"],
+  topic: ["Nova", "#38bdf8", "#22d3ee"], research: ["Research team", "#22d3ee", "#34d399"], writer: ["Writing team", "#fbbf24", "#f472b6"],
+  reviewer: ["Iris", "#f472b6", "#a78bfa"], media: ["Pixel", "#f472b6", "#fb7185"], editor: ["Quinn", "#34d399", "#38bdf8"],
+  formatter: ["Kai", "#a3e635", "#22d3ee"], publisher: ["Echo", "#60a5fa", "#a78bfa"] };
+const agentName = id => (S.agents?.[id]?.members?.length ? S.agents[id].members.join(" · ") : null) || AGENTS[id]?.[0] || id;
+const agentTitle = id => id === "supervisor" ? "Supervisor" : S.agents?.[id]?.title || STEP_TITLES[id] || id;
+const avatar = (id, sm) => { const [n, h1, h2] = AGENTS[id] || [id, "#38bdf8", "#a78bfa"];
+  return `<span class="avatar${sm ? " sm" : ""}" style="--h1:${h1};--h2:${h2}" aria-hidden="true">${esc((id === "research" || id === "writer" ? agentTitle(id) : n)[0])}</span>`; };
 const WEEKDAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
 const DAY_NAMES = { mon: "Monday", tue: "Tuesday", wed: "Wednesday", thu: "Thursday", fri: "Friday", sat: "Saturday", sun: "Sunday" };
 
-const S = { tab: "overview", overview: null, runId: null, run: null, events: [], lastT: 0, selected: null,
+const S = { agents: null, tab: "overview", overview: null, runId: null, run: null, events: [], lastT: 0, selected: null,
   poll: null, config: null, dirty: false };
 
 async function api(path, opts = {}) {
@@ -126,7 +135,7 @@ async function startRun() {
 
 /* ---------- workflow ---------- */
 async function renderWorkflow() {
-  const { runs } = await api("/api/runs");
+  const [{ runs }] = await Promise.all([api("/api/runs"), loadAgents()]);
   if (!S.runId && runs.length) S.runId = runs[0].run_id;
   $("#view").innerHTML = `
     <div class="row"><div><h1>Workflow</h1><p class="sub">Every agent, every attempt and every supervisor decision, live.</p></div>
@@ -139,7 +148,11 @@ async function renderWorkflow() {
       <div class="panel"><div class="row"><h2 style="margin:0">Log</h2><span class="spacer"></span>
         <label class="checkline small"><input type="checkbox" id="log-filter"> Only this step</label></div>
         <div class="timeline" id="timeline" style="margin-top:10px"></div></div>
-    </div>`;
+    </div>
+    <div class="panel" style="margin-top:16px"><h2>Working memory</h2>
+      <p class="muted small" style="margin-top:-6px">What went wrong during this run, who sent the work back and why. An agent that is sent
+        back sees all of it, so a fix is not undone in a later round. Fixed problems are kept for future runs.</p>
+      <div id="memory" class="memory-list"></div></div>`;
   $("#run-pick").onchange = e => { S.runId = e.target.value; S.selected = null; loadRun(true); };
   $("#log-filter").onchange = drawTimeline;
   if (!S.runId) { $("#wf-graph").innerHTML = graphSvg(null); return; }
@@ -162,7 +175,22 @@ async function loadRun(reset) {
   $("#wf-graph").innerHTML = graphSvg(st);
   rebindNodes();
   drawTimeline();
+  drawMemory();
   if (S.selected) drawStep();
+}
+
+function memEntry(e) {
+  const list = (lbl, xs) => xs?.length ? `<div class="lbl">${lbl}</div><ul>${xs.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : "";
+  if (e.kind === "passed") return `<div class="mem passed"><span class="who">${avatar(e.step, 1)} ${esc(agentName(e.step))}</span>
+    <span class="muted small">· ${esc(STEP_TITLES[e.step] || e.step)} passed on attempt ${esc(e.attempt)}</span></div>`;
+  return `<div class="mem"><span class="who">${avatar(e.step, 1)} ${esc(agentName(e.step))}</span>
+    <span class="muted small">· ${esc(STEP_TITLES[e.step] || e.step)} sent back by ${esc(e.by)} · ${esc((e.at || "").slice(11, 19))}</span>
+    ${list("Why it failed", e.why)}${list("What to change", e.instructions)}</div>`;
+}
+function drawMemory() {
+  const el = $("#memory"); if (!el) return;
+  const mem = S.run?.memory || [];
+  el.innerHTML = mem.length ? mem.slice().reverse().map(memEntry).join("") : `<div class="empty">Nothing yet: no agent has been sent back in this run.</div>`;
 }
 function rebindNodes() {
   document.querySelectorAll(".wf .node").forEach(n => n.onclick = () => { S.selected = n.dataset.step;
@@ -170,34 +198,37 @@ function rebindNodes() {
 }
 
 function graphSvg(st) {
-  const steps = Object.keys(STEP_TITLES), W = 150, H = 66, GAP = 34, X0 = 20, Y = 128;
+  const steps = Object.keys(STEP_TITLES), W = 150, H = 80, GAP = 34, X0 = 20, Y = 140, SH = 62;
   const width = X0 * 2 + steps.length * W + (steps.length - 1) * GAP;
   const supX = width / 2 - 90, supY = 14;
   const supState = st ? (st.state === "running" ? "running" : st.state === "failed" ? "failed" : "passed") : "pending";
-  let svg = `<svg class="wf" viewBox="0 0 ${width} 260" role="img" aria-label="Agent workflow">`;
+  let svg = `<svg class="wf" viewBox="0 0 ${width} 300" role="img" aria-label="Agent workflow">`;
   steps.forEach((s, i) => {
     const x = X0 + i * (W + GAP);
-    svg += `<path class="sup" d="M ${supX + 90} ${supY + 50} C ${supX + 90} 90, ${x + W / 2} 90, ${x + W / 2} ${Y}"/>`;
+    svg += `<path class="sup" d="M ${supX + 90} ${supY + SH} C ${supX + 90} 100, ${x + W / 2} 100, ${x + W / 2} ${Y}"/>`;
     if (i < steps.length - 1) {
       const done = st && st.steps[s] && ["passed", "skipped"].includes(st.steps[s].state);
       svg += `<path class="edge ${done ? "done" : ""}" d="M ${x + W} ${Y + H / 2} L ${x + W + GAP - 6} ${Y + H / 2}" marker-end="url(#arr${done ? "d" : ""})"/>`;
     }
   });
   const [sf, ss, stx] = STATE_COLORS[supState];
-  svg += `<defs><marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#b8bfca"/></marker>
-    <marker id="arrd" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#0a7d43"/></marker></defs>`;
-  svg += `<g class="node ${S.selected === "supervisor" ? "selected" : ""}" data-step="supervisor"><rect x="${supX}" y="${supY}" width="180" height="50" rx="12" fill="${sf}" stroke="${ss}"/>
-    <text x="${supX + 90}" y="${supY + 22}" text-anchor="middle" fill="#17191c">Supervisor</text>
-    <text class="st" x="${supX + 90}" y="${supY + 39}" text-anchor="middle" fill="${stx}">${st ? st.interventions + " intervention(s)" : "orchestrates the crew"}</text></g>`;
+  svg += `<defs><marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#5b6b89"/></marker>
+    <marker id="arrd" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#34d399"/></marker></defs>`;
+  svg += `<g class="node ${S.selected === "supervisor" ? "selected" : ""}" data-step="supervisor"><rect x="${supX}" y="${supY}" width="180" height="${SH}" rx="14" fill="${sf}" stroke="${ss}"/>
+    <text class="nm" x="${supX + 90}" y="${supY + 22}" text-anchor="middle" fill="#e6edf7">${esc(agentName("supervisor"))}</text>
+    <text class="ti" x="${supX + 90}" y="${supY + 37}" text-anchor="middle" fill="#38bdf8">Supervisor</text>
+    <text class="st" x="${supX + 90}" y="${supY + 53}" text-anchor="middle" fill="${stx}">${st ? st.interventions + " intervention(s)" : "orchestrates the crew"}</text></g>`;
   steps.forEach((s, i) => {
     const x = X0 + i * (W + GAP), info = st?.steps[s] || { state: "pending", attempts: 0 };
     const [fill, stroke, tc] = STATE_COLORS[info.state] || STATE_COLORS.pending;
     const label = info.state === "retrying" ? `retrying (try ${info.attempts})` : info.state + (info.attempts > 1 ? ` · ${info.attempts} tries` : "");
     svg += `<g class="node ${info.state} ${S.selected === s ? "selected" : ""}" data-step="${s}">
-      <rect x="${x}" y="${Y}" width="${W}" height="${H}" rx="12" fill="${fill}" stroke="${stroke}"/>
-      <text x="${x + W / 2}" y="${Y + 27}" text-anchor="middle" fill="#17191c">${esc(STEP_TITLES[s])}</text>
-      <text class="st" x="${x + W / 2}" y="${Y + 46}" text-anchor="middle" fill="${tc}">${esc(label)}</text></g>`;
-    if (info.cost_usd) svg += `<text x="${x + W / 2}" y="${Y + H + 18}" text-anchor="middle" font-size="11" fill="#5d6470">${money(info.cost_usd)}</text>`;
+      <rect x="${x}" y="${Y}" width="${W}" height="${H}" rx="14" fill="${fill}" stroke="${stroke}"/>
+      <rect x="${x}" y="${Y}" width="${W}" height="4" rx="2" fill="${(AGENTS[s] || [])[1] || stroke}" opacity=".85"/>
+      <text class="nm" x="${x + W / 2}" y="${Y + 28}" text-anchor="middle" fill="#e6edf7">${esc(agentName(s).length > 19 ? agentName(s).slice(0, 18) + "…" : agentName(s))}</text>
+      <text class="ti" x="${x + W / 2}" y="${Y + 45}" text-anchor="middle" fill="${(AGENTS[s] || [])[1] || "#38bdf8"}">${esc(STEP_TITLES[s])}</text>
+      <text class="st" x="${x + W / 2}" y="${Y + 65}" text-anchor="middle" fill="${tc}">${esc(label)}</text></g>`;
+    if (info.cost_usd) svg += `<text x="${x + W / 2}" y="${Y + H + 18}" text-anchor="middle" font-size="11" font-family="monospace" fill="#8a98b3">${money(info.cost_usd)}</text>`;
   });
   // supervisor rewinds: a return arrow under the graph from the step that failed back to where work restarted
   const rewinds = {};
@@ -212,17 +243,17 @@ function graphSvg(st) {
     const [from, to] = k.split(">"), i = steps.indexOf(from), j = steps.indexOf(to);
     if (i < 0 || j < 0) return;
     const x1 = X0 + i * (W + GAP) + W / 2, x2 = X0 + j * (W + GAP) + W / 2, y = Y + H, dip = 34 + idx * 10;
-    svg += `<path d="M ${x1} ${y + 26} C ${x1} ${y + dip + 20}, ${x2} ${y + dip + 20}, ${x2} ${y + 26}" fill="none" stroke="#b42318"
+    svg += `<path d="M ${x1} ${y + 26} C ${x1} ${y + dip + 20}, ${x2} ${y + dip + 20}, ${x2} ${y + 26}" fill="none" stroke="#fb7185"
       stroke-width="1.8" stroke-dasharray="5 4" marker-end="url(#arrr)"/>
-      <text x="${(x1 + x2) / 2}" y="${y + dip + 22}" text-anchor="middle" font-size="11" font-weight="600" fill="#b42318">sent back ×${n}</text>`;
+      <text x="${(x1 + x2) / 2}" y="${y + dip + 22}" text-anchor="middle" font-size="11" font-weight="600" fill="#fb7185">sent back ×${n}</text>`;
   });
-  svg += `<defs><marker id="arrr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#b42318"/></marker></defs>`;
+  svg += `<defs><marker id="arrr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#fb7185"/></marker></defs>`;
   return svg + "</svg>";
 }
 
 async function drawStep() {
   const s = S.selected, st = S.run.status;
-  $("#step-title").textContent = s === "supervisor" ? "Supervisor" : STEP_TITLES[s];
+  $("#step-title").innerHTML = `<span class="who">${avatar(s)} <span>${esc(agentName(s))}<br><span class="small muted">${esc(agentTitle(s))}</span></span></span>`;
   if (s === "supervisor") {
     const dec = S.events.filter(e => e.step === "supervisor" && e.kind === "decision");
     $("#step-detail").innerHTML = dec.length ? `<ol class="steps-list">${dec.map(e => `<li><b>${esc(e.data.action)} → ${esc(e.data.target)}</b>: ${esc(e.data.reason)}
@@ -234,6 +265,8 @@ async function drawStep() {
   let html = `<div class="row">${chip(info.state || "pending")}<span class="muted small">${info.attempts || 0} attempt(s) · ${money(info.cost_usd)}</span></div>
     ${info.summary ? `<p>${esc(info.summary)}</p>` : ""}
     ${info.errors?.length ? `<h3>Problems found by validation</h3><ul class="err-list">${info.errors.map(e => `<li>${esc(e)}</li>`).join("")}</ul>` : ""}`;
+  const back = (S.run.memory || []).filter(e => e.step === s && e.kind === "sent_back");
+  if (back.length) html += `<h3>Sent back ${back.length}× — the reasons it was given</h3>` + back.map(memEntry).join("");
   if (S.run.files.includes(`${s}.json`)) {
     try {
       const r = await fetch(`/api/runs/${encodeURIComponent(S.runId)}/artifact/${s}.json`); const art = await r.json();
@@ -256,7 +289,7 @@ function drawTimeline() {
   const el = $("#timeline"); if (!el) return;
   const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
   el.innerHTML = evs.map(e => `<div class="ev ${esc(e.level)} ${esc(e.step)}"><span class="t">${esc(e.ts.slice(11, 19))}</span>
-    <span class="s">${esc(e.step)}</span><span class="m">${esc(e.kind)}: ${esc(e.message)}
+    <span class="s">${avatar(e.step, 1)}${esc(AGENTS[e.step]?.[0] || e.step)}</span><span class="m">${esc(e.kind)}: ${esc(e.message)}
     ${e.data ? `<details><summary class="small muted">details</summary><pre>${esc(JSON.stringify(e.data, null, 2))}</pre></details>` : ""}</span></div>`).join("")
     || `<div class="empty">No events yet.</div>`;
   if (atBottom) el.scrollTop = el.scrollHeight;
@@ -409,7 +442,7 @@ async function renderPlan() {
 
 /* ---------- team ---------- */
 async function renderTeam() {
-  const d = await api("/api/team");
+  const [d, { memory }] = await Promise.all([api("/api/team"), api("/api/memory"), loadAgents()]);
   const ROLE = { research: "Researchers", writer: "Writers" };
   const dots = m => m.window.map(g => `<span class="dot-${g ? "ok" : "bad"}" title="${g ? "good" : "bad"}"></span>`).join("") || `<span class="muted small">no posts yet</span>`;
   const card = m => {
@@ -425,7 +458,20 @@ async function renderTeam() {
       ${last && !last.good && last.problems?.length ? `<div class="small" style="margin-top:6px;color:var(--bad)">Last problem: ${esc(last.problems[0].slice(0, 180))}</div>` : ""}
     </div>`;
   };
-  $("#view").innerHTML = `<h1>Team</h1><p class="sub">Several researchers and writers work on every post. Researchers' verified sources are combined;
+  const crew = Object.values(S.agents || {}).map(a => `<div class="agent-card">${avatar(a.id)}<div style="min-width:0">
+      <div class="nm">${esc(agentName(a.id))}</div><div class="ti">${esc(a.title)}</div>
+      <div class="small" style="margin-top:4px">${esc(a.role)}</div>
+      ${a.llm ? `<div class="small muted mono" style="margin-top:4px">${esc(a.llm.model || "default model")}</div>` : `<div class="small muted mono" style="margin-top:4px">no AI: rules only</div>`}</div></div>`).join("");
+  const memRows = Object.entries(memory).flatMap(([step, rows]) => rows.map((r, i) => ({ step, i, ...r }))).reverse();
+  const memHtml = memRows.length ? memRows.map(r => `<div class="mem passed"><div class="row"><span class="who">${avatar(r.step, 1)} ${esc(STEP_TITLES[r.step] || r.step)}</span>
+      <span class="muted small">${esc(fmtTime(r.at))}</span><span class="spacer"></span><button class="small" data-forget="${esc(r.step)}:${r.i}">Forget</button></div>
+      <div class="lbl" style="margin-top:6px">Problem</div><div>${esc(r.problem)}</div>
+      ${r.fix?.length ? `<div class="lbl" style="margin-top:4px">What fixed it</div><ul>${r.fix.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}</div>`).join("")
+    : `<div class="empty">Nothing yet. When an agent's work is sent back and then fixed, the crew remembers the problem and the fix.</div>`;
+  $("#view").innerHTML = `<h1>Crew</h1><p class="sub">Every agent, its name and its job. Orion, the Supervisor, checks each step and sends work back
+    with the reasons it failed.</p>
+    <div class="panel section"><h2>The crew</h2><div class="grid g3">${crew}</div></div>
+    <h2 style="margin-top:22px">Research and writing teams</h2><p class="sub">Several researchers and writers work on every post. Researchers' verified sources are combined;
     writers compete, ${d.rules.pre_review ? "every draft is pre-reviewed and the best is polished, " : ""}and only the best goes to the Editor.
     A member is replaced automatically when fewer than ${Math.round(d.rules.fire_min_success * 100)}% of their last ${d.rules.fire_window} posts were good;
     the new hire learns from the mistakes.</p>
@@ -438,11 +484,16 @@ async function renderTeam() {
     <div class="panel section"><h2>Former members</h2>${d.fired.length ? `<table><thead><tr><th>Name</th><th>Role</th><th>Left</th><th>Why</th><th>Lessons they left</th></tr></thead><tbody>${
       d.fired.map(f => `<tr><td><b>${esc(f.name)}</b></td><td class="small">${esc(f.role)}</td><td class="small">${esc(fmtTime(f.fired_at))}</td>
         <td class="small">${esc(f.reason)}</td><td class="small">${(f.lessons || []).map(esc).join("<br>")}</td></tr>`).join("")}</tbody></table>`
-      : `<div class="empty">Nobody has been replaced.</div>`}</div>`;
+      : `<div class="empty">Nobody has been replaced.</div>`}</div>
+    <div class="panel section"><h2>Long-term memory</h2><p class="muted small" style="margin-top:-6px">Problems the crew fixed in earlier runs.
+      The 3 most recent for each step are given to that agent at the start of every run.</p><div class="memory-list">${memHtml}</div></div>`;
   const act = async (path, body, msg) => { try { await post(path, body); toast(msg); } catch (e) { toast(e.message, true); } renderTeam(); };
   document.querySelectorAll("[data-fire]").forEach(b => b.onclick = () => {
     if (!confirm(`Replace ${b.dataset.name}? A new member is hired with lessons from ${b.dataset.name}'s mistakes.`)) return;
     b.disabled = true; act("/api/team/fire", { id: b.dataset.fire }, `${b.dataset.name} was replaced`);
+  });
+  document.querySelectorAll("[data-forget]").forEach(b => b.onclick = () => {
+    const [step, index] = b.dataset.forget.split(":"); act("/api/memory/forget", { step, index: +index }, "Forgotten");
   });
   document.querySelectorAll("[data-hire]").forEach(b => b.onclick = () => act("/api/team/hire", { role: b.dataset.hire }, "Hired"));
   document.querySelectorAll("[data-lesson]").forEach(b => b.onclick = () => {
@@ -508,7 +559,7 @@ async function renderSettings() {
     <p class="muted small">Each agent runs through your Claude Code login. Model: <span class="mono">haiku</span> (cheapest), <span class="mono">sonnet</span> or <span class="mono">opus</span>.
       "Max $" stops a single call.</p>
     <table><thead><tr><th>Agent</th><th>What it does</th><th>Model</th><th>Timeout (s)</th><th>Max $ per call</th></tr></thead><tbody>${
-      agents.filter(a => a.uses_llm).map(a => { const s = c.llm.agents[a.id] || {}; return `<tr><td><b>${esc(a.title)}</b></td><td class="small muted">${esc(a.role)}</td>
+      agents.filter(a => a.uses_llm).map(a => { const s = c.llm.agents[a.id] || {}; return `<tr><td><span class="who">${avatar(a.id, 1)}<b>${esc(a.name || a.title)}</b></span><div class="small muted">${esc(a.title)}</div></td><td class="small muted">${esc(a.role)}</td>
         <td>${inp(`llm.agents.${a.id}.model`, s.model ?? c.llm.defaults.model, "text", 'list="models" style="width:120px"')}</td>
         <td>${inp(`llm.agents.${a.id}.timeout_s`, s.timeout_s ?? c.llm.defaults.timeout_s, "number", 'min="30" max="3600" style="width:90px"')}</td>
         <td>${inp(`llm.agents.${a.id}.max_budget_usd`, s.max_budget_usd ?? c.llm.defaults.max_budget_usd, "number", 'step="0.05" min="0.05" max="20" style="width:90px"')}</td></tr>`; }).join("")}</tbody></table>
@@ -740,4 +791,7 @@ $("#bell").onclick = async () => {
 
 window.addEventListener("beforeunload", e => { if (S.dirty) { e.preventDefault(); e.returnValue = ""; } });
 setInterval(refreshOverview, 15000);
-refreshOverview().then(() => setTab(location.hash.slice(1) || "overview"));
+async function loadAgents() {
+  try { S.agents = Object.fromEntries((await api("/api/agents")).agents.map(a => [a.id, a])); } catch (e) { /* names fall back to AGENTS */ }
+}
+Promise.all([refreshOverview(), loadAgents()]).then(() => setTab(location.hash.slice(1) || "overview"));

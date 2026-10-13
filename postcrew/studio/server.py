@@ -18,6 +18,7 @@ from urllib.parse import parse_qs, urlparse
 from .. import __version__, crew, linkedin, notify as notify_mod
 from ..agents import planner as planner_mod
 from ..agents import team as team_mod
+from .. import memory as memory_mod
 from ..agents.credentials import run_check
 from ..agents.publisher import publish_one, scheduled_at
 from ..agents.supervisor import CREW, Supervisor
@@ -59,11 +60,15 @@ class Studio:
     def agents(self):
         cfg = self.ws.config()
         rows = []
+        roster = team_mod.load(self.ws)["members"]
         for a in [planner_mod.PlannerAgent()] + CREW + [Supervisor()]:
-            rows.append({"id": a.id, "title": a.title, "role": a.role, "uses_llm": getattr(a, "uses_llm", True),
+            role = {"research": "research", "writer": "writer"}.get(a.id)
+            members = [m["name"] for m in roster if m["role"] == role][:cfg["team"][role]] if role else []
+            rows.append({"id": a.id, "title": a.title, "name": a.name, "role": a.role, "members": members,
+                         "uses_llm": getattr(a, "uses_llm", True),
                          "llm": agent_settings(cfg, a.id) if getattr(a, "uses_llm", True) else None})
             if a.id == "writer":
-                rows.append({"id": "reviewer", "title": "Pre-reviewer", "uses_llm": True,
+                rows.append({"id": "reviewer", "title": "Pre-reviewer", "name": "Iris", "members": [], "uses_llm": True,
                              "role": "Scores every draft the way the Editor will, so the best one goes on.",
                              "llm": agent_settings(cfg, "reviewer")})
         return {"agents": rows, "steps": STEPS}
@@ -73,8 +78,9 @@ class Studio:
         if not SAFE_ID.match(run_id) or not (d / "status.json").exists():
             return None
         files = sorted(p.name for p in d.iterdir() if p.is_file() and p.name not in ("events.jsonl",))
+        mem = d / "memory.json"
         return {"status": json.loads((d / "status.json").read_text()), "events": read_events(d, after),
-                "files": files}
+                "files": files, "memory": json.loads(mem.read_text()) if mem.exists() else []}
 
     def start_run(self, body):
         if crew.is_running():
@@ -195,6 +201,13 @@ class Studio:
                              sum(v) / len(v) < cfg["team"]["fire_min_success"], window=v))
         return {"members": rows, "fired": data["fired"][::-1], "lessons": data["lessons"], "size": size,
                 "rules": {k: cfg["team"][k] for k in ("fire_window", "fire_min_success", "pre_review")}}
+
+    def memory(self):
+        return {"memory": memory_mod.load(self.ws)}
+
+    def memory_forget(self, body):
+        memory_mod.forget(self.ws, body.get("step", ""), int(body.get("index", -1)))
+        return self.memory()
 
     def team_action(self, action, body):
         role = body.get("role")
@@ -461,6 +474,8 @@ def make_handler(studio):
                     ("GET", "/api/overview"): lambda: studio.overview(),
                     ("GET", "/api/plan"): lambda: studio.plan(),
                     ("GET", "/api/team"): lambda: studio.team(),
+                    ("GET", "/api/memory"): lambda: studio.memory(),
+                    ("POST", "/api/memory/forget"): lambda: studio.memory_forget(self.body()),
                     ("PUT", "/api/plan"): lambda: studio.plan_save(self.body()),
                     ("POST", "/api/plan/fill"): lambda: studio.plan_fill(self.body()),
                     ("GET", "/api/agents"): lambda: studio.agents(),
