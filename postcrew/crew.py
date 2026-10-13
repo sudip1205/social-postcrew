@@ -25,6 +25,13 @@ def target_date(cfg, now=None):
     return (now or local_now(cfg)).date() + timedelta(days=cfg["schedule"]["lead_days"])
 
 
+def post_for(ws, day):
+    """The post already made for this date (queued, awaiting approval or published), or None."""
+    day = day.isoformat() if isinstance(day, date) else day
+    return next((p for p in ws.queue() if p.get("date") == day and p.get("status") not in ("vetoed", "failed")),
+                None) or next((p for p in ws.history() if p.get("date") == day), None)
+
+
 def run_crew(ws, day=None, category=None, llm=None, fetch=fetch_text, dry_run=False, echo=False, run_id=None):
     """Run the whole crew for one post. Returns the supervisor result plus run_id. One run at a time."""
     cfg = ws.config()

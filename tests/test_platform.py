@@ -11,7 +11,7 @@ from unittest import mock
 from zoneinfo import ZoneInfo
 
 from helpers import FakeLinkedIn, TempWorkspace, claude_ok
-from postcrew import notify, scheduler
+from postcrew import crew, notify, scheduler
 from postcrew.agents import credentials as cred_mod
 from postcrew.defaults import DEFAULT_CONFIG
 from postcrew.llm import ClaudeCode, LLMError
@@ -167,6 +167,26 @@ class SchedulerTests(unittest.TestCase):
             scheduler.tick(ws, datetime(2026, 10, 12, 19, 2, tzinfo=tz), **kw)   # no duplicates a minute later
             self.assertEqual(len(calls), n)
             self.assertEqual(calls.count(("plan", "2026-10-12")), 1)
+
+    def test_does_not_generate_when_the_day_already_has_a_post(self):
+        with TempWorkspace() as ws:
+            tz = ZoneInfo(ws.config()["schedule"]["timezone"])
+            calls = []
+            kw = dict(runner=lambda ws_, d: calls.append(d.isoformat()), publisher=lambda ws_: [],
+                      checker=lambda ws_: None, planner=lambda ws_, d: None)
+            evening = datetime(2026, 10, 12, 19, 1, tzinfo=tz)                  # generates Tuesday 2026-10-13
+            ws.save_queue([{"id": "a", "date": "2026-10-13", "status": "queued"}])    # made by a manual run
+            scheduler.tick(ws, evening, **kw)
+            ws.save_queue([])
+            ws.add_history({"id": "a", "date": "2026-10-13", "status": "published"})  # ...and already published
+            scheduler.tick(ws, evening, **kw)
+            self.assertEqual(calls, [])
+            ws.remove_history(lambda p: True)
+            with crew._running:                                                  # a manual run is still going
+                scheduler.tick(ws, evening, **kw)
+            self.assertEqual(calls, [])
+            scheduler.tick(ws, evening, **kw)                                    # nothing there and nothing running
+            self.assertEqual(calls, ["2026-10-13"])
 
     def test_pause_stops_everything(self):
         with TempWorkspace() as ws:

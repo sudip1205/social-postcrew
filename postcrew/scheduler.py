@@ -11,7 +11,7 @@ from datetime import datetime, timedelta, timezone
 from .agents.credentials import run_check
 from .agents.planner import plan_week
 from .agents.publisher import publish_due
-from .crew import category_for, local_now, run_crew, target_date
+from .crew import category_for, is_running, local_now, post_for, run_crew, target_date
 from .notify import notify
 from .workspace import WEEKDAYS
 
@@ -51,7 +51,8 @@ def tick(ws, now=None, runner=run_crew, publisher=publish_due, checker=run_check
     target = target_date(cfg, now)
     if (_passed(now, cfg["schedule"]["generate_time"]) and st.get("generated_for") != target.isoformat()
             and category_for(cfg, target)):
-        if not any(p["date"] == target.isoformat() and p["status"] not in ("vetoed", "failed") for p in ws.queue()):
+        # a post for that date already made (e.g. by a manual run) or a run still going: nothing to generate
+        if not post_for(ws, target) and not is_running():
             st["generated_for"] = target.isoformat()
             ws.save_state("scheduler", st)
             runner(ws, target)
