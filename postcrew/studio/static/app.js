@@ -17,6 +17,7 @@ const AGENTS = { supervisor: ["Orion", "command", "compass"], planner: ["Vega", 
   research: ["Research team", "research", "search"], writer: ["Writing team", "writing", "pen"], reviewer: ["Iris", "writing", "eye"],
   media: ["Pixel", "design", "image"], editor: ["Quinn", "quality", "check"], formatter: ["Kai", "quality", "align"],
   credentials: ["Aegis", "ops", "shield"], publisher: ["Echo", "ops", "send"] };
+const PROVIDERS = { "claude-code": "Claude Code (Claude plan)", anthropic: "Claude API", openai: "OpenAI API", "openai-compatible": "OpenAI-compatible server" };
 const ICONS = { // 24x24 line icons
   compass: '<circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/>',
   calendar: '<rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
@@ -84,7 +85,7 @@ async function refreshOverview() {
 
 function bannerHtml(o) {
   const out = [];
-  const li = o.credentials?.linkedin, cl = o.credentials?.claude;
+  const li = o.credentials?.linkedin, cl = o.credentials?.ai || o.credentials?.claude;
   if (o.config_errors?.length) out.push(["error", `Settings have ${o.config_errors.length} problem(s): ${o.config_errors[0]}`, "settings", "Fix settings"]);
   if (cl && cl.state !== "ok") out.push(["error", cl.message, "credentials", "Open Credentials"]);
   if (li && !["ok", "unreachable"].includes(li.state)) out.push([li.state === "expiring" ? "warning" : "error", li.message, "credentials", "Reconnect LinkedIn"]);
@@ -610,9 +611,19 @@ async function renderSettings() {
       <button id="test-notify" class="small">Send a test</button><span class="muted small">Gmail and Telegram are set up in Credentials.</span></div></div>
 
   <details class="panel section adv"><summary><h2 style="display:inline">Advanced</h2> <span class="muted small">AI models, quality bar, limits. The defaults work.</span></summary>
+    <h3>AI provider</h3>
+    <div class="grid g2">
+      <label class="f">Which AI runs the crew${sel("llm.backend", c.llm.backend, [["claude-code", "Claude Pro / Max / Team plan (Claude Code login, no API key)"],
+        ["anthropic", "Claude API (Anthropic API key)"], ["openai", "OpenAI API (OpenAI API key)"],
+        ["openai-compatible", "OpenAI-compatible: Ollama, LM Studio, OpenRouter, Groq, vLLM..."]])}</label>
+      <label class="f">Server address (OpenAI-compatible; optional for OpenAI)${inp("llm.api.base_url", c.llm.api.base_url, "url", 'placeholder="http://localhost:11434/v1"')}</label></div>
+    <p class="muted small">API keys go in <a href="#credentials">Credentials</a>. OpenAI-compatible servers have no web search: researchers then suggest pages they know, and every page is still downloaded and checked.</p>
+    ${c.llm.backend === "claude-code" ? "" : `<div class="grid g3">${[["opus", "Strongest (opus)"], ["sonnet", "Balanced (sonnet)"], ["haiku", "Fastest (haiku)"]].map(([t, l]) =>
+      `<label class="f">${l} model${inp(`llm.api.models.${c.llm.backend}.${t}`, c.llm.api.models[c.llm.backend]?.[t] || "", "text", 'placeholder="model id"')}</label>`).join("")}</div>
+      <p class="muted small">Agents ask for a tier; these are the ${esc(c.llm.backend)} models used for each. Prices for the cost estimate are in <span class="mono">config.json</span> (<span class="mono">llm.api.prices</span>).</p>`}
     <h3>AI models</h3>
-    <p class="muted small">Each agent runs through your Claude Code login. Model: <span class="mono">haiku</span> (cheapest), <span class="mono">sonnet</span> or <span class="mono">opus</span>.
-      "Max $" stops a single call.</p>
+    <p class="muted small">Model per agent: a tier (<span class="mono">haiku</span> = cheapest, <span class="mono">sonnet</span>, <span class="mono">opus</span> = strongest) or a full model id.
+      "Max $" stops a single call. Save after changing the provider to see its model fields.</p>
     <table><thead><tr><th>Agent</th><th>What it does</th><th>Model</th><th>Timeout (s)</th><th>Max $ per call</th></tr></thead><tbody>${
       agents.filter(a => a.uses_llm).map(a => { const s = c.llm.agents[a.id] || {}; return `<tr><td><span class="who">${avatar(a.id, 1)}<b>${esc(a.name || a.title)}</b></span><div class="small muted">${esc(a.title)}</div></td><td class="small muted">${esc(a.role)}</td>
         <td>${inp(`llm.agents.${a.id}.model`, s.model ?? c.llm.defaults.model, "text", 'list="models" style="width:120px"')}</td>
@@ -639,6 +650,7 @@ async function renderSettings() {
       <label class="f">Check credentials daily at${inp("schedule.credential_check_time", c.schedule.credential_check_time, "time")}</label>
       <label class="f">Warn days before the LinkedIn token expires${inp("notifications.warn_days_before_expiry", c.notifications.warn_days_before_expiry, "number", 'min="1" max="30"')}</label>
       <label class="f">Claude Code command${inp("llm.claude_path", c.llm.claude_path)}</label>
+      <label class="f">Longest AI answer (tokens, API providers)${inp("llm.api.max_output_tokens", c.llm.api.max_output_tokens, "number", 'min="1000" max="200000"')}</label>
       <label class="f">LinkedIn API version (YYYYMM)${inp("publishing.linkedin_api_version", c.publishing.linkedin_api_version)}</label>
       <label class="f">Blocked phrases (one per line)<textarea data-k="profile.blocklist" data-list="1" rows="3">${esc(c.profile.blocklist.join("\n"))}</textarea></label>
     </div></details>
@@ -766,7 +778,7 @@ async function saveSettings() {
 
 /* ---------- credentials ---------- */
 async function renderCredentials() {
-  const d = await api("/api/credentials"), s = d.secrets, st = d.status || {}, li = st.linkedin || {}, cl = st.claude || {};
+  const d = await api("/api/credentials"), s = d.secrets, st = d.status || {}, li = st.linkedin || {}, cl = st.ai || st.claude || {};
   const set = v => v ? `<span class="secret-state" style="color:var(--ok)">saved</span>` : `<span class="secret-state muted">not set</span>`;
   $("#view").innerHTML = `<h1>Credentials</h1><p class="sub">Stored only in <span class="mono">workspace/secrets.json</span> (readable by you only). The browser can set them but never read them back.</p>
   <div class="grid g2">
@@ -787,10 +799,17 @@ async function renderCredentials() {
       <li>Copy the <b>Client ID</b> and <b>Client Secret</b> from the Auth tab into the fields above and save.</li>
       <li>Click <b>Connect LinkedIn</b>, sign in and allow. Scopes requested: <span class="mono">${esc(d.scopes)}</span>.</li>
       <li>Tokens last about 60 days. When the monitor warns you, click <b>Reconnect LinkedIn</b>.</li></ol></details></div>
-  <div class="panel"><div class="row"><h2 style="margin:0">Claude Code (the AI for every agent)</h2><span class="spacer"></span>${chip(cl.state || "unknown")}</div>
-    <p>${esc(cl.message || "Not checked yet.")}</p>
-    <div class="row"><button id="test-claude">Test with a tiny call</button><span class="muted small" id="claude-result"></span></div>
-    <p class="muted small">Not logged in? Run <span class="mono">claude</span> once in a terminal and log in. No API key is needed.</p>
+  <div class="panel"><div class="row"><h2 style="margin:0">AI provider: ${esc(PROVIDERS[d.backend] || d.backend)}</h2><span class="spacer"></span>${chip(cl.backend && cl.backend !== d.backend ? "unknown" : cl.state || "unknown")}</div>
+    <p>${esc(cl.backend && cl.backend !== d.backend ? "Not checked yet: click Check now." : cl.message || "Not checked yet.")}</p>
+    <div class="row"><button id="test-ai">Test with a tiny call</button><span class="muted small" id="ai-result"></span></div>
+    <p class="muted small">${d.backend === "claude-code" ? `Uses your Claude Pro / Max / Team plan. Not logged in? Run <span class="mono">claude</span> once in a terminal and log in. No API key is needed.`
+      : d.backend === "openai-compatible" ? `Server: <span class="mono">${esc(d.base_url || "not set")}</span>. The key is optional (local servers such as Ollama need none).` : `Pay-as-you-go with your own API key.`}
+      Change the provider in <a href="#settings">Settings > Advanced</a>.</p>
+    ${d.backend === "claude-code" ? "" : (() => { const k = { anthropic: ["anthropic_api_key", "Anthropic API key", "sk-ant-...", "https://console.anthropic.com/settings/keys"],
+        openai: ["openai_api_key", "OpenAI API key", "sk-...", "https://platform.openai.com/api-keys"], "openai-compatible": ["llm_api_key", "API key (optional)", "", ""] }[d.backend];
+      return `<div class="grid g2"><label class="f">${k[1]} ${set(s[k[0]])}<input id="ai-key" type="password" placeholder="${s[k[0]] ? "•••••••• (saved, type to replace)" : k[2]}" autocomplete="new-password"></label>
+        <div style="padding-top:22px"><button id="save-ai" data-k="${k[0]}">Save key</button>${s[k[0]] ? ` <button class="danger" id="del-ai" data-k="${k[0]}">Remove</button>` : ""}</div></div>
+        ${k[3] ? `<p class="muted small">Create one at <a href="${k[3]}" target="_blank" rel="noopener">${k[3].replace("https://", "")}</a>. Stored only in <span class="mono">workspace/secrets.json</span>.</p>` : ""}`; })()}
     <h3>Gmail notifications (optional)</h3>
     <ol class="muted small"><li>Turn on <a href="https://myaccount.google.com/signinoptions/two-step-verification" target="_blank" rel="noopener">2-Step Verification</a> for the Gmail account.</li>
       <li>Create an <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener">App Password</a> (name it "Postcrew") and paste the 16 characters below. Never use your normal Gmail password.</li></ol>
@@ -823,10 +842,14 @@ async function renderCredentials() {
     const body = { telegram_chat_id: $("#tg-chat").value.trim() }; if ($("#tg-token").value) body.telegram_bot_token = $("#tg-token").value.trim();
     try { await api("/api/credentials", { method: "PUT", body }); toast("Telegram saved"); renderCredentials(); } catch (e) { toast(e.message, true); }
   };
-  $("#test-claude").onclick = async () => {
-    const b = $("#test-claude"); b.disabled = true; $("#claude-result").textContent = "calling…";
-    const r = await post("/api/credentials/test-claude").catch(e => ({ ok: false, error: e.message }));
-    $("#claude-result").textContent = r.ok ? `OK: ${r.model} answered in ${r.seconds}s (${money(r.cost_usd)})` : `Failed: ${r.error}`; b.disabled = false;
+  const saveKey = (k, v) => api("/api/credentials", { method: "PUT", body: { [k]: v } }).then(async () => {
+    toast(v ? "Key saved" : "Key removed"); await post("/api/credentials/check"); renderCredentials(); refreshOverview(); }).catch(e => toast(e.message, true));
+  if ($("#save-ai")) $("#save-ai").onclick = e => { const v = $("#ai-key").value.trim(); if (v) saveKey(e.target.dataset.k, v); else $("#ai-key").focus(); };
+  if ($("#del-ai")) $("#del-ai").onclick = e => { if (confirm("Remove this API key from this computer?")) saveKey(e.target.dataset.k, ""); };
+  $("#test-ai").onclick = async () => {
+    const b = $("#test-ai"); b.disabled = true; $("#ai-result").textContent = "calling…";
+    const r = await post("/api/credentials/test-ai").catch(e => ({ ok: false, error: e.message }));
+    $("#ai-result").textContent = r.ok ? `OK: ${r.model} answered in ${r.seconds}s (${money(r.cost_usd)})` : `Failed: ${r.error}`; b.disabled = false;
   };
 }
 

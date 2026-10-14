@@ -122,13 +122,30 @@ def validate_config(cfg):
         errs.append(f"publishing.approval must be one of {APPROVAL_MODES}")
     if not re.fullmatch(r"\d{6}", str(p.get("linkedin_api_version", ""))):
         errs.append("publishing.linkedin_api_version must be YYYYMM, e.g. 202601")
+    if not re.fullmatch(r"https?://[^\s]+", str(cfg.get("notifications", {}).get("studio_url", "http://localhost"))):
+        errs.append("notifications.studio_url must start with http:// or https://")
     llm = cfg.get("llm", {})
-    if llm.get("backend") != "claude-code":
-        errs.append("llm.backend: only 'claude-code' is supported in this version")
+    backends = ["claude-code", "anthropic", "openai", "openai-compatible"]
+    if llm.get("backend") not in backends:
+        errs.append(f"llm.backend must be one of {backends}")
+    api = llm.get("api", {})
+    url = str(api.get("base_url") or "")
+    if url and not re.fullmatch(r"https?://[^\s]+", url):
+        errs.append("llm.api.base_url must start with http:// or https://")
+    if llm.get("backend") == "openai-compatible":
+        if not url:
+            errs.append("llm.api.base_url: set the server's address, e.g. http://localhost:11434/v1 for Ollama")
+        tiers = api.get("models", {}).get("openai-compatible") or {}
+        if not all(str(tiers.get(t) or "").strip() for t in ("opus", "sonnet", "haiku")):
+            errs.append("llm.api.models.openai-compatible: name the model to use for each of opus, sonnet and haiku "
+                        "(they may be the same)")
+    mot = api.get("max_output_tokens", 16000)
+    if not (isinstance(mot, int) and 1000 <= mot <= 200000):
+        errs.append("llm.api.max_output_tokens must be a whole number 1000-200000")
     for aid, a in {"defaults": llm.get("defaults", {}), **llm.get("agents", {})}.items():
         if aid != "defaults" and aid not in AGENT_IDS:
             errs.append(f"llm.agents.{aid}: unknown agent")
-        if "model" in a and not re.fullmatch(r"[A-Za-z0-9._\-\[\]]{2,80}", str(a["model"])):
+        if "model" in a and not re.fullmatch(r"[A-Za-z0-9._:/@\-\[\]]{2,120}", str(a["model"])):
             errs.append(f"llm.agents.{aid}.model looks wrong (use sonnet, opus, haiku or a full model id)")
         if "timeout_s" in a and not (isinstance(a["timeout_s"], int) and 30 <= a["timeout_s"] <= 3600):
             errs.append(f"llm.agents.{aid}.timeout_s must be 30-3600 seconds")

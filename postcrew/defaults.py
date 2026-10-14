@@ -41,8 +41,32 @@ DEFAULT_CONFIG = {
         "linkedin_api_version": "202601",
     },
     "llm": {
+        # claude-code: your Claude Pro / Max / Team login through the Claude Code CLI (no API key).
+        # anthropic | openai: their APIs, with an API key (Credentials tab). openai-compatible: Ollama, LM Studio,
+        # OpenRouter, Groq, vLLM, Azure OpenAI ... at api.base_url (no web search there).
         "backend": "claude-code",
         "claude_path": "claude",
+        "api": {
+            "base_url": "",              # openai-compatible: e.g. http://localhost:11434/v1 (Ollama); openai: optional
+            "max_output_tokens": 16000,
+            # Agents ask for a tier (opus = strongest, sonnet = balanced, haiku = fastest) or a full model id.
+            "models": {
+                "anthropic": {"opus": "claude-opus-5-5", "sonnet": "claude-sonnet-5-5",
+                              "haiku": "claude-haiku-4-5-20251001"},
+                "openai": {"opus": "gpt-5", "sonnet": "gpt-5-mini", "haiku": "gpt-5-nano"},
+                "openai-compatible": {"opus": "", "sonnet": "", "haiku": ""},
+            },
+            # USD per million tokens, for the cost shown per run and the budget caps. Check your provider's
+            # current price list; a model missing here counts as $0 (web searches still count).
+            "prices": {
+                "claude-opus-5-5": {"input": 5.0, "output": 25.0},
+                "claude-sonnet-5-5": {"input": 3.0, "output": 15.0},
+                "claude-haiku-4-5-20251001": {"input": 1.0, "output": 5.0},
+                "gpt-5": {"input": 1.25, "output": 10.0},
+                "gpt-5-mini": {"input": 0.25, "output": 2.0},
+                "gpt-5-nano": {"input": 0.05, "output": 0.4},
+            },
+        },
         "defaults": {"model": "sonnet", "timeout_s": 600, "max_budget_usd": 1.0},
         "agents": {
             "planner": {"model": "sonnet", "timeout_s": 600, "max_budget_usd": 1.0},
@@ -79,6 +103,7 @@ DEFAULT_CONFIG = {
         "email": False,                  # Gmail; needs gmail_address + gmail_app_password in secrets
         "telegram": False,               # needs telegram_bot_token + telegram_chat_id in secrets
         "warn_days_before_expiry": 7,
+        "studio_url": "http://localhost:8765",  # where links in emails point (your port, or your SSH tunnel)
     },
     "categories": {
         "algorithm": {
@@ -147,4 +172,4 @@ DEFAULT_CONFIG = {
 # Secrets live in workspace/secrets.json (chmod 600). These are the keys the Studio knows about.
 SECRET_KEYS = ["linkedin_client_id", "linkedin_client_secret", "linkedin_access_token", "linkedin_token_expires_at",
                "linkedin_person_urn", "linkedin_name", "gmail_address", "gmail_app_password", "email_to",
-               "telegram_bot_token", "telegram_chat_id"]
+               "telegram_bot_token", "telegram_chat_id", "anthropic_api_key", "openai_api_key", "llm_api_key"]

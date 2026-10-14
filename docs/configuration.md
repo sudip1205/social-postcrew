@@ -88,12 +88,16 @@ Which model each agent uses and how much a single call may cost. Studio: **Setti
 
 | Key | Default | What it does |
 |---|---|---|
-| `backend` | `"claude-code"` | The only backend in this version: every agent runs through `claude -p` with your Claude Code login. |
+| `backend` | `"claude-code"` | Which AI runs the crew: `claude-code` (your Claude Pro / Max / Team plan through the Claude Code CLI), `anthropic` (Claude API key), `openai` (OpenAI API key), or `openai-compatible` (Ollama, LM Studio, OpenRouter, Groq, vLLM...). See [AI providers](ai-providers.md). |
 | `claude_path` | `"claude"` | The Claude Code command. Use the full path (`which claude`) if the Studio runs as a service and can't find it. |
+| `api.base_url` | `""` | Server address for `openai-compatible` (required), e.g. `http://localhost:11434/v1`; optional for `openai`. |
+| `api.models.<provider>` | see [AI providers](ai-providers.md#model-tiers) | Which model each tier (`opus`, `sonnet`, `haiku`) means for that provider. |
+| `api.prices` | estimates for the default models | USD per million tokens (`input`, `output`) per model id, for the cost shown and the budget caps. |
+| `api.max_output_tokens` | `16000` | Longest answer per call with an API provider (1000-200000). |
 | `defaults` | `{"model": "sonnet", "timeout_s": 600, "max_budget_usd": 1.0}` | Used for any agent not listed under `agents`. |
-| `agents.<id>.model` | see below | `haiku` (fastest, cheapest), `sonnet` or `opus` (strongest), or a full model id. |
+| `agents.<id>.model` | see below | A tier: `haiku` (fastest, cheapest), `sonnet` or `opus` (strongest), mapped to your provider's models; or a full model id such as `gpt-5` or `qwen3:32b`. |
 | `agents.<id>.timeout_s` | see below | Seconds before a call is stopped and counted as a failed try. 30-3600. |
-| `agents.<id>.max_budget_usd` | see below | Cost cap for **one call**, passed to Claude Code as `--max-budget-usd`. Up to 20. |
+| `agents.<id>.max_budget_usd` | see below | Cost cap for **one call** (Claude Code's `--max-budget-usd`; for API providers, Postcrew stops a call that goes over it). Up to 20. |
 
 Defaults per agent:
 
@@ -115,6 +119,7 @@ The Credential Monitor, Formatter and Publisher use no AI; they are plain rules.
 
 **About cost.** Each call reports what it would cost at API prices, and the run log adds them up. On a
 Claude Pro or Max plan you are not charged that amount; the usage counts towards your plan's limits instead.
+With an API provider you pay that amount (estimated from `llm.api.prices`).
 With the defaults, a researched news post typically uses $1-2 of API-equivalent usage, and a short dev tip
 much less.
 
@@ -162,6 +167,7 @@ See [notifications](notifications.md).
 | `email` | `false` | Email through your Gmail account (needs a Gmail App Password). |
 | `telegram` | `false` | Messages from your own Telegram bot. |
 | `warn_days_before_expiry` | `7` | Warn this many days before the LinkedIn token expires (1-30). |
+| `studio_url` | `"http://localhost:8765"` | Where the button in each email points. Change it if you use another port or reach the Studio through an SSH tunnel on another port. |
 
 Every notification also appears under the bell icon in the Studio, whatever these switches say.
 
@@ -230,9 +236,11 @@ sends them back to the browser.
 | `linkedin_client_id`, `linkedin_client_secret` | you, from your LinkedIn developer app |
 | `linkedin_access_token`, `linkedin_token_expires_at`, `linkedin_person_urn`, `linkedin_name` | **Connect LinkedIn** |
 | `gmail_address`, `gmail_app_password`, `email_to` | you, for email notifications |
+| `anthropic_api_key`, `openai_api_key`, `llm_api_key` | you, for the Claude API, the OpenAI API or an OpenAI-compatible server ([AI providers](ai-providers.md)) |
 | `telegram_bot_token`, `telegram_chat_id` | you, for Telegram notifications |
 
-There is no Anthropic API key: Claude Code keeps its own login.
+With the default `claude-code` provider there is no API key: Claude Code keeps its own login. API keys may
+also come from the environment variables `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` and `LLM_API_KEY`.
 
 ## The workspace folder
 
@@ -269,6 +277,7 @@ code) moves your whole setup; reconnect LinkedIn there if the redirect port diff
 | Variable | What it does |
 |---|---|
 | `POSTCREW_HOME` | Workspace folder. Default: `./workspace` next to the code. Same as `--workspace`. |
+| `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `LLM_API_KEY` | API keys, used when none is saved on Credentials. |
 
 ## Changing the prompts
 

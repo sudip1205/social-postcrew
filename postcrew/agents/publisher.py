@@ -48,6 +48,35 @@ def enqueue(ws, cfg, run_id, day, category, final, review):
     return post
 
 
+def post_url(urn):
+    return f"https://www.linkedin.com/feed/update/{urn}/" if urn else ""
+
+
+def post_rows(ws, post, *extra):
+    """The table rows that describe a post in notification emails."""
+    cfg = ws.config()
+    cat = cfg["categories"].get(post.get("category"), {}).get("label", post.get("category", ""))
+    review = (post.get("review") or {}).get("overall")
+    rows = [("Topic", post.get("topic", "")), ("Kind of post", cat), ("Post date", post.get("date", ""))]
+    if post.get("scheduled_at") and post.get("status") in ("queued", "approved", "awaiting_approval"):
+        local = datetime.fromisoformat(post["scheduled_at"]).astimezone(ZoneInfo(cfg["schedule"]["timezone"]))
+        rows.append(("Publishes at", local.strftime("%a %d %b %Y, %H:%M ") + cfg["schedule"]["timezone"]))
+    if review is not None:
+        rows.append(("Editor score", f"{review} / 100"))
+    rows.append(("Length", f"{len(post.get('text', ''))} characters"))
+    if post.get("media_kind"):
+        rows.append(("Picture", {"video": "Algorithm video", "image": "Poster image", "poster": "Poster image"}.get(post["media_kind"],
+                                                                                           post["media_kind"])))
+    if post.get("first_comment"):
+        rows.append(("First comment", post["first_comment"]))
+    return rows + list(extra)
+
+
+def post_details(ws, post, *extra):
+    media = ws.root / post["media"] if post.get("media") and post.get("media_kind") != "video" else None
+    return {"rows": post_rows(ws, post, *extra), "text": post.get("text", ""), "image": str(media) if media else None}
+
+
 def add_first_comment(ws, post, li, owner, ev, sleep=time.sleep, waits=COMMENT_WAITS_S):
     """Add the post's first comment, retrying after short waits. Records comment_status (added | failed) on post."""
     err = None
@@ -65,8 +94,12 @@ def add_first_comment(ws, post, li, owner, ev, sleep=time.sleep, waits=COMMENT_W
     post.update(comment_status="failed", comment_error=str(err), comment_tries=post.get("comment_tries", 0) + 1)
     ev("warning", f"post is live but the first comment failed: {err}", "warning")  # the post is live; do not lose that
     if post["comment_tries"] >= COMMENT_MAX_TRIES:
-        notify(ws, "First comment not added", f"{post['topic']}: add it by hand on LinkedIn. {err}"[:300],
-               level="warning", key=f"comment-{post['id']}", action={"label": "Open Queue", "tab": "queue"})
+        notify(ws, "First comment not added", f"{post['topic']}: the post is live, but LinkedIn refused the first "
+               "comment. Add it by hand on LinkedIn.", level="warning", key=f"comment-{post['id']}",
+               action={"label": "Open Queue", "tab": "queue"},
+               details={"rows": [("Topic", post["topic"]), ("Post on LinkedIn", post_url(post["urn"])),
+                                 ("Comment to add", post["first_comment"]), ("Tries", post["comment_tries"]),
+                                 ("LinkedIn said", str(err)[:300])]})
     return False
 
 
@@ -140,8 +173,9 @@ def publish_one(ws, post, client_factory=LinkedIn, log=print, sleep=time.sleep):
         ev("failed", f"publishing failed: {e}", "error")
         if run:
             run.step("publisher", "failed", errors=[str(e)])
-        notify(ws, "Publishing failed", f"{post['topic']}: {e}", level="error", key=f"publish-{post['id']}",
-               action={"label": "Open Queue", "tab": "queue"})
+        notify(ws, "Publishing failed", f"{post['topic']} was not published. It stays in the queue.", level="error",
+               key=f"publish-{post['id']}", action={"label": "Open Queue", "tab": "queue"},
+               details={"rows": post_rows(ws, post, ("LinkedIn said", str(e)[:300]))})
         return post
     post.update(status="published", urn=urn, published_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
                 error=None)
@@ -153,7 +187,10 @@ def publish_one(ws, post, client_factory=LinkedIn, log=print, sleep=time.sleep):
     ws.add_history({k: post.get(k) for k in ("id", "date", "category", "topic", "text", "first_comment", "media",
                                              "urn", "published_at", "run_id", "comment_status", "comment_error",
                                              "comment_tries")})
-    notify(ws, "Posted to LinkedIn", post["topic"], level="success", action={"label": "Open Queue", "tab": "queue"})
+    comment = {"added": "added", "failed": "failed, will retry"}.get(post.get("comment_status"), "none")
+    notify(ws, "Posted to LinkedIn", f"{post['topic']} is live on your profile.", level="success",
+           action={"label": "Open Queue", "tab": "queue"},
+           details=post_details(ws, post, ("Post on LinkedIn", post_url(urn)), ("First comment status", comment)))
     return post
 
 
@@ -190,7 +227,11 @@ class PublisherAgent(Agent):
             return {"post_id": post["id"], "status": published[-1]["status"], "mode": mode}
         notify(ctx.ws, "Post ready" if mode != "manual" else "Post waiting for your approval",
                f"{post['topic']} - {'publishes ' + post['date'] + ' ' + ctx.cfg['schedule']['post_time'] if mode != 'manual' else 'approve it in the Queue'}",
-               level="info", action={"label": "Review in Queue", "tab": "queue"})
+               level="info", action={"label": "Review in Queue", "tab": "queue"},
+               details=post_details(ctx.ws, post, ("Cost of this run", f"${ctx.run.cost:.2f} at API prices"),
+                                    ("What to do", "Nothing: it goes out at the time above. Veto or edit it in the "
+                                                   "Queue before then." if mode != "manual"
+                                     else "Approve, edit or veto it in the Queue.")))
         return {"post_id": post["id"], "status": post["status"], "scheduled_at": post["scheduled_at"], "mode": mode}
 
     def summary(self, out):

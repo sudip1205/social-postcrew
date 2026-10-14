@@ -20,7 +20,7 @@ from .workspace import Workspace, validate_config
 
 
 def cmd_doctor(ws):
-    from .agents.credentials import check_claude
+    from .agents.credentials import check_ai
     cfg = ws.config()
     rows = [("Python 3.9+", sys.version_info >= (3, 9), sys.version.split()[0])]
     try:
@@ -30,8 +30,8 @@ def cmd_doctor(ws):
         rows.append(("Pillow (posters)", False, "pip install Pillow"))
     rows.append(("ffmpeg (algorithm videos)", bool(shutil.which("ffmpeg")),
                  "found" if shutil.which("ffmpeg") else "brew install ffmpeg / sudo apt install ffmpeg"))
-    cl = check_claude(cfg)
-    rows.append(("Claude Code CLI", cl["state"] == "ok", cl["message"]))
+    cl = check_ai(ws, cfg)
+    rows.append((f"AI: {cl['provider']}", cl["state"] == "ok", cl["message"]))
     errs = validate_config(cfg)
     rows.append(("Settings", not errs, "valid" if not errs else "; ".join(errs[:3])))
     s = ws.secrets()

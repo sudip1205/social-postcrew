@@ -4,6 +4,7 @@
 |---|---|
 | [Getting started](getting-started.md) | you are installing Postcrew and making your first post |
 | [Connect LinkedIn](linkedin-setup.md) | you are creating the LinkedIn app, or the token expired |
+| [AI providers](ai-providers.md) | you want to use the Claude API, OpenAI, or a local model instead of your Claude plan |
 | [Studio guide](studio-guide.md) | you want to know what a tab, panel or button does |
 | [Configuration reference](configuration.md) | you want to know what a setting does, or edit `config.json` |
 | [The crew](agents.md) | you want to know how a post is made, reviewed, sent back and remembered |

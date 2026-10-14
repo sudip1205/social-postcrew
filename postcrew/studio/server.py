@@ -288,12 +288,14 @@ class Studio:
         return post
 
     def credentials(self):
+        llm = self.ws.config()["llm"]
         return {"secrets": self.ws.masked_secrets(), "status": self.ws.state("credentials", {}),
-                "redirect_uri": self.redirect_uri, "scopes": linkedin.SCOPE}
+                "redirect_uri": self.redirect_uri, "scopes": linkedin.SCOPE,
+                "backend": llm["backend"], "base_url": llm.get("api", {}).get("base_url", "")}
 
     def save_credentials(self, body):
         allowed = {"linkedin_client_id", "linkedin_client_secret", "gmail_address", "gmail_app_password", "email_to",
-                   "telegram_bot_token", "telegram_chat_id"}
+                   "telegram_bot_token", "telegram_chat_id", "anthropic_api_key", "openai_api_key", "llm_api_key"}
         changes = {k: (v.strip() if isinstance(v, str) else v) for k, v in body.items() if k in allowed}
         if any(k not in allowed for k in body):
             raise ValueError(f"only these can be set here: {sorted(allowed)}")
@@ -314,8 +316,18 @@ class Studio:
         s = self.ws.secrets()
         if not (s.get("gmail_address") and s.get("gmail_app_password")):
             return {"ok": False, "error": "save the Gmail address and App Password first"}
-        err = notify_mod._gmail(s["gmail_address"], s["gmail_app_password"], s.get("email_to"), "Postcrew: test email",
-                                "If you can read this, Postcrew can email you notifications.")
+        cfg = self.ws.config()
+        days = ", ".join(f"{d.title()} {cfg['categories'].get(c, {}).get('label', c)}"
+                         for d, c in cfg["schedule"]["days"].items() if c)
+        err = notify_mod.email(self.ws, "Test email", "If you can read this, Postcrew can email you notifications. "
+                               "Real alerts look like this, with the post and its poster when there is one.",
+                               details={"rows": [("Sent to", s.get("email_to") or s["gmail_address"]),
+                                                 ("AI provider", cfg["llm"]["backend"]),
+                                                 ("Publishing", "practice mode (nothing is sent)" if cfg["publishing"]["dry_run"]
+                                                  else f"live, approval: {cfg['publishing']['approval']}"),
+                                                 ("Posts go out at", f"{cfg['schedule']['post_time']} {cfg['schedule']['timezone']}"),
+                                                 ("Weekly schedule", days)]},
+                               action={"label": "Open Settings", "tab": "settings"}, subject="Postcrew: test email")
         return {"ok": not err, "error": err, "to": s.get("email_to") or s["gmail_address"]}
 
     def oauth_start(self):
@@ -348,9 +360,9 @@ class Studio:
                                                          f"until {expires.date().isoformat()}.", level="success")
         return info.get("name", "")
 
-    def test_claude(self):
+    def test_ai(self):
         try:
-            res = make_backend(self.ws.config()).call(
+            res = make_backend(self.ws.config(), self.ws.secrets()).call(
                 "supervisor", "Reply only through the schema.", "Say ok.",
                 {"type": "object", "properties": {"ok": {"type": "boolean"}}, "required": ["ok"]})
             return {"ok": True, "model": res.model, "cost_usd": res.cost_usd, "seconds": res.duration_s}
@@ -491,7 +503,7 @@ def make_handler(studio):
                     ("PUT", "/api/credentials"): lambda: studio.save_credentials(self.body()),
                     ("POST", "/api/credentials/check"): lambda: run_check(ws),
                     ("POST", "/api/credentials/disconnect"): lambda: self.disconnect(),
-                    ("POST", "/api/credentials/test-claude"): lambda: studio.test_claude(),
+                    ("POST", "/api/credentials/test-ai"): lambda: studio.test_ai(),
                     ("GET", "/api/notifications"): lambda: ws.state("notifications", {"items": []}),
                     ("POST", "/api/notifications/read"): lambda: (notify_mod.mark_read(ws, self.body().get("ids")),
                                                                   {"ok": True})[1],

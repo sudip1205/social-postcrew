@@ -302,8 +302,20 @@ class Supervisor:
         msg = f"{reason}. Last problems: " + "; ".join(problems[:3])
         ctx.run.finish("failed", msg)
         self._review_team(ctx)  # no long-term memory from a failed run: its "fixes" did not get a post approved
-        notify(ctx.ws, f"No post for {ctx.day.isoformat()}", f"{self.by_id[step].title}: {msg[:400]}", level="error",
-               key=f"run-failed-{ctx.day.isoformat()}", action={"label": "See the run", "tab": "workflow"}, quiet_hours=1)
+        a = self.by_id[step]
+        notify(ctx.ws, f"No post for {ctx.day.isoformat()}", f"The crew stopped at {getattr(a, 'name', '') or a.title} "
+               f"({a.title}): {reason}.", level="error", key=f"run-failed-{ctx.day.isoformat()}",
+               action={"label": "See the run", "tab": "workflow"}, quiet_hours=1,
+               details={"rows": [("Post date", ctx.day.strftime("%a %d %b %Y")),
+                                 ("Kind of post", ctx.cat.get("label", ctx.category)),
+                                 ("Topic", (ctx.outputs.get("topic") or {}).get("topic", "not chosen yet")),
+                                 ("Stopped at", f"{getattr(a, 'name', '') or a.title}, {a.title}"),
+                                 ("Why", reason)]
+                        + [(f"Problem {i}", p[:300]) for i, p in enumerate(problems[:3], 1)]
+                        + [("Tries", sum(x.get("attempts", 0) for x in ctx.run.status["steps"].values())),
+                           ("Cost", f"${ctx.run.cost:.2f} at API prices"), ("Run", ctx.run.status["run_id"]),
+                           ("What to do", "Open the run to see every attempt, then start a new run for this date "
+                                          "from the Overview, or plan a different topic.")]})
         return {"ok": False, "failed_step": step, "reason": reason, "problems": problems, "cost_usd": ctx.run.cost}
 
     def _result_text(self, ctx):

@@ -40,8 +40,12 @@ at the time you choose. You watch all of it live in the Studio, and nothing goes
 - **You stay in control.** Practice mode is on until you turn it off. Publish automatically with a veto
   window, wait for your approval, or publish right away.
 - **Private and local.** No server, no database, no telemetry. Your settings, secrets and posts stay in one
-  folder on your machine. The AI runs through your own [Claude Code](https://claude.com/claude-code) login,
-  so there is no API key to manage.
+  folder on your machine.
+- **Bring your own AI.** Use your Claude Pro / Max / Team plan through [Claude Code](https://claude.com/claude-code)
+  (no API key), the Claude API, the OpenAI API, or any OpenAI-compatible server: Ollama, LM Studio,
+  OpenRouter, Groq, vLLM. [AI providers â†’](docs/ai-providers.md)
+- **Alerts worth reading.** Styled emails with the post, its poster and a table of the details, plus
+  desktop and Telegram alerts.
 - **Official LinkedIn API only.** OAuth from the Studio. It posts to your profile and adds the first comment,
   and nothing else.
 
@@ -64,8 +68,9 @@ was sent back for earlier in the run, and what to change. [More about the crew â
 
 ## Quick start
 
-You need Python 3.9+, [Claude Code](https://claude.com/claude-code) installed and logged in (`claude`, once),
-and macOS, Linux or Windows with WSL.
+You need Python 3.9+ on macOS, Linux or Windows with WSL, and an AI provider: by default
+[Claude Code](https://claude.com/claude-code) logged in to your Claude plan (`claude`, once), or an Anthropic or
+OpenAI API key, or a local model ([AI providers](docs/ai-providers.md)).
 
 ```bash
 git clone https://github.com/sudip1205/social-postcrew.git postcrew && cd postcrew
@@ -102,6 +107,7 @@ Every tab, panel and button is explained in the [Studio guide](docs/studio-guide
 | | |
 |---|---|
 | [Getting started](docs/getting-started.md) | install, first rehearsal, go live, update, uninstall |
+| [AI providers](docs/ai-providers.md) | Claude plan, Claude API, OpenAI API, Ollama and other OpenAI-compatible servers |
 | [Connect LinkedIn](docs/linkedin-setup.md) | the developer app, OAuth, token expiry, the first comment |
 | [Studio guide](docs/studio-guide.md) | every tab and button |
 | [Configuration reference](docs/configuration.md) | every setting in `config.json`, categories, secrets, the workspace folder, prompts |
@@ -133,14 +139,15 @@ Everything that is yours lives in one folder, `workspace/`, which git ignores:
   Studio never sends them back to the browser.
 - The folder also holds the queue, the published list, run logs and memory.
 
-The Studio only listens on `127.0.0.1`. Agents run through Claude Code in an isolated mode: they have no
-shell, no code tools and no MCP servers, and your own Claude settings are ignored. Web pages are treated as
+The Studio only listens on `127.0.0.1`. Agents have no shell and no code tools: through Claude Code they run in
+an isolated mode (no MCP servers, your own Claude settings ignored), and through an API they can only answer
+and, where the provider offers it, search the web. Web pages are treated as
 data, never as instructions. See [SECURITY.md](SECURITY.md).
 
 ## Costs
 
-Postcrew is free. LinkedIn's API is free. The AI runs on your Claude account: on a Pro or Max plan, posts
-count towards your plan's usage limits; with an Anthropic Console account, you pay per use. Every run shows
+Postcrew is free. LinkedIn's API is free. The AI runs on your own account: on a Claude Pro or Max plan, posts
+count towards your plan's usage limits; with an API key, you pay your provider per use; a local model is free. Every run shows
 its cost at API prices, and you can cap it per call and per post in Settings. With the default models, a
 researched news post typically uses $1-2 at API prices, and a short dev tip far less.
 

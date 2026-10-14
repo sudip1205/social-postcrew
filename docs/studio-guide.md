@@ -135,7 +135,8 @@ bottom shows unsaved changes). If something is wrong, the page lists exactly wha
 **Publishing and alerts**: the approval mode, **Practice mode**, and which notification channels to use
 (**Send a test** tries them).
 
-**Advanced** (folded): models, timeouts and cost caps per agent; the quality bar; tries and budget per post;
+**Advanced** (folded): the **AI provider** (Claude plan, Claude API, OpenAI API or an OpenAI-compatible
+server, with its address and model per tier); models, timeouts and cost caps per agent; the quality bar; tries and budget per post;
 team sizes and replacement rules; days ahead; credential check time; expiry warning; the Claude Code
 command; the LinkedIn API version; and blocked phrases.
 
@@ -148,8 +149,9 @@ Every field is explained in the [configuration reference](configuration.md).
 - **LinkedIn**: the token's state, who you're connected as and until when. **Connect / Reconnect
   LinkedIn**, **Check now**, **Disconnect**. Under **LinkedIn app**, the Client ID and Secret of your developer
   app, and a step-by-step guide to creating one ([details](linkedin-setup.md)).
-- **Claude Code**: whether it's logged in. **Test with a tiny call** runs one real call and shows the
-  model, time and cost.
+- **AI provider**: the provider chosen in Settings and whether it's ready (Claude Code logged in, or the API
+  key accepted). For an API provider, paste its key here. **Test with a tiny call** runs one real call and
+  shows the model, time and cost ([details](ai-providers.md)).
 - **Gmail notifications** and **Telegram notifications**: their details and a test button
   ([details](notifications.md)).
 

@@ -22,13 +22,15 @@ scheduled post. Everything runs on your own computer.
 |---|---|---|
 | macOS or Linux (Windows: use [WSL](https://learn.microsoft.com/windows/wsl/install)) | yes | Postcrew is plain Python and runs anywhere Python and Claude Code run |
 | Python 3.9 or newer | yes | `python3 --version` |
-| [Claude Code](https://claude.com/claude-code), logged in | yes | every agent thinks through your Claude Code login; no API key is stored by Postcrew |
-| A Claude plan (Pro, Max, Team) or an Anthropic Console account | yes | Claude Code needs one of them |
+| An AI provider | yes | by default your Claude Pro / Max / Team plan through [Claude Code](https://claude.com/claude-code) (no API key). Or an Anthropic or OpenAI API key, or any OpenAI-compatible server such as Ollama: see [AI providers](ai-providers.md) |
 | A LinkedIn account and a free LinkedIn developer app | to publish | only needed when you want posts to go out ([guide](linkedin-setup.md)) |
 | ffmpeg | optional | only for the algorithm animation videos |
 | Java 17+ | optional | only for running the test suite (it compiles the Java shown in animations) |
 
 ## 2. Install Claude Code
+
+Skip this step if you will use an API key or a local model instead: choose that provider in
+**Settings > Advanced** after step 5 and follow [AI providers](ai-providers.md).
 
 Follow the [official instructions](https://docs.claude.com/en/docs/claude-code/setup). The short version:
 

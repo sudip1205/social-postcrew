@@ -120,7 +120,7 @@ class FakeSMTP:
 class EmailTests(unittest.TestCase):
     def setUp(self):
         FakeSMTP.sent = []
-        patcher = mock.patch.object(notify._gmail, "__defaults__", (FakeSMTP,))
+        patcher = mock.patch.object(notify, "SMTP", FakeSMTP)
         patcher.start()
         self.addCleanup(patcher.stop)
 
@@ -135,7 +135,36 @@ class EmailTests(unittest.TestCase):
             notify.notify(ws, "Post ready", "queued for 08:30")
             msg = FakeSMTP.sent[0]
             self.assertEqual((msg["To"], msg["Subject"]), ("me@gmail.com", "Postcrew: Post ready"))
-            self.assertIn("queued for 08:30", msg.get_content())
+            self.assertIn("queued for 08:30", msg.get_body(("plain",)).get_content())
+            self.assertIn("queued for 08:30", msg.get_body(("html",)).get_content())
+
+    def test_email_is_html_with_a_table_the_post_and_its_poster(self):
+        with TempWorkspace() as ws:
+            ws.update_secrets(gmail_address="me@gmail.com", gmail_app_password="abcdefghijklmnop")
+            cfg = ws.config()
+            cfg["notifications"].update(email=True, desktop=False, studio_url="http://localhost:9000")
+            ws.save_config(cfg)
+            poster = ws.root / "media" / "p.png"
+            poster.parent.mkdir(exist_ok=True)
+            __import__("PIL.Image").Image.new("RGB", (8, 8), "white").save(poster)
+            notify.notify(ws, "Post ready", "Acme <Model 2> pricing", action={"label": "Review in Queue", "tab": "queue"},
+                          details={"rows": [("Topic", "Acme & co"), ("Editor score", "88 / 100")],
+                                   "text": "Line one\nLine two", "image": str(poster)})
+            msg = FakeSMTP.sent[0]
+            page = msg.get_body(("html",)).get_content()
+            self.assertIn("<td", page)
+            self.assertIn("Editor score", page)
+            self.assertIn("Acme &amp; co", page)                    # values are escaped
+            self.assertIn("Acme &lt;Model 2&gt; pricing", page)
+            self.assertIn("Line one<br>Line two", page)
+            self.assertIn('href="http://localhost:9000/#queue"', page)
+            cid = page.split('src="cid:')[1].split('"')[0]
+            images = [p for p in msg.walk() if p.get_content_type() == "image/png"]
+            self.assertEqual(images[0]["Content-ID"], f"<{cid}>")
+            text = msg.get_body(("plain",)).get_content()
+            self.assertIn("Editor score  88 / 100", text)            # the plain part is tabulated too
+            self.assertIn("Line two", text)
+            self.assertEqual(ws.state("notifications")["items"][-1]["rows"][1], ["Editor score", "88 / 100"])
 
     def test_reports_a_wrong_password_and_hides_it(self):
         with TempWorkspace() as ws:
@@ -374,7 +403,7 @@ class StudioTests(unittest.TestCase):
                                                        "gmail_app_password": "abcdefghijklmnop"})
         self.assertEqual(code, 200)
         self.assertNotIn("abcdefghijklmnop", json.dumps(d))
-        with mock.patch.object(notify._gmail, "__defaults__", (FakeSMTP,)):
+        with mock.patch.object(notify, "SMTP", FakeSMTP):
             code, d = self.req("POST", "/api/notifications/test-email")
         self.assertEqual((d["ok"], d["to"]), (True, "me@gmail.com"))
 

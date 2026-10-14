@@ -20,6 +20,13 @@ Desktop notifications only work while you are logged in to that computer. On a s
 
 ## Gmail
 
+Emails are formatted for reading on a phone or a desktop: a coloured header shows what kind of alert it is
+(update, done, needs attention, problem), then a table of the details. A "post ready" email shows the topic,
+kind of post, publish time, Editor score, length, picture, first comment, cost and what to do, followed by
+the full post and its poster. A failure email says where the crew stopped, why, the problems found and what
+to do next. Every email has a button that opens the right Studio tab, and a plain-text version for mail apps
+that don't show HTML. Telegram messages include the same details as plain lines.
+
 Postcrew sends email through your Gmail account with an **App Password**, a 16-character password that only
 works for this one app. Your real Gmail password is never used.
 
@@ -30,6 +37,9 @@ works for this one app. Your real Gmail password is never used.
 3. In the Studio, open **Credentials > Gmail notifications**. Enter the Gmail address, paste the App Password,
    and optionally a different address to send to. Click **Save Gmail**, then **Send a test email**.
 4. Turn on **Gmail** in **Settings > Publishing and alerts** and save.
+
+The button in each email opens `http://localhost:8765`. If you use another port or reach the Studio through an
+SSH tunnel, set `notifications.studio_url` in `config.json`.
 
 To revoke it, delete the App Password in your Google account.
 

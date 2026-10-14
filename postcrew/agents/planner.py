@@ -9,7 +9,7 @@ topic for that day yourself or ask the planner for one.
 """
 import re
 import threading
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from ..checks import repeat_problem
 from ..render import tracers
@@ -128,7 +128,7 @@ class PlannerAgent(Agent):
             return {}
         run_id = datetime.now().strftime("plan-%Y%m%d-%H%M%S")
         run = RunLog(ws.root / "plans" / run_id, run_id, meta={"dates": [d.isoformat() for d, _ in todo]})
-        ctx = RunContext(ws=ws, cfg=cfg, day=todo[0][0], category=todo[0][1], run=run, llm=llm or make_backend(cfg))
+        ctx = RunContext(ws=ws, cfg=cfg, day=todo[0][0], category=todo[0][1], run=run, llm=llm or make_backend(cfg, ws.secrets()))
         run.event("planner", "started", f"planning {len(todo)} day(s): {', '.join(d.isoformat() for d, _ in todo)}")
         out = {}
         for d, cat in [x for x in todo if cfg["categories"][x[1]]["media"] == "animation" or x[1] == "week-recap"]:
@@ -247,8 +247,12 @@ def plan_week(ws, today, llm=None):
         return out
     bad = {k: e["error"] for k, e in out.items() if "error" in e}
     from ..notify import notify
+    cats = ws.config()["categories"]
+    rows = [(date.fromisoformat(d).strftime("%a %d %b"), f"could not plan: {e['error']}" if "error" in e else
+             f"{e['topic']}  ({cats.get(e.get('category'), {}).get('label', e.get('category', ''))})")
+            for d, e in sorted(out.items())]
     notify(ws, "This week's topics are ready" if not bad else "Some topics could not be planned",
            f"{len(out) - len(bad)} day(s) planned" + (f"; {len(bad)} failed: {next(iter(bad.values()))}" if bad else "")
            + ". Review or change them in the Plan tab.", level="warning" if bad else "info",
-           action={"label": "Open the plan", "tab": "plan"})
+           action={"label": "Open the plan", "tab": "plan"}, details={"rows": rows})
     return out

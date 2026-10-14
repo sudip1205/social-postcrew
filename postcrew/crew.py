@@ -50,7 +50,7 @@ def run_crew(ws, day=None, category=None, llm=None, fetch=fetch_text, dry_run=Fa
         run = RunLog(ws.runs_dir / run_id, run_id, meta={"date": day.isoformat(), "category": category,
                                                          "label": cfg["categories"][category]["label"],
                                                          "dry_run": dry_run}, echo=echo)
-        ctx = RunContext(ws=ws, cfg=cfg, day=day, category=category, run=run, llm=llm or make_backend(cfg),
+        ctx = RunContext(ws=ws, cfg=cfg, day=day, category=category, run=run, llm=llm or make_backend(cfg, ws.secrets()),
                          fetch=fetch, dry_run=dry_run)
         if dry_run:  # rehearse every agent, but never touch the queue
             from .agents.supervisor import CREW

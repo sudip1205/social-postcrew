@@ -13,7 +13,7 @@ postcrew/
   workspace.py       the workspace folder, config validation, queue and history
   crew.py            starts a run for one date
   scheduler.py       the built-in scheduler (inside `serve`)
-  llm.py             the Claude Code backend (`claude -p`, isolated)
+  llm.py             AI backends: Claude Code CLI, Claude API, OpenAI API, OpenAI-compatible
   checks.py          deterministic checks: placeholders, hype, invented experience, numbers, links, repeats
   memory.py          working and long-term memory
   runlog.py          events.jsonl and status.json per run
@@ -58,10 +58,12 @@ Java and compare its output with the animation, so the code on screen is real (n
 
 ## Add a model backend
 
-Implement a class with
+Four ship with Postcrew ([AI providers](ai-providers.md)). For another API, subclass `APIBackend` in
+`postcrew/llm.py` (it handles keys, model tiers, retries, errors and cost) and implement `ask()`; or implement a class with
 `call(agent_id, system, prompt, schema, tools=(), cwd=None, model=None, member=None)` that returns an
 `LLMResult(data=..., cost_usd=..., model=..., turns=...)`, and register it in `make_backend` in
-`postcrew/llm.py`. Add its name to the `llm.backend` check in `validate_config`. Keep the guarantees: the
+`postcrew/llm.py`. Add its name to the `llm.backend` check in `validate_config`, its key to `SECRET_KEYS`, and
+its label to `PROVIDER` in `agents/credentials.py`. Keep the guarantees: the
 output must match the JSON schema, and only the tools listed in `tools` may be available to the model.
 
 ## Run the tests

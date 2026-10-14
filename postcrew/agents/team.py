@@ -153,7 +153,7 @@ def fire(ws, member_id, cfg, llm=None, reason="fired from the Studio", notify_us
     m = next((x for x in data["members"] if x["id"] == member_id), None)
     if not m:
         raise KeyError(member_id)
-    new_lessons = learn(m, cfg, llm, data["lessons"].get(m["role"], []))
+    new_lessons = learn(m, cfg, llm, data["lessons"].get(m["role"], []), ws.secrets())
     with _lock:
         data = load(ws)
         data["members"] = [x for x in data["members"] if x["id"] != member_id]
@@ -167,7 +167,10 @@ def fire(ws, member_id, cfg, llm=None, reason="fired from the Studio", notify_us
         notify(ws, f"{m['name']} was replaced by {hired['name']}",
                f"{m['name']} ({m['role']}) was let go: {reason}. {hired['name']} joins with "
                f"{len(lessons(ws, m['role']))} lesson(s) from past mistakes.", level="warning",
-               action={"label": "Open Team", "tab": "team"})
+               action={"label": "Open Crew", "tab": "team"},
+               details={"rows": [("Role", m["role"]), ("Replaced", m["name"]), ("Why", reason),
+                                 ("New member", f"{hired['name']}: {hired['persona'][:160]}")]
+                        + [(f"Lesson {i}", t) for i, t in enumerate(new_lessons, 1)]})
     return m, hired
 
 
@@ -198,7 +201,7 @@ LESSON_SCHEMA = {
 }
 
 
-def learn(m, cfg, llm=None, known=()):
+def learn(m, cfg, llm=None, known=(), secrets=None):
     """Turn a member's recorded problems into a few rules for the next hire. Falls back to the most common
     problems as written when the model is unavailable."""
     probs = [p for r in m["recent"] if not r["good"] for p in r.get("problems", [])]
@@ -207,7 +210,7 @@ def learn(m, cfg, llm=None, known=()):
     common = [p for p, _ in Counter(probs).most_common(12)]
     try:
         from ..llm import make_backend
-        res = (llm or make_backend(cfg)).call(
+        res = (llm or make_backend(cfg, secrets)).call(
             "supervisor", "You coach a content team. Reply only through the schema.",
             f"A {m['role']} on a LinkedIn writing team was replaced because of these recurring problems:\n"
             + "\n".join(f"- {p[:300]}" for p in common)

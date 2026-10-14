@@ -11,6 +11,13 @@ Install Claude Code and run `claude` once to log in. If the Studio runs as a ser
 shell's `PATH`: put the full path (`which claude`) in **Settings > Advanced > Claude Code command**, or add its
 folder to `PATH` in the service file.
 
+**The AI provider shows `missing` or `invalid`.** Add or replace the API key on Credentials; check that the
+account has credit. For an OpenAI-compatible server, check that it is running and the address ends in `/v1`
+(`curl http://localhost:11434/v1/models`).
+
+**"the model did not return JSON" or "the answer was cut off".** Use a stronger model for that agent, or raise
+`llm.api.max_output_tokens`. Small local models struggle with the longer agents (writer, editor, research).
+
 **`logged_out`.** Run `claude` in a terminal, log in, and click **Check now** on Credentials.
 
 **Port 8765 is already in use.** Another Studio is running (`lsof -i :8765`), or pick another port with
@@ -74,11 +81,11 @@ Password and paste it again; don't use your normal Gmail password.
 
 ## FAQ
 
-**Does it need an Anthropic API key?** No. It uses your Claude Code login. On a Claude plan, usage counts
-towards your plan's limits; the costs shown are API-equivalent estimates.
+**Does it need an API key?** Not by default: it uses your Claude Code login, and usage counts towards your
+Claude plan's limits. You can switch to an API key or a local model; see [AI providers](ai-providers.md).
 
-**Can I use another model provider?** Not out of the box. The LLM layer is one small class; see
-[extending](extending.md).
+**Can I use another model provider?** Yes: the Claude API, the OpenAI API, or any OpenAI-compatible server
+(Ollama, LM Studio, OpenRouter, Groq, vLLM...). See [AI providers](ai-providers.md).
 
 **Will it post things I haven't seen?** Only if you choose `auto_with_veto` or `immediate` and turn practice
 mode off. With `manual`, nothing goes out until you approve it. Every post must pass strict checks either way.
@@ -88,7 +95,8 @@ personal, and research quotes are checked against the pages Postcrew downloaded 
 like invented experience are rejected automatically.
 
 **Where is my data?** Only in your workspace folder, on your computer. Postcrew has no server and no
-telemetry. Agent prompts go to Anthropic through Claude Code; posts go to LinkedIn when published.
+telemetry. Agent prompts go to the AI provider you chose (Anthropic through Claude Code by default, or nowhere outside
+your machine with a local model); posts go to LinkedIn when published.
 
 **Does it work on Windows?** Use [WSL](https://learn.microsoft.com/windows/wsl/install) and follow the Linux
 instructions.
