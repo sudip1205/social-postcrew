@@ -43,7 +43,7 @@ settings and hooks are ignored. Each agent gets only the tools it needs (the res
 ## 3. Download and install Postcrew
 
 ```bash
-git clone https://github.com/<owner>/postcrew.git
+git clone https://github.com/sudip1205/social-postcrew.git postcrew
 cd postcrew
 python3 -m venv .venv && source .venv/bin/activate   # recommended: keeps Postcrew's one dependency separate
 python3 -m pip install --upgrade pip                 # older pips can't install the `postcrew` command below
