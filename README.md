@@ -70,7 +70,7 @@ and macOS, Linux or Windows with WSL.
 ```bash
 git clone https://github.com/<owner>/postcrew.git && cd postcrew
 python3 -m venv .venv && source .venv/bin/activate
-python3 -m pip install -r requirements.txt
+python3 -m pip install --upgrade pip -r requirements.txt
 python3 -m postcrew init        # creates ./workspace with default settings
 python3 -m postcrew doctor      # checks what is installed and configured
 python3 -m postcrew serve       # opens the Studio at http://localhost:8765 and starts the scheduler

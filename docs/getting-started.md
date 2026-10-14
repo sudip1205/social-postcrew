@@ -46,11 +46,13 @@ settings and hooks are ignored. Each agent gets only the tools it needs (the res
 git clone https://github.com/<owner>/postcrew.git
 cd postcrew
 python3 -m venv .venv && source .venv/bin/activate   # recommended: keeps Postcrew's one dependency separate
+python3 -m pip install --upgrade pip                 # older pips can't install the `postcrew` command below
 python3 -m pip install -r requirements.txt           # installs Pillow, the only dependency
 ```
 
 Prefer a `postcrew` command? Run `python3 -m pip install -e .` in the same folder; then `postcrew serve`
-works as well as `python3 -m postcrew serve`.
+works as well as `python3 -m postcrew serve` (while the virtual environment is active). Run
+`source .venv/bin/activate` again in each new terminal.
 
 Optional, for algorithm videos:
 
