@@ -4,7 +4,7 @@
   1. Replace /PATH/TO/postcrew (twice) and, if needed, the python3 path (run `which python3`).
   2. cp deploy/launchd/com.postcrew.studio.plist ~/Library/LaunchAgents/
   3. launchctl load ~/Library/LaunchAgents/com.postcrew.studio.plist
-  Logs: ~/Library/Logs/postcrew.log. Stop: launchctl unload ~/Library/LaunchAgents/com.postcrew.studio.plist
+  Logs: /tmp/postcrew.log (change StandardOutPath below to keep them elsewhere). Stop: launchctl unload ~/Library/LaunchAgents/com.postcrew.studio.plist
   PATH must include the folder that contains `claude` (often /Users/YOU/.local/bin; launchd does not expand ~) and ffmpeg.
 -->
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

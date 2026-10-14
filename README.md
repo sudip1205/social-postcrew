@@ -1,187 +1,163 @@
-# Postcrew
+<p align="center">
+  <img src="docs/assets/hero.svg" alt="Postcrew: a supervised crew of AI agents that writes, fact-checks, designs, reviews and publishes your LinkedIn posts" width="100%">
+</p>
 
-A crew of AI agents that writes, fact-checks, designs, reviews and publishes one LinkedIn post a day for you,
-with a live dashboard that shows every step.
+<p align="center">
+  <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-4f46e5"></a>
+  <img alt="Python 3.9+" src="https://img.shields.io/badge/python-3.9%2B-0d9488">
+  <img alt="Runs locally" src="https://img.shields.io/badge/runs-locally-ea580c">
+  <img alt="One dependency" src="https://img.shields.io/badge/dependencies-Pillow-db2777">
+</p>
 
-- **Multi-agent, supervised.** A Topic Scout, Researcher, Writer, Visual Designer, Editor Review, Formatter
-  and Publisher each do one job. A Supervisor validates every output and, when an agent gets stuck, tells it
-  exactly what to fix or sends the work back to the agent that caused the problem.
-- **Accuracy you can audit.** The Researcher's quotes are checked against pages the program downloads
-  itself. Every price, percent and big number in the post must appear in a verified source. Code on posters
-  must parse. Nothing reaches the queue without passing a strict review, scored 3 times with the worst score
-  kept.
-- **Visual by default.** 1080×1350 posters (points, steps, code, flow) and, for algorithm posts, an MP4
-  where the line of Java being executed is highlighted as the data moves.
-- **Everything is logged and visualized.** Each run has a full event log, every agent's output, and a live
-  workflow graph in the Studio.
-- **No API keys for the AI.** Every agent runs through your [Claude Code](https://claude.com/claude-code)
-  login (`claude -p`), isolated from your own Claude settings, with only the tools it needs and a dollar cap
-  per call and per post.
-- **Official LinkedIn API only.** OAuth sign-in from the Studio; a Credential Monitor checks the token daily
-  and tells you before it expires.
-- Standard-library Python plus Pillow. No database, no build step, no cloud service.
+<p align="center">
+  <a href="docs/getting-started.md"><b>Getting started</b></a> ·
+  <a href="docs/studio-guide.md">Studio guide</a> ·
+  <a href="docs/configuration.md">Configuration</a> ·
+  <a href="docs/agents.md">How the crew works</a> ·
+  <a href="docs/troubleshooting.md">Troubleshooting</a>
+</p>
+
+Postcrew writes one LinkedIn post a day for you, on your own computer. A crew of named AI agents picks the
+topic, researches primary sources, drafts the post, designs the poster, reviews it strictly and publishes it
+at the time you choose. You watch all of it live in the Studio, and nothing goes out that you didn't allow.
+
+<p align="center"><img src="docs/assets/crew-run.gif" alt="A crew run in the Studio: each agent lights up while it works, sent-back work shows as a red arrow" width="100%"></p>
+
+## Why Postcrew
+
+- **A crew, not one prompt.** Eleven agents with one job each: Nova picks the topic, Ada and Ravi research,
+  Maya and Leo write, Iris pre-reviews, Pixel designs, Quinn edits, Kai formats, Echo publishes, Aegis
+  watches your credentials, Vega plans the week. Orion, the Supervisor, checks every step.
+- **Accuracy you can audit.** Postcrew downloads every source page itself and rejects any quote that isn't on
+  it. Every price, percent and big number must come from a verified source. Code on posters must parse.
+- **Strict review that converges.** The writers and the Editor use the same scoring guide. The Editor scores
+  each post three times and the worst score counts. A post that falls short comes back with at most four
+  exact fixes, one per weak criterion, which the writer applies word for word.
+- **It learns.** Problems fixed in approved runs become lessons for the next run. Team members whose work is
+  consistently weak are replaced, and the team writes down what went wrong.
+- **Visual by default.** 1080×1350 posters (points, steps, code, flow) and, for algorithm posts, an MP4 where
+  the line of Java being executed lights up as the data moves.
+- **You stay in control.** Practice mode is on until you turn it off. Publish automatically with a veto
+  window, wait for your approval, or publish right away.
+- **Private and local.** No server, no database, no telemetry. Your settings, secrets and posts stay in one
+  folder on your machine. The AI runs through your own [Claude Code](https://claude.com/claude-code) login,
+  so there is no API key to manage.
+- **Official LinkedIn API only.** OAuth from the Studio. It posts to your profile and adds the first comment,
+  and nothing else.
 
 ## How a post is made
 
+<p align="center"><img src="docs/assets/review-loop.svg" alt="Writers draft, Iris pre-reviews and polishes, Quinn the Editor scores; failing criteria come back as exact fixes" width="100%"></p>
+
 ```mermaid
 flowchart LR
-    S{{Supervisor}} -.validates & redirects.-> C & T & R & W & M & E & F & P
-    C[Credential Monitor] --> T[Topic Scout] --> R[Researcher] --> W[Writer] --> M[Visual Designer] --> E[Editor Review] --> F[Formatter] --> P[Publisher]
-    E -. "sent back (fix_owner)" .-> W
-    E -. "facts wrong" .-> R
-    R -. downloads & re-checks .-> WEB[(primary sources)]
-    P --> Q[(Queue)] --> LI[LinkedIn]
+    O{{Orion<br/>Supervisor}} -.checks every step.-> A & N & R & W & P & Q & K & E
+    A[Aegis<br/>credentials] --> N[Nova<br/>topic] --> R[Ada · Ravi<br/>research] --> W[Maya · Leo + Iris<br/>write and pre-review] --> P[Pixel<br/>poster] --> Q[Quinn<br/>Editor x3] --> K[Kai<br/>format] --> E[Echo<br/>publish]
+    Q -. "exact fixes" .-> W
+    Q -. "facts wrong" .-> R
+    R -. downloads and re-checks .-> WEB[(primary sources)]
+    E --> LI[LinkedIn]
 ```
 
-| Agent | Does | Validated by |
-|---|---|---|
-| Week Planner | drafts the topic for every remaining day of the current week so you can edit any day or ask for another | no repeats of published, planned or rejected topics |
-| Credential Monitor | LinkedIn token valid and not expiring? Claude Code logged in? | free API check, `claude auth status` |
-| Topic Scout | picks the topic for the day's category, never a repeat | length, similarity to the last 60 posts |
-| Research team | 2 researchers (by default) each choose primary sources with WebSearch; the program downloads them; each quotes them verbatim; their verified work is combined | every quote must be on the downloaded page; every fact needs a quote; recency |
-| Writer team | 2 writers (by default) each draft the post from verified facts only, in your voice and their own style; a pre-review scores each draft like the Editor; the best is polished once and goes on | length, hook, no markdown, no hype words, no placeholders, no invented experience, unsourced numbers, stray links |
-| Visual Designer | poster spec (rendered with Pillow) or algorithm animation (ffmpeg) | it renders and fits, layout allowed, code parses, numbers sourced |
-| Editor Review | scores accuracy, clarity, hook, value, tone, format; flags real problems | worst of 3 reviews must reach your thresholds with no red flag |
-| Formatter | LinkedIn formatting: hook above "...see more", links to the first comment, hashtags last | 3,000-character limit, fold length |
-| Publisher | queues for post time (or your approval) and posts with native image/video | credentials re-checked right before posting |
-
-**The team learns.** Every member's work is recorded on the roster. A member whose recent posts are
-consistently bad (by default fewer than a third of their last 6) is replaced; the team writes down what went
-wrong as short lessons, and the new hire and every colleague in that role follow them from then on. See the
-**Team** tab to watch scores, replace or hire members, and edit the lessons.
-
-When a step fails, the Supervisor reads the problems and the outputs so far and decides: **retry** with
-specific instructions, **rewind** to an earlier agent (for example: the Editor found an unsupported claim →
-the Writer revises its previous draft), or **abort**. Hard limits on tries and dollars always apply, and a
-failed day notifies you with the reason.
+When any step fails, the reasons travel with the work: the agent sees who sent it back, why, everything it
+was sent back for earlier in the run, and what to change. [More about the crew →](docs/agents.md)
 
 ## Quick start
 
-Requirements: Python 3.9+, [Claude Code](https://claude.com/claude-code) installed and logged in, and
-ffmpeg for algorithm videos (optional).
+You need Python 3.9+, [Claude Code](https://claude.com/claude-code) installed and logged in (`claude`, once),
+and macOS, Linux or Windows with WSL.
 
 ```bash
-git clone https://github.com/<you>/postcrew && cd postcrew
+git clone https://github.com/<owner>/postcrew.git && cd postcrew
+python3 -m venv .venv && source .venv/bin/activate
 python3 -m pip install -r requirements.txt
-python3 -m postcrew init
+python3 -m postcrew init        # creates ./workspace with default settings
 python3 -m postcrew doctor      # checks what is installed and configured
 python3 -m postcrew serve       # opens the Studio at http://localhost:8765 and starts the scheduler
 ```
 
 Then, in the Studio:
 
-1. **Settings**: your name, the handle printed on posters, your audience, true facts about yourself (the
-   writer never invents experience), what to post each day, models per agent, approval mode.
-2. **Credentials**: create a free LinkedIn developer app (the page walks you through it), paste its Client
-   ID and Secret, click **Connect LinkedIn**.
-3. **Overview → Run the crew now** with *Rehearsal* ticked: every agent runs, nothing is queued. Open the
-   **Workflow** tab to watch it.
-4. When you like the results, untick **Dry run** in Settings → Publishing.
+1. **Settings**: your topics and ideas, which topic goes on which day, and true facts about you (the writers
+   never invent experience).
+2. **Overview → Run the crew now**, with **Rehearsal** ticked. Watch it in **Workflow**. Nothing is queued.
+3. **Credentials**: create a free LinkedIn developer app ([5-minute guide](docs/linkedin-setup.md)) and click
+   **Connect LinkedIn**.
+4. When you like the results, turn off **Practice mode** in Settings.
 
-Publishing starts in dry-run mode: the publisher logs exactly what it would send and sends nothing until
-you turn that off.
+The full walkthrough is in [Getting started](docs/getting-started.md).
 
 ## The Studio
 
-| Tab | What you can do |
+| | |
 |---|---|
-| Team | the researchers and writers, their recent results, who is at risk; replace or hire members; the lessons learned from past mistakes |
-| Plan | this week, Monday to Sunday: edit any topics and save them together, or ask the Week Planner for a different one (with an optional hint) |
-| Overview | next post and run, LinkedIn status, start a run or rehearsal, pause the schedule, recent runs |
-| Workflow | live graph of the crew (state, tries, cost per agent, sent-back arrows), the Supervisor's decisions, each agent's output and rendered media, the full event log |
-| Queue | LinkedIn-style preview of every queued post: approve, edit, veto, publish now; the published list (add posts you published yourself, remove one to allow its topic again) |
-| Settings | **Topic ideas** (your own list per kind of post, plus a focus for the whole plan; then plan or re-plan the week), and the configurator: profile, schedule and days, categories and their briefs, models and limits per agent, quality thresholds, notifications |
-| Credentials | LinkedIn app and OAuth connect/reconnect, token status, Claude Code login test, Gmail, Telegram |
+| <img src="docs/assets/screens/overview.png" alt="Overview" width="100%"> **Overview**: what's next, warnings, run the crew now, recent runs | <img src="docs/assets/screens/queue.png" alt="Queue" width="100%"> **Queue**: LinkedIn-style previews; approve, edit, veto or publish now |
+| <img src="docs/assets/screens/team.png" alt="Crew" width="100%"> **Crew**: every agent by team, the roster, lessons and long-term memory | <img src="docs/assets/screens/plan.png" alt="Plan" width="100%"> **Plan**: this week's topics; edit any day or ask for another |
+| <img src="docs/assets/screens/settings.png" alt="Settings" width="100%"> **Settings**: topics, schedule, about you, models and limits | <img src="docs/assets/screens/credentials.png" alt="Credentials" width="100%"> **Credentials**: LinkedIn, Claude Code, Gmail, Telegram |
 
-Notifications (bell icon) appear in the Studio and, if enabled, as desktop notifications, Gmail emails and
-Telegram messages: token expiring or invalid, a day with no post and why, a post ready or published, failures.
+Every tab, panel and button is explained in the [Studio guide](docs/studio-guide.md).
 
-## Configuration
+## Documentation
 
-Everything lives in one workspace folder (`./workspace`, or set `POSTCREW_HOME`):
-
-```
-workspace/
-  config.json     settings from the Studio (no secrets)
-  secrets.json    LinkedIn app + token, Gmail App Password, Telegram (mode 600, never commit it)
-  queue.json      posts that passed review
-  history.json    what was published (used to avoid repeats)
-  media/          queued posters and videos
-  runs/<run_id>/  events.jsonl, status.json, each agent's output, rejected attempts, media
-  prompts/        optional: your own version of any file in postcrew/prompts/
-  PAUSE           create this file to stop all generating and publishing
-```
-
-**Approval modes:** `auto_with_veto` (default; posts at post time unless you veto), `manual` (waits for
-Approve), `immediate`.
-
-**Categories** are fully configurable: label, media (`poster`, `animation`, `none`), poster layouts,
-research (`required`, `optional`, `off`), length, whether every number must be sourced, maximum source age,
-and the brief that tells the agents what the post must contain. Seven are built in: algorithm, ai-news,
-build-guide, tool-spotlight, security, dev-tip, week-recap.
-
-**Prompts** for every agent are plain Markdown in `postcrew/prompts/`. Copy one into `workspace/prompts/`
-to change it without touching the code.
-
-## Running it unattended
-
-`postcrew serve` includes the scheduler: it writes the post at `generate_time` the day before, publishes at
-`post_time`, and checks credentials daily. Keep it running as a service:
-
-- **macOS:** `deploy/launchd/com.postcrew.studio.plist` (instructions inside)
-- **Linux:** `deploy/systemd/postcrew.service` (a user service; instructions inside)
-- **cron instead:** run `postcrew serve --no-scheduler` for the Studio and schedule
-  `python3 -m postcrew run`, `python3 -m postcrew publish` and `python3 -m postcrew check` yourself.
-
-The Studio listens on `127.0.0.1` only. On a remote machine, reach it with an SSH tunnel
-(`ssh -L 8765:localhost:8765 your-server`); LinkedIn's OAuth redirect then still works on `localhost`.
+| | |
+|---|---|
+| [Getting started](docs/getting-started.md) | install, first rehearsal, go live, update, uninstall |
+| [Connect LinkedIn](docs/linkedin-setup.md) | the developer app, OAuth, token expiry, the first comment |
+| [Studio guide](docs/studio-guide.md) | every tab and button |
+| [Configuration reference](docs/configuration.md) | every setting in `config.json`, categories, secrets, the workspace folder, prompts |
+| [The crew](docs/agents.md) | each agent, the review loop, memory, the roster |
+| [Notifications](docs/notifications.md) | desktop, Gmail, Telegram |
+| [Running unattended](docs/running-unattended.md) | launchd, systemd, cron, on a server |
+| [Troubleshooting and FAQ](docs/troubleshooting.md) | when something doesn't work |
+| [Extending](docs/extending.md) | code map, new agents, animations, model backends |
 
 ## Command line
 
 ```
 python3 -m postcrew init | serve | doctor | check | status
+python3 -m postcrew serve [--port 8765] [--no-scheduler]
 python3 -m postcrew run [--date YYYY-MM-DD] [--category ai-news] [--dry-run]
-python3 -m postcrew publish
+python3 -m postcrew publish              # publish whatever is due
 python3 -m postcrew plan                 # draft the rest of this week's topics now
-python3 -m postcrew import posts.json    # posts published elsewhere ({"posts": [{"date", "topic", "text"}]}), never repeated
+python3 -m postcrew import posts.json    # posts published elsewhere, never repeated
 ```
+
+To use another workspace folder, put `--workspace PATH` before the command, or set `POSTCREW_HOME`.
+
+## Your data stays yours
+
+Everything that is yours lives in one folder, `workspace/`, which git ignores:
+
+- `config.json` holds your settings.
+- `secrets.json` holds your LinkedIn, Gmail and Telegram secrets. It is readable only by your user, and the
+  Studio never sends them back to the browser.
+- The folder also holds the queue, the published list, run logs and memory.
+
+The Studio only listens on `127.0.0.1`. Agents run through Claude Code in an isolated mode: they have no
+shell, no code tools and no MCP servers, and your own Claude settings are ignored. Web pages are treated as
+data, never as instructions. See [SECURITY.md](SECURITY.md).
 
 ## Costs
 
-You pay only for Claude usage on your own account (each call reports its cost; per-call and per-post caps
-are in Settings). In testing, a short dev tip cost about $0.03 and a researched news post with two revisions
-about $0.70, using Sonnet for writing and Haiku for review. LinkedIn's API is free.
-
-## Adding an algorithm animation
-
-Algorithm posts use built-in, tested traces (`postcrew/render/tracers.py`): Java code plus a step-by-step
-trace of what it does. The tests compile and run the Java and compare it with the animation, so the code on
-screen is real. To add one, add a `Tracer` and run the tests.
-
-## Extending
-
-- **Another LLM backend:** implement `call(agent_id, system, prompt, schema, tools, cwd)` returning an
-  `LLMResult` and register it in `postcrew/llm.py`.
-- **Another agent:** subclass `Agent` (`run` + `validate`), add it to `CREW` in
-  `postcrew/agents/supervisor.py` and to `STEPS` in `postcrew/runlog.py`.
-
-## Development
-
-```bash
-python3 -m unittest discover -s tests     # no network, no tokens: the LLM, web and LinkedIn are faked
-```
-
-See [CONTRIBUTING.md](CONTRIBUTING.md). Security reports: [SECURITY.md](SECURITY.md).
+Postcrew is free. LinkedIn's API is free. The AI runs on your Claude account: on a Pro or Max plan, posts
+count towards your plan's usage limits; with an Anthropic Console account, you pay per use. Every run shows
+its cost at API prices, and you can cap it per call and per post in Settings. With the default models, a
+researched news post typically uses $1-2 at API prices, and a short dev tip far less.
 
 ## Responsible use
 
-Postcrew publishes only to your own profile through LinkedIn's official API. It does not comment, message,
-connect, like or scrape. It never invents personal experience: the writer may only use facts you list in
-Settings. You are responsible for what is published under your name; keep dry run or `manual` approval on
-until you trust the output.
+Postcrew posts only to your own profile, through LinkedIn's official API. It doesn't comment on other
+posts, message, connect, like or scrape. It never invents personal experience: the writers may only use the
+facts you list about yourself. You are responsible for what is published under your name, so keep practice
+mode or manual approval on until you trust the output.
 
-LinkedIn is a trademark of LinkedIn Corporation. This project is not affiliated with or endorsed by LinkedIn
-or Anthropic.
+LinkedIn is a trademark of LinkedIn Corporation. Claude is a trademark of Anthropic. This project is not
+affiliated with or endorsed by LinkedIn or Anthropic.
+
+## Contributing
+
+Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) and [Extending](docs/extending.md).
+The tests run offline in about 20 seconds: `python3 -m unittest discover -s tests`.
 
 ## License
 

@@ -1,11 +1,22 @@
 # your data and secrets: never commit
 workspace/
+secrets*.json
+.env
 *.tmp
 PAUSE
+
+# local developer tools (not part of the project)
+.claude/
+.mcp.json
+.ignore
+graft/
+
+# Python and OS
 __pycache__/
 *.pyc
 .DS_Store
 .venv/
+venv/
 dist/
 build/
 *.egg-info/
