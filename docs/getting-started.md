@@ -3,6 +3,9 @@
 This guide takes you from nothing to your first rehearsed post in about 15 minutes, and then to a live,
 scheduled post. Everything runs on your own computer.
 
+> **Just looking?** `pip install postcrew && postcrew demo` runs the whole crew on scripted answers in its own
+> demo workspace: no AI account, no API key, no LinkedIn. Come back here when you want real posts.
+
 - [1. What you need](#1-what-you-need)
 - [2. Install Claude Code](#2-install-claude-code)
 - [3. Download and install Postcrew](#3-download-and-install-postcrew)
@@ -44,6 +47,17 @@ settings and hooks are ignored. Each agent gets only the tools it needs (the res
 
 ## 3. Download and install Postcrew
 
+The quickest way is from PyPI:
+
+```bash
+python3 -m pip install --upgrade pip postcrew   # installs Postcrew and Pillow, its only dependency
+```
+
+Your workspace is then `~/.postcrew`. Use a [virtual environment](https://docs.python.org/3/library/venv.html)
+if you like to keep packages separate.
+
+To change the code, or to always run the latest version, install from source instead:
+
 ```bash
 git clone https://github.com/sudip1205/social-postcrew.git postcrew
 cd postcrew
@@ -54,7 +68,8 @@ python3 -m pip install -r requirements.txt           # installs Pillow, the only
 
 Prefer a `postcrew` command? Run `python3 -m pip install -e .` in the same folder; then `postcrew serve`
 works as well as `python3 -m postcrew serve` (while the virtual environment is active). Run
-`source .venv/bin/activate` again in each new terminal.
+`source .venv/bin/activate` again in each new terminal. The examples below use `python3 -m postcrew`, which
+works with either install.
 
 Optional, for algorithm videos:
 
@@ -72,7 +87,7 @@ python3 -m postcrew doctor     # checks Python, Pillow, ffmpeg, Claude Code, set
 
 The **workspace** is the one folder that holds everything that is yours: settings, secrets, the queue, the
 published list, run logs and memory. It is never committed to git. By default it is `./workspace` inside
-the project; set `POSTCREW_HOME=/some/folder` (or pass `--workspace /some/folder`) to keep it elsewhere.
+the project (`~/.postcrew` when installed from PyPI); set `POSTCREW_HOME=/some/folder` (or pass `--workspace /some/folder`) to keep it elsewhere.
 See [the workspace layout](configuration.md#the-workspace-folder).
 
 `doctor` prints a checklist. A missing LinkedIn connection is expected at this point.
@@ -145,6 +160,8 @@ The scheduler only works while `postcrew serve` is running. To keep it running a
 terminal, log out or restart, install it as a service: [running unattended](running-unattended.md).
 
 ## Updating
+
+Installed from PyPI: `python3 -m pip install --upgrade postcrew`. From source:
 
 ```bash
 cd postcrew

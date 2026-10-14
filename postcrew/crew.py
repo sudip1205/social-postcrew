@@ -43,6 +43,14 @@ def run_crew(ws, day=None, category=None, llm=None, fetch=fetch_text, dry_run=Fa
         return {"ok": False, "reason": f"no category is scheduled for {day.strftime('%A')}", "run_id": None}
     if category not in cfg["categories"]:
         return {"ok": False, "reason": f"unknown category {category!r}", "run_id": None}
+    if cfg["llm"]["backend"] == "demo":
+        from . import demo
+        if category != demo.CATEGORY:
+            return {"ok": False, "reason": f"the demo only writes {cfg['categories'][demo.CATEGORY]['label']} posts: "
+                                           f"pick that category, or choose a real AI provider in Settings",
+                    "run_id": None}
+        if fetch is fetch_text:
+            fetch = demo.fetch   # the demo never goes online
     if not _running.acquire(blocking=False):
         return {"ok": False, "reason": "another crew run is in progress", "run_id": None}
     try:

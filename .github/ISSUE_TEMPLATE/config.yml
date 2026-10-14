@@ -1,5 +1,11 @@
 blank_issues_enabled: true
 contact_links:
+  - name: Question or setup help
+    url: https://github.com/sudip1205/social-postcrew/discussions/categories/q-a
+    about: Ask in Discussions > Q&A; issues are for bugs and planned work.
+  - name: Idea
+    url: https://github.com/sudip1205/social-postcrew/discussions/categories/ideas
+    about: Share ideas in Discussions > Ideas before opening a feature request.
   - name: Security vulnerability
     url: https://docs.github.com/code-security/security-advisories/guidance-on-reporting-and-writing-information-about-vulnerabilities/privately-reporting-a-security-vulnerability
     about: Please report security problems privately (Security tab > Report a vulnerability), not as an issue.

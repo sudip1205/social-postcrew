@@ -318,5 +318,8 @@ BACKENDS = {"claude-code": ClaudeCode, "anthropic": Anthropic, "openai": OpenAI,
 
 def make_backend(cfg, secrets=None):
     """secrets: the workspace's secrets (API keys); API keys may also come from the environment."""
+    if cfg["llm"]["backend"] == "demo":
+        from .demo import Demo
+        return Demo(cfg, secrets)
     cls = BACKENDS[cfg["llm"]["backend"]]
     return cls(cfg) if cls is ClaudeCode else cls(cfg, secrets)

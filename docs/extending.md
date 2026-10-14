@@ -8,12 +8,13 @@ request.
 
 ```
 postcrew/
-  __main__.py        the command line (init, serve, run, publish, check, doctor, status, plan, import)
+  __main__.py        the command line (demo, init, serve, run, publish, check, doctor, status, plan, import)
   defaults.py        default settings
   workspace.py       the workspace folder, config validation, queue and history
   crew.py            starts a run for one date
   scheduler.py       the built-in scheduler (inside `serve`)
   llm.py             AI backends: Claude Code CLI, Claude API, OpenAI API, OpenAI-compatible
+  demo.py            the demo backend: scripted answers and the one page it serves (`postcrew demo`)
   checks.py          deterministic checks: placeholders, hype, invented experience, numbers, links, repeats
   memory.py          working and long-term memory
   runlog.py          events.jsonl and status.json per run

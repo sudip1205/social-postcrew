@@ -1,5 +1,6 @@
 # your data and secrets: never commit
 workspace/
+workspace-demo/
 secrets*.json
 .env
 *.tmp

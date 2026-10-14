@@ -88,7 +88,7 @@ Which model each agent uses and how much a single call may cost. Studio: **Setti
 
 | Key | Default | What it does |
 |---|---|---|
-| `backend` | `"claude-code"` | Which AI runs the crew: `claude-code` (your Claude Pro / Max / Team plan through the Claude Code CLI), `anthropic` (Claude API key), `openai` (OpenAI API key), or `openai-compatible` (Ollama, LM Studio, OpenRouter, Groq, vLLM...). See [AI providers](ai-providers.md). |
+| `backend` | `"claude-code"` | Which AI runs the crew: `claude-code` (your Claude Pro / Max / Team plan through the Claude Code CLI), `anthropic` (Claude API key), `openai` (OpenAI API key), `openai-compatible` (Ollama, LM Studio, OpenRouter, Groq, vLLM...), or `demo` (scripted answers, no AI; what `postcrew demo` uses). See [AI providers](ai-providers.md). |
 | `claude_path` | `"claude"` | The Claude Code command. Use the full path (`which claude`) if the Studio runs as a service and can't find it. |
 | `api.base_url` | `""` | Server address for `openai-compatible` (required), e.g. `http://localhost:11434/v1`; optional for `openai`. |
 | `api.models.<provider>` | see [AI providers](ai-providers.md#model-tiers) | Which model each tier (`opus`, `sonnet`, `haiku`) means for that provider. |
@@ -276,7 +276,7 @@ code) moves your whole setup; reconnect LinkedIn there if the redirect port diff
 
 | Variable | What it does |
 |---|---|
-| `POSTCREW_HOME` | Workspace folder. Default: `./workspace` next to the code. Same as `--workspace`. |
+| `POSTCREW_HOME` | Workspace folder. Default: `./workspace` in a source checkout, `~/.postcrew` when installed from PyPI. Same as `--workspace`. `postcrew demo` always uses its own folder (`./workspace-demo` or `~/.postcrew-demo`) unless you pass `--workspace`. |
 | `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `LLM_API_KEY` | API keys, used when none is saved on Credentials. |
 
 ## Changing the prompts

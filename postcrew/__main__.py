@@ -1,5 +1,6 @@
 """postcrew - a crew of AI agents that writes, reviews and publishes your LinkedIn posts.
 
+  python3 -m postcrew demo                 try it: a full crew run on scripted answers (no AI, no LinkedIn)
   python3 -m postcrew init                 create the workspace (settings, secrets, queue)
   python3 -m postcrew serve [--port 8765]  open the Studio and start the scheduler
   python3 -m postcrew run [--date D] [--category C] [--dry-run]   run the crew once now
@@ -16,7 +17,7 @@ import shutil
 import sys
 
 from . import __version__
-from .workspace import Workspace, validate_config
+from .workspace import Workspace, default_root, validate_config
 
 
 def cmd_doctor(ws):
@@ -67,11 +68,46 @@ def cmd_import(ws, path):
     return 0
 
 
+def cmd_demo(ws, port, browser=True):
+    """A separate demo workspace on the scripted demo provider: start one practice run, open the Studio."""
+    import threading
+    import webbrowser
+    from . import demo
+    from .crew import post_for, run_crew, target_date
+    from .studio.server import serve
+    cfg = ws.config()
+    if cfg["llm"]["backend"] != "demo":   # first time: set the demo workspace up
+        cfg["llm"]["backend"] = "demo"
+        cfg["publishing"]["dry_run"] = True
+        cfg["notifications"]["desktop"] = False
+        cfg["profile"].update(name=cfg["profile"]["name"] or "Demo User",
+                              handle=cfg["profile"]["handle"] or "example.com/demo")
+        cfg["schedule"]["days"] = {d: demo.CATEGORY for d in cfg["schedule"]["days"]}
+        ws.save_config(cfg)
+    day = target_date(cfg)
+    url = f"http://localhost:{port}/#{'queue' if post_for(ws, day) else 'workflow'}"
+    print(f"Postcrew demo: scripted answers, practice mode, nothing leaves this computer.\n"
+          f"Workspace: {ws.root}\nWatch the crew at {url}  (Ctrl+C to stop)\n"
+          f"To write real posts: python3 -m postcrew init, then serve (see docs/getting-started.md).", flush=True)
+
+    def start():
+        if not post_for(ws, day):
+            run_crew(ws, day, demo.CATEGORY)
+    threading.Timer(1.5, start).start()
+    if browser:
+        threading.Timer(1.0, webbrowser.open, [url]).start()
+    serve(ws, port, scheduler=False)
+    return 0
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="postcrew", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--workspace", help="workspace folder (default: $POSTCREW_HOME or ./workspace)")
+    ap.add_argument("--workspace", help="workspace folder (default: $POSTCREW_HOME, ./workspace in a checkout, or ~/.postcrew)")
     ap.add_argument("--version", action="version", version=f"postcrew {__version__}")
     sub = ap.add_subparsers(dest="cmd", required=True)
+    dm = sub.add_parser("demo", help="a full crew run on scripted answers: no AI account, key or LinkedIn needed")
+    dm.add_argument("--port", type=int, default=8765)
+    dm.add_argument("--no-browser", action="store_true")
     sub.add_parser("init")
     sv = sub.add_parser("serve")
     sv.add_argument("--port", type=int, default=8765)
@@ -89,7 +125,11 @@ def main(argv=None):
     im.add_argument("file")
     a = ap.parse_args(argv)
 
+    if a.cmd == "demo" and not a.workspace:
+        a.workspace = default_root("workspace-demo")   # never the real workspace
     ws = Workspace(a.workspace).init()
+    if a.cmd == "demo":
+        return cmd_demo(ws, a.port, browser=not a.no_browser)
     if a.cmd == "init":
         print(f"Workspace ready: {ws.root}\nNext: python3 -m postcrew serve, then open http://localhost:8765")
         return 0

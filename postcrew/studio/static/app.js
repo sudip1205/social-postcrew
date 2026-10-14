@@ -17,7 +17,7 @@ const AGENTS = { supervisor: ["Orion", "command", "compass"], planner: ["Vega", 
   research: ["Research team", "research", "search"], writer: ["Writing team", "writing", "pen"], reviewer: ["Iris", "writing", "eye"],
   media: ["Pixel", "design", "image"], editor: ["Quinn", "quality", "check"], formatter: ["Kai", "quality", "align"],
   credentials: ["Aegis", "ops", "shield"], publisher: ["Echo", "ops", "send"] };
-const PROVIDERS = { "claude-code": "Claude Code (Claude plan)", anthropic: "Claude API", openai: "OpenAI API", "openai-compatible": "OpenAI-compatible server" };
+const PROVIDERS = { "claude-code": "Claude Code (Claude plan)", anthropic: "Claude API", openai: "OpenAI API", "openai-compatible": "OpenAI-compatible server", demo: "Demo (scripted answers, no AI)" };
 const ICONS = { // 24x24 line icons
   compass: '<circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/>',
   calendar: '<rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
@@ -615,10 +615,11 @@ async function renderSettings() {
     <div class="grid g2">
       <label class="f">Which AI runs the crew${sel("llm.backend", c.llm.backend, [["claude-code", "Claude Pro / Max / Team plan (Claude Code login, no API key)"],
         ["anthropic", "Claude API (Anthropic API key)"], ["openai", "OpenAI API (OpenAI API key)"],
-        ["openai-compatible", "OpenAI-compatible: Ollama, LM Studio, OpenRouter, Groq, vLLM..."]])}</label>
+        ["openai-compatible", "OpenAI-compatible: Ollama, LM Studio, OpenRouter, Groq, vLLM..."],
+        ["demo", "Demo: scripted answers, no AI (for trying Postcrew)"]])}</label>
       <label class="f">Server address (OpenAI-compatible; optional for OpenAI)${inp("llm.api.base_url", c.llm.api.base_url, "url", 'placeholder="http://localhost:11434/v1"')}</label></div>
     <p class="muted small">API keys go in <a href="#credentials">Credentials</a>. OpenAI-compatible servers have no web search: researchers then suggest pages they know, and every page is still downloaded and checked.</p>
-    ${c.llm.backend === "claude-code" ? "" : `<div class="grid g3">${[["opus", "Strongest (opus)"], ["sonnet", "Balanced (sonnet)"], ["haiku", "Fastest (haiku)"]].map(([t, l]) =>
+    ${["claude-code", "demo"].includes(c.llm.backend) ? "" : `<div class="grid g3">${[["opus", "Strongest (opus)"], ["sonnet", "Balanced (sonnet)"], ["haiku", "Fastest (haiku)"]].map(([t, l]) =>
       `<label class="f">${l} model${inp(`llm.api.models.${c.llm.backend}.${t}`, c.llm.api.models[c.llm.backend]?.[t] || "", "text", 'placeholder="model id"')}</label>`).join("")}</div>
       <p class="muted small">Agents ask for a tier; these are the ${esc(c.llm.backend)} models used for each. Prices for the cost estimate are in <span class="mono">config.json</span> (<span class="mono">llm.api.prices</span>).</p>`}
     <h3>AI models</h3>
@@ -803,9 +804,10 @@ async function renderCredentials() {
     <p>${esc(cl.backend && cl.backend !== d.backend ? "Not checked yet: click Check now." : cl.message || "Not checked yet.")}</p>
     <div class="row"><button id="test-ai">Test with a tiny call</button><span class="muted small" id="ai-result"></span></div>
     <p class="muted small">${d.backend === "claude-code" ? `Uses your Claude Pro / Max / Team plan. Not logged in? Run <span class="mono">claude</span> once in a terminal and log in. No API key is needed.`
+      : d.backend === "demo" ? `Scripted answers for trying Postcrew: no AI is called and it only writes one made-up AI news story.`
       : d.backend === "openai-compatible" ? `Server: <span class="mono">${esc(d.base_url || "not set")}</span>. The key is optional (local servers such as Ollama need none).` : `Pay-as-you-go with your own API key.`}
       Change the provider in <a href="#settings">Settings > Advanced</a>.</p>
-    ${d.backend === "claude-code" ? "" : (() => { const k = { anthropic: ["anthropic_api_key", "Anthropic API key", "sk-ant-...", "https://console.anthropic.com/settings/keys"],
+    ${["claude-code", "demo"].includes(d.backend) ? "" : (() => { const k = { anthropic: ["anthropic_api_key", "Anthropic API key", "sk-ant-...", "https://console.anthropic.com/settings/keys"],
         openai: ["openai_api_key", "OpenAI API key", "sk-...", "https://platform.openai.com/api-keys"], "openai-compatible": ["llm_api_key", "API key (optional)", "", ""] }[d.backend];
       return `<div class="grid g2"><label class="f">${k[1]} ${set(s[k[0]])}<input id="ai-key" type="password" placeholder="${s[k[0]] ? "•••••••• (saved, type to replace)" : k[2]}" autocomplete="new-password"></label>
         <div style="padding-top:22px"><button id="save-ai" data-k="${k[0]}">Save key</button>${s[k[0]] ? ` <button class="danger" id="del-ai" data-k="${k[0]}">Remove</button>` : ""}</div></div>

@@ -9,6 +9,7 @@ AI provider**, then add its key (if any) on **Credentials**.
 | `anthropic`: **Claude API** | an Anthropic API key | pay per use | yes (Anthropic's server-side tool) |
 | `openai`: **OpenAI API** | an OpenAI API key | pay per use | yes (OpenAI's built-in tool) |
 | `openai-compatible`: **any OpenAI-compatible server**: Ollama, LM Studio, OpenRouter, Groq, Together, vLLM, Azure OpenAI and others | its address, and a key if it needs one | depends on the server; local models are free | no (see below) |
+| `demo`: **scripted answers** | nothing | free | no; it never goes online |
 
 Nothing else changes when you switch: the same agents, prompts, checks, review and limits apply.
 
@@ -79,6 +80,14 @@ security explainers, algorithms) work well anywhere.
 **Use capable models.** The agents must follow long instructions and return valid JSON. Small local models
 (under about 14B parameters) often fail the Editor or the format checks; Postcrew then retries and, at the
 limits, gives up on the day rather than posting something weak.
+
+## Demo (scripted answers)
+
+`postcrew demo` creates a separate demo workspace on this provider, starts one run and opens the Studio. Only
+the answers are scripted: the Supervisor, every check, quote verification (against one made-up page served
+locally), the poster, the Editor's three reads and the send-back loop are the real code. It writes one made-up
+AI news story ("Acme Model 2"), refuses other categories, and starts in practice mode with no LinkedIn login, so it can't publish. Choose a real
+provider in **Settings > Advanced** when you want real posts, or run `postcrew init` for a fresh workspace.
 
 ## Cost estimates
 

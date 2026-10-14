@@ -13,3 +13,8 @@ Thanks for helping. A few rules keep Postcrew small and trustworthy:
 - Keep prompts in `postcrew/prompts/*.md`, not in code.
 
 Pull requests: describe what changes for a user, include tests, keep the diff focused.
+
+New here? Issues labelled [good first issue](https://github.com/sudip1205/social-postcrew/labels/good%20first%20issue)
+are small and self-contained; [help wanted](https://github.com/sudip1205/social-postcrew/labels/help%20wanted) are
+bigger. Questions go to [Discussions](https://github.com/sudip1205/social-postcrew/discussions). `postcrew demo`
+gives you a full run to test against without any account.

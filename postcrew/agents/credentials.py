@@ -69,7 +69,7 @@ def check_claude(cfg, runner=subprocess.run):
 
 
 PROVIDER = {"claude-code": "Claude Code", "anthropic": "Claude API", "openai": "OpenAI API",
-            "openai-compatible": "OpenAI-compatible server"}
+            "openai-compatible": "OpenAI-compatible server", "demo": "Demo (scripted answers)"}
 
 
 def check_api(cfg, secrets, opener=urllib.request.urlopen):
@@ -94,7 +94,10 @@ def check_api(cfg, secrets, opener=urllib.request.urlopen):
 
 def check_ai(ws, cfg, runner=subprocess.run, opener=urllib.request.urlopen):
     name = cfg["llm"]["backend"]
-    out = check_claude(cfg, runner) if name == "claude-code" else check_api(cfg, ws.secrets(), opener)
+    if name == "demo":
+        out = {"state": "ok", "message": "Demo mode: scripted answers, no AI is called."}
+    else:
+        out = check_claude(cfg, runner) if name == "claude-code" else check_api(cfg, ws.secrets(), opener)
     return {**out, "backend": name, "provider": PROVIDER[name]}
 
 
@@ -107,7 +110,7 @@ def run_check(ws, live=True, notify_user=True, client_factory=LinkedIn, runner=s
     ws.save_state("credentials", status)
     if notify_user:
         li, cl = status["linkedin"], status["ai"]
-        if li["state"] not in ("ok", "unreachable"):
+        if li["state"] not in ("ok", "unreachable") and cfg["llm"]["backend"] != "demo":   # the demo never posts
             notify(ws, "LinkedIn connection needs attention", li["message"],
                    level="warning" if li["state"] == "expiring" else "error", key=f"linkedin-{li['state']}",
                    action={"label": "Reconnect LinkedIn", "tab": "credentials"},

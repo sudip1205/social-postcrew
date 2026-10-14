@@ -8,7 +8,7 @@
       runs/<run_id>/   one folder per crew run: events.jsonl, status.json, artifacts, media
       state/           scheduler + credential monitor state, notifications
 
-Location: $POSTCREW_HOME, else ./workspace next to the code.
+Location: $POSTCREW_HOME, else ./workspace in a source checkout, or ~/.postcrew when installed with pip.
 """
 import copy
 import json
@@ -21,6 +21,14 @@ from pathlib import Path
 from .defaults import AGENT_IDS, DEFAULT_CONFIG, SECRET_KEYS
 
 CODE_ROOT = Path(__file__).resolve().parent.parent
+
+
+def default_root(name="workspace"):
+    """./workspace in a source checkout; ~/.postcrew when installed with pip (never inside site-packages).
+    name: "workspace-demo" gives the demo's folder (./workspace-demo or ~/.postcrew-demo)."""
+    if (CODE_ROOT / "pyproject.toml").exists():
+        return CODE_ROOT / name
+    return Path.home() / (".postcrew" + name[len("workspace"):])
 _lock = threading.RLock()
 WEEKDAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
 APPROVAL_MODES = ["auto_with_veto", "manual", "immediate"]
@@ -125,7 +133,7 @@ def validate_config(cfg):
     if not re.fullmatch(r"https?://[^\s]+", str(cfg.get("notifications", {}).get("studio_url", "http://localhost"))):
         errs.append("notifications.studio_url must start with http:// or https://")
     llm = cfg.get("llm", {})
-    backends = ["claude-code", "anthropic", "openai", "openai-compatible"]
+    backends = ["claude-code", "anthropic", "openai", "openai-compatible", "demo"]
     if llm.get("backend") not in backends:
         errs.append(f"llm.backend must be one of {backends}")
     api = llm.get("api", {})
@@ -166,7 +174,7 @@ def validate_config(cfg):
 
 class Workspace:
     def __init__(self, root=None):
-        self.root = Path(root or os.environ.get("POSTCREW_HOME") or CODE_ROOT / "workspace").resolve()
+        self.root = Path(root or os.environ.get("POSTCREW_HOME") or default_root()).resolve()
         self.runs_dir = self.root / "runs"
         self.state_dir = self.root / "state"
 
