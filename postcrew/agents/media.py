@@ -80,14 +80,27 @@ class MediaAgent(Agent):
             poster.render_poster(spec, path, handle)
         except (poster.PosterError, ValueError, KeyError, TypeError) as e:
             return {"kind": "image", "path": None, "spec": spec, "shown_text": "", "render_error": str(e)}
-        return {"kind": "image", "path": str(path), "spec": spec, "shown_text": poster.poster_text(spec)}
+        out = {"kind": "image", "path": str(path), "spec": spec, "shown_text": poster.poster_text(spec)}
+        if ctx.cat["media"] == "video":   # the same poster, built up piece by piece
+            if not shutil.which("ffmpeg"):
+                ctx.run.event(self.id, "fallback", "ffmpeg is not installed, so this post gets the poster image "
+                              "instead of the animated video (macOS: brew install ffmpeg; Debian/Ubuntu: "
+                              "sudo apt install ffmpeg)", level="warning")
+                return out
+            video = ctx.run.dir / "poster.mp4"
+            try:
+                info = animate.render_poster_video(spec, video, handle)
+            except (animate.AnimationError, poster.PosterError) as e:
+                raise AgentError(str(e), fatal=True)
+            out.update(kind="video", path=str(video), poster=str(path), seconds=info["seconds"])
+        return out
 
     def validate(self, ctx, out):
         if out.get("render_error"):
             return [f"the poster did not render: {out['render_error']}. Shorten the text or use fewer items"]
         problems = []
         spec = out.get("spec", {})
-        if out["kind"] == "image" and spec.get("layout") not in ctx.cat.get("layouts", []):
+        if "algo" not in spec and spec.get("layout") not in ctx.cat.get("layouts", []):
             problems.append(f"layout must be one of {ctx.cat['layouts']}")
         if out["kind"] == "video" and not 15 <= (out.get("seconds") or 0) <= 60:
             problems.append(f"video is {out.get('seconds')}s; it must be 15-60s")
@@ -95,7 +108,7 @@ class MediaAgent(Agent):
             err = check_code(spec["code"], spec.get("language"))
             if err:
                 problems.append(f"the poster code does not parse: {err}")
-        if out["kind"] == "image":
+        if "algo" not in spec:   # a poster, still or animated
             problems += poster_number_problems(ctx.outputs["writer"]["text"], out.get("shown_text", ""))
         if ctx.cat.get("fact_check"):
             research = ctx.outputs.get("research") or {}
@@ -106,6 +119,8 @@ class MediaAgent(Agent):
         return problems
 
     def summary(self, out):
+        if out.get("kind") == "video" and "algo" not in out.get("spec", {}):
+            return f"animated poster ({out['spec'].get('layout', '?')}, {out.get('seconds', 0):.0f}s)"
         if out.get("kind") == "video":
             return f"animation {out['spec']['algo']} ({out.get('seconds', 0):.0f}s)"
         return f"poster ({out.get('spec', {}).get('layout', '?')})"

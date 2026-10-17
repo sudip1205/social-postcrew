@@ -182,7 +182,7 @@ Add one with **Add topic**; the id is made from its name.
 | *id* (the key) | yes | Lowercase letters, digits and dashes, up to 31 characters. Used in `schedule.days`. |
 | `label` | yes | The name shown everywhere. |
 | `brief` | yes | **What this kind of post must contain**, in plain words. Every agent reads it. This is the most powerful setting: describe the order of sections, the hook you want, what is forbidden, what goes in the first comment. |
-| `media` | yes | `poster` (a 1080×1350 image), `animation` (an MP4 for algorithm posts), or `none`. |
+| `media` | yes | `poster` (a 1080×1350 image), `video` (the same poster as an MP4 of about 18 seconds: the title first, then each card, step, box or few lines of code fading in; any topic, needs ffmpeg, falls back to the poster image without it), `animation` (an MP4 for algorithm posts), or `none`. |
 | `layouts` | for posters | Allowed poster layouts, any of `points` (numbered cards), `steps` (a how-to), `code` (a highlighted snippet; the code must parse), `flow` (a step-by-step flow). |
 | `kicker` | no | The small label on top of the poster, e.g. `AI NEWS`. Max 26 characters. |
 | `research` | no | `required`: the research team must find and verify sources (default for news). `optional`: research when useful. `off`: write from general, well-established knowledge only. |

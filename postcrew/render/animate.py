@@ -240,6 +240,44 @@ def render_animation(tracer, out_path, handle="", fps=FPS):
     return {"path": str(out), "seconds": n_written / fps, "frames": n_written}
 
 
+def render_poster_video(spec, out_path, handle="", fps=FPS, seconds=18.0):
+    """The animated poster: each piece fades in, then the whole poster holds. About `seconds` long."""
+    from .poster import poster_stages
+    if not shutil.which("ffmpeg"):
+        raise AnimationError("ffmpeg is not installed (macOS: brew install ffmpeg; Debian/Ubuntu: sudo apt install ffmpeg)")
+    stages = poster_stages(spec, handle)
+    fade, first, last = 0.6, 2.0, 5.0
+    reveals = len(stages) - 1
+    hold = max(1.2, (seconds - first - last - fade * reveals) / max(1, reveals - 1))
+    out = Path(out_path)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    cmd = ["ffmpeg", "-y", "-loglevel", "error", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{W}x{H}",
+           "-r", str(fps), "-i", "-", "-c:v", "libx264", "-preset", "medium", "-crf", "20", "-pix_fmt", "yuv420p",
+           "-movflags", "+faststart", str(out)]
+    proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+    n_written = 0
+    try:
+        for i, img in enumerate(stages):
+            if i:
+                nf = round(fade * fps)
+                for f in range(1, nf + 1):
+                    proc.stdin.write(Image.blend(stages[i - 1], img, _ease(f / nf)).tobytes())
+                n_written += nf
+            n = round((first if i == 0 else last if i == reveals else hold) * fps)
+            data = img.tobytes()
+            for _ in range(n):
+                proc.stdin.write(data)
+            n_written += n
+        proc.stdin.close()
+        err = proc.stderr.read().decode(errors="replace")
+        proc.stderr.close()
+        if proc.wait() != 0:
+            raise AnimationError(f"ffmpeg failed: {err[-400:]}")
+    except BrokenPipeError:
+        raise AnimationError(f"ffmpeg stopped early: {proc.stderr.read().decode(errors='replace')[-400:]}")
+    return {"path": str(out), "seconds": n_written / fps, "frames": n_written}
+
+
 def animation_text(tracer):
     """Text shown in the video, for the gate and the judge."""
     t = TRACERS[tracer] if isinstance(tracer, str) else tracer

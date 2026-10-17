@@ -32,7 +32,7 @@ def default_root(name="workspace"):
 _lock = threading.RLock()
 WEEKDAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
 APPROVAL_MODES = ["auto_with_veto", "manual", "immediate"]
-MEDIA_KINDS = ["poster", "animation", "none"]
+MEDIA_KINDS = ["poster", "video", "animation", "none"]
 POSTER_LAYOUTS = ["points", "steps", "code", "flow"]
 RESEARCH_MODES = ["required", "optional", "off"]
 TIME_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
@@ -97,7 +97,7 @@ def validate_config(cfg):
             errs.append(f"{where}.label is required")
         if c.get("media") not in MEDIA_KINDS:
             errs.append(f"{where}.media must be one of {MEDIA_KINDS}")
-        if c.get("media") == "poster":
+        if c.get("media") in ("poster", "video"):
             lay = c.get("layouts") or []
             if not lay or any(x not in POSTER_LAYOUTS for x in lay):
                 errs.append(f"{where}.layouts must be a non-empty subset of {POSTER_LAYOUTS}")

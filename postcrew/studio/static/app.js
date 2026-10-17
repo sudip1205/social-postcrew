@@ -703,7 +703,7 @@ function drawTopics() {
         : `<textarea data-c="ideas" rows="4" placeholder="Your ideas, one per line&#10;e.g. Kafka consumer groups">${esc((k.ideas || []).join("\n"))}</textarea>`}
       ${used.length ? `<div class="small muted" style="margin-top:4px">Already used: ${used.map(x => `${esc(x.idea)} (${esc(x.used_on)})`).join("; ")}</div>` : ""}
       <details class="more"><summary class="small">More options</summary><div class="grid g2" style="margin-top:8px">
-        <label class="f">Picture${opt("media", k.media, [["poster", "Poster image"], ["animation", "Algorithm video"], ["none", "No picture"]])}</label>
+        <label class="f">Picture${opt("media", k.media, [["poster", "Poster image"], ["video", "Animated video (the poster, built up piece by piece)"], ["animation", "Algorithm video"], ["none", "No picture"]])}</label>
         <label class="f">Research${opt("research", k.research || "optional", [["required", "Always, with sources"], ["optional", "When useful"], ["off", "None"]])}</label>
         <label class="f">Poster style<input data-c="layouts" value="${esc((k.layouts || []).join(", "))}" placeholder="points, steps, code, flow"></label>
         <label class="f">Label on the poster<input data-c="kicker" value="${esc(k.kicker || "")}" maxlength="26"></label>

@@ -47,8 +47,9 @@ at the time you choose. You watch all of it live in the Studio, and nothing goes
   exact fixes, one per weak criterion, which the writer applies word for word.
 - **It learns.** Problems fixed in approved runs become lessons for the next run. Team members whose work is
   consistently weak are replaced, and the team writes down what went wrong.
-- **Visual by default.** 1080×1350 posters (points, steps, code, flow) and, for algorithm posts, an MP4 where
-  the line of Java being executed lights up as the data moves.
+- **Visual by default.** 1080×1350 posters (points, steps, code, flow), or the same poster as an animated video
+  that builds up piece by piece, for any topic. Algorithm posts get an MP4 where the line of Java being executed
+  lights up as the data moves.
 - **You stay in control.** Practice mode is on until you turn it off. Publish automatically with a veto
   window, wait for your approval, or publish right away.
 - **Private and local.** No server, no database, no telemetry. Your settings, secrets and posts stay in one

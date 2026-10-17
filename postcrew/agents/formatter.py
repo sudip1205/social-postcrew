@@ -48,7 +48,7 @@ class FormatterAgent(Agent):
         w, m = ctx.outputs["writer"], ctx.outputs.get("media") or {}
         text, fc, moved = format_post(w["text"], w.get("first_comment", ""))
         return {"text": text, "first_comment": fc, "moved_links": moved, "media_path": m.get("path"),
-                "media_kind": m.get("kind"), "title": ctx.outputs["topic"]["topic"], "chars": len(text)}
+                "media_kind": m.get("kind"), "poster_path": m.get("poster"), "title": ctx.outputs["topic"]["topic"], "chars": len(text)}
 
     def validate(self, ctx, out):
         problems = []

@@ -31,6 +31,19 @@ class CrewTests(unittest.TestCase):
         s.update(over)
         return s
 
+    @unittest.skipUnless(__import__("shutil").which("ffmpeg"), "ffmpeg not installed")
+    def test_animated_video_category_queues_the_video_and_keeps_the_poster(self, _):
+        with TempWorkspace() as ws:
+            cfg = ws.config()
+            cfg["categories"]["ai-news"]["media"] = "video"
+            ws.save_config(cfg)
+            res = run_crew(ws, TUESDAY, llm=ScriptedLLM(self.script()), fetch=fake_fetch())
+            self.assertTrue(res["ok"], res)
+            post = ws.queue()[0]
+            self.assertEqual(post["media_kind"], "video")
+            self.assertTrue(post["media"].endswith(".mp4") and post["poster_image"].endswith(".png"))
+            self.assertTrue((ws.root / post["media"]).stat().st_size > 10_000)
+
     def test_happy_path_queues_a_verified_post_with_poster(self, _):
         with TempWorkspace() as ws:
             llm = ScriptedLLM(self.script())

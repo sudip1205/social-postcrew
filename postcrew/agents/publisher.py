@@ -36,10 +36,15 @@ def enqueue(ws, cfg, run_id, day, category, final, review):
         dest.parent.mkdir(exist_ok=True)
         shutil.copy2(final["media_path"], dest)
         media = str(dest.relative_to(ws.root))
+    poster_image = None
+    if final.get("poster_path"):   # an animated poster: keep the still too (email, and a fallback to look at)
+        dest = ws.root / "media" / f"{pid}.png"
+        shutil.copy2(final["poster_path"], dest)
+        poster_image = str(dest.relative_to(ws.root))
     mode = cfg["publishing"]["approval"]
     post = {"id": pid, "run_id": run_id, "date": day.isoformat(), "category": category, "topic": final["title"],
             "text": final["text"], "first_comment": final.get("first_comment", ""), "media": media,
-            "media_kind": final.get("media_kind"), "status": "awaiting_approval" if mode == "manual" else "queued",
+            "media_kind": final.get("media_kind"), "poster_image": poster_image, "status": "awaiting_approval" if mode == "manual" else "queued",
             "scheduled_at": scheduled_at(cfg, day) if mode != "immediate" else datetime.now(timezone.utc).isoformat(),
             "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "review": {k: review.get(k) for k in ("overall", "scores")}}
@@ -65,7 +70,8 @@ def post_rows(ws, post, *extra):
         rows.append(("Editor score", f"{review} / 100"))
     rows.append(("Length", f"{len(post.get('text', ''))} characters"))
     if post.get("media_kind"):
-        rows.append(("Picture", {"video": "Algorithm video", "image": "Poster image", "poster": "Poster image"}.get(post["media_kind"],
+        rows.append(("Picture", "Animated poster video" if post.get("poster_image") else
+                     {"video": "Algorithm video", "image": "Poster image", "poster": "Poster image"}.get(post["media_kind"],
                                                                                            post["media_kind"])))
     if post.get("first_comment"):
         rows.append(("First comment", post["first_comment"]))
@@ -74,6 +80,8 @@ def post_rows(ws, post, *extra):
 
 def post_details(ws, post, *extra):
     media = ws.root / post["media"] if post.get("media") and post.get("media_kind") != "video" else None
+    if post.get("poster_image"):
+        media = ws.root / post["poster_image"]
     return {"rows": post_rows(ws, post, *extra), "text": post.get("text", ""), "image": str(media) if media else None}
 
 

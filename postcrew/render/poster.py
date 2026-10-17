@@ -2,6 +2,7 @@
 
 Layouts: points (cards), steps (numbered timeline), code (code panel), flow (boxes + arrows).
 Raises PosterError when the text cannot fit, so the caller can ask for shorter copy.
+poster_stages() draws the same poster built up piece by piece, for the animated video (animate.py).
 """
 import re
 from pathlib import Path
@@ -95,7 +96,7 @@ def _items(spec, lo, hi, keys):
     for it in items:
         if not isinstance(it, dict) or not it.get(keys[0]):
             raise PosterError(f"every item needs '{keys[0]}'")
-    return items
+    return items[:spec["_n"]] if "_n" in spec else items   # _n: draw only the first n (a video stage)
 
 
 def _fit(draw_fn, top, bottom):
@@ -167,7 +168,7 @@ def _steps(p, spec, top, k):
                 p.text((tx, ty), ln, "sans", 26 * k, MUTED)
                 ty += 34 * k
     y -= 30 * k
-    res = spec.get("result")
+    res = spec.get("result") if len(blocks) == len(spec["items"]) else None
     if res:
         y += 26 * k
         lines = wrap(res, "semi", 28 * k, 960 - 56 * k)
@@ -198,7 +199,7 @@ def _code(p, spec, top, k):
     p.rrect((60, top, 1020, top + h), r=20, fill=CODE_BG, outline=CODE_BORDER, width=2)
     p.text((60 + 26 * k, top + 20 * k), lang.capitalize(), "mono", 20 * k, MUTED, tracking=1.5)
     y = top + 26 * k + 30 * k
-    for i, ln in enumerate(code, 1):
+    for i, ln in enumerate(code[:spec.get("_n", len(code))], 1):
         p.text((60 + 26 * k + num_w - 14 * k, y + p.ascent("mono", size)), str(i), "mono", size * 0.82,
                "#4d6a8c", anchor="rs")
         x = 60 + 26 * k + num_w
@@ -207,6 +208,8 @@ def _code(p, spec, top, k):
             x += text_width(txt, "mono", size)
         y += lh
     y = top + h
+    if spec.get("_n", len(code)) < len(code):
+        return y
     cap = spec.get("caption")
     if cap:
         y += 22 * k
@@ -269,7 +272,7 @@ def _flow(p, spec, top, k):
 _LAYOUT_FN = {"points": _points, "steps": _steps, "code": _code, "flow": _flow}
 
 
-def render_poster(spec, out_path, handle=""):
+def _layout(spec):
     layout = spec.get("layout")
     if layout not in _LAYOUT_FN:
         raise PosterError(f"unknown poster layout '{layout}' (use one of {', '.join(LAYOUTS)})")
@@ -279,14 +282,34 @@ def render_poster(spec, out_path, handle=""):
     body_top = _header(probe, spec)
     fn = _LAYOUT_FN[layout]
     k = _fit(lambda pp, y, kk: fn(pp, spec, y, kk), body_top, BODY_BOTTOM)
+    return fn, body_top, k
+
+
+def _draw(spec, handle, fn, body_top, k):
     p = Painter(W, H, scale=2)
     _header(p, spec)
     fn(p, spec, body_top, k)
     footer(p, spec.get("footer_left", ""), handle)
+    return p.result()
+
+
+def render_poster(spec, out_path, handle=""):
+    fn, body_top, k = _layout(spec)
     out = Path(out_path)
     out.parent.mkdir(parents=True, exist_ok=True)
-    p.result().save(out, optimize=True)
+    _draw(spec, handle, fn, body_top, k).save(out, optimize=True)
     return out
+
+
+def poster_stages(spec, handle="", max_stages=7):
+    """The poster built up: the header alone, then one more item (or a few more lines of code) per image,
+    ending with the whole poster. Every stage uses the full poster's sizes, so nothing moves between them."""
+    fn, body_top, k = _layout(spec)
+    total = len(spec["code"].rstrip("\n").split("\n")) if spec["layout"] == "code" else len(spec["items"])
+    step = -(-total // max_stages)   # ceil: at most max_stages reveals
+    counts = sorted({0, total} | set(range(step, total, step)))
+    return [_draw(dict(spec, _n=n), handle, fn, body_top, k) for n in counts[:-1]] + \
+        [_draw(spec, handle, fn, body_top, k)]
 
 
 def poster_text(spec):
