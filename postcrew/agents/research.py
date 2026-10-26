@@ -143,15 +143,26 @@ class ResearchAgent(Agent):
     def _research(self, ctx, guidance, member):
         topic = ctx.outputs["topic"]
         style = team.persona_block(ctx.ws, member)
+        from .. import brief as briefmod
+        ob = briefmod.of(ctx)
+        refs = briefmod.reference_urls(ob)
         brief = (f"Topic: {topic['topic']}\nAngle: {topic['angle']}\nWhy now: {topic['why_now']}\n"
                  f"Post date: {ctx.day.isoformat()}\nCategory: {ctx.cat['label']} - {ctx.cat['brief']}\n"
+                 + (briefmod.cat_context(ctx.cat) + "\n" if briefmod.cat_context(ctx.cat) else "") +
                  f"Research is {ctx.cat.get('research')} for this category."
                  + (f" Sources must be published within {ctx.cat['max_source_age_days']} days of the post date."
-                    if ctx.cat.get("max_source_age_days") else ""))
+                    if ctx.cat.get("max_source_age_days") else "")
+                 + (f"\nThe owner supplied these reference pages (read them first): {', '.join(refs)}" if refs else "")
+                 + ("\nThe post's example is a REAL, PUBLIC incident: find the primary sources (the company's or "
+                    "regulator's own write-up) and quote what they actually state." if ob.get("example_kind") == "incident"
+                    and ob.get("example") else ""))
         # 1. search
         found = self.ask(ctx, self.prompt(ctx, "research") + style, brief + "\nSuggested queries:\n" +
                          "\n".join(f"- {q}" for q in topic.get("search_queries", [])) + guidance_block(guidance),
                          SEARCH_SCHEMA, tools=["WebSearch"], member=member)
+        for u in reversed(refs):   # the owner's own references are always fetched
+            if not any((c.get("url") or "").strip() == u for c in found["candidates"]):
+                found["candidates"].insert(0, {"url": u, "title": "owner reference"})
         # 2. fetch, ourselves
         pages, failed = {}, []
         for c in found["candidates"][:5]:

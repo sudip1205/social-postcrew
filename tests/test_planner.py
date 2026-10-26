@@ -119,7 +119,8 @@ class TopicFollowsPlanTests(unittest.TestCase):
     def test_planned_topic_is_used_without_asking(self):
         with TempWorkspace() as ws:
             planner.set_entry(ws, "2026-10-17", {"category": "dev-tip", "topic": "Python walrus operator",
-                                                 "angle": "when := helps", "search_queries": [], "source": "planner"})
+                                                 "angle": "when := helps", "search_queries": ["python walrus"],
+                                                 "source": "planner"})
             llm = ScriptedLLM({})
             ctx = self.ctx(ws, date(2026, 10, 17), "dev-tip", llm)
             out = TopicAgent().run(ctx, [])
@@ -148,3 +149,33 @@ class TopicFollowsPlanTests(unittest.TestCase):
                 cmd_import(ws, f.name)
             self.assertEqual([p["topic"] for p in ws.history()], ["Cheap small models"])
             self.assertNotIn("2026-10-12", planner.taken_dates(ws))   # imported: blocks repeats, not the date
+
+
+class PlannerBriefTests(unittest.TestCase):
+    def test_planner_writes_a_brief_for_each_day(self):
+        from postcrew import brief
+        with TempWorkspace() as ws:
+            cfg = ws.config()
+            cfg["schedule"]["days"]["wed"] = "briefed"
+            ws.save_config(cfg)
+            day = {"date": "2026-10-21", "topic": "Why agents need short-lived tokens", "angle": "token exchange",
+                   "search_queries": ["token exchange rfc 8693"],
+                   "context": "Agents hold broad tokens.", "example": "A refund agent with one admin token.",
+                   "example_kind": "incident", "references": [], "takeaway": "Exchange tokens per task.",
+                   "pattern": "before-after", "question": "How do you issue agent credentials?", "visual": "system-flow",
+                   "systems": [{"id": "agent", "label": "Agent", "kind": "agent", "note": "acts"},
+                               {"id": "api", "label": "API", "kind": "api-gateway", "note": "checks"}],
+                   "flow": [{"from": "agent", "to": "api", "label": "POST refund", "kind": "request",
+                             "payload": "Bearer admin", "caption": "The agent calls the API", "scene": "Before"},
+                            {"from": "api", "to": "agent", "label": "Refunded", "kind": "response",
+                             "payload": "200 OK", "caption": "Everything is refunded", "scene": "Before"}]}
+            llm = ScriptedLLM({"planner": [{"days": [day]}]})
+            out = planner.PlannerAgent().plan(ws, [date(2026, 10, 21)], llm=llm)
+            b = out["2026-10-21"]["brief"]
+            self.assertEqual(b["pattern"], "before-after")
+            self.assertEqual(b["example_kind"], "scenario")   # an incident without a source is only a scenario
+            self.assertEqual(b["visual"]["type"], "system-flow")
+            self.assertEqual(len(b["visual"]["flow"]), 2)
+            self.assertIn("example", b["generated"])
+            self.assertEqual(planner.load_plan(ws)["2026-10-21"]["brief"], b)
+            self.assertIn("ABOUT THIS TYPE", llm.calls[0]["prompt"]) if ws.config()["categories"]["briefed"].get("context") else None

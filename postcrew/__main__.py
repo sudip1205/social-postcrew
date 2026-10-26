@@ -14,6 +14,7 @@
 import argparse
 import json
 import shutil
+from pathlib import Path
 import sys
 
 from . import __version__
@@ -42,6 +43,16 @@ def cmd_doctor(ws):
                  s.get("linkedin_name") or "click Connect LinkedIn in Studio > Credentials"))
     rows.append(("Publishing mode", True, "DRY RUN (nothing is sent)" if cfg["publishing"]["dry_run"] else
                  f"LIVE, approval: {cfg['publishing']['approval']}"))
+    if cfg["platforms"]["youtube"]["enabled"]:
+        yt = cfg["platforms"]["youtube"]
+        rows.append(("YouTube: ffmpeg (videos)", bool(shutil.which("ffmpeg")), "found" if shutil.which("ffmpeg") else
+                     "brew install ffmpeg / sudo apt install ffmpeg"))
+        rows.append(("YouTube: ElevenLabs voice", bool(s.get("elevenlabs_api_key") and yt["video"]["voice"].get("voice_id")),
+                     yt["video"]["voice"].get("voice_name") or "add the API key in Credentials and choose a voice in Settings"))
+        rows.append(("YouTube connected", bool(s.get("youtube_refresh_token")),
+                     s.get("youtube_channel_title") or "click Connect YouTube in Studio > Credentials"))
+        rows.append(("YouTube publishing", True, "DRY RUN (nothing is uploaded)" if yt["publishing"]["dry_run"] else
+                     f"LIVE, approval: {yt['publishing']['approval']}, {yt['publishing'].get('visibility', 'public')}"))
     for name, ok, detail in rows:
         print(f"  {'OK ' if ok else 'NO '} {name:<28} {detail}")
     return 0 if all(ok for _, ok, _ in rows[:5]) else 1
@@ -66,6 +77,52 @@ def cmd_import(ws, path):
         added += 1
     print(f"Imported {added} post(s) into the history; the crew will not repeat them.")
     return 0
+
+
+def cmd_plan_import(ws, path, apply_schedule=False):
+    """Load per-day briefs from a text file: `## YYYY-MM-DD` sections of `Key: value` lines (see docs/topic-briefs.md)."""
+    import re
+    from datetime import datetime
+    from . import brief as briefmod
+    from .agents.planner import set_entry
+    from .workspace import WEEKDAYS
+    text = Path(path).read_text()
+    parts = re.split(r"(?m)^##\s+(\d{4}-\d{2}-\d{2})\s*$", text)
+    if len(parts) < 3:
+        print("No '## YYYY-MM-DD' sections found.")
+        return 2
+    cfg, bad, done = ws.config(), [], []
+    for day, body in zip(parts[1::2], parts[2::2]):
+        try:
+            wd = WEEKDAYS[datetime.strptime(day, "%Y-%m-%d").weekday()]
+            raw = briefmod.parse_text(body)
+            topic, angle = (raw.get("topic") or "").strip(), (raw.get("angle") or "").strip()
+            cat = raw.get("category") or cfg["schedule"]["days"].get(wd) or "briefed"
+            if cat not in cfg["categories"]:
+                raise ValueError(f"unknown category {cat!r}")
+            if not 5 <= len(topic) <= 90:
+                raise ValueError("Topic: must be 5-90 characters")
+            entry = {"category": cat, "topic": topic, "angle": angle[:400], "search_queries": [], "source": "manual",
+                     "rejected": []}
+            brief = briefmod.normalize(raw)
+            if brief:
+                entry["brief"] = brief
+            if cfg["schedule"]["days"].get(wd) != cat:
+                if not apply_schedule:
+                    print(f"  note: {day} is a {wd} and {wd} is scheduled as {cfg['schedule']['days'].get(wd)!r}, not {cat!r}; "
+                          f"use --apply-schedule to schedule {cat!r} on every {wd}.")
+                else:
+                    cfg["schedule"]["days"][wd] = cat
+            set_entry(ws, day, entry)
+            done.append(day)
+        except (ValueError, briefmod.BriefError) as e:
+            bad.append(f"{day}: {e}")
+    if apply_schedule:
+        ws.save_config(cfg)
+    print(f"Planned {len(done)} day(s): {', '.join(done)}")
+    for b in bad:
+        print("  skipped " + b)
+    return 1 if bad else 0
 
 
 def cmd_demo(ws, port, browser=True):
@@ -116,13 +173,20 @@ def main(argv=None):
     r.add_argument("--date", help="post date YYYY-MM-DD (default: per schedule.lead_days)")
     r.add_argument("--category")
     r.add_argument("--dry-run", action="store_true", help="run every agent but do not queue the post")
+    r.add_argument("--platform", default="linkedin", help="the app to write for (default: linkedin)")
+    r.add_argument("--format", choices=["short", "long"], help="YouTube: make a short or a long video this time")
+    r.add_argument("--seconds", type=int, help="YouTube: about how long the video should be")
     sub.add_parser("publish")
     sub.add_parser("check")
     sub.add_parser("doctor")
     sub.add_parser("status")
-    sub.add_parser("plan")
+    pl = sub.add_parser("plan")
+    pl.add_argument("--platform", default="linkedin", help="the app to plan (default: linkedin)")
     im = sub.add_parser("import")
     im.add_argument("file")
+    pi = sub.add_parser("plan-import", help="load per-day topic briefs from a text file")
+    pi.add_argument("file")
+    pi.add_argument("--apply-schedule", action="store_true", help="also schedule each day's category on that weekday")
     a = ap.parse_args(argv)
 
     if a.cmd == "demo" and not a.workspace:
@@ -161,21 +225,24 @@ def main(argv=None):
             print("Fix the settings first:\n  " + "\n  ".join(errs))
             return 2
         from .crew import run_crew
-        res = run_crew(ws, a.date, a.category, dry_run=a.dry_run, echo=True)
+        options = {k: v for k, v in (("format", a.format), ("target_seconds", a.seconds)) if v}
+        res = run_crew(ws, a.date, a.category, dry_run=a.dry_run, echo=True, platform=a.platform, options=options)
         print(json.dumps({k: res.get(k) for k in ("ok", "run_id", "reason", "failed_step", "cost_usd")}, indent=2))
         return 0 if res.get("ok") else 1
     if a.cmd == "import":
         return cmd_import(ws, a.file)
+    if a.cmd == "plan-import":
+        return cmd_plan_import(ws, a.file, a.apply_schedule)
     if a.cmd == "plan":
         from .agents.planner import plan_week
         from .crew import local_now
-        for d, e in sorted(plan_week(ws, local_now(ws.config()).date()).items()):
+        for d, e in sorted(plan_week(ws, local_now(ws.config()).date(), platform=a.platform).items()):
             print(f"  {d}  {e.get('topic') or 'FAILED: ' + e.get('error', '')}")
         return 0
     if a.cmd == "status":
         from .crew import list_runs
         for p in ws.queue():
-            print(f"  queue  {p['date']}  {p['status']:<18} {p['topic'][:60]}")
+            print(f"  queue  {p['date']}  {p.get('platform') or 'linkedin':<9} {p['status']:<18} {p['topic'][:60]}")
         for r_ in list_runs(ws, 8):
             print(f"  run    {r_['run_id']:<20} {r_['state']:<10} {str(r_.get('result'))[:70]}")
         return 0

@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Workflow | Postcrew Studio</title>
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Plus+Jakarta+Sans:wght@600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols Outlined -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS with configuration -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {},
+          borderRadius: {
+            "DEFAULT": "0.5rem",
+            "lg": "1rem",
+            "xl": "1.5rem",
+            "full": "9999px"
+          },
+          spacing: {},
+          fontFamily: {
+            headline: ["Plus Jakarta Sans", "sans-serif"],
+            display: ["Plus Jakarta Sans", "sans-serif"],
+            body: ["Inter", "sans-serif"],
+            label: ["Inter", "sans-serif"]
+          },
+          fontSize: {}
+        },
+      },
+    }
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      display: inline-block;
+      vertical-align: middle;
+      line-height: 1;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: #F8FAFC;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #CBD5E1;
+      border-radius: 9999px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: #94A3B8;
+    }
+    .dotted-help {
+      text-decoration-line: underline;
+      text-decoration-style: dotted;
+      text-underline-offset: 3px;
+      cursor: help;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-900 font-body min-h-screen antialiased flex flex-col selection:bg-violet-100 selection:text-violet-900">
+<!-- TOP APP BAR (Executed strictly from Shared Components JSON + Design System rules) -->
+<header class="bg-white dark:bg-slate-900 docked full-width top-0 sticky z-40 border-b border-slate-200 dark:border-slate-800 shadow-sm dark:shadow-none">
+<div class="w-full px-6 py-3 flex items-center justify-between mx-auto">
+<!-- Brand & Platform Badges -->
+<div class="flex items-center gap-6">
+<a class="font-headline font-black text-lg text-slate-900 dark:text-white flex items-center gap-2 hover:opacity-90 transition-opacity" href="#">
+<div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-violet-600 via-indigo-600 to-sky-500 flex items-center justify-center text-white shadow-sm shadow-violet-200">
+<span class="material-symbols-outlined text-[20px]">smart_toy</span>
+</div>
+<span>Postcrew Studio</span>
+</a>
+<!-- Connected Accounts Badges -->
+<div class="hidden lg:flex items-center gap-2 border-l border-slate-200 pl-4 py-0.5">
+<div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-[#0A66C2] border border-blue-200" title="Connected: Postcrew Corporate Page">
+<span class="font-bold text-[11px] bg-[#0A66C2] text-white px-1 rounded-sm leading-none py-0.5">in</span>
+<span>LinkedIn</span>
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+</div>
+<div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-red-50 text-[#FF0033] border border-red-200" title="Connected: Postcrew Tech Studio Channel">
+<span class="material-symbols-outlined text-[14px]">smart_display</span>
+<span>YouTube</span>
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+</div>
+</div>
+</div>
+<!-- Main Navigation Links (Workflow is explicitly ACTIVE) -->
+<nav class="hidden md:flex items-center gap-1 font-label">
+<!-- Overview -->
+<a class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-slate-600 dark:text-slate-400 font-medium hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors duration-150 active:scale-95 transition-transform duration-100 ease-in-out" href="#">
+<span class="material-symbols-outlined text-[19px]">dashboard</span>
+<span>Overview</span>
+</a>
+<!-- Plan -->
+<a class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-slate-600 dark:text-slate-400 font-medium hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors duration-150 active:scale-95 transition-transform duration-100 ease-in-out" href="#">
+<span class="material-symbols-outlined text-[19px]">calendar_month</span>
+<span>Plan</span>
+</a>
+<!-- Crew -->
+<a class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-slate-600 dark:text-slate-400 font-medium hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors duration-150 active:scale-95 transition-transform duration-100 ease-in-out" href="#">
+<span class="material-symbols-outlined text-[19px]">groups</span>
+<span>Crew</span>
+</a>
+<!-- Workflow [ACTIVE] -->
+<a class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-violet-50 dark:bg-violet-950 text-violet-700 dark:text-violet-300 font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors duration-150 active:scale-95 transition-transform duration-100 ease-in-out" href="#">
+<span class="material-symbols-outlined text-[19px]">account_tree</span>
+<span>Workflow</span>
+</a>
+<!-- Queue -->
+<a class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-slate-600 dark:text-slate-400 font-medium hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors duration-150 active:scale-95 transition-transform duration-100 ease-in-out" href="#">
+<span class="material-symbols-outlined text-[19px]">schedule_send</span>
+<span>Queue</span>
+</a>
+<!-- Settings -->
+<a class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-slate-600 dark:text-slate-400 font-medium hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors duration-150 active:scale-95 transition-transform duration-100 ease-in-out" href="#">
+<span class="material-symbols-outlined text-[19px]">settings</span>
+<span>Settings</span>
+</a>
+</nav>
+<!-- Trailing Action Controls -->
+<div class="flex items-center gap-3">
+<!-- Live Run Mode Pill Indicator -->
+<div class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-violet-100 text-violet-800 border border-violet-200">
+<span class="relative flex h-2 w-2">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-violet-500 opacity-75"></span>
+<span class="relative inline-flex rounded-full h-2 w-2 bg-violet-600"></span>
+</span>
+<span>Autonomous Live Run</span>
+</div>
+<!-- Trailing secondary action from JSON -->
+<button class="hidden xl:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-300 text-slate-700 bg-white hover:bg-slate-50 font-medium text-xs shadow-sm transition-all active:scale-95">
+<span class="material-symbols-outlined text-[16px] text-blue-600">science</span>
+<span>Practice mode</span>
+</button>
+<!-- Trailing primary action from JSON -->
+<button class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-violet-600 text-white hover:bg-violet-700 font-semibold text-sm shadow-sm transition-all active:scale-95 shadow-violet-200">
+<span class="material-symbols-outlined text-[18px]">play_arrow</span>
+<span>Run now</span>
+</button>
+<!-- Trailing Icon Actions -->
+<div class="flex items-center border-l border-slate-200 pl-2 ml-1 gap-1 text-slate-600">
+<button class="p-2 rounded-lg hover:bg-slate-100 transition-colors relative" title="Notifications">
+<span class="material-symbols-outlined text-[20px]">notifications</span>
+<span class="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-amber-500"></span>
+</button>
+<button class="p-2 rounded-lg hover:bg-slate-100 transition-colors" title="Help &amp; Docs">
+<span class="material-symbols-outlined text-[20px]">help</span>
+</button>
+<!-- Agent Command Avatar -->
+<div class="ml-2 w-8 h-8 rounded-full bg-gradient-to-tr from-violet-600 to-indigo-600 flex items-center justify-center text-white ring-2 ring-violet-200 cursor-pointer text-xs font-bold" title="Agent Command Avatar">
+            AC
+          </div>
+</div>
+</div>
+</div>
+</header>
+<!-- MAIN CANVAS -->
+<main class="flex-1 w-full max-w-[1560px] mx-auto p-4 md:p-6 space-y-6" data-active-view="workflow">
+<!-- PAGE HEADER / RUN STATUS BANNERS -->
+<section class="space-y-4">
+<!-- Breadcrumb sub-nav with metadata -->
+<div class="flex flex-wrap items-center justify-between gap-4">
+<div class="flex items-center gap-2 text-xs md:text-sm text-slate-500">
+<span class="text-slate-600 font-medium">Workflow</span>
+<span class="material-symbols-outlined text-[16px] text-slate-400">chevron_right</span>
+<span class="inline-flex items-center gap-1 font-semibold text-slate-900 bg-white px-2 py-0.5 rounded border border-slate-200 shadow-2xs">
+<span class="w-2 h-2 rounded-full bg-violet-600"></span>
+            Live Run #842
+          </span>
+<span class="material-symbols-outlined text-[16px] text-slate-400">chevron_right</span>
+<div class="inline-flex items-center gap-2 font-headline font-bold text-slate-900 text-sm md:text-base">
+<span class="border-l-4 border-[#FF0033] pl-2">AI in Production: 5 Lessons from Scale</span>
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-50 text-[#FF0033] border border-red-200">
+<span class="material-symbols-outlined text-[14px]">smart_display</span>
+              YouTube Video · 45s Short
+            </span>
+</div>
+</div>
+<div class="flex items-center gap-2 text-xs text-slate-500">
+<span class="material-symbols-outlined text-[16px] text-slate-400">hub</span>
+<span>Triggered via Auto-Scheduler (Cadence: Daily 09:00 PST)</span>
+</div>
+</div>
+<!-- Live Execution Control Bar & Cost/Token Dashboard -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+<!-- Run Status Banner (7 Cols) -->
+<div class="lg:col-span-7 bg-white rounded-xl border border-slate-200 p-4 shadow-sm flex flex-wrap items-center justify-between gap-4">
+<div class="flex items-center gap-3.5">
+<div class="w-10 h-10 rounded-xl bg-violet-100 text-violet-700 flex items-center justify-center">
+<span class="material-symbols-outlined text-[24px] animate-spin">sync</span>
+</div>
+<div>
+<div class="flex items-center gap-2">
+<h1 class="font-headline font-bold text-slate-900 text-sm md:text-base">Pipeline Active · Iteration 2 (Correction cycle)</h1>
+<span class="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1">
+<span class="material-symbols-outlined text-[13px]">published_with_changes</span>
+                  Refining Hook
+                </span>
+</div>
+<p class="text-xs text-slate-500 mt-0.5 flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[14px] text-slate-400">timer</span>
+<span>Elapsed: <strong class="font-mono text-slate-700">02:14</strong></span>
+<span class="text-slate-300">•</span>
+<span>Target speech cadence: <span class="dotted-help" title="Targeting 150-160 words per minute for vertical video">155 wpm</span></span>
+</p>
+</div>
+</div>
+<!-- Controls -->
+<div class="flex items-center gap-2">
+<button class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-semibold transition-colors active:scale-95 shadow-2xs">
+<span class="material-symbols-outlined text-[16px] text-slate-600">pause</span>
+<span>Pause Run</span>
+</button>
+<button class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-semibold transition-colors active:scale-95 shadow-2xs">
+<span class="material-symbols-outlined text-[16px] text-red-600">stop</span>
+<span>Stop</span>
+</button>
+<button class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-colors active:scale-95 shadow-2xs">
+<span class="material-symbols-outlined text-[16px] text-slate-600">replay</span>
+<span>Re-run</span>
+</button>
+</div>
+</div>
+<!-- Live Resource & Telemetry Banner (5 Cols) -->
+<div class="lg:col-span-5 bg-white rounded-xl border border-slate-200 p-4 shadow-sm flex flex-col justify-between gap-2.5">
+<div class="flex items-center justify-between text-xs">
+<div class="flex items-center gap-1 text-slate-600 font-medium">
+<span class="material-symbols-outlined text-[16px] text-slate-400">payments</span>
+<span>Total Cost: <strong class="text-slate-900 font-bold">$0.18</strong> <span class="text-slate-400">/ $0.50 cap</span></span>
+</div>
+<div class="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+<span class="material-symbols-outlined text-[13px]">speed</span>
+<span>Avg Latency: 4.2s</span>
+</div>
+</div>
+<!-- Progress Bar against session budget -->
+<div class="space-y-1">
+<div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden flex">
+<div class="h-full bg-gradient-to-r from-emerald-500 to-violet-600 rounded-full transition-all duration-500" style="width: 36%;"></div>
+</div>
+<div class="flex items-center justify-between text-[11px] text-slate-500">
+<span class="flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+<span class="dotted-help" title="Budget spent across LLM prompt, completion, and ElevenLabs speech units">36% budget consumed (Optimal)</span>
+</span>
+<span class="font-mono">Tokens: <span class="text-slate-700 font-medium">14.2k fresh</span> · <span class="text-slate-500">8.4k cached</span> · <span class="text-violet-700 font-medium">2.9k out</span></span>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- HORIZONTAL AGENT PIPELINE GRAPH (HERO VISUALIZATION) -->
+<section class="bg-white rounded-xl border border-slate-200 shadow-sm p-5 relative overflow-hidden">
+<!-- Section Title & Legend -->
+<div class="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-100">
+<div class="flex items-center gap-2">
+<div class="p-1.5 rounded-lg bg-violet-50 text-violet-700">
+<span class="material-symbols-outlined text-[20px]">schema</span>
+</div>
+<div>
+<h2 class="font-headline font-bold text-slate-900 text-sm">Autonomous Assembly Chain</h2>
+<p class="text-xs text-slate-500">Live multi-agent graph with automated self-correction loop</p>
+</div>
+</div>
+<!-- Status Legend based on Design System rules -->
+<div class="flex items-center gap-3 text-[11px] font-medium text-slate-600 overflow-x-auto py-1">
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px] text-emerald-600">check_circle</span>
+<span>Passed (#059669)</span>
+</div>
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px] text-violet-600 animate-spin">progress_activity</span>
+<span>Running (#7C3AED)</span>
+</div>
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px] text-amber-600">schedule</span>
+<span>Waiting (#D97706)</span>
+</div>
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px] text-rose-600">cancel</span>
+<span>Rejected / Loop (#E11D48)</span>
+</div>
+</div>
+</div>
+<!-- Graph Canvas with Horizontal Nodes & Connectors -->
+<div class="relative pt-6 pb-12 overflow-x-auto custom-scrollbar">
+<!-- VISUAL REVISION LOOP OVERLAY (From Quinn Editor back to Script Writers) -->
+<div class="absolute inset-x-0 top-0 pointer-events-none h-full z-10 hidden md:block">
+<svg class="w-full h-full" fill="none" preserveaspectratio="none" viewbox="0 0 1340 180">
+<!-- Curved red loop line from Quinn Editor (#7 ~ x:1060) back to Script Writers (#4 ~ x:570) -->
+<path d="M 1060 45 C 1060 8, 570 8, 570 45" fill="none" stroke="#E11D48" stroke-dasharray="6 4" stroke-width="2.5"></path>
+<!-- Arrow head pointing down to Script Writers -->
+<polygon fill="#E11D48" points="570,48 565,36 575,36"></polygon>
+</svg>
+<!-- Badged annotation on the arc -->
+<div class="absolute left-[640px] top-[1px] transform -translate-x-1/2 -translate-y-1/2">
+<div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-50 border border-rose-300 text-rose-700 text-[11px] font-bold shadow-md">
+<span class="material-symbols-outlined text-[14px] text-rose-600">replay</span>
+<span>Sent back to Script writers (Revision requested)</span>
+</div>
+</div>
+</div>
+<!-- 8 Agent Nodes Grid -->
+<div class="flex items-stretch gap-2.5 min-w-[1240px] relative z-20 pt-4">
+<!-- 1. Aegis: Guardrails & Policy (Passed) -->
+<div class="flex-1 bg-white rounded-xl border-2 border-emerald-500/80 p-3 shadow-xs flex flex-col justify-between hover:shadow-md transition-shadow relative">
+<div class="flex items-start justify-between gap-1 mb-2">
+<div class="w-8 h-8 rounded-full bg-gradient-to-tr from-slate-700 to-slate-900 text-white flex items-center justify-center shadow-xs">
+<span class="material-symbols-outlined text-[18px]">shield</span>
+</div>
+<span class="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+<span class="material-symbols-outlined text-[12px]">check_circle</span>
+<span>1.2s</span>
+</span>
+</div>
+<div>
+<div class="text-[10px] font-semibold tracking-wide text-slate-400 uppercase">Policy Guard</div>
+<h3 class="font-headline font-bold text-slate-900 text-xs mt-0.5">Aegis</h3>
+<p class="text-[11px] text-emerald-700 font-medium mt-1">Completed · 1.2s</p>
+</div>
+<div class="mt-2 pt-2 border-t border-slate-100 text-[10px] text-slate-500 flex items-center justify-between">
+<span>Brand checks</span>
+<span class="font-semibold text-emerald-600">100% Pass</span>
+</div>
+</div>
+<!-- Connector 1 -> 2 -->
+<div class="flex items-center justify-center text-slate-300">
+<span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+</div>
+<!-- 2. Nova: Trend & Topic Scout (Passed) -->
+<div class="flex-1 bg-white rounded-xl border-2 border-emerald-500/80 p-3 shadow-xs flex flex-col justify-between hover:shadow-md transition-shadow">
+<div class="flex items-start justify-between gap-1 mb-2">
+<div class="w-8 h-8 rounded-full bg-gradient-to-tr from-sky-500 to-blue-600 text-white flex items-center justify-center shadow-xs">
+<span class="material-symbols-outlined text-[18px]">radar</span>
+</div>
+<span class="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+<span class="material-symbols-outlined text-[12px]">check_circle</span>
+<span>3.4s</span>
+</span>
+</div>
+<div>
+<div class="text-[10px] font-semibold tracking-wide text-slate-400 uppercase">Topic Scout</div>
+<h3 class="font-headline font-bold text-slate-900 text-xs mt-0.5">Nova</h3>
+<p class="text-[11px] text-emerald-700 font-medium mt-1">Completed · 3.4s</p>
+</div>
+<div class="mt-2 pt-2 border-t border-slate-100 text-[10px] text-slate-500 flex items-center justify-between">
+<span>Audience angle</span>
+<span class="font-semibold text-slate-700">Identified</span>
+</div>
+</div>
+<!-- Connector 2 -> 3 -->
+<div class="flex items-center justify-center text-slate-300">
+<span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+</div>
+<!-- 3. Ada & Ravi: Deep Research & Sourcing (Passed) -->
+<div class="flex-1 bg-white rounded-xl border-2 border-emerald-500/80 p-3 shadow-xs flex flex-col justify-between hover:shadow-md transition-shadow">
+<div class="flex items-start justify-between gap-1 mb-2">
+<div class="w-8 h-8 rounded-full bg-gradient-to-tr from-teal-500 to-emerald-600 text-white flex items-center justify-center shadow-xs">
+<span class="material-symbols-outlined text-[18px]">search</span>
+</div>
+<span class="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+<span class="material-symbols-outlined text-[12px]">check_circle</span>
+<span>8.1s</span>
+</span>
+</div>
+<div>
+<div class="text-[10px] font-semibold tracking-wide text-slate-400 uppercase">Research Squad</div>
+<h3 class="font-headline font-bold text-slate-900 text-xs mt-0.5">Ada &amp; Ravi</h3>
+<p class="text-[11px] text-emerald-700 font-medium mt-1">Completed · 8.1s</p>
+</div>
+<div class="mt-2 pt-2 border-t border-slate-100 text-[10px] text-slate-500 flex items-center justify-between">
+<span>Verified facts</span>
+<span class="font-semibold text-slate-700">4 Sources</span>
+</div>
+</div>
+<!-- Connector 3 -> 4 -->
+<div class="flex items-center justify-center text-slate-300">
+<span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+</div>
+<!-- 4. Script Writers: Prompt & Script Drafting (Running / Revising) -->
+<div class="flex-1 bg-violet-50/70 rounded-xl border-2 border-violet-600 p-3 shadow-md ring-4 ring-violet-100 flex flex-col justify-between transition-all transform scale-[1.02]">
+<div class="flex items-start justify-between gap-1 mb-2">
+<div class="w-8 h-8 rounded-full bg-gradient-to-tr from-orange-500 to-amber-600 text-white flex items-center justify-center shadow-xs">
+<span class="material-symbols-outlined text-[18px]">edit_note</span>
+</div>
+<span class="inline-flex items-center gap-1 text-[10px] font-bold text-violet-700 bg-violet-100 px-1.5 py-0.5 rounded border border-violet-300">
+<span class="material-symbols-outlined text-[12px] animate-spin">progress_activity</span>
+<span>Active</span>
+</span>
+</div>
+<div>
+<div class="text-[10px] font-semibold tracking-wide text-violet-700 uppercase">Script Drafting</div>
+<h3 class="font-headline font-bold text-slate-900 text-xs mt-0.5">Script Writers</h3>
+<p class="text-[11px] text-violet-700 font-semibold mt-1">Re-drafting fixes · attempt 2</p>
+</div>
+<div class="mt-2 pt-2 border-t border-violet-200 text-[10px] text-violet-900 flex items-center justify-between font-medium">
+<span>Words Target</span>
+<span class="font-bold">120 words</span>
+</div>
+</div>
+<!-- Connector 4 -> 5 -->
+<div class="flex items-center justify-center text-slate-300">
+<span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+</div>
+<!-- 5. Voice: ElevenLabs Voice Synthesis (Waiting) -->
+<div class="flex-1 bg-white rounded-xl border border-amber-300 p-3 shadow-2xs flex flex-col justify-between opacity-80 hover:opacity-100 transition-opacity">
+<div class="flex items-start justify-between gap-1 mb-2">
+<div class="w-8 h-8 rounded-full bg-gradient-to-tr from-sky-400 to-indigo-500 text-white flex items-center justify-center shadow-xs">
+<span class="material-symbols-outlined text-[18px]">mic</span>
+</div>
+<span class="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+<span class="material-symbols-outlined text-[12px]">schedule</span>
+<span>Wait</span>
+</span>
+</div>
+<div>
+<div class="text-[10px] font-semibold tracking-wide text-slate-400 uppercase">Voiceover</div>
+<h3 class="font-headline font-bold text-slate-900 text-xs mt-0.5">Voice (ElevenLabs)</h3>
+<p class="text-[11px] text-amber-700 font-medium mt-1">Waiting on approved script</p>
+</div>
+<div class="mt-2 pt-2 border-t border-slate-100 text-[10px] text-slate-400 flex items-center justify-between">
+<span>Model Profile</span>
+<span>Adam (Natural)</span>
+</div>
+</div>
+<!-- Connector 5 -> 6 -->
+<div class="flex items-center justify-center text-slate-300">
+<span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+</div>
+<!-- 6. Video: Scene & B-Roll Render (Waiting) -->
+<div class="flex-1 bg-white rounded-xl border border-amber-300 p-3 shadow-2xs flex flex-col justify-between opacity-80 hover:opacity-100 transition-opacity">
+<div class="flex items-start justify-between gap-1 mb-2">
+<div class="w-8 h-8 rounded-full bg-gradient-to-tr from-pink-500 to-rose-500 text-white flex items-center justify-center shadow-xs">
+<span class="material-symbols-outlined text-[18px]">movie</span>
+</div>
+<span class="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+<span class="material-symbols-outlined text-[12px]">schedule</span>
+<span>Wait</span>
+</span>
+</div>
+<div>
+<div class="text-[10px] font-semibold tracking-wide text-slate-400 uppercase">Video Montage</div>
+<h3 class="font-headline font-bold text-slate-900 text-xs mt-0.5">Video Synthesizer</h3>
+<p class="text-[11px] text-amber-700 font-medium mt-1">Queued for voice sync</p>
+</div>
+<div class="mt-2 pt-2 border-t border-slate-100 text-[10px] text-slate-400 flex items-center justify-between">
+<span>Aspect Ratio</span>
+<span>9:16 Vertical</span>
+</div>
+</div>
+<!-- Connector 6 -> 7 -->
+<div class="flex items-center justify-center text-slate-300">
+<span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+</div>
+<!-- 7. Quinn Editor: Quality & Fact Check (SELECTED & REJECTED PRIOR DRAFT) -->
+<div class="flex-1 bg-rose-50/40 rounded-xl border-2 border-rose-500 p-3 shadow-md ring-4 ring-rose-100 flex flex-col justify-between cursor-pointer transition-all">
+<div class="flex items-start justify-between gap-1 mb-2">
+<div class="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-600 to-violet-700 text-white flex items-center justify-center shadow-xs ring-2 ring-violet-400">
+<span class="material-symbols-outlined text-[18px]">fact_check</span>
+</div>
+<span class="inline-flex items-center gap-1 text-[10px] font-bold text-rose-700 bg-rose-100 px-1.5 py-0.5 rounded border border-rose-300">
+<span class="material-symbols-outlined text-[12px]">cancel</span>
+<span>Flagged</span>
+</span>
+</div>
+<div>
+<div class="text-[10px] font-semibold tracking-wide text-rose-700 uppercase flex items-center gap-1">
+<span>Editor Gate</span>
+<span class="w-1.5 h-1.5 rounded-full bg-violet-600" title="Selected agent"></span>
+</div>
+<h3 class="font-headline font-bold text-slate-900 text-xs mt-0.5">Quinn Editor</h3>
+<p class="text-[11px] text-rose-700 font-bold mt-1">Found 2 style &amp; pacing issues</p>
+</div>
+<div class="mt-2 pt-2 border-t border-rose-200 text-[10px] text-rose-900 font-medium flex items-center justify-between">
+<span>Inspected at</span>
+<span>02:12 (Selected)</span>
+</div>
+</div>
+<!-- Connector 7 -> 8 -->
+<div class="flex items-center justify-center text-slate-300">
+<span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+</div>
+<!-- 8. Echo Publisher: YouTube API Uploader (Waiting / Idle) -->
+<div class="flex-1 bg-white rounded-xl border border-slate-200 p-3 shadow-2xs flex flex-col justify-between opacity-60 hover:opacity-90 transition-opacity">
+<div class="flex items-start justify-between gap-1 mb-2">
+<div class="w-8 h-8 rounded-full bg-gradient-to-tr from-slate-400 to-slate-600 text-white flex items-center justify-center shadow-xs">
+<span class="material-symbols-outlined text-[18px]">send</span>
+</div>
+<span class="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
+<span class="material-symbols-outlined text-[12px]">pause_circle</span>
+<span>Idle</span>
+</span>
+</div>
+<div>
+<div class="text-[10px] font-semibold tracking-wide text-slate-400 uppercase">YouTube Publisher</div>
+<h3 class="font-headline font-bold text-slate-900 text-xs mt-0.5">Echo Publisher</h3>
+<p class="text-[11px] text-slate-500 font-medium mt-1">Awaiting final render</p>
+</div>
+<div class="mt-2 pt-2 border-t border-slate-100 text-[10px] text-slate-400 flex items-center justify-between">
+<span>Destination</span>
+<span>Channel Shorts</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- SPLIT SECTION: LIVE EVENT TIMELINE (65%) & SELECTED AGENT DRAWER (35%) -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+<!-- LEFT COLUMN: LIVE EVENT TIMELINE (65% width) -->
+<section class="lg:col-span-8 bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col overflow-hidden">
+<!-- Header & Filter Bar -->
+<div class="p-4 border-b border-slate-100 space-y-3">
+<div class="flex flex-wrap items-center justify-between gap-3">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[20px] text-violet-700">receipt_long</span>
+<h2 class="font-headline font-bold text-slate-900 text-base">Execution Audit Timeline</h2>
+<span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700">19 events</span>
+</div>
+<!-- Auto-scroll live toggle -->
+<label class="flex items-center gap-2 text-xs font-medium text-slate-600 cursor-pointer select-none">
+<input checked="" class="w-4 h-4 rounded text-violet-600 border-slate-300 focus:ring-violet-500" type="checkbox"/>
+<span class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[15px] text-emerald-600">sync</span>
+<span>Auto-scroll on live stream</span>
+</span>
+</label>
+</div>
+<!-- Filter Chips & Search Bar -->
+<div class="flex flex-wrap items-center justify-between gap-2 pt-1">
+<div class="flex items-center gap-1.5 overflow-x-auto text-xs">
+<button class="px-3 py-1 rounded-full font-semibold bg-violet-600 text-white shadow-2xs">
+                All Events (19)
+              </button>
+<button class="px-3 py-1 rounded-full font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors">
+                Agent Actions
+              </button>
+<button class="px-3 py-1 rounded-full font-medium text-rose-700 bg-rose-50 border border-rose-200 hover:bg-rose-100 transition-colors flex items-center gap-1">
+<span class="material-symbols-outlined text-[13px]">published_with_changes</span>
+<span>Revisions &amp; Gates (2)</span>
+</button>
+<button class="px-3 py-1 rounded-full font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors">
+                System &amp; Tokens
+              </button>
+</div>
+<div class="relative w-full sm:w-56">
+<span class="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-[17px]">search</span>
+<input class="w-full pl-8 pr-3 py-1 text-xs rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500" placeholder="Search event logs..." type="text"/>
+</div>
+</div>
+</div>
+<!-- Audit Log Rows -->
+<div class="divide-y divide-slate-100 max-h-[560px] overflow-y-auto custom-scrollbar p-2">
+<!-- Event 1 (02:12 - Quinn Editor FLAG REVISION) -->
+<div class="p-3.5 rounded-lg bg-rose-50/50 border border-rose-200 transition-colors hover:bg-rose-50 flex items-start gap-3.5 my-1">
+<div class="font-mono text-xs font-bold text-rose-700 pt-0.5 whitespace-nowrap">02:12</div>
+<div class="w-7 h-7 rounded-full bg-gradient-to-tr from-indigo-600 to-violet-700 text-white flex-shrink-0 flex items-center justify-center text-xs shadow-2xs">
+<span class="material-symbols-outlined text-[15px]">fact_check</span>
+</div>
+<div class="flex-1 space-y-1">
+<div class="flex flex-wrap items-center justify-between gap-1">
+<div class="flex items-center gap-1.5">
+<span class="font-headline font-bold text-xs text-slate-900">Quinn Editor</span>
+<span class="px-1.5 py-0.2 rounded text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300">
+                    Veto &amp; Return
+                  </span>
+</div>
+<span class="text-[11px] text-slate-400">Duration: 2.8s</span>
+</div>
+<p class="text-xs text-slate-800 font-medium leading-relaxed">
+                Flagged hook intro (too slow, 4.2s pacing) and tone mismatch in scene 3. Returned draft to Script Writers with 2 mandatory edits.
+              </p>
+<div class="flex items-center gap-2 pt-1 text-[11px]">
+<span class="text-rose-700 font-semibold cursor-pointer underline flex items-center gap-0.5">
+<span class="material-symbols-outlined text-[13px]">visibility</span>
+<span>View 2 correction prompts</span>
+</span>
+<span class="text-slate-300">•</span>
+<span class="text-slate-500">Input tokens: 15.9k</span>
+</div>
+</div>
+</div>
+<!-- Event 2 (01:58 - Script Writers Draft Generated) -->
+<div class="p-3.5 rounded-lg hover:bg-slate-50 transition-colors flex items-start gap-3.5">
+<div class="font-mono text-xs font-semibold text-slate-500 pt-0.5 whitespace-nowrap">01:58</div>
+<div class="w-7 h-7 rounded-full bg-gradient-to-tr from-orange-500 to-amber-600 text-white flex-shrink-0 flex items-center justify-center text-xs shadow-2xs">
+<span class="material-symbols-outlined text-[15px]">edit_note</span>
+</div>
+<div class="flex-1 space-y-1">
+<div class="flex flex-wrap items-center justify-between gap-1">
+<div class="flex items-center gap-1.5">
+<span class="font-headline font-bold text-xs text-slate-900">Script Writers</span>
+<span class="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    Draft v1 Generated
+                  </span>
+</div>
+<span class="text-[11px] text-slate-400">Duration: 14.6s</span>
+</div>
+<p class="text-xs text-slate-700 leading-relaxed">
+                Draft v1 generated (<span class="font-semibold">142 words</span>, estimated 44s speech runtime) following Hook-Value-CTA retention formula.
+              </p>
+<div class="flex items-center gap-2 pt-0.5 text-[11px] text-slate-500">
+<span>Model: Claude 3.5 Sonnet</span>
+<span class="text-slate-300">•</span>
+<span>Completion cost: $0.062</span>
+</div>
+</div>
+</div>
+<!-- Event 3 (01:22 - Ada & Ravi Synthesized Sources) -->
+<div class="p-3.5 rounded-lg hover:bg-slate-50 transition-colors flex items-start gap-3.5">
+<div class="font-mono text-xs font-semibold text-slate-500 pt-0.5 whitespace-nowrap">01:22</div>
+<div class="w-7 h-7 rounded-full bg-gradient-to-tr from-teal-500 to-emerald-600 text-white flex-shrink-0 flex items-center justify-center text-xs shadow-2xs">
+<span class="material-symbols-outlined text-[15px]">search</span>
+</div>
+<div class="flex-1 space-y-1">
+<div class="flex flex-wrap items-center justify-between gap-1">
+<div class="flex items-center gap-1.5">
+<span class="font-headline font-bold text-xs text-slate-900">Ada &amp; Ravi (Research Squad)</span>
+<span class="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    4 Citations Cached
+                  </span>
+</div>
+<span class="text-[11px] text-slate-400">Duration: 8.1s</span>
+</div>
+<p class="text-xs text-slate-700 leading-relaxed">
+                Synthesized 4 verified citations from research cache on GPU fleet optimization and distributed latency bottlenecks.
+              </p>
+<div class="text-[11px] text-slate-500">
+                Primary paper: <em class="text-slate-700 font-normal">arXiv:2401.08942 · Scale Systems 2024</em>
+</div>
+</div>
+</div>
+<!-- Event 4 (00:45 - Nova Audience Angles) -->
+<div class="p-3.5 rounded-lg hover:bg-slate-50 transition-colors flex items-start gap-3.5">
+<div class="font-mono text-xs font-semibold text-slate-500 pt-0.5 whitespace-nowrap">00:45</div>
+<div class="w-7 h-7 rounded-full bg-gradient-to-tr from-sky-500 to-blue-600 text-white flex-shrink-0 flex items-center justify-center text-xs shadow-2xs">
+<span class="material-symbols-outlined text-[15px]">radar</span>
+</div>
+<div class="flex-1 space-y-1">
+<div class="flex flex-wrap items-center justify-between gap-1">
+<div class="flex items-center gap-1.5">
+<span class="font-headline font-bold text-xs text-slate-900">Nova</span>
+<span class="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-sky-50 text-sky-700 border border-sky-200">
+                    Angle Selected
+                  </span>
+</div>
+<span class="text-[11px] text-slate-400">Duration: 3.4s</span>
+</div>
+<p class="text-xs text-slate-700 leading-relaxed">
+                Extracted high-intent audience angles: <span class="font-medium text-slate-900">"Compute cost vs ROI"</span>, scoring 92.4 viral coefficient score on YouTube Shorts tech tags.
+              </p>
+</div>
+</div>
+<!-- Event 5 (00:10 - Aegis Brand Guardrails) -->
+<div class="p-3.5 rounded-lg hover:bg-slate-50 transition-colors flex items-start gap-3.5">
+<div class="font-mono text-xs font-semibold text-slate-500 pt-0.5 whitespace-nowrap">00:10</div>
+<div class="w-7 h-7 rounded-full bg-gradient-to-tr from-slate-700 to-slate-900 text-white flex-shrink-0 flex items-center justify-center text-xs shadow-2xs">
+<span class="material-symbols-outlined text-[15px]">shield</span>
+</div>
+<div class="flex-1 space-y-1">
+<div class="flex flex-wrap items-center justify-between gap-1">
+<div class="flex items-center gap-1.5">
+<span class="font-headline font-bold text-xs text-slate-900">Aegis</span>
+<span class="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    Policy Clear
+                  </span>
+</div>
+<span class="text-[11px] text-slate-400">Duration: 1.2s</span>
+</div>
+<p class="text-xs text-slate-700 leading-relaxed">
+                Pre-run brand guardrails &amp; copyright compliance approved. Sensitive words filter clean. No brand conflict detected.
+              </p>
+</div>
+</div>
+</div>
+<!-- Footer / Live Heartbeat -->
+<div class="p-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+<div class="flex items-center gap-2">
+<span class="relative flex h-2 w-2">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+<span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+</span>
+<span>WebSocket active (Cluster Node: us-east-2)</span>
+</div>
+<button class="text-violet-600 hover:text-violet-700 font-semibold flex items-center gap-1">
+<span class="material-symbols-outlined text-[15px]">download</span>
+<span>Export raw JSON logs</span>
+</button>
+</div>
+</section>
+<!-- RIGHT COLUMN: SELECTED AGENT DETAILS DRAWER (35% width) -->
+<section class="lg:col-span-4 bg-white rounded-xl border-2 border-violet-200 shadow-md p-5 sticky top-20 space-y-5">
+<!-- Drawer Header -->
+<div class="flex items-start justify-between gap-3 border-b border-slate-100 pb-4">
+<div class="flex items-center gap-3">
+<div class="w-12 h-12 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-700 text-white flex items-center justify-center shadow-md ring-2 ring-violet-200">
+<span class="material-symbols-outlined text-[28px]">fact_check</span>
+</div>
+<div>
+<div class="flex items-center gap-1.5">
+<h3 class="font-headline font-bold text-slate-900 text-base">Quinn Editor</h3>
+<span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-violet-100 text-violet-800">v3.2</span>
+</div>
+<p class="text-xs text-slate-500">Lead Quality &amp; Guardrail Agent</p>
+</div>
+</div>
+<span class="px-2 py-1 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200 flex items-center gap-1">
+<span class="material-symbols-outlined text-[13px]">error</span>
+<span>Iterating</span>
+</span>
+</div>
+<!-- Quick Telemetry Metrics Grid -->
+<div class="grid grid-cols-2 gap-2 text-xs">
+<div class="p-2.5 rounded-lg bg-slate-50 border border-slate-200/80">
+<div class="text-[11px] text-slate-500 flex items-center gap-1">
+<span class="material-symbols-outlined text-[13px] text-slate-400">autorenew</span>
+<span>Attempts</span>
+</div>
+<div class="font-headline font-bold text-slate-900 text-sm mt-0.5">2 / 3 <span class="text-[10px] font-normal text-slate-400">max cap</span></div>
+</div>
+<div class="p-2.5 rounded-lg bg-slate-50 border border-slate-200/80">
+<div class="text-[11px] text-slate-500 flex items-center gap-1">
+<span class="material-symbols-outlined text-[13px] text-slate-400">payments</span>
+<span>Run Cost</span>
+</div>
+<div class="font-headline font-bold text-slate-900 text-sm mt-0.5">$0.041</div>
+</div>
+<div class="p-2.5 rounded-lg bg-slate-50 border border-slate-200/80">
+<div class="text-[11px] text-slate-500 flex items-center gap-1">
+<span class="material-symbols-outlined text-[13px] text-slate-400">timer</span>
+<span>Execution Time</span>
+</div>
+<div class="font-headline font-bold text-slate-900 text-sm mt-0.5">2.8s</div>
+</div>
+<div class="p-2.5 rounded-lg bg-slate-50 border border-slate-200/80">
+<div class="text-[11px] text-slate-500 flex items-center gap-1">
+<span class="material-symbols-outlined text-[13px] text-slate-400">tune</span>
+<span>Accuracy Threshold</span>
+</div>
+<div class="font-headline font-bold text-slate-900 text-sm mt-0.5">94% Strict</div>
+</div>
+</div>
+<!-- Token Breakdown Box -->
+<div class="p-3 rounded-lg bg-violet-50/60 border border-violet-100 text-xs space-y-1.5">
+<div class="flex items-center justify-between font-semibold text-violet-900">
+<span class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[15px] text-violet-600">memory</span>
+<span>Token Usage Breakdown</span>
+</span>
+<span class="font-mono text-[11px]">16.7k total</span>
+</div>
+<div class="text-[11px] text-slate-600 flex items-center justify-between">
+<span>Fresh: <strong class="text-slate-800">3.8k</strong></span>
+<span>Cached: <strong class="text-slate-800">12.1k</strong> (72% hit)</span>
+<span>Output: <strong class="text-violet-700">840</strong></span>
+</div>
+</div>
+<!-- Editor's Exact Fixes (Interactive Checklist) -->
+<div class="space-y-2.5 pt-1">
+<div class="flex items-center justify-between">
+<h4 class="font-headline font-bold text-xs text-slate-900 uppercase tracking-wider flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px] text-rose-600">checklist</span>
+<span>Editor's Exact Fixes</span>
+</h4>
+<span class="text-[11px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+              2 in progress
+            </span>
+</div>
+<p class="text-[11px] text-slate-500">Live directives piped back to Script Writers agent:</p>
+<div class="space-y-2">
+<!-- Fix 1 (In Progress / Sent) -->
+<div class="p-3 rounded-lg bg-amber-50/70 border border-amber-200 space-y-1">
+<div class="flex items-start gap-2">
+<span class="material-symbols-outlined text-[18px] text-amber-700 mt-0.5">check_box</span>
+<div class="flex-1">
+<div class="text-xs font-semibold text-slate-900">Fix 1: Shorten Hook Line</div>
+<p class="text-[11px] text-slate-700 leading-snug mt-0.5">
+                    "Shorten hook line from 18 words to under 10 words for immediate 3-second retention."
+                  </p>
+<div class="mt-1 text-[10px] font-bold text-amber-800 flex items-center gap-1">
+<span class="material-symbols-outlined text-[12px] animate-spin">progress_activity</span>
+<span>Re-drafting in Script Writers</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Fix 2 (In Progress / Sent) -->
+<div class="p-3 rounded-lg bg-amber-50/70 border border-amber-200 space-y-1">
+<div class="flex items-start gap-2">
+<span class="material-symbols-outlined text-[18px] text-amber-700 mt-0.5">check_box</span>
+<div class="flex-1">
+<div class="text-xs font-semibold text-slate-900">Fix 2: Simplify Technical Jargon</div>
+<p class="text-[11px] text-slate-700 leading-snug mt-0.5">
+                    "Replace technical jargon 'distributed inference cluster' with 'cloud GPU network' in Scene 2."
+                  </p>
+<div class="mt-1 text-[10px] font-bold text-amber-800 flex items-center gap-1">
+<span class="material-symbols-outlined text-[12px] animate-spin">progress_activity</span>
+<span>Re-drafting in Script Writers</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Gate (Pending Next Inspection) -->
+<div class="p-3 rounded-lg bg-slate-50 border border-slate-200 space-y-1 opacity-75">
+<div class="flex items-start gap-2">
+<span class="material-symbols-outlined text-[18px] text-slate-400 mt-0.5">check_box_outline_blank</span>
+<div class="flex-1">
+<div class="text-xs font-semibold text-slate-700">Gate: Strict Runtime Verification</div>
+<p class="text-[11px] text-slate-600 leading-snug mt-0.5">
+                    "Verify target speech duration is strictly under 45.0s before passing to ElevenLabs."
+                  </p>
+<div class="mt-1 text-[10px] font-medium text-slate-500">
+                    Pending next draft inspection
+                  </div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Action Buttons in Drawer -->
+<div class="pt-2 space-y-2 border-t border-slate-100">
+<button class="w-full inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs transition-colors shadow-2xs active:scale-98">
+<span class="material-symbols-outlined text-[17px]">verified</span>
+<span>Override &amp; Force Pass</span>
+</button>
+<div class="grid grid-cols-2 gap-2">
+<button class="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-medium text-xs transition-colors shadow-2xs">
+<span class="material-symbols-outlined text-[16px] text-slate-500">difference</span>
+<span>Inspect Prompt Diff</span>
+</button>
+<button class="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-medium text-xs transition-colors shadow-2xs">
+<span class="material-symbols-outlined text-[16px] text-slate-500">tune</span>
+<span>Adjust Threshold</span>
+</button>
+</div>
+</div>
+</section>
+</div>
+</main>
+<!-- FOOTER STATUS / HELPER STRIP -->
+<footer class="w-full border-t border-slate-200 bg-white py-3 px-6 text-xs text-slate-500 flex flex-wrap items-center justify-between gap-4 mt-8">
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-1.5 font-medium text-slate-700">
+<span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+<span>Postcrew Engine v2.4</span>
+</div>
+<span class="text-slate-300">•</span>
+<span>Autonomous Crew: <strong class="text-slate-800">8 agents synchronized</strong></span>
+<span class="text-slate-300">•</span>
+<span>Target Platform: <strong class="text-[#FF0033]">YouTube Shorts</strong></span>
+</div>
+<div class="flex items-center gap-3">
+<span class="dotted-help" title="All agents execute with automated self-healing loops up to 3 attempts.">Self-Correction Protocol: Level 3 Enabled</span>
+<span class="text-slate-300">•</span>
+<span class="font-mono text-slate-400">Latency Ping: 38ms</span>
+</div>
+</footer>
+</body></html>

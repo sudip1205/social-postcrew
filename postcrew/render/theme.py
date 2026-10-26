@@ -105,15 +105,15 @@ class Painter:
     def rrect(self, box, r=16, fill=None, outline=None, width=2):
         x0, y0, x1, y1 = (self._sc(v) for v in box)
         self.d.rounded_rectangle((x0, y0, x1, y1), radius=self._sc(r), fill=fill, outline=outline,
-                                 width=self._sc(width) if outline else 0)
+                                 width=max(1, int(round(self._sc(width)))) if outline else 0)
 
     def ellipse(self, box, fill=None, outline=None, width=2):
         self.d.ellipse([self._sc(v) for v in box], fill=fill, outline=outline,
-                       width=self._sc(width) if outline else 0)
+                       width=max(1, int(round(self._sc(width)))) if outline else 0)
 
     def line(self, p0, p1, fill, width=2):
         self.d.line([self._sc(p0[0]), self._sc(p0[1]), self._sc(p1[0]), self._sc(p1[1])],
-                    fill=fill, width=self._sc(width))
+                    fill=fill, width=max(1, int(round(self._sc(width)))))
 
     def dashed_rrect(self, box, r=16, fill=None, outline=BORDER, width=2, dash=10, gap=8):
         x0, y0, x1, y1 = box

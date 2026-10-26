@@ -9,6 +9,7 @@ import json
 from concurrent.futures import ThreadPoolExecutor
 
 from ..checks import link_problems, number_problems, repeat_problem, text_problems
+from .. import brief as briefmod
 from . import team
 from .base import Agent, AgentError, Feedback, guidance_block, recent_block
 from .editor import CRITERIA, RED_FLAGS, SCHEMA as REVIEW_SCHEMA, fix_text, pick_fixes, review_material
@@ -176,8 +177,10 @@ class WriterAgent(Agent):
         system = (self.prompt(ctx, min_chars=ctx.cat["min_chars"], max_chars=ctx.cat["max_chars"])
                   + team.persona_block(ctx.ws, member))
         prompt = (f"Category: {ctx.cat['label']}\nWhat this category needs: {ctx.cat['brief']}\n"
-                  f"Length: {ctx.cat['min_chars']}-{ctx.cat['max_chars']} characters.\n"
-                  f"Topic: {topic['topic']}\nAngle: {topic['angle']}\n\n"
+                  f"Length: as long as the post needs (no padding; 3000 characters at most).\n"
+                  + (briefmod.cat_context(ctx.cat) + "\n" if briefmod.cat_context(ctx.cat) else "")
+                  + f"Topic: {topic['topic']}\nAngle: {topic['angle']}\n\n"
+                  + (briefmod.writer_block(briefmod.of(ctx)) + "\n\n" if briefmod.of(ctx) else "")
                   + research_block(ctx.outputs.get("research"))
                   + ("\n\nPOSTS OF THE WEEK (draw the recap only from these):\n" +
                      json.dumps(topic["week_posts"], ensure_ascii=False, indent=1) if topic.get("week_posts") else "")
@@ -193,7 +196,7 @@ class WriterAgent(Agent):
         problems = text_problems(text, ctx.cat, ctx.profile, fc)
         problems += link_problems(text, fc, verified)
         if ctx.cat.get("fact_check"):
-            problems += number_problems(text, "", verified)
+            problems += number_problems(text, "", verified + briefmod.supplied(ctx))
         dup = repeat_problem("", text, ctx.recent(60))
         if dup:
             problems.append(dup)

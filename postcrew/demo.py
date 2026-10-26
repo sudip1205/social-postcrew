@@ -87,13 +87,13 @@ class Demo:
             return {"topic": "Acme Model 2 pricing", "angle": "which everyday jobs the new price makes worth "
                     "automating", "why_now": "it launched this week", "search_queries": ["acme model 2 pricing"]}
         if agent_id == "writer":
-            hook = HOOK_2 if self.editor_calls >= 3 else HOOK_1   # the second draft applies the Editor's fix
+            hook = HOOK_2 if self.editor_calls >= 2 else HOOK_1   # the second draft applies the Editor's fix
             return {"text": f"{hook}\n\n{BODY}", "first_comment": f"Source: {URL}"}
         if agent_id == "reviewer":
             return review(89)
         if agent_id == "editor":
             self.editor_calls += 1
-            if self.editor_calls <= 3:   # round one: one of the three reads finds the hook weak
+            if self.editor_calls <= 2:   # round one: the second read finds the hook weak, so the draft goes back at once
                 return review(76, hook=72, fixes=[{"criterion": "hook", "fix": HOOK_FIX}]) \
                     if self.editor_calls == 2 else review(86)
             return review(90)

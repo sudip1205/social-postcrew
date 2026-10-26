@@ -138,8 +138,9 @@ def source_problems(verified, research_mode, max_age_days=None, today=None):
 def text_problems(text, cat, profile, first_comment=""):
     problems = []
     n = len(text)
-    if not cat["min_chars"] <= n <= cat["max_chars"]:
-        problems.append(f"length is {n} characters; this category needs {cat['min_chars']}-{cat['max_chars']}")
+    lo, hi = cat.get("min_chars", 50), cat.get("max_chars", 3000)
+    if not lo <= n <= hi:
+        problems.append(f"length is {n} characters; LinkedIn posts must be {lo}-{hi}")
     hook = next((ln for ln in text.split("\n") if ln.strip()), "")
     if not 15 <= len(hook) <= 180:
         problems.append(f"first line (the hook) is {len(hook)} characters; keep it 15-180")
@@ -164,6 +165,91 @@ def text_problems(text, cat, profile, first_comment=""):
         if norm(m.group()) not in about:
             problems.append(f"'{m.group()}' claims personal experience that is not in profile.about; "
                             f"rephrase as advice or opinion")
+            break
+    return problems
+
+
+YOUTUBE_TITLE_MAX, YOUTUBE_DESC_MAX, YOUTUBE_TAGS_MAX = 100, 5000, 500
+SCENE_LAYOUTS = ("title", "statement", "points", "code", "diagram")
+
+
+def script_problems(script, spec, cat, profile):
+    """The automatic checks on a YouTube script before any reviewer sees it. spec: platforms.video_spec(...)."""
+    problems = []
+    scenes = script.get("scenes") or []
+    text = script.get("text") or ""
+    words = len(text.split())
+    target, hi = spec["target_seconds"], spec["max_words"]
+    lo = int(hi * 0.7)
+    if words > int(hi * 1.1):
+        problems.append(f"the narration is {words} words: about {words / 2.5:.0f} seconds, but this {spec['format']} video "
+                        f"should run about {target} seconds ({hi} words at most). Cut {words - hi} words")
+    elif words < lo:
+        problems.append(f"the narration is only {words} words: about {words / 2.5:.0f} seconds, but this video should "
+                        f"run about {target} seconds ({lo}-{hi} words)")
+    mn, mx = (3, 10) if spec["format"] == "short" else (4, 40)
+    if not mn <= len(scenes) <= mx:
+        problems.append(f"{len(scenes)} scenes: a {spec['format']} video needs {mn}-{mx}")
+    for i, sc in enumerate(scenes, 1):
+        if sc.get("layout") not in SCENE_LAYOUTS:
+            problems.append(f"scene {i}: layout must be one of {SCENE_LAYOUTS}")
+        if not (sc.get("narration") or "").strip():
+            problems.append(f"scene {i} has no narration")
+        if sc.get("layout") == "code":
+            code_problem = check_code(sc.get("code") or "", sc.get("language") or "")
+            if code_problem:
+                problems.append(f"scene {i}: {code_problem}")
+        elif sc.get("layout") == "points" and not 1 <= len(sc.get("items") or []) <= 5:
+            problems.append(f"scene {i}: 'points' needs 1-5 items")
+        elif sc.get("layout") == "diagram":
+            from .render.scenes import parse_edge
+            nodes = [n for n in sc.get("nodes") or [] if n]
+            edges = sc.get("edges") or []
+            if not 2 <= len(nodes) <= 6 or len(set(n.lower() for n in nodes)) != len(nodes) or any(len(n) > 18 for n in nodes):
+                problems.append(f"scene {i}: a diagram needs 2-6 different boxes with labels of at most 18 characters")
+            elif not 1 <= len(edges) <= 8:
+                problems.append(f"scene {i}: a diagram needs 1-8 arrows")
+            else:
+                bad = [e for e in edges if not parse_edge(e, nodes)]
+                if bad:
+                    problems.append(f"scene {i}: arrow {bad[0]!r} must be 'Box > Other box' using the exact box labels")
+        elif sc.get("layout") in ("title", "statement") and not (sc.get("on_screen") or "").strip():
+            problems.append(f"scene {i}: write the on-screen text")
+    joined = " ".join((sc.get("narration") or "") for sc in scenes)
+    if scenes and norm(joined) != norm(text):
+        problems.append("'text' must be the scenes' narration, in order: it is what the voice reads")
+    title = (script.get("title") or "").strip()
+    if not 10 <= len(title) <= YOUTUBE_TITLE_MAX:
+        problems.append(f"the title is {len(title)} characters; YouTube allows {YOUTUBE_TITLE_MAX} and a good one has 10-70")
+    desc = script.get("description") or ""
+    if not 40 <= len(desc) <= YOUTUBE_DESC_MAX:
+        problems.append(f"the description is {len(desc)} characters; write 40-{YOUTUBE_DESC_MAX}")
+    tags = script.get("tags") or []
+    if not 3 <= len(tags) <= 15 or sum(len(t) + 1 for t in tags) > YOUTUBE_TAGS_MAX or any(len(t) > 30 or "," in t for t in tags):
+        problems.append(f"tags: 3-15 short tags (under 30 characters, no commas), {YOUTUBE_TAGS_MAX} characters in all")
+    thumb = (script.get("thumbnail_text") or "").strip()
+    if not 2 <= len(thumb) <= 30:
+        problems.append("thumbnail_text must be 2-30 characters")
+    everything = "\n".join([text, title, desc, thumb, " ".join(tags)])
+    m = PLACEHOLDER.search(everything)
+    if m:
+        problems.append(f"remove the placeholder {m.group()!r}")
+    bad = [b for b in profile.get("blocklist", []) if re.search(r"\b" + re.escape(b) + r"\b", everything, re.I)]
+    if bad:
+        problems.append(f"contains blocked phrase(s): {bad}")
+    slop = [x for x in SLOP if x in text.lower()]
+    if slop:
+        problems.append(f"remove hype phrases: {slop}")
+    if "**" in text or "`" in text or re.search(r"(?m)^#{1,6} ", text):
+        problems.append("the narration is read aloud: no markdown (**, #, backticks)")
+    if URL.search(text):
+        problems.append("do not read a web address aloud: put links in the description")
+    if re.search(r"\b(hey guys|what's up guys|smash that|don't forget to (like|subscribe))\b", text, re.I):
+        problems.append("cut the filler opener / begging for likes: start with the problem or the result")
+    about = norm(" ".join(profile.get("about", [])))
+    for m in INVENTED.finditer(text):
+        if norm(m.group()) not in about:
+            problems.append(f"'{m.group()}' claims personal experience that is not in profile.about; rephrase as advice")
             break
     return problems
 

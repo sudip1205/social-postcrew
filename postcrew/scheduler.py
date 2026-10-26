@@ -7,13 +7,15 @@ import threading
 import time
 import traceback
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 from .agents.credentials import run_check
 from .agents.planner import plan_week
 from .agents.publisher import publish_due
+from . import platforms
 from .crew import category_for, is_running, local_now, post_for, run_crew, target_date
 from .notify import notify
-from .workspace import WEEKDAYS
+from .platforms import LINKEDIN, WEEKDAYS
 
 TICK_S = 30
 PUBLISH_EVERY_S = 15 * 60
@@ -24,8 +26,20 @@ def _passed(now, hhmm):
     return (now.hour, now.minute) >= (hh, mm)
 
 
+def _earliest(sched):
+    """The first moment of the day anything can go out on this schedule."""
+    return min([sched["post_time"]] + list((sched.get("day_times") or {}).values())
+               + [e["time"] for e in sched.get("dates") or [] if e.get("time")])
+
+
+def _call(fn, ws, arg, platform):
+    """LinkedIn keeps the original call shape; other apps are told which one."""
+    return fn(ws, arg) if platform == LINKEDIN else fn(ws, arg, platform=platform)
+
+
 def tick(ws, now=None, runner=run_crew, publisher=publish_due, checker=run_check, planner=plan_week):
-    """One scheduler step. Returns the list of things it did (for logs and tests)."""
+    """One scheduler step. Returns the list of things it did (for logs and tests).
+    Every enabled app plans, generates and publishes on its own schedule."""
     if ws.paused():
         return ["paused"]
     cfg = ws.config()
@@ -40,28 +54,37 @@ def tick(ws, now=None, runner=run_crew, publisher=publish_due, checker=run_check
         checker(ws)
         did.append("credentials")
 
-    pn = cfg["planning"]
-    if (pn["enabled"] and WEEKDAYS[now.weekday()] == pn["weekday"] and _passed(now, pn["time"])
-            and st.get("planned_on") != today):
-        st["planned_on"] = today
-        ws.save_state("scheduler", st)
-        planner(ws, now.date())
-        did.append("plan this week")
+    gates = []
+    for pid in platforms.enabled(cfg):
+        pcfg = platforms.view(cfg, pid)
+        sched, who = pcfg["schedule"], "" if pid == LINKEDIN else f"{pid} "
+        pnow = now.astimezone(ZoneInfo(sched["timezone"]))
+        name = platforms.state_name("scheduler", pid)
+        ps = st if pid == LINKEDIN else ws.state(name, {})
+        pn = pcfg["planning"]
+        if (pn["enabled"] and WEEKDAYS[pnow.weekday()] == pn["weekday"] and _passed(pnow, pn["time"])
+                and ps.get("planned_on") != today):
+            ps["planned_on"] = today
+            ws.save_state(name, ps)
+            _call(planner, ws, pnow.date(), pid)
+            did.append(f"plan this week{'' if pid == LINKEDIN else ' (' + pid + ')'}")
 
-    target = target_date(cfg, now)
-    if (_passed(now, cfg["schedule"]["generate_time"]) and st.get("generated_for") != target.isoformat()
-            and category_for(cfg, target)):
-        # a post for that date already made (e.g. by a manual run) or a run still going: nothing to generate
-        if not post_for(ws, target) and not is_running():
-            st["generated_for"] = target.isoformat()
-            ws.save_state("scheduler", st)
-            runner(ws, target)
-            did.append(f"generate {target.isoformat()}")
+        target = target_date(pcfg, pnow)
+        if (_passed(pnow, sched["generate_time"]) and ps.get("generated_for") != target.isoformat()
+                and category_for(pcfg, target)):
+            # a post for that date already made (e.g. by a manual run) or a run still going: nothing to generate
+            if not post_for(ws, target, pid) and not is_running():
+                ps["generated_for"] = target.isoformat()
+                ws.save_state(name, ps)
+                _call(runner, ws, target, pid)
+                did.append(f"generate {who}{target.isoformat()}")
+        gates.append((pnow, _earliest(sched)))
 
     last = st.get("published_check")
     utc = now.astimezone(timezone.utc)
-    if _passed(now, cfg["schedule"]["post_time"]) and (
+    if any(_passed(pnow, t) for pnow, t in gates) and (
             not last or utc - datetime.fromisoformat(last) >= timedelta(seconds=PUBLISH_EVERY_S)):
+        st = ws.state("scheduler", {})   # a platform's step above may have rewritten it
         st["published_check"] = utc.isoformat(timespec="seconds")
         ws.save_state("scheduler", st)
         if publisher(ws):

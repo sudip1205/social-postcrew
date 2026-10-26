@@ -4,8 +4,9 @@ import json
 import shutil
 from urllib.parse import urlparse
 
+from .. import brief as briefmod
 from ..checks import check_code, number_problems, poster_number_problems
-from ..render import animate, poster, tracers
+from ..render import animate, poster, sysflow, tracers
 from .base import Agent, AgentError, guidance_block
 
 ITEM = {"type": "object", "properties": {k: {"type": "string"} for k in ("head", "body", "label", "sub", "tag", "via")},
@@ -38,6 +39,18 @@ def source_footer(research, first_comment=""):
     return ""
 
 
+KICKER_RULE = ("a short label for this post, 1-3 words, at most 24 characters, taken from its topic "
+               "(for example 'TOKEN EXCHANGE' or 'PASSKEYS')")
+
+
+def kicker_for(ctx, spec):
+    """The label on the picture comes from the post's own context; the topic name is the fallback."""
+    k = " ".join(str(spec.get("kicker") or "").split())
+    if not k:
+        k = (ctx.outputs.get("topic") or {}).get("topic") or ctx.cat.get("label", "")
+    return k.upper()[:26].rstrip()
+
+
 class MediaAgent(Agent):
     id = "media"
     title = "Visual Designer"
@@ -45,7 +58,7 @@ class MediaAgent(Agent):
     role = "Designs the poster (or renders the algorithm animation) and checks it fits and matches the post."
 
     def applies(self, ctx):
-        return ctx.cat["media"] != "none"
+        return ctx.cat["media"] != "none" and briefmod.media_mode(ctx.cat, briefmod.of(ctx)) != "none"
 
     def run(self, ctx, guidance):
         handle = ctx.profile.get("handle", "")
@@ -63,8 +76,11 @@ class MediaAgent(Agent):
                 raise AgentError(str(e), fatal=True)
             return {"kind": "video", "path": str(path), "seconds": info.get("seconds"),
                     "shown_text": animate.animation_text(algo), "spec": {"algo": algo}}
-        system = self.prompt(ctx, layouts=", ".join(ctx.cat["layouts"]), kicker=ctx.cat.get("kicker", ""))
-        prompt = (f"Allowed layouts: {ctx.cat['layouts']}\nKicker (pill text): {ctx.cat.get('kicker', '')}\n\n"
+        if briefmod.media_mode(ctx.cat, briefmod.of(ctx)) == "sysflow":
+            return self._sysflow(ctx, guidance, handle)
+        layouts = list(poster.LAYOUTS)   # the style is chosen from the post: code for code, steps for how-tos...
+        system = self.prompt(ctx, layouts=", ".join(layouts), kicker=KICKER_RULE)
+        prompt = (f"Allowed layouts: {layouts}\nKicker (pill text): {KICKER_RULE}\n\n"
                   f"THE POST (the poster must agree with it and add no new claims):\n{ctx.outputs['writer']['text']}"
                   + "\n\nEvery fact, name and number on the poster must appear in the post above, worded the same way "
                     "(same qualifiers, same figures). Leave out anything the post does not say."
@@ -73,7 +89,7 @@ class MediaAgent(Agent):
                      if ctx.previous.get("media") else "")
                   + guidance_block(guidance))
         spec = self.ask(ctx, system, prompt, SCHEMA)
-        spec["kicker"] = spec.get("kicker") or ctx.cat.get("kicker", "")
+        spec["kicker"] = kicker_for(ctx, spec)
         spec["footer_left"] = source_footer(ctx.outputs.get("research"), ctx.outputs["writer"].get("first_comment", ""))
         path = ctx.run.dir / "poster.png"
         try:
@@ -95,13 +111,41 @@ class MediaAgent(Agent):
             out.update(kind="video", path=str(video), poster=str(path), seconds=info["seconds"])
         return out
 
+    def _sysflow(self, ctx, guidance, handle):
+        if not shutil.which("ffmpeg"):
+            raise AgentError("ffmpeg is not installed (macOS: brew install ffmpeg; Debian/Ubuntu: "
+                             "sudo apt install ffmpeg)", fatal=True)
+        ob = briefmod.of(ctx)
+        system = self.prompt(ctx, "sysflow", kicker=KICKER_RULE)
+        prompt = (f"THE POST (the animation must agree with it and add no new claims):\n{ctx.outputs['writer']['text']}\n\n"
+                  f"Kicker (pill text): {KICKER_RULE}\n\n" + briefmod.media_block(ob)
+                  + (f"\n\nYOUR PREVIOUS SPEC (revise it):\n{json.dumps(ctx.previous['media'].get('spec', {}).get('sysflow', {}), ensure_ascii=False)}"
+                     if (ctx.previous.get("media") or {}).get("spec", {}).get("sysflow") else "")
+                  + guidance_block(guidance))
+        spec = self.ask(ctx, system, prompt, sysflow.SCHEMA)
+        spec["kicker"] = kicker_for(ctx, spec)
+        bad = sysflow.validate_spec(spec)
+        shown = sysflow.shown_text(spec)
+        if bad:
+            return {"kind": "video", "path": None, "spec": {"sysflow": spec}, "shown_text": shown,
+                    "render_error": "; ".join(bad)}
+        path, still = ctx.run.dir / "system-flow.mp4", ctx.run.dir / "system-flow.png"
+        try:
+            info = sysflow.render_sysflow(spec, path, handle, still_path=still)
+        except sysflow.SysflowError as e:
+            raise AgentError(str(e), fatal=True)
+        return {"kind": "video", "path": str(path), "poster": str(still), "seconds": info["seconds"],
+                "spec": {"sysflow": spec}, "shown_text": shown}
+
     def validate(self, ctx, out):
+        if "sysflow" in out.get("spec", {}):
+            return self._validate_sysflow(ctx, out)
         if out.get("render_error"):
             return [f"the poster did not render: {out['render_error']}. Shorten the text or use fewer items"]
         problems = []
         spec = out.get("spec", {})
-        if "algo" not in spec and spec.get("layout") not in ctx.cat.get("layouts", []):
-            problems.append(f"layout must be one of {ctx.cat['layouts']}")
+        if "algo" not in spec and spec.get("layout") not in poster.LAYOUTS:
+            problems.append(f"layout must be one of {list(poster.LAYOUTS)}")
         if out["kind"] == "video" and not 15 <= (out.get("seconds") or 0) <= 60:
             problems.append(f"video is {out.get('seconds')}s; it must be 15-60s")
         if spec.get("code"):
@@ -118,7 +162,28 @@ class MediaAgent(Agent):
                          for p in number_problems("", out.get("shown_text", ""), verified)]
         return problems
 
+    def _validate_sysflow(self, ctx, out):
+        if out.get("render_error"):
+            return [f"the animation spec is not valid: {out['render_error']}"]
+        problems = []
+        secs = out.get("seconds") or 0
+        if not sysflow.MIN_SECONDS <= secs <= sysflow.MAX_SECONDS:
+            problems.append(f"the animation is {secs:.0f}s; it must be {sysflow.MIN_SECONDS:.0f}-{sysflow.MAX_SECONDS:.0f}s")
+        post = ctx.outputs["writer"]["text"].lower()
+        names = [s["label"] for s in out["spec"]["sysflow"].get("systems", [])]
+        absent = [n for n in names if n.lower() not in post and n.split()[0].lower() not in post]
+        if len(absent) > max(1, len(names) // 2):   # soft: the post and the animation should name the same parts
+            problems.append(f"the post never mentions these animated components: {absent}. Rename them to the words "
+                            f"the post uses so the text and the animation agree")
+        extra = poster_number_problems(ctx.outputs["writer"]["text"] + " " + " ".join(briefmod.numbers_in(briefmod.of(ctx))),
+                                       sysflow.claim_text(out["spec"]["sysflow"]))
+        return problems + [e.replace("the poster shows numbers the post does not",
+                                     "the animation's titles and captions show numbers the post does not") for e in extra]
+
     def summary(self, out):
+        if "sysflow" in out.get("spec", {}):
+            s = out["spec"]["sysflow"]
+            return f"system animation ({len(s.get('systems', []))} components, {out.get('seconds', 0):.0f}s)"
         if out.get("kind") == "video" and "algo" not in out.get("spec", {}):
             return f"animated poster ({out['spec'].get('layout', '?')}, {out.get('seconds', 0):.0f}s)"
         if out.get("kind") == "video":

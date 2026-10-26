@@ -19,7 +19,7 @@ Every agent has a name, a team colour and an icon in the Studio, so you can tell
 | Writing team | **Maya · Leo** (by default) | Each writes a full draft from verified facts only, in your voice and their own style. | length, hook, no markdown, no hype words, no placeholders, no invented experience, no unsourced numbers, no stray links, no blocked phrases |
 | Writing team | **Iris**, Pre-reviewer | Scores every draft the way the Editor will, picks the best and polishes it. | |
 | Design | **Pixel**, Visual Designer | Writes the poster spec (rendered with Pillow) or picks the algorithm animation (rendered with ffmpeg). | it renders and fits; allowed layout; code on posters parses; numbers are sourced; poster text matches the post |
-| Quality | **Quinn**, Editor Review | Scores accuracy, clarity, hook, value, tone and format, three times; the worst counts. Flags real problems. | overall ≥ 80, every criterion ≥ 70, no red flag (your thresholds) |
+| Quality | **Quinn**, Editor Review | Scores accuracy, clarity, hook, value, tone and format, up to three times; the worst counts, and a failing read ends the review early. Flags real problems. | overall ≥ 80, every criterion ≥ 70, no red flag (your thresholds) |
 | Quality | **Kai**, Formatter | LinkedIn formatting: hook above "...see more", links moved to the first comment, hashtags last. No AI. | 3,000-character limit, fold length |
 | Operations | **Aegis**, Credential Monitor | Checks the LinkedIn token and the Claude Code login before any work starts, and daily. No AI. | |
 | Operations | **Echo**, Publisher | Queues the approved post for its date (or your approval), publishes it with its image or video, and adds the first comment. No AI. | credentials re-checked right before posting |
@@ -48,7 +48,7 @@ flowchart LR
    rubric and picks the best. If it isn't comfortably above the bar, she gives exact fixes and the writer
    applies them, up to `polish_rounds` times.
 5. **Pixel** designs the poster, which is rendered and checked.
-6. **Quinn** reviews the whole post three times independently. The worst score counts.
+6. **Quinn** reviews the whole post up to three times independently. The worst score counts, so the first read that fails sends the post back at once.
 7. **Kai** formats it for LinkedIn, and **Echo** queues it (or publishes it, in `immediate` mode).
 
 Every agent's output, every rejected attempt and every decision is saved in `workspace/runs/<run_id>/`
@@ -128,3 +128,20 @@ On the **Crew** tab you can see each member's recent results and who is at risk,
 - Web pages are treated as data, never as instructions, in every prompt.
 - Agents run with no shell, no code tools, no MCP servers and no access to your Claude settings; the
   researchers get web search and nothing else.
+
+## The YouTube crew
+
+YouTube has its own schedule, plan and crew run, and reuses the machinery above: the same Supervisor, Topic Scout (with its own
+prompt), Researchers, writer team and Editor. Two agents are different or new:
+
+| Agent | Job | Checked by code |
+|---|---|---|
+| **Script team** (the writers) | Write the whole script: title, description, tags, thumbnail text and the scenes (what the voice says, what is on screen). Same drafting, pre-review and polishing loop. | words fit the length (2.5 a second), scene count and layouts, title/description/tag limits, code that parses, no filler opener, no web address read aloud, no hype, no placeholders, no invented experience, sourced numbers |
+| **Quinn**, Editor | Scores the script on hook (first 3 seconds), value, clarity, accuracy, tone and format; up to three reads, the worst counts, a failing read ends the review. | same bar as posts |
+| **Echo Voice** (new) | Reads each scene with ElevenLabs, after the Editor passed. Cached; never runs in a rehearsal. | one clip per scene; a Short stays under 60 s |
+| **Reel**, Video Producer (new) | Draws the scenes and captions, adds the voice, renders the video and a 1280x720 thumbnail with ffmpeg (or an animation MCP server). | format (9:16 or 16:9), length, audio track, readable file |
+| **Chalk**, Blackboard Producer (new) | Replaces Reel when the video renderer is *Blackboard*: draws the script by hand on a chalkboard, timed to the voice recorded first (boxes, arrows, bullets and code appear as they are spoken). | same checks as Reel |
+| **Echo**, Publisher | Queues the video, then uploads it at its time with the YouTube Data API. | approval mode, practice mode, quota and connection checks |
+
+The Editor reviews the script, not the pixels, so the voice and the video are only made after the script passes: a script that is
+sent back costs no voice characters and no render time. See [Videos, voice and your own files](video-and-voice.md).

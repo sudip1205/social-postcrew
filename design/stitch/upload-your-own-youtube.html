@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+
+<html class="h-full bg-slate-50" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Postcrew Studio — Review &amp; Publish Queue</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {},
+          borderRadius: {
+            "DEFAULT": "0.5rem",
+            "lg": "1rem",
+            "xl": "1.5rem",
+            "full": "9999px"
+          },
+          spacing: {},
+          fontFamily: {
+            headline: ["Plus Jakarta Sans", "sans-serif"],
+            display: ["Plus Jakarta Sans", "sans-serif"],
+            body: ["Inter", "sans-serif"],
+            label: ["Inter", "sans-serif"]
+          },
+          fontSize: {}
+        },
+      },
+    }
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      line-height: 1;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      vertical-align: middle;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 9999px;
+    }
+  </style>
+<meta content="web_standard" name="shell-type"/></head>
+<body class="h-full font-body text-slate-800 bg-[#F8FAFC] antialiased flex flex-col">
+<!-- Shared TopNavBar Header -->
+<header class="docked full-width top-0 sticky z-40 bg-white border-b border-slate-200 shadow-sm">
+<div class="w-full px-6 py-3 flex items-center justify-between mx-auto">
+<!-- Left: Brand Logo & Main Nav -->
+<div class="flex items-center gap-8">
+<a class="font-headline font-black text-lg text-slate-900 flex items-center gap-2" href="#">
+<div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-violet-600 to-indigo-500 flex items-center justify-center text-white shadow-sm shadow-violet-200">
+<span class="material-symbols-outlined text-xl">smart_toy</span>
+</div>
+<span class="tracking-tight font-extrabold text-slate-900">Postcrew Studio</span>
+</a>
+<!-- Global Navigation Items -->
+<nav class="hidden md:flex items-center gap-1 font-label text-sm">
+<a class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-slate-600 font-medium hover:text-slate-900 hover:bg-slate-100 transition-colors duration-150 active:scale-95" href="#">
+<span class="material-symbols-outlined text-[20px] text-slate-400">dashboard</span>
+<span>Overview</span>
+</a>
+<a class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-slate-600 font-medium hover:text-slate-900 hover:bg-slate-100 transition-colors duration-150 active:scale-95" href="#">
+<span class="material-symbols-outlined text-[20px] text-slate-400">calendar_month</span>
+<span>Plan</span>
+</a>
+<a class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-slate-600 font-medium hover:text-slate-900 hover:bg-slate-100 transition-colors duration-150 active:scale-95" href="#">
+<span class="material-symbols-outlined text-[20px] text-slate-400">group_work</span>
+<span>Crew</span>
+</a>
+<a class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-slate-600 font-medium hover:text-slate-900 hover:bg-slate-100 transition-colors duration-150 active:scale-95" href="#">
+<span class="material-symbols-outlined text-[20px] text-slate-400">schema</span>
+<span>Workflow</span>
+</a>
+<!-- Active Queue Tab per semantic intent -->
+<a class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-violet-50 text-violet-700 font-semibold active:scale-95 transition-transform duration-100 ease-in-out" href="#">
+<span class="material-symbols-outlined text-[20px] text-violet-600">outbox</span>
+<span>Queue</span>
+<span class="bg-violet-200 text-violet-800 text-xs px-1.5 py-0.2 rounded-full font-bold">14</span>
+</a>
+<a class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-slate-600 font-medium hover:text-slate-900 hover:bg-slate-100 transition-colors duration-150 active:scale-95" href="#">
+<span class="material-symbols-outlined text-[20px] text-slate-400">settings</span>
+<span>Settings</span>
+</a>
+</nav>
+</div>
+<!-- Right Header Actions & Connectors -->
+<div class="flex items-center gap-3">
+<!-- Connected Platforms Status Pills -->
+<div class="hidden lg:flex items-center gap-2 px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg">
+<div class="flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium text-slate-700">
+<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+<span class="font-bold text-[#0A66C2]">in</span>
+<span class="text-slate-600">LinkedIn</span>
+</div>
+<div class="w-px h-3.5 bg-slate-200"></div>
+<div class="flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium text-slate-700">
+<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+<span class="material-symbols-outlined text-[15px] text-[#FF0033]">smart_display</span>
+<span class="text-slate-600">YouTube</span>
+</div>
+</div>
+<!-- Secondary Action: Practice Mode -->
+<button class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-sky-700 bg-sky-50 border border-sky-200 rounded-lg hover:bg-sky-100 active:scale-95 transition-all" type="button">
+<span class="material-symbols-outlined text-base text-sky-600">science</span>
+<span>Practice mode</span>
+</button>
+<!-- Notification & Help Icons -->
+<div class="flex items-center border-l border-slate-200 pl-3 gap-1">
+<button class="p-2 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 relative active:scale-95 transition-colors" type="button">
+<span class="material-symbols-outlined text-[22px]">notifications</span>
+<span class="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-500 rounded-full"></span>
+</button>
+<button class="p-2 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 active:scale-95 transition-colors" type="button">
+<span class="material-symbols-outlined text-[22px]">help</span>
+</button>
+</div>
+<!-- Primary Action "Run now" -->
+<button class="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-700 text-white font-label font-medium text-sm shadow-sm shadow-violet-200 active:scale-95 transition-all" type="button">
+<span class="material-symbols-outlined text-base">bolt</span>
+<span>Run now</span>
+</button>
+<!-- Agent Command Avatar -->
+<div class="w-8 h-8 rounded-full bg-gradient-to-br from-violet-600 via-indigo-600 to-sky-500 p-0.5 shadow cursor-pointer ml-1" title="Agent Command Avatar">
+<div class="w-full h-full rounded-full bg-white flex items-center justify-center">
+<span class="text-xs font-bold text-violet-700">AC</span>
+</div>
+</div>
+</div>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="flex-1 w-full max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col gap-6" data-active-view="upload-modal"><div class="flex flex-col w-full relative">
+<!-- Subtle Studio Backdrop Mimic (creates depth & context underneath modal) -->
+<div class="w-full opacity-35 filter blur-sm pointer-events-none select-none transition-all duration-300">
+<div class="flex items-center justify-between py-4">
+<div class="flex items-center gap-3">
+<div class="h-9 w-44 bg-slate-200 rounded-lg"></div>
+<div class="h-7 w-20 bg-slate-100 rounded-full"></div>
+</div>
+<div class="flex items-center gap-2">
+<div class="h-9 w-28 bg-slate-200 rounded-lg"></div>
+<div class="h-9 w-32 bg-slate-200 rounded-lg"></div>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-5 mt-3">
+<div class="h-64 bg-slate-200/80 rounded-xl"></div>
+<div class="h-64 bg-slate-200/80 rounded-xl"></div>
+<div class="h-64 bg-slate-200/80 rounded-xl"></div>
+</div>
+</div>
+<!-- Focused Modal Overlay Layer -->
+<div class="absolute -inset-4 sm:-inset-6 lg:-inset-8 z-50 flex items-start justify-center pt-2 sm:pt-4 pb-12 px-3 sm:px-4 bg-slate-900/40 backdrop-blur-md transition-all" id="uploadModal">
+<div class="w-full max-w-4xl bg-white rounded-xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+<!-- Modal Header -->
+<div class="px-6 sm:px-8 pt-6 pb-5 bg-gradient-to-b from-slate-50/70 to-white flex flex-col gap-3">
+<div class="flex items-center justify-between">
+<!-- Platform / Format Badge with left indicator -->
+<div class="inline-flex items-center gap-2 px-2.5 py-1 bg-rose-50 text-[#FF0033] rounded-lg">
+<span class="w-2 h-2 rounded-full bg-[#FF0033] animate-pulse"></span>
+<span class="material-symbols-outlined text-[18px]">smart_display</span>
+<span class="font-label font-bold text-xs tracking-wide">YouTube Short · 45s</span>
+</div>
+<!-- Close Action Button -->
+<button aria-label="Close dialog" class="p-2 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors active:scale-95" type="button">
+<span class="material-symbols-outlined text-[22px]">close</span>
+</button>
+</div>
+<div class="flex flex-col gap-1">
+<h2 class="font-headline font-bold text-2xl sm:text-[26px] text-slate-900 tracking-tight flex items-center gap-2.5">
+<span class="material-symbols-outlined text-slate-700 text-2xl">drive_folder_upload</span>
+            Use your own content for this video
+          </h2>
+<p class="font-body text-slate-500 text-sm leading-relaxed max-w-2xl">
+            Override automated generation by bringing your custom script, synthesized voiceover, or edited video clip. The crew will seamlessly stitch remaining components and harmonize metadata.
+          </p>
+</div>
+</div>
+<!-- Core Content - 3 Interactive Drop Zones -->
+<div class="px-6 sm:px-8 py-5 flex flex-col gap-5 overflow-y-auto max-h-[calc(85vh-180px)] custom-scrollbar">
+<!-- Zone 1: Custom Script -->
+<div class="bg-slate-50/80 rounded-xl p-4 sm:p-5 flex flex-col gap-3.5 hover:bg-slate-50 transition-colors">
+<div class="flex flex-wrap items-center justify-between gap-2">
+<div class="flex items-center gap-2.5">
+<div class="w-8 h-8 rounded-lg bg-orange-100 text-[#EA580C] flex items-center justify-center shadow-xs">
+<span class="material-symbols-outlined text-[20px]">edit_note</span>
+</div>
+<div>
+<h3 class="font-headline font-semibold text-sm sm:text-base text-slate-900 flex items-center gap-1.5">
+                  Custom Script (.txt, .md, .docx)
+                </h3>
+<span class="font-body text-xs text-slate-500">Structured markdown parsed into 3 sequence scenes</span>
+</div>
+</div>
+<!-- Status Indicator Badge -->
+<div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-[#059669] font-label text-xs font-semibold">
+<span class="material-symbols-outlined text-[16px]">check_circle</span>
+<span>76 words · 42s estimated speech pace</span>
+</div>
+</div>
+<!-- Script Parsed Breakdown Card -->
+<div class="bg-white rounded-lg p-3.5 shadow-sm flex flex-col gap-2.5">
+<div class="flex items-center justify-between text-xs font-label text-slate-500 pb-1">
+<div class="flex items-center gap-1.5 font-medium text-slate-700">
+<span class="material-symbols-outlined text-[16px] text-slate-400">description</span>
+<span>source_script_v2.md</span>
+<span class="text-slate-400 font-normal">(4.2 KB)</span>
+</div>
+<button class="text-violet-600 hover:text-violet-800 font-medium inline-flex items-center gap-1 transition-colors" type="button">
+<span class="material-symbols-outlined text-[15px]">sync</span>
+<span>Replace file</span>
+</button>
+</div>
+<!-- Scene Grid -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
+<div class="bg-slate-50 rounded-lg p-2.5 flex flex-col gap-1">
+<div class="flex items-center justify-between">
+<span class="font-semibold text-slate-800 font-headline">Scene 1 · Hook</span>
+<span class="text-slate-400 font-mono text-[11px]">0:00 - 0:08</span>
+</div>
+<p class="text-slate-600 italic line-clamp-2">"Stop wasting 6 hours every week assembling vertical snippets..."</p>
+<div class="mt-1 flex items-center justify-between text-[11px] text-slate-500 font-label">
+<span>18 words</span>
+<span class="text-emerald-600 font-medium">Fast paced</span>
+</div>
+</div>
+<div class="bg-slate-50 rounded-lg p-2.5 flex flex-col gap-1">
+<div class="flex items-center justify-between">
+<span class="font-semibold text-slate-800 font-headline">Scene 2 · Core Value</span>
+<span class="text-slate-400 font-mono text-[11px]">0:08 - 0:24</span>
+</div>
+<p class="text-slate-600 italic line-clamp-2">"Here is how multi-agent pipelines generate B-roll in parallel with zero manual effort."</p>
+<div class="mt-1 flex items-center justify-between text-[11px] text-slate-500 font-label">
+<span>42 words</span>
+<span class="text-emerald-600 font-medium">Balanced tempo</span>
+</div>
+</div>
+<div class="bg-slate-50 rounded-lg p-2.5 flex flex-col gap-1">
+<div class="flex items-center justify-between">
+<span class="font-semibold text-slate-800 font-headline">Scene 3 · CTA</span>
+<span class="text-slate-400 font-mono text-[11px]">0:24 - 0:42</span>
+</div>
+<p class="text-slate-600 italic line-clamp-2">"Tap subscribe and turn on autonomous YouTube dispatch in your studio today."</p>
+<div class="mt-1 flex items-center justify-between text-[11px] text-slate-500 font-label">
+<span>16 words</span>
+<span class="text-emerald-600 font-medium">Punchy outro</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Zone 2: Voiceover Audio -->
+<div class="bg-slate-50/80 rounded-xl p-4 sm:p-5 flex flex-col gap-3.5 hover:bg-slate-50 transition-colors">
+<div class="flex flex-wrap items-center justify-between gap-2">
+<div class="flex items-center gap-2.5">
+<div class="w-8 h-8 rounded-lg bg-violet-100 text-[#7C3AED] flex items-center justify-center shadow-xs">
+<span class="material-symbols-outlined text-[20px]">mic</span>
+</div>
+<div>
+<h3 class="font-headline font-semibold text-sm sm:text-base text-slate-900 flex items-center gap-1.5">
+                  Voiceover Audio (.mp3, .wav)
+                </h3>
+<span class="font-body text-xs text-slate-500">AI audio or custom studio track normalized to -14 LUFS</span>
+</div>
+</div>
+<!-- Status Indicator Badge -->
+<div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-[#059669] font-label text-xs font-semibold">
+<span class="material-symbols-outlined text-[16px]">check_circle</span>
+<span>Pacing synced with script</span>
+</div>
+</div>
+<!-- Waveform Player Card -->
+<div class="bg-white rounded-lg p-4 shadow-sm flex flex-col sm:flex-row items-center gap-4">
+<!-- Play / Pause Button -->
+<button aria-label="Play audio preview" class="w-10 h-10 rounded-full bg-violet-600 text-white flex items-center justify-center shadow-md shadow-violet-200 hover:bg-violet-700 active:scale-95 transition-transform shrink-0" id="audioToggleBtn" type="button">
+<span class="material-symbols-outlined text-[22px]">play_arrow</span>
+</button>
+<!-- Waveform Representation (24 bars) -->
+<div class="flex-1 w-full flex items-center gap-1 h-10 px-2 py-1 bg-slate-50 rounded-lg overflow-hidden">
+<div class="w-1 bg-violet-600 rounded-full h-3"></div>
+<div class="w-1 bg-violet-600 rounded-full h-5"></div>
+<div class="w-1 bg-violet-600 rounded-full h-8"></div>
+<div class="w-1 bg-violet-600 rounded-full h-6"></div>
+<div class="w-1 bg-violet-600 rounded-full h-9"></div>
+<div class="w-1 bg-violet-600 rounded-full h-4"></div>
+<div class="w-1 bg-violet-600 rounded-full h-7"></div>
+<div class="w-1 bg-violet-500 rounded-full h-8"></div>
+<div class="w-1 bg-violet-500 rounded-full h-5"></div>
+<div class="w-1 bg-violet-500 rounded-full h-10"></div>
+<div class="w-1 bg-violet-400 rounded-full h-6"></div>
+<div class="w-1 bg-violet-400 rounded-full h-8"></div>
+<div class="w-1 bg-violet-300 rounded-full h-4"></div>
+<div class="w-1 bg-violet-300 rounded-full h-7"></div>
+<div class="w-1 bg-violet-300 rounded-full h-9"></div>
+<div class="w-1 bg-slate-300 rounded-full h-5"></div>
+<div class="w-1 bg-slate-300 rounded-full h-7"></div>
+<div class="w-1 bg-slate-300 rounded-full h-4"></div>
+<div class="w-1 bg-slate-300 rounded-full h-8"></div>
+<div class="w-1 bg-slate-300 rounded-full h-6"></div>
+<div class="w-1 bg-slate-200 rounded-full h-5"></div>
+<div class="w-1 bg-slate-200 rounded-full h-3"></div>
+<div class="w-1 bg-slate-200 rounded-full h-4"></div>
+<div class="w-1 bg-slate-200 rounded-full h-2"></div>
+</div>
+<!-- Metadata info chips -->
+<div class="flex items-center gap-3 shrink-0 text-xs font-label">
+<div class="flex flex-col items-end">
+<span class="font-mono font-bold text-slate-800 text-sm">0:41.8</span>
+<span class="text-slate-400 text-[11px]">44.1kHz stereo</span>
+</div>
+<span class="px-2 py-1 rounded bg-slate-100 text-slate-700 font-medium text-[11px] whitespace-nowrap">
+                Custom voice file (ElevenLabs)
+              </span>
+</div>
+</div>
+</div>
+<!-- Zone 3: Finished Video / B-Roll -->
+<div class="bg-slate-50/80 rounded-xl p-4 sm:p-5 flex flex-col gap-3.5 hover:bg-slate-50 transition-colors">
+<div class="flex flex-wrap items-center justify-between gap-2">
+<div class="flex items-center gap-2.5">
+<div class="w-8 h-8 rounded-lg bg-sky-100 text-[#0284C7] flex items-center justify-center shadow-xs">
+<span class="material-symbols-outlined text-[20px]">videocam</span>
+</div>
+<div>
+<h3 class="font-headline font-semibold text-sm sm:text-base text-slate-900 flex items-center gap-1.5">
+                  Finished Video / B-Roll (.mp4, .mov)
+                </h3>
+<span class="font-body text-xs text-slate-500">Autonomous spec validation and aspect conformance</span>
+</div>
+</div>
+<div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-200/70 text-slate-700 font-label text-xs font-medium">
+<span class="material-symbols-outlined text-[16px] text-slate-500">verified</span>
+<span>4 verification tests passed</span>
+</div>
+</div>
+<!-- Video Audit + 9:16 Preview Card -->
+<div class="bg-white rounded-lg p-3.5 sm:p-4 shadow-sm flex flex-col sm:flex-row items-center gap-4">
+<!-- 9:16 Vertical Video Preview Component -->
+<div class="relative w-28 h-48 sm:w-32 sm:h-52 rounded-lg overflow-hidden bg-slate-900 shrink-0 shadow-inner group">
+<img class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" data-alt="Vertical 9:16 YouTube Short preview displaying a modern creative workspace, high contrast neon studio lighting, crisp digital graphics overlay, cinematic color grading with rich shadows, sharp mobile framing" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAtkrkOiYFdCk47EjjFWmz7Dws7q2E0Vjm-mXpXNymUs4NascpU3nMyaRaVBMHu2fOxaM7hjeHE0jMTslektSoxj5vdmb9To4oxwA1IstpvKiJvrxFUq-y8yYG-mbav08T6l6PB7Xn2z8fhxTYjmlwyvc8kajD7pgngw47L0L4Q0ClcRWmh2xFEcn_XIZwMroQ4VzcBWU_FkVxOo8_nB0Qus98AH_KPoraSYPf58saB"/>
+<div class="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent flex flex-col justify-between p-2">
+<span class="self-end px-1.5 py-0.5 rounded bg-black/60 text-white font-mono text-[10px]">9:16</span>
+<div class="flex items-center justify-between text-white text-[11px] font-medium">
+<span class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[13px] text-rose-500">smart_display</span>
+<span>Shorts</span>
+</span>
+<span class="font-mono text-[10px]">42s</span>
+</div>
+</div>
+</div>
+<!-- Automatic Spec Checks with Color-Coded Badges -->
+<div class="flex-1 w-full flex flex-col justify-center gap-2.5">
+<div class="text-xs font-semibold text-slate-700 font-headline uppercase tracking-wider">
+                Specification Compliance Audit
+              </div>
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+<!-- Check 1: Aspect -->
+<div class="p-2 rounded-lg bg-emerald-50/70 flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px] text-[#059669]">check_circle</span>
+<span class="font-medium text-slate-800">Aspect ratio 9:16</span>
+</div>
+<span class="text-emerald-700 font-semibold font-mono text-[11px]">1080×1920</span>
+</div>
+<!-- Check 2: Resolution -->
+<div class="p-2 rounded-lg bg-emerald-50/70 flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px] text-[#059669]">check_circle</span>
+<span class="font-medium text-slate-800">High definition</span>
+</div>
+<span class="text-emerald-700 font-semibold font-mono text-[11px]">1080p · 60fps</span>
+</div>
+<!-- Check 3: Duration -->
+<div class="p-2 rounded-lg bg-emerald-50/70 flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px] text-[#059669]">check_circle</span>
+<span class="font-medium text-slate-800">Within Shorts limit</span>
+</div>
+<span class="text-emerald-700 font-semibold font-mono text-[11px]">42s &lt; 60s</span>
+</div>
+<!-- Check 4: Audio track detected / Warning -->
+<div class="p-2 rounded-lg bg-amber-50/80 flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px] text-[#D97706]">schedule</span>
+<span class="font-medium text-slate-800">Audio track muxing</span>
+</div>
+<span class="text-amber-800 font-medium text-[11px] truncate max-w-[130px]" title="Will be replaced by Voiceover step">
+                    Replaced by VO
+                  </span>
+</div>
+</div>
+<!-- Re-upload or replace trigger -->
+<div class="flex items-center justify-between pt-1">
+<span class="text-xs text-slate-400">File: edited_clip_final_render.mp4 (38.4 MB)</span>
+<button class="text-xs font-semibold text-sky-700 hover:text-sky-900 inline-flex items-center gap-1 transition-colors" type="button">
+<span class="material-symbols-outlined text-[14px]">file_upload</span>
+<span>Upload different cut</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Governance & Editorial Controls Section -->
+<div class="px-6 sm:px-8 py-4 bg-slate-50 flex flex-col gap-3">
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+<!-- Quinn the Editor Review Summary -->
+<div class="flex items-start sm:items-center gap-2.5">
+<div class="w-6 h-6 rounded-full bg-gradient-to-tr from-indigo-600 to-violet-500 text-white flex items-center justify-center text-[11px] font-bold shrink-0 mt-0.5 sm:mt-0 shadow-xs">
+              QE
+            </div>
+<div class="text-xs text-slate-600 leading-normal">
+<span>The crew will still check your script with </span>
+<span class="font-semibold text-slate-900 underline decoration-dotted decoration-slate-400 underline-offset-4 cursor-help relative group inline-block">
+                Quinn the Editor
+                <!-- Tooltip -->
+<span class="invisible group-hover:visible absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-60 p-2.5 bg-slate-900 text-white text-[11px] font-normal rounded-lg shadow-xl z-50 pointer-events-none transition-all">
+<strong class="font-semibold text-indigo-300 block mb-0.5">Quality Agent Quinn</strong>
+                  Reviews tone consistency, script pacing, policy compliance, and channel guidelines before rendering.
+                </span>
+</span>
+<span> before final YouTube render.</span>
+</div>
+</div>
+<!-- Safe Toggle Switch: Skip the Editor -->
+<label class="inline-flex items-center gap-2.5 cursor-pointer shrink-0 select-none">
+<div class="relative inline-flex items-center">
+<input class="sr-only peer" id="skipEditorToggle" type="checkbox"/>
+<div class="w-9 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-orange-600"></div>
+</div>
+<div class="flex flex-col">
+<span class="text-xs font-semibold text-slate-800 font-label">Skip the Editor for this video</span>
+<span class="text-[10px] text-slate-400">Disables tone, pacing, and policy guardrails</span>
+</div>
+</label>
+</div>
+<!-- Handoff Note to Echo the Publisher -->
+<div class="flex items-center gap-2 text-xs text-slate-500 bg-white/70 px-3 py-2 rounded-lg">
+<span class="material-symbols-outlined text-[16px] text-slate-400">arrow_forward</span>
+<span>Handoff: <strong class="font-semibold text-slate-700">Echo the Publisher</strong> will automatically queue this for YouTube upload once confirmed.</span>
+</div>
+</div>
+<!-- Modal Footer -->
+<div class="px-6 sm:px-8 py-4 bg-white flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs">
+<!-- Left: Autonomous Revert Action -->
+<button class="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-lg text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors active:scale-95" type="button">
+<span class="material-symbols-outlined text-[18px] text-slate-400">auto_fix_high</span>
+<span>Let the crew make it</span>
+</button>
+<!-- Right: Primary and Cancel Actions -->
+<div class="w-full sm:w-auto flex items-center justify-end gap-2.5">
+<button class="flex-1 sm:flex-none inline-flex items-center justify-center px-4 py-2 rounded-lg text-xs font-medium text-slate-600 hover:text-slate-800 hover:bg-slate-100 transition-colors active:scale-95" type="button">
+<span>Cancel</span>
+</button>
+<button class="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-[#6D4AFF] hover:bg-[#5b3ce0] text-white font-label font-semibold text-xs shadow-md shadow-violet-200 active:scale-95 transition-all" type="button">
+<span class="material-symbols-outlined text-[18px]">publish</span>
+<span>Use these files &amp; update run</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+<script>
+  (function() {
+    const playBtn = document.getElementById('audioToggleBtn');
+    if (playBtn) {
+      let isPlaying = false;
+      playBtn.addEventListener('click', function() {
+        isPlaying = !isPlaying;
+        const icon = playBtn.querySelector('.material-symbols-outlined');
+        if (icon) {
+          icon.textContent = isPlaying ? 'pause' : 'play_arrow';
+        }
+      });
+    }
+
+    const toggle = document.getElementById('skipEditorToggle');
+    if (toggle) {
+      toggle.addEventListener('change', function(e) {
+        if (e.target.checked) {
+          console.info('Guardrails bypassed for this run.');
+        }
+      });
+    }
+  })();
+</script></main>
+</body></html>

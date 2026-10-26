@@ -31,7 +31,9 @@ Your home page.
     post and skips its own run.
 - **Pause schedule**: stops all automatic writing and publishing until you resume (same as creating the
   `workspace/PAUSE` file). Manual runs still work.
-- **Recent runs**: every run with its state, result, cost and number of Supervisor interventions. Click one
+- **App switcher** (top right, shown once a second app is switched on): Overview, Plan, Queue and Run now all follow the
+  chosen app. Each app has its own schedule, plan and queue.
+- **Recent runs**: every run with its state, result, cost, tokens (fresh + cached input, output) and number of Supervisor interventions. Click one
   to open it in Workflow.
 
 ## Plan

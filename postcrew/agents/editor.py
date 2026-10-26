@@ -33,13 +33,39 @@ SCHEMA = {
 }
 
 
+def script_material(ctx, w):
+    """What the Editor reads of a YouTube script: the metadata, every scene, and the length against the target."""
+    spec = ctx.video
+    words = len(w["text"].split())
+    parts = [f"CATEGORY: {ctx.cat['label']}", f"WHAT THIS CATEGORY NEEDS: {ctx.cat['brief']}",
+             f"VIDEO: {spec['format']}, target about {spec['target_seconds']} seconds ({int(spec['max_words'] * 0.7)}-"
+             f"{spec['max_words']} words). This script: {words} words, about {words / 2.5:.0f} seconds, {len(w['scenes'])} scenes."
+             + (" (The owner wrote this script: judge it, do not rewrite it from scratch.)" if w.get("source") == "own" else ""),
+             "", "<draft>", f"TITLE: {w.get('title', '')}", f"THUMBNAIL TEXT: {w.get('thumbnail_text', '')}",
+             f"TAGS: {', '.join(w.get('tags', []))}", "DESCRIPTION:", w.get("description", ""), "", "SCENES:"]
+    for i, sc in enumerate(w["scenes"], 1):
+        parts.append(f"Scene {i} [{sc.get('layout')}, ~{sc.get('seconds', 0):.0f}s] on screen: {sc.get('on_screen') or '-'}"
+                     + (f" | items: {'; '.join(sc['items'])}" if sc.get("items") else "")
+                     + (f"\n  code ({sc.get('language')}):\n  " + sc["code"].replace("\n", "\n  ") if sc.get("code") else ""))
+        parts.append(f"  narration: {sc.get('narration', '')}")
+    parts.append("</draft>")
+    return parts
+
+
 def review_material(ctx, draft=None):
     """draft: review this writer output instead of the accepted one (the writer team's pre-review)."""
     w, m, r = draft or ctx.outputs["writer"], ctx.outputs.get("media") or {}, ctx.outputs.get("research") or {}
-    parts = [f"CATEGORY: {ctx.cat['label']} (length target {ctx.cat['min_chars']}-{ctx.cat['max_chars']} chars)",
-             f"WHAT THIS CATEGORY NEEDS: {ctx.cat['brief']}", "", "<draft>", "POST TEXT:", w["text"], "",
-             f"FIRST COMMENT: {w.get('first_comment') or '(none)'}", "",
-             "TEXT SHOWN ON THE IMAGE/VIDEO:", m.get("shown_text") or "(no media)", "</draft>"]
+    if getattr(ctx, "platform", "linkedin") == "youtube":
+        parts = script_material(ctx, w)
+    else:
+        parts = [f"CATEGORY: {ctx.cat['label']} (any length is fine if the post is clear; 3000 characters at most)",
+                 f"WHAT THIS CATEGORY NEEDS: {ctx.cat['brief']}", "", "<draft>", "POST TEXT:", w["text"], "",
+                 f"FIRST COMMENT: {w.get('first_comment') or '(none)'}", "",
+                 "TEXT SHOWN ON THE IMAGE/VIDEO:", m.get("shown_text") or "(no media)", "</draft>"]
+    if "sysflow" in (m.get("spec") or {}):
+        parts.insert(-1, "(The media is an animated system diagram: its step list is on-screen detail, not a second "
+                         "post. Judge it only for contradictions, wrong names or unsupported claims. Numbers inside example payloads, "
+                         "such as ports, status codes or sizes, are illustrative protocol traffic.)")
     if r.get("reference"):
         parts += ["", "<reference_facts> (trusted, built in)", json.dumps(r["reference"], ensure_ascii=False, indent=1),
                   "</reference_facts>"]
@@ -51,6 +77,8 @@ def review_material(ctx, draft=None):
         parts.append("</sources>")
     elif ctx.cat.get("research") == "required":
         parts += ["", "<sources>none</sources>"]
+    from .. import brief as briefmod
+    parts += briefmod.review_block(briefmod.of(ctx))
     parts += ["", "<about_the_owner> (the only personal facts the post may claim)",
               "\n".join(ctx.profile.get("about", [])) or "(none)", "</about_the_owner>"]
     if ctx.reviews:
@@ -101,6 +129,7 @@ class EditorAgent(Agent):
         system = self.prompt(ctx, red_flags=", ".join(RED_FLAGS))
         material = review_material(ctx)
         runs, errors = [], []
+        early = False
         for i in range(pl["review_runs"]):
             try:
                 runs.append(self.ask(ctx, system, material, SCHEMA))
@@ -108,7 +137,12 @@ class EditorAgent(Agent):
                 if e.fatal:
                     raise
                 errors.append(str(e))
-        if len(runs) < min(2, pl["review_runs"]):
+                continue
+            if self._fails(runs[-1], pl):
+                # the worst score counts, so a failing review cannot be rescued by more of them: send the draft back now
+                early = True
+                break
+        if len(runs) < min(2, pl["review_runs"]) and not early:
             # fail closed: a post is never accepted without a review
             raise AgentError(f"reviewer produced {len(runs)} result(s): {'; '.join(errors)[:300]}")
         worst = min(runs, key=lambda r: r["overall"])
@@ -121,6 +155,11 @@ class EditorAgent(Agent):
         return {"passed": passed, "overall": worst["overall"], "scores": scores, "red_flags": flags,
                 "reasons": worst.get("reasons", ""), "fixes": fixes, "runs": len(runs), "errors": errors,
                 "fix_owner": max(set(owners), key=owners.count) if owners else worst.get("fix_owner", "writer")}
+
+    @staticmethod
+    def _fails(r, pl):
+        return (r["overall"] < pl["min_overall"] or bool(r.get("red_flags"))
+                or min(r["scores"].get(k, 0) for k in CRITERIA) < pl["min_subscore"])
 
     def validate(self, ctx, out):
         if out["passed"]:

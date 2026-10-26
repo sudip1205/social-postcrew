@@ -84,7 +84,7 @@ class CrewTests(unittest.TestCase):
         with TempWorkspace() as ws:
             llm = ScriptedLLM(self.script(
                 writer=[writer(bad), writer()],
-                editor=[review(55, ["unsupported_claim"], owner="research")] * 3 + [review()],
+                editor=[review(55, ["unsupported_claim"], owner="research")] * 1 + [review()],
                 supervisor=[{"action": "retry", "target": "writer", "instructions": ["remove 73%"], "reason": "unsourced"},
                             {"action": "rewind", "target": "research", "instructions": ["verify the claims"],
                              "reason": "editor flagged unsupported claim"}]))
@@ -99,7 +99,7 @@ class CrewTests(unittest.TestCase):
 
     def test_editor_fixes_go_straight_to_their_owner_word_for_word(self, _):
         with TempWorkspace() as ws:
-            llm = ScriptedLLM(self.script(editor=[review(60, owner="media", fixes=["shorter poster title"])] * 3 + [review()],
+            llm = ScriptedLLM(self.script(editor=[review(60, owner="media", fixes=["shorter poster title"])] * 1 + [review()],
                                           supervisor=[LLMError("down", kind="failed")]))
             res = run_crew(ws, TUESDAY, llm=llm, fetch=fake_fetch())
             self.assertTrue(res["ok"], res)
@@ -111,9 +111,30 @@ class CrewTests(unittest.TestCase):
             dec = next(e["data"] for e in evs if e["kind"] == "decision")
             self.assertEqual((dec["action"], dec["target"]), ("rewind", "media"))
 
+    def test_a_failing_review_sends_the_draft_back_without_the_other_reads(self, _):
+        with TempWorkspace() as ws:
+            llm = ScriptedLLM(self.script(editor=[review(60, owner="writer"), review(), review(), review()],
+                                          supervisor=[{"action": "rewind", "target": "writer", "instructions": ["fix"],
+                                                       "reason": "weak"}]))
+            res = run_crew(ws, TUESDAY, llm=llm, fetch=fake_fetch())
+            self.assertTrue(res["ok"], res)
+            # round one: the first read failed, so 1 call, not 3; round two: all 3 reads passed
+            self.assertEqual(llm.agents_called().count("editor"), 1 + 3)
+
+    def test_runs_count_their_tokens(self, _):
+        with TempWorkspace() as ws:
+            from postcrew.runlog import RunLog
+            run = RunLog(ws.runs_dir / "t", "t", meta={})
+            run.add_tokens("writer", {"in": 100, "cached": 50, "out": 10})
+            run.add_tokens("editor", {"in": 20, "cached": 0, "out": 5})
+            run.add_tokens("editor", {"in": 0, "cached": 0, "out": 0})
+            st = json.loads((ws.runs_dir / "t" / "status.json").read_text())
+            self.assertEqual(st["tokens"], {"in": 120, "cached": 50, "out": 15})
+            self.assertEqual(st["steps"]["editor"]["tokens"], {"in": 20, "cached": 0, "out": 5})
+
     def test_editor_rejection_is_never_answered_by_re_reviewing(self, _):
         with TempWorkspace() as ws:
-            llm = ScriptedLLM(self.script(editor=[review(60, owner="writer")] * 3 + [review()],
+            llm = ScriptedLLM(self.script(editor=[review(60, owner="writer")] * 1 + [review()],
                                           supervisor=[{"action": "retry", "target": "editor", "instructions": ["again"],
                                                        "reason": "model chose a pointless retry"}]))
             res = run_crew(ws, TUESDAY, llm=llm, fetch=fake_fetch())
@@ -124,7 +145,7 @@ class CrewTests(unittest.TestCase):
 
     def test_writer_revises_its_previous_draft_after_review(self, _):
         with TempWorkspace() as ws:
-            llm = ScriptedLLM(self.script(editor=[review(60, owner="writer", fixes=["shorten the hook"])] * 3 + [review()]))
+            llm = ScriptedLLM(self.script(editor=[review(60, owner="writer", fixes=["shorten the hook"])] * 1 + [review()]))
             res = run_crew(ws, TUESDAY, llm=llm, fetch=fake_fetch(), dry_run=True)
             self.assertTrue(res["ok"], res)
             second = [c for c in llm.calls if c["agent"] == "writer"][1]["prompt"]
@@ -134,7 +155,7 @@ class CrewTests(unittest.TestCase):
     def test_sent_back_work_gets_the_reasons_and_the_crew_remembers_them(self, _):
         with TempWorkspace() as ws:
             llm = ScriptedLLM(self.script(
-                editor=[review(60, owner="writer", fixes=["shorten the hook"])] * 3 + [review()],
+                editor=[review(60, owner="writer", fixes=["shorten the hook"])] * 1 + [review()],
                 supervisor=[{"action": "rewind", "target": "writer", "instructions": ["cut line 1 to 90 characters"],
                              "reason": "weak hook"}]))
             res = run_crew(ws, TUESDAY, llm=llm, fetch=fake_fetch(), dry_run=True)
@@ -157,7 +178,7 @@ class CrewTests(unittest.TestCase):
 
     def test_editor_sees_its_previous_rounds(self, _):
         with TempWorkspace() as ws:
-            llm = ScriptedLLM(self.script(editor=[review(60, fixes=["Replace line 1 with: 'Acme Model 2: $0.10'"])] * 3
+            llm = ScriptedLLM(self.script(editor=[review(60, fixes=["Replace line 1 with: 'Acme Model 2: $0.10'"])] * 1
                                           + [review()]))
             res = run_crew(ws, TUESDAY, llm=llm, fetch=fake_fetch(), dry_run=True)
             self.assertTrue(res["ok"], res)
@@ -208,17 +229,20 @@ class CrewTests(unittest.TestCase):
             self.assertTrue(res["ok"], res)
             self.assertEqual(ws.queue()[0]["topic"], "Acme agents SDK quickstart")
 
-    def test_category_without_research_skips_researcher(self, _):
+    def test_research_always_runs_even_if_an_old_config_turned_it_off(self, _):
         with TempWorkspace() as ws:
             spec = {"layout": "code", "title": "Default arguments are [[shared]]", "language": "python",
                     "code": "def add(item, items=None):\n    if items is None:\n        items = []\n    items.append(item)\n    return items",
                     "caption": "Use None, then create the list inside"}
+            cfg = ws.config()
+            cfg["categories"]["dev-tip"]["research"] = "off"
+            ws.save_config(cfg)
             llm = ScriptedLLM(self.script(topic=[topic("Mutable default arguments in Python", [])],
                                           writer=[writer(DEV_TIP, "")], media=[spec]))
             res = run_crew(ws, SATURDAY, llm=llm, fetch=fake_fetch())
             self.assertTrue(res["ok"], res)
-            self.assertEqual(status(ws, res["run_id"])["steps"]["research"]["state"], "skipped")
-            self.assertNotIn("research", llm.agents_called())
+            self.assertEqual(status(ws, res["run_id"])["steps"]["research"]["state"], "passed")
+            self.assertEqual(ws.config()["categories"]["dev-tip"]["research"], "optional")
 
     def test_poster_code_that_does_not_parse_is_rejected(self, _):
         with TempWorkspace() as ws:

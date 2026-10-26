@@ -15,13 +15,16 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from .. import __version__, crew, linkedin, notify as notify_mod
+from .. import __version__, assets as assets_mod, crew, linkedin, notify as notify_mod, platforms, voice as voice_mod, youtube
 from ..agents import planner as planner_mod
 from ..agents import team as team_mod
+from .. import brief as brief_mod
 from .. import memory as memory_mod
 from ..agents.credentials import run_check
-from ..agents.publisher import publish_one, scheduled_at
+from ..agents.publisher import publish_post, scheduled_at
 from ..agents.supervisor import CREW, Supervisor
+from ..agents.blackboard import BlackboardAgent
+from ..agents.voice import VoiceAgent
 from ..llm import LLMError, agent_settings, make_backend
 from ..runlog import STEPS, read_events
 from ..workspace import validate_config
@@ -40,14 +43,33 @@ class Studio:
     def redirect_uri(self):
         return f"http://localhost:{self.port}/oauth/callback"
 
+    @property
+    def youtube_redirect_uri(self):
+        return f"http://localhost:{self.port}/oauth/youtube/callback"
+
     # ---------- api ----------
-    def overview(self):
-        cfg = self.ws.config()
-        q = self.ws.queue()
+    def _view(self, platform=None):
+        """(platform id, config as that app sees it). Raises ValueError for an app that does not exist."""
+        platform = platform or platforms.LINKEDIN
+        try:
+            return platform, platforms.view(self.ws.config(), platform)
+        except KeyError:
+            raise ValueError(f"unknown app {platform!r}")
+
+    def overview(self, platform=None):
+        platform, cfg = self._view(platform)
+        full = self.ws.config()
+        q = [p for p in self.ws.queue() if platforms.platform_of(p) == platform]
         now = crew.local_now(cfg)
         target = crew.target_date(cfg, now)
         return {"version": __version__, "workspace": str(self.ws.root), "running": crew.is_running(),
-                "paused": self.ws.paused(), "config_errors": validate_config(cfg),
+                "platform": platform,
+                "platforms": [{"id": p, "label": platforms.label(p), "enabled": platforms.is_enabled(full, p)}
+                              for p in platforms.PLATFORM_IDS],
+                "upcoming": [{"date": d.isoformat(), "category": v["category"], "time": v["time"],
+                              "label": cfg["categories"].get(v["category"], {}).get("label", v["category"])}
+                             for d, v in platforms.upcoming(cfg["schedule"], now.date(), 21)][:7],
+                "paused": self.ws.paused(), "config_errors": validate_config(full),
                 "credentials": self.ws.state("credentials", {}), "notifications": notify_mod.unread(self.ws)[-20:],
                 "queue": {s: sum(1 for p in q if p["status"] == s) for s in
                           ("queued", "awaiting_approval", "approved", "failed", "dry_run")},
@@ -55,13 +77,13 @@ class Studio:
                          "generate_time": cfg["schedule"]["generate_time"], "post_time": cfg["schedule"]["post_time"],
                          "timezone": cfg["schedule"]["timezone"]},
                 "dry_run": cfg["publishing"]["dry_run"], "approval": cfg["publishing"]["approval"],
-                "published": len(self.ws.history())}
+                "published": sum(1 for p in self.ws.history() if platforms.platform_of(p) == platform)}
 
     def agents(self):
         cfg = self.ws.config()
         rows = []
         roster = team_mod.load(self.ws)["members"]
-        for a in [planner_mod.PlannerAgent()] + CREW + [Supervisor()]:
+        for a in [planner_mod.PlannerAgent()] + CREW + [VoiceAgent(), BlackboardAgent(), Supervisor()]:
             role = {"research": "research", "writer": "writer"}.get(a.id)
             members = [m["name"] for m in roster if m["role"] == role][:cfg["team"][role]] if role else []
             rows.append({"id": a.id, "title": a.title, "name": a.name, "role": a.role, "members": members,
@@ -85,18 +107,26 @@ class Studio:
     def start_run(self, body):
         if crew.is_running():
             raise ValueError("a crew run is already in progress")
-        cfg = self.ws.config()
-        errs = validate_config(cfg)
+        platform, cfg = self._view(body.get("platform"))
+        errs = validate_config(self.ws.config())
         if errs:
             raise ValueError("fix the settings first: " + "; ".join(errs[:3]))
         day = body.get("date") or crew.target_date(cfg).isoformat()
         datetime.strptime(day, "%Y-%m-%d")
         category = body.get("category") or None
+        options = {}
+        if body.get("format"):
+            if body["format"] not in ("short", "long"):
+                raise ValueError("format must be short or long")
+            options["format"] = body["format"]
+        if body.get("target_seconds"):
+            options["target_seconds"] = int(body["target_seconds"])
         run_id = self.ws.new_run_id(day)
 
         def go():
             try:
-                crew.run_crew(self.ws, day, category, dry_run=bool(body.get("dry_run")), run_id=run_id)
+                crew.run_crew(self.ws, day, category, dry_run=bool(body.get("dry_run")), run_id=run_id,
+                              platform=platform, options=options)
             except Exception as e:
                 traceback.print_exc()
                 notify_mod.notify(self.ws, "Crew run crashed", str(e)[:300], level="error")
@@ -104,31 +134,36 @@ class Studio:
         return {"run_id": run_id}
 
     # ---------- week plan ----------
-    def plan(self):
+    def plan(self, platform=None):
         """Monday-Sunday of the current week: category, planned topic, and whether it is written or past."""
-        cfg = self.ws.config()
+        platform, cfg = self._view(platform)
         today = crew.local_now(cfg).date()
         week = planner_mod.this_week(today)
-        entries = planner_mod.load_plan(self.ws)
-        queue = {p["date"]: p for p in self.ws.queue() if p.get("status") != "vetoed"}
-        hist = {p.get("date"): p for p in self.ws.history() if not p.get("imported")}
+        entries = planner_mod.load_plan(self.ws, platform)
+        mine = lambda p: platforms.platform_of(p) == platform
+        queue = {p["date"]: p for p in self.ws.queue() if mine(p) and p.get("status") != "vetoed"}
+        hist = {p.get("date"): p for p in self.ws.history() if mine(p) and not p.get("imported")}
         rows = []
         for d in week:
-            iso, cat = d.isoformat(), cfg["schedule"]["days"].get(planner_mod.WEEKDAYS[d.weekday()]) or ""
+            iso, cat = d.isoformat(), crew.category_for(cfg, d) or ""
             c = cfg["categories"].get(cat, {})
             done = hist.get(iso) or queue.get(iso)
-            rows.append({"date": iso, "weekday": d.strftime("%A"), "category": cat, "label": c.get("label", ""),
+            e = entries.get(iso) if (entries.get(iso) or {}).get("category") == cat else None
+            rows.append({"brief_text": brief_mod.to_text(e["brief"]) if e and e.get("brief") else "",
+                         "briefing": brief_mod.briefing_mode(c) if c else "off",
+                         "date": iso, "weekday": d.strftime("%A"), "category": cat, "label": c.get("label", ""),
                          "plan_ahead": c.get("plan_ahead", True), "fixed": c.get("media") == "animation" or cat == "week-recap",
                          "entry": entries.get(iso) if (entries.get(iso) or {}).get("category") == cat else None,
                          "written": ({"status": "published" if iso in hist else done.get("status"),
                                       "topic": done.get("topic", "")} if done else None),
                          "past": d <= today})
-        return {"days": rows, "planning": cfg["planning"], "ideas": planner_mod.idea_status(self.ws, cfg),
+        return {"days": rows, "planning": cfg["planning"], "platform": platform,
+                "ideas": planner_mod.idea_status(self.ws, self.ws.config(), platform),
                 "week": [week[0].isoformat(), week[-1].isoformat()], "today": today.isoformat()}
 
-    def _plan_day(self, day):
+    def _plan_day(self, day, platform=None):
         datetime.strptime(day, "%Y-%m-%d")
-        row = next((r for r in self.plan()["days"] if r["date"] == day), None)
+        row = next((r for r in self.plan(platform)["days"] if r["date"] == day), None)
         if not row or not row["category"]:
             raise ValueError(f"{day} has no post scheduled (or is outside this week)")
         if row["past"]:
@@ -142,51 +177,82 @@ class Studio:
         days = body.get("days")
         if not isinstance(days, dict) or not days:
             raise ValueError("nothing to save")
+        platform = self._view(body.get("platform"))[0]
         checked = []
         for day, v in days.items():
-            row = self._plan_day(day)
+            row = self._plan_day(day, platform)
             topic, angle = (v.get("topic") or "").strip(), (v.get("angle") or "").strip()
             if topic and (not 5 <= len(topic) <= 90 or len(angle) > 400):
                 raise ValueError(f"{row['weekday']}: the topic must be 5-90 characters and the angle under 400")
-            checked.append((day, row, topic, angle))
-        for day, row, topic, angle in checked:
-            self._set_topic(day, row, topic, angle)
-        return self.plan()
+            extra = {}
+            for key in ("format", "target_seconds"):   # a YouTube day's own kind of video; empty = inherit
+                if key in v:
+                    val = v[key]
+                    if key == "format" and val not in ("", None, "short", "long"):
+                        raise ValueError(f"{row['weekday']}: format must be short or long")
+                    if key == "target_seconds" and val not in ("", None):
+                        if not (isinstance(val, (int, float)) or str(val).isdigit()) or not 15 <= int(val) <= 1800:
+                            raise ValueError(f"{row['weekday']}: length must be 15-1800 seconds")
+                        val = int(val)
+                    extra[key] = val or None
+            brief = None
+            if "brief" in v:   # absent = keep the saved brief; empty = clear it
+                try:
+                    brief = brief_mod.normalize(v.get("brief") or {})
+                except brief_mod.BriefError as e:
+                    raise ValueError(f"{row['weekday']}: {e}")
+            checked.append((day, row, topic, angle, brief, extra))
+        for day, row, topic, angle, brief, extra in checked:
+            self._set_topic(day, row, topic, angle, brief, platform, extra)
+        return self.plan(platform)
 
     def plan_edit(self, day, body):
-        return self.plan_save({"days": {day: body}})
+        return self.plan_save({"days": {day: body}, "platform": body.get("platform")})
 
-    def _set_topic(self, day, row, topic, angle):
+    def _set_topic(self, day, row, topic, angle, brief=None, platform=platforms.LINKEDIN, extra=None):
         old = row["entry"] or {}
         if not topic:
-            planner_mod.set_entry(self.ws, day, None)
+            planner_mod.set_entry(self.ws, day, None, platform)
             return
-        if topic == old.get("topic") and angle == old.get("angle", ""):
+        brief = old.get("brief", {}) if brief is None else brief
+        extra = extra or {}
+        if (topic == old.get("topic") and angle == old.get("angle", "") and brief == old.get("brief", {})
+                and all(old.get(k) == v for k, v in extra.items())):
             return  # unchanged: keep who chose it
-        planner_mod.set_entry(self.ws, day, {"category": row["category"], "topic": topic, "angle": angle,
-                                             "search_queries": [] if topic != old.get("topic") else
-                                             old.get("search_queries", []),
-                                             "source": "manual", "rejected": old.get("rejected", [])})
+        entry = {"category": row["category"], "topic": topic, "angle": angle,
+                 "search_queries": [] if topic != old.get("topic") else old.get("search_queries", []),
+                 "source": "manual", "rejected": old.get("rejected", [])}
+        if brief:
+            entry["brief"] = brief
+        for key in ("format", "target_seconds"):
+            val = extra[key] if key in extra else old.get(key)
+            if val:
+                entry[key] = val
+        planner_mod.set_entry(self.ws, day, entry, platform)
 
     def plan_suggest(self, day, body):
-        self._plan_day(day)
+        platform = self._view(body.get("platform"))[0]
+        self._plan_day(day, platform)
         out = planner_mod.PlannerAgent().plan(self.ws, [datetime.strptime(day, "%Y-%m-%d").date()],
-                                              hint=(body.get("hint") or "").strip()[:300], force=True)
+                                              hint=(body.get("hint") or "").strip()[:300], force=True,
+                                              platform=platform)
         if out.get(day, {}).get("error"):
             raise ValueError(f"the planner could not find a new topic: {out[day]['error']}")
-        return self.plan()
+        return self.plan(platform)
 
     def plan_fill(self, body=None):
         """Plan the open days; replan=True also replaces the planner's own topics (yours are kept)."""
+        platform, cfg = self._view((body or {}).get("platform"))
         if (body or {}).get("replan"):
-            today = crew.local_now(self.ws.config()).date()
-            out = planner_mod.PlannerAgent().plan(self.ws, planner_mod.days_left(today), replan=True)
+            today = crew.local_now(cfg).date()
+            out = planner_mod.PlannerAgent().plan(self.ws, planner_mod.days_left(today), replan=True,
+                                                  platform=platform)
             bad = [e["error"] for e in out.values() if "error" in e]
             if bad:
                 raise ValueError(f"{len(bad)} day(s) could not be re-planned: {bad[0]}")
         else:
-            planner_mod.plan_week(self.ws, crew.local_now(self.ws.config()).date())
-        return self.plan()
+            planner_mod.plan_week(self.ws, crew.local_now(cfg).date(), platform=platform)
+        return self.plan(platform)
 
     # ---------- team ----------
     def team(self):
@@ -237,11 +303,12 @@ class Studio:
         datetime.strptime(day, "%Y-%m-%d")
         if not 3 <= len(topic) <= 150 or len(text) > 3000:
             raise ValueError("the topic must be 3-150 characters (and the text under 3,000)")
+        platform, cfg = self._view(body.get("platform"))
         cat = body.get("category") or ""
-        if cat and cat not in self.ws.config()["categories"]:
+        if cat and cat not in cfg["categories"]:
             raise ValueError(f"unknown topic type {cat!r}")
-        self.ws.add_history({"id": "manual-" + pysecrets.token_hex(4), "date": day, "topic": topic, "category": cat,
-                             "text": text, "imported": True, "added_by_hand": True})
+        self.ws.add_history({"id": "manual-" + pysecrets.token_hex(4), "platform": platform, "date": day,
+                             "topic": topic, "category": cat, "text": text, "imported": True, "added_by_hand": True})
         return {"history": self.ws.history()}
 
     def history_remove(self, body):
@@ -264,12 +331,29 @@ class Studio:
         elif action == "veto":
             post["status"] = "vetoed"
         elif action == "restore":
-            post["status"] = "awaiting_approval" if self.ws.config()["publishing"]["approval"] == "manual" else "queued"
+            pcfg = platforms.view(self.ws.config(), platforms.platform_of(post))
+            post["status"] = "awaiting_approval" if pcfg["publishing"]["approval"] == "manual" else "queued"
         elif action == "publish_now":
-            post = publish_one(self.ws, dict(post))
+            post = publish_post(self.ws, dict(post))
             if post["status"] == "published":
                 self.ws.save_queue([p for p in self.ws.queue() if p["id"] != pid])
                 return post
+        elif action == "edit" and platforms.platform_of(post) == "youtube":
+            yt = post.setdefault("youtube", {})
+            title = (body.get("title", yt.get("title")) or "").strip()
+            desc = body.get("description", yt.get("description")) or ""
+            tags = body.get("tags", yt.get("tags", []))
+            if isinstance(tags, str):
+                tags = [t.strip() for t in tags.split(",") if t.strip()]
+            if not 5 <= len(title) <= 100 or len(desc) > 5000 or len(tags) > 15 or sum(len(t) + 1 for t in tags) > 500:
+                raise ValueError("the title must be 5-100 characters, the description under 5,000, and at most 15 tags "
+                                 "(500 characters in all)")
+            yt.update(title=title, description=desc, tags=tags)
+            post["topic"], post["text"], post["edited"] = title, desc, True
+            if body.get("date"):
+                d = datetime.strptime(body["date"], "%Y-%m-%d").date()
+                post["date"], post["scheduled_at"] = d.isoformat(), scheduled_at(
+                    platforms.view(self.ws.config(), "youtube"), d)
         elif action == "edit":
             text = body.get("text", post["text"])
             if not text.strip() or len(text) > 3000:
@@ -277,7 +361,8 @@ class Studio:
             post["text"], post["first_comment"] = text, body.get("first_comment", post.get("first_comment", ""))
             if body.get("date"):
                 d = datetime.strptime(body["date"], "%Y-%m-%d").date()
-                post["date"], post["scheduled_at"] = d.isoformat(), scheduled_at(self.ws.config(), d)
+                post["date"], post["scheduled_at"] = d.isoformat(), scheduled_at(
+                    platforms.view(self.ws.config(), platforms.platform_of(post)), d)
             post["edited"] = True
         elif action == "delete":
             self.ws.save_queue([p for p in posts if p["id"] != pid])
@@ -291,11 +376,13 @@ class Studio:
         llm = self.ws.config()["llm"]
         return {"secrets": self.ws.masked_secrets(), "status": self.ws.state("credentials", {}),
                 "redirect_uri": self.redirect_uri, "scopes": linkedin.SCOPE,
+                "youtube_redirect_uri": self.youtube_redirect_uri,
                 "backend": llm["backend"], "base_url": llm.get("api", {}).get("base_url", "")}
 
     def save_credentials(self, body):
         allowed = {"linkedin_client_id", "linkedin_client_secret", "gmail_address", "gmail_app_password", "email_to",
-                   "telegram_bot_token", "telegram_chat_id", "anthropic_api_key", "openai_api_key", "llm_api_key"}
+                   "telegram_bot_token", "telegram_chat_id", "anthropic_api_key", "openai_api_key", "llm_api_key",
+                   "youtube_client_id", "youtube_client_secret", "elevenlabs_api_key"}
         changes = {k: (v.strip() if isinstance(v, str) else v) for k, v in body.items() if k in allowed}
         if any(k not in allowed for k in body):
             raise ValueError(f"only these can be set here: {sorted(allowed)}")
@@ -305,6 +392,12 @@ class Studio:
         cid = changes.get("linkedin_client_id")
         if cid and not re.fullmatch(r"[A-Za-z0-9]{8,40}", cid):
             raise ValueError("linkedin_client_id should be the 8-40 letter/digit Client ID from the app's Auth tab")
+        if changes.get("youtube_client_id") and not re.fullmatch(r"[0-9]+-[A-Za-z0-9_]+\.apps\.googleusercontent\.com",
+                                                                 changes["youtube_client_id"]):
+            raise ValueError("youtube_client_id should look like 1234567890-abc123.apps.googleusercontent.com "
+                             "(Google Cloud > APIs & Services > Credentials)")
+        if "youtube_client_id" in changes or "youtube_client_secret" in changes:   # new app: the old connection is void
+            changes.setdefault("youtube_refresh_token", None)
         for k in ("gmail_address", "email_to"):
             if changes.get(k) and not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", changes[k]):
                 raise ValueError(f"{k} should be an email address")
@@ -360,6 +453,99 @@ class Studio:
                                                          f"until {expires.date().isoformat()}.", level="success")
         return info.get("name", "")
 
+    # ---------- YouTube ----------
+    def youtube_start(self):
+        s = self.ws.secrets()
+        if not (s.get("youtube_client_id") and s.get("youtube_client_secret")):
+            raise ValueError("save the Google OAuth client ID and secret first")
+        state = "yt-" + pysecrets.token_urlsafe(24)
+        self.oauth_states = {k: v for k, v in self.oauth_states.items()
+                             if v > datetime.now(timezone.utc) - timedelta(minutes=15)}
+        self.oauth_states[state] = datetime.now(timezone.utc)
+        return youtube.auth_url(s["youtube_client_id"], self.youtube_redirect_uri, state)
+
+    def youtube_callback(self, q):
+        if q.get("error"):
+            raise ValueError(f"Google said: {q['error']}")
+        state = q.get("state", "")
+        if state not in self.oauth_states or not state.startswith("yt-"):
+            raise ValueError("sign-in expired or did not start here; click Connect YouTube again")
+        del self.oauth_states[state]
+        s = self.ws.secrets()
+        tok = youtube.exchange_code(s["youtube_client_id"], s["youtube_client_secret"], q["code"], self.youtube_redirect_uri)
+        if not tok.get("refresh_token"):
+            raise ValueError("Google did not return a refresh token: remove Postcrew from myaccount.google.com/permissions "
+                             "and connect again")
+        ch = youtube.YouTube(s["youtube_client_id"], s["youtube_client_secret"], tok["refresh_token"]).channel()
+        self.ws.update_secrets(youtube_refresh_token=tok["refresh_token"], youtube_channel_title=ch.get("title", ""))
+        run_check(self.ws, notify_user=False)
+        notify_mod.notify(self.ws, "YouTube connected", f"Connected to the channel {ch.get('title', '')}.", level="success")
+        return ch.get("title", "")
+
+    def disconnect(self, app):
+        if app == "youtube":
+            self.ws.update_secrets(youtube_refresh_token=None, youtube_channel_title=None)
+        elif app in ("linkedin", None):
+            self.ws.update_secrets(linkedin_access_token=None, linkedin_token_expires_at=None,
+                                   linkedin_person_urn=None, linkedin_name=None)
+        else:
+            raise ValueError(f"unknown app {app!r}")
+        return run_check(self.ws, notify_user=False)
+
+    # ---------- voice ----------
+    def _voice_key(self):
+        key = self.ws.secrets().get("elevenlabs_api_key")
+        if not key:
+            raise ValueError("add your ElevenLabs API key in Credentials first")
+        return key
+
+    def test_voice(self):
+        try:
+            r = voice_mod.check_key(self._voice_key())
+        except voice_mod.VoiceError as e:
+            return {"ok": False, "message": str(e), "characters_left": None}
+        return {"ok": r["ok"], "message": r["message"], "characters_left": r.get("characters_left")}
+
+    def voices(self):
+        try:
+            return {"voices": voice_mod.list_voices(self._voice_key())}
+        except voice_mod.VoiceError as e:
+            raise ValueError(str(e))
+
+    def voice_sample(self, body):
+        voice_id = str(body.get("voice_id") or "")
+        if not re.fullmatch(r"[A-Za-z0-9]{8,40}", voice_id):
+            raise ValueError("pick a voice first")
+        text = (body.get("text") or "This is how your videos will sound. Short sentences, clear words, one idea at a time.")[:300]
+        vcfg = dict(self.ws.config()["platforms"]["youtube"]["video"]["voice"], voice_id=voice_id)
+        try:
+            r = voice_mod.cached_synthesize(self.ws.root, text, vcfg, self._voice_key())
+        except voice_mod.VoiceError as e:
+            raise ValueError(str(e))
+        dest = self.ws.root / "media" / f"sample-{Path(r['path']).stem}.mp3"
+        dest.parent.mkdir(exist_ok=True)
+        if not dest.exists():
+            dest.write_bytes(Path(r["path"]).read_bytes())
+        return {"url": f"/media/{dest.name}"}
+
+    # ---------- the owner's own script, voice and video ----------
+    def assets_list(self, platform, day):
+        return {"assets": assets_mod.describe(self.ws, platform, day, platforms.view(self.ws.config(), platform))}
+
+    def asset_upload(self, platform, day, kind, name, rfile, length):
+        try:
+            assets_mod.save_stream(self.ws, platform, day, kind, name, rfile, length)
+        except assets_mod.AssetError as e:
+            raise ValueError(str(e))
+        return self.assets_list(platform, day)
+
+    def asset_remove(self, platform, day, kind):
+        try:
+            assets_mod.remove(self.ws, platform, day, kind)
+        except assets_mod.AssetError as e:
+            raise ValueError(str(e))
+        return self.assets_list(platform, day)
+
     def test_ai(self):
         try:
             res = make_backend(self.ws.config(), self.ws.secrets()).call(
@@ -414,8 +600,47 @@ def make_handler(studio):
             path = Path(path).resolve()
             if root.resolve() not in path.parents or not path.is_file():
                 return self.send(404, {"error": "not found"})
-            ctype = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+            ctype = ({".woff2": "font/woff2", ".js": "text/javascript", ".css": "text/css"}.get(path.suffix)
+                     or mimetypes.guess_type(path.name)[0] or "application/octet-stream")
             return self.send(200, body=path.read_bytes(), ctype=ctype)
+
+        def media(self, path, root):
+            """Images, audio and video, streamed in pieces and with Range support so <video> can seek."""
+            path = Path(path).resolve()
+            if root.resolve() not in path.parents or not path.is_file():
+                return self.send(404, {"error": "not found"})
+            size = path.stat().st_size
+            ctype = {".mp4": "video/mp4", ".mp3": "audio/mpeg", ".png": "image/png"}.get(path.suffix) \
+                or mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+            start, end, code = 0, size - 1, 200
+            m = re.match(r"bytes=(\d*)-(\d*)$", self.headers.get("Range", ""))
+            if m and (m.group(1) or m.group(2)):
+                if m.group(1):
+                    start = int(m.group(1))
+                    end = int(m.group(2)) if m.group(2) else size - 1
+                else:
+                    start = max(0, size - int(m.group(2)))
+                if start >= size or end < start:
+                    return self.send(416, {"error": "range not satisfiable"}, headers={"Content-Range": f"bytes */{size}"})
+                end, code = min(end, size - 1), 206
+            self.send_response(code)
+            self.send_header("Content-Type", ctype)
+            self.send_header("Content-Length", str(end - start + 1))
+            self.send_header("Accept-Ranges", "bytes")
+            self.send_header("X-Content-Type-Options", "nosniff")
+            if code == 206:
+                self.send_header("Content-Range", f"bytes {start}-{end}/{size}")
+            self.end_headers()
+            if self.command != "HEAD":
+                with open(path, "rb") as f:
+                    f.seek(start)
+                    left = end - start + 1
+                    while left:
+                        chunk = f.read(min(1 << 20, left))
+                        if not chunk:
+                            break
+                        self.wfile.write(chunk)
+                        left -= len(chunk)
 
         def page(self, title, message, ok=True):
             html = (f"<!doctype html><meta charset=utf-8><title>{title}</title><body style='font:16px system-ui;"
@@ -451,7 +676,7 @@ def make_handler(studio):
                 if method == "GET" and p.startswith("/static/"):
                     return self.file(STATIC / p[len("/static/"):], STATIC)
                 if method == "GET" and p.startswith("/media/"):
-                    return self.file(ws.root / "media" / p[len("/media/"):], ws.root / "media")
+                    return self.media(ws.root / "media" / p[len("/media/"):], ws.root / "media")
                 if method == "GET" and p == "/oauth/start":
                     try:
                         return self.send(302, {}, headers={"Location": studio.oauth_start()})
@@ -472,6 +697,28 @@ def make_handler(studio):
                         return self.file(ws.runs_dir / run_id / name, ws.runs_dir / run_id)
                     d = studio.run_detail(run_id, float(q.get("after", 0)))
                     return self.send(200, d) if d else self.send(404, {"error": "no such run"})
+                if method == "GET" and p == "/oauth/youtube/start":
+                    try:
+                        return self.send(302, {}, headers={"Location": studio.youtube_start()})
+                    except ValueError as e:
+                        return self.page("Cannot connect yet", str(e), ok=False)
+                if method == "GET" and p == "/oauth/youtube/callback":
+                    try:
+                        name = studio.youtube_callback(q)
+                        return self.page("YouTube connected", f"Connected to {name or 'your channel'}. You can close this tab.")
+                    except (ValueError, youtube.YouTubeError, KeyError) as e:
+                        return self.page("YouTube sign-in failed", str(e), ok=False)
+                m = re.match(r"^/api/assets/([a-z0-9-]+)/(\d{4}-\d{2}-\d{2})(?:/(remove))?$", p)
+                if m:
+                    platform, day, remove = m.groups()
+                    if method == "GET" and not remove:
+                        return self.send(200, studio.assets_list(platform, day))
+                    if method == "POST" and remove:
+                        return self.send(200, studio.asset_remove(platform, day, self.body().get("kind", "")))
+                    if method == "POST":
+                        n = int(self.headers.get("Content-Length") or 0)
+                        return self.send(200, studio.asset_upload(platform, day, q.get("kind", ""), q.get("name", ""),
+                                                                  self.rfile, n))
                 m = re.match(r"^/api/team/(fire|hire|lesson-remove)$", p)
                 if m and method == "POST":
                     return self.send(200, studio.team_action(m.group(1), self.body()))
@@ -483,8 +730,8 @@ def make_handler(studio):
                 if method == "POST" and m:
                     return self.send(200, studio.queue_action(m.group(1), m.group(2), self.body()))
                 routes = {
-                    ("GET", "/api/overview"): lambda: studio.overview(),
-                    ("GET", "/api/plan"): lambda: studio.plan(),
+                    ("GET", "/api/overview"): lambda: studio.overview(q.get("platform")),
+                    ("GET", "/api/plan"): lambda: studio.plan(q.get("platform")),
                     ("GET", "/api/team"): lambda: studio.team(),
                     ("GET", "/api/memory"): lambda: studio.memory(),
                     ("POST", "/api/memory/forget"): lambda: studio.memory_forget(self.body()),
@@ -502,7 +749,10 @@ def make_handler(studio):
                     ("GET", "/api/credentials"): lambda: studio.credentials(),
                     ("PUT", "/api/credentials"): lambda: studio.save_credentials(self.body()),
                     ("POST", "/api/credentials/check"): lambda: run_check(ws),
-                    ("POST", "/api/credentials/disconnect"): lambda: self.disconnect(),
+                    ("POST", "/api/credentials/disconnect"): lambda: studio.disconnect(self.body().get("app")),
+                    ("POST", "/api/credentials/test-voice"): lambda: studio.test_voice(),
+                    ("GET", "/api/voices"): lambda: studio.voices(),
+                    ("POST", "/api/voices/sample"): lambda: studio.voice_sample(self.body()),
                     ("POST", "/api/credentials/test-ai"): lambda: studio.test_ai(),
                     ("GET", "/api/notifications"): lambda: ws.state("notifications", {"items": []}),
                     ("POST", "/api/notifications/read"): lambda: (notify_mod.mark_read(ws, self.body().get("ids")),
@@ -533,11 +783,6 @@ def make_handler(studio):
                 return {"ok": False, "errors": errs}
             studio.ws.save_config(cfg)
             return {"ok": True, "config": studio.ws.config()}
-
-        def disconnect(self):
-            studio.ws.update_secrets(linkedin_access_token=None, linkedin_token_expires_at=None,
-                                     linkedin_person_urn=None, linkedin_name=None)
-            return run_check(studio.ws, notify_user=False)
 
         def pause(self):
             flag = studio.ws.root / "PAUSE"

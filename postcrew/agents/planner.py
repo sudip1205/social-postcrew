@@ -11,7 +11,10 @@ import re
 import threading
 from datetime import date, datetime, timedelta, timezone
 
+from .. import brief as briefmod
+from .. import platforms
 from ..checks import repeat_problem
+from ..platforms import LINKEDIN
 from ..render import tracers
 from ..runlog import RunLog
 from ..workspace import WEEKDAYS
@@ -28,31 +31,34 @@ SCHEMA = {
             "topic": {"type": "string", "description": "Short topic name, 5-90 chars"},
             "angle": {"type": "string", "description": "What the reader will learn or be able to do"},
             "search_queries": {"type": "array", "items": {"type": "string"}, "maxItems": 5},
+            **briefmod.BRIEF_PROPS,
         },
-        "required": ["date", "topic", "angle", "search_queries"], "additionalProperties": False}}},
+        "required": ["date", "topic", "angle", "search_queries"] + list(briefmod.BRIEF_PROPS),
+        "additionalProperties": False}}},
     "required": ["days"],
     "additionalProperties": False,
 }
 
 
 # ---------- the plan file ----------
-def load_plan(ws):
-    return ws.state("plan", {"days": {}})["days"]
+def load_plan(ws, platform=LINKEDIN):
+    return ws.state(platforms.state_name("plan", platform), {"days": {}})["days"]
 
 
-def set_entry(ws, day, entry):
-    """entry None removes the day (the Topic Scout then picks the topic the day before)."""
+def set_entry(ws, day, entry, platform=LINKEDIN):
+    """entry None removes the day (the Topic Scout then picks the topic the day before). Each app has its own plan."""
+    name = platforms.state_name("plan", platform)
     with _lock:
-        data = ws.state("plan", {"days": {}})
+        data = ws.state(name, {"days": {}})
         if entry is None:
             data["days"].pop(day, None)
         else:
             data["days"][day] = dict(entry, updated_at=datetime.now(timezone.utc).isoformat(timespec="seconds"))
-        ws.save_state("plan", data)
+        ws.save_state(name, data)
 
 
-def planned_for(ws, day, category):
-    e = load_plan(ws).get(day.isoformat() if hasattr(day, "isoformat") else day)
+def planned_for(ws, day, category, platform=LINKEDIN):
+    e = load_plan(ws, platform).get(day.isoformat() if hasattr(day, "isoformat") else day)
     return e if e and e.get("category") == category and e.get("topic") else None
 
 
@@ -67,11 +73,11 @@ def days_left(today):
     return [d for d in this_week(today) if d > today]
 
 
-def idea_status(ws, cfg=None):
+def idea_status(ws, cfg=None, platform=LINKEDIN):
     """{category: [{"idea", "used_on"}]}: used_on = date of the published or planned post that covers the idea."""
-    cfg = cfg or ws.config()
-    plan = load_plan(ws)
-    covered = [{"topic": p.get("topic", ""), "date": p.get("date", "")} for p in ws.recent_posts(200)]
+    cfg = platforms.view(cfg or ws.config(), platform)
+    plan = load_plan(ws, platform)
+    covered = [{"topic": p.get("topic", ""), "date": p.get("date", "")} for p in ws.recent_posts(200, platform)]
     covered += [{"topic": e.get("topic", ""), "date": d} for d, e in plan.items() if e.get("topic")]
     out = {}
     for cid, c in cfg["categories"].items():
@@ -83,7 +89,14 @@ def idea_status(ws, cfg=None):
     return out
 
 
+def idea_title(idea):
+    """An idea may carry its own context after '::' ("Circuit breaker :: closed, open, half-open; Resilience4j"); only the
+    title is matched against posts already made."""
+    return idea.split("::", 1)[0].strip()
+
+
 def idea_matches(idea, topic):
+    idea = idea_title(idea)
     words = lambda s: {w for w in re.findall(r"[a-z0-9+#]+", s.lower()) if len(w) > 2 and w not in STOP}
     a, b = words(idea), words(topic)
     return bool(a) and (repeat_problem(idea, "", [{"topic": topic}]) is not None or len(a & b) >= max(1, (len(a) + 1) // 2))
@@ -92,11 +105,12 @@ def idea_matches(idea, topic):
 STOP = {"the", "and", "for", "with", "how", "why", "what", "you", "your", "into", "from", "explained", "about", "using"}
 
 
-def taken_dates(ws):
-    """Dates already written (queued) or published by Postcrew: their topic can no longer be planned.
+def taken_dates(ws, platform=LINKEDIN):
+    """Dates already written (queued) or published by Postcrew on this app: their topic can no longer be planned.
     Imported posts only count for repeats; their dates came from another tool."""
-    return ({p["date"] for p in ws.queue() if p.get("status") not in ("vetoed", "failed")}
-            | {p.get("date") for p in ws.history() if not p.get("imported")})
+    mine = lambda p: platforms.platform_of(p) == platform
+    return ({p["date"] for p in ws.queue() if mine(p) and p.get("status") not in ("vetoed", "failed")}
+            | {p.get("date") for p in ws.history() if mine(p) and not p.get("imported")})
 
 
 class PlannerAgent(Agent):
@@ -105,16 +119,16 @@ class PlannerAgent(Agent):
     name = "Vega"
     role = "Drafts the topic for every remaining day of this week; you can edit any day or ask for another topic."
 
-    def plan(self, ws, days, llm=None, hint="", force=False, replan=False):
+    def plan(self, ws, days, llm=None, hint="", force=False, replan=False, platform=LINKEDIN):
         """Plan `days` (dates). force=True also plans fresh-news days and replaces existing entries, rejecting
         the old topic ('Suggest another'). replan=True replaces the planner's own entries without rejecting them
         (after you change your ideas); topics you typed yourself are kept. Returns {date: entry or {"error"}}."""
         from ..llm import make_backend
-        cfg = ws.config()
-        plan, taken = load_plan(ws), taken_dates(ws)
+        cfg = platforms.view(ws.config(), platform)
+        plan, taken = load_plan(ws, platform), taken_dates(ws, platform)
         todo = []
         for d in days:
-            iso, cat = d.isoformat(), cfg["schedule"]["days"].get(WEEKDAYS[d.weekday()])
+            iso, cat = d.isoformat(), platforms.category_for(cfg["schedule"], d)
             if not cat or cat not in cfg["categories"] or iso in taken:
                 continue
             e, ahead = plan.get(iso), cfg["categories"][cat].get("plan_ahead", True)
@@ -127,8 +141,10 @@ class PlannerAgent(Agent):
         if not todo:
             return {}
         run_id = datetime.now().strftime("plan-%Y%m%d-%H%M%S")
-        run = RunLog(ws.root / "plans" / run_id, run_id, meta={"dates": [d.isoformat() for d, _ in todo]})
-        ctx = RunContext(ws=ws, cfg=cfg, day=todo[0][0], category=todo[0][1], run=run, llm=llm or make_backend(cfg, ws.secrets()))
+        run = RunLog(ws.root / "plans" / run_id, run_id, meta={"dates": [d.isoformat() for d, _ in todo],
+                                                               "platform": platform})
+        ctx = RunContext(ws=ws, cfg=cfg, day=todo[0][0], category=todo[0][1], run=run, llm=llm or make_backend(cfg, ws.secrets()),
+                         platform=platform)
         run.event("planner", "started", f"planning {len(todo)} day(s): {', '.join(d.isoformat() for d, _ in todo)}")
         out = {}
         for d, cat in [x for x in todo if cfg["categories"][x[1]]["media"] == "animation" or x[1] == "week-recap"]:
@@ -142,7 +158,7 @@ class PlannerAgent(Agent):
                 old = plan.get(iso) or {}
                 rejected = (old.get("rejected", []) + ([old["topic"]] if force and not replan and old.get("topic")
                                                        else []))[-10:]
-                set_entry(ws, iso, dict(e, rejected=rejected))
+                set_entry(ws, iso, dict(e, rejected=rejected), platform)
         ok = sum(1 for e in out.values() if "error" not in e)
         run.finish("succeeded" if ok == len(out) else "failed", f"planned {ok} of {len(out)} day(s)")
         return out
@@ -173,6 +189,7 @@ class PlannerAgent(Agent):
             ideas = [i for i in c.get("ideas", []) if not any(idea_matches(i, t) for t in covered + avoid)]
             blocks[d.isoformat()] = (f"DATE {d.isoformat()} ({d.strftime('%A')}) - category {cat}: {c['label']}\n"
                                      f"What it needs: {c['brief']}\nResearch: {c.get('research', 'optional')}"
+                                     + (("\n" + briefmod.cat_context(c)) if briefmod.cat_context(c) else "")
                                      + (f"\nTHE OWNER'S TOPIC IDEAS for this category, not used yet: {ideas}. Base this "
                                         f"day on one of them (the earliest that fits); use each idea once across the plan."
                                         if ideas else "")
@@ -206,6 +223,9 @@ class PlannerAgent(Agent):
                     continue
                 result[iso] = {"category": cat, "topic": x["topic"].strip(), "angle": x["angle"].strip(),
                                "search_queries": x.get("search_queries", []), "source": "planner"}
+                brief = self._brief(ctx, x, cat)
+                if brief:
+                    result[iso]["brief"] = brief
                 chosen.append(x["topic"])
             ctx.run.event("planner", "validated", f"attempt {attempt}: {len(result)} of {len(todo)} day(s) accepted",
                           {"problems": guidance}, level="warning" if guidance else "info")
@@ -216,6 +236,28 @@ class PlannerAgent(Agent):
                                                     if g.startswith(d_iso(x)))[:300]
                                          or "the planner could not find a topic"})
         return result
+
+    def _brief(self, ctx, x, cat):
+        """The day's brief (context, real-world example, pattern, animation) the planner wrote with the topic."""
+        if briefmod.briefing_mode(ctx.cfg["categories"][cat]) == "off":
+            return {}
+        raw = {k: x.get(k) for k in briefmod.BRIEF_PROPS if x.get(k)}
+        if raw.get("example_kind") == "incident" and not raw.get("references"):
+            raw["example_kind"] = "scenario"        # an incident needs a primary source to be treated as real
+        raw["visual_type"] = raw.pop("visual", "") or ""
+        raw["generated"] = [k for k in ("context", "example", "takeaway", "pattern", "question", "systems", "flow")
+                            if raw.get(k)]
+        for attempt in (0, 1):
+            try:
+                return briefmod.normalize(raw)
+            except briefmod.BriefError as e:
+                ctx.run.event("planner", "brief", f"{x.get('date')}: brief problem ({e}); "
+                              + ("kept the text, dropped the animation steps" if not attempt else "no brief for this day"),
+                              level="warning")
+                raw.pop("systems", None), raw.pop("flow", None)
+                if attempt:
+                    return {}
+        return {}
 
     def problems(self, ctx, x, cat, chosen, old):
         if not x:
@@ -240,18 +282,19 @@ def d_iso(item):
     return item[0].isoformat()
 
 
-def plan_week(ws, today, llm=None):
-    """The scheduler's weekly job: plan the open days left in the current week."""
-    out = PlannerAgent().plan(ws, days_left(today), llm=llm)
+def plan_week(ws, today, llm=None, platform=LINKEDIN):
+    """The scheduler's weekly job: plan the open days left in the current week, for one app."""
+    out = PlannerAgent().plan(ws, days_left(today), llm=llm, platform=platform)
     if not out:
         return out
     bad = {k: e["error"] for k, e in out.items() if "error" in e}
     from ..notify import notify
-    cats = ws.config()["categories"]
+    cats = platforms.view(ws.config(), platform)["categories"]
     rows = [(date.fromisoformat(d).strftime("%a %d %b"), f"could not plan: {e['error']}" if "error" in e else
              f"{e['topic']}  ({cats.get(e.get('category'), {}).get('label', e.get('category', ''))})")
             for d, e in sorted(out.items())]
-    notify(ws, "This week's topics are ready" if not bad else "Some topics could not be planned",
+    who = "" if platform == LINKEDIN else f"{platforms.label(platform)}: "
+    notify(ws, who + ("This week's topics are ready" if not bad else "Some topics could not be planned"),
            f"{len(out) - len(bad)} day(s) planned" + (f"; {len(bad)} failed: {next(iter(bad.values()))}" if bad else "")
            + ". Review or change them in the Plan tab.", level="warning" if bad else "info",
            action={"label": "Open the plan", "tab": "plan"}, details={"rows": rows})

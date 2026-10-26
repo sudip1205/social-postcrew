@@ -75,3 +75,18 @@ python3 -m unittest discover -s tests
 
 No network, no tokens, about 20 seconds. Tests for the algorithm animations need Java and ffmpeg; CI
 installs both (`.github/workflows/tests.yml`).
+
+## The Studio's look (Stitch)
+
+The Studio UI is built from the Stitch design saved in `design/stitch/` (screens as HTML + PNG, plus `design.md`). Never restyle
+from memory: copy the screen.
+
+- `postcrew/studio/static/index.html` + `app.js`: the shell (top bar, app switcher, banner, footer), router and API helpers.
+- `ui.js`: shared components (icons, status chips, app badges, tooltips, buttons). `views/<tab>.js`: one file per screen.
+- `tailwind.css`, `fonts.css`, `fonts/` are **generated** by `python3 scripts/build_ui_assets.py` (Tailwind for the classes in
+  the screens and views, plus only the Material Symbols icons used). The Studio loads nothing from the internet.
+- Design changed in Stitch? `python3 scripts/stitch_sync.py`, then rebuild, then update the matching view.
+  `python3 scripts/stitch_check.py` checks the views still follow it (no emoji icons, no old classes, known icons and classes).
+- Where the Studio differs from Stitch on purpose: `design/DEVIATIONS.md`.
+
+Claude Code users get this wired in: the `stitch-ui` and `stitch-sync` skills and hooks in `.claude/` keep UI changes on the design.

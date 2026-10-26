@@ -16,7 +16,7 @@ Rules that never bend:
    take:"). Never state them as fact, and never invent a comparison with an older product the sources do not make.
 
 Format:
-- Length {{min_chars}}-{{max_chars}} characters.
+- Length: as long as the post needs to be clear and useful, with no padding (LinkedIn allows at most 3,000 characters).
 - The first line is a specific hook, at most ~150 characters so it shows above "...see more": the single
   most concrete fact you have (a name, number, date, command or result), not a general statement. Not a
   question, not clickbait.

@@ -43,6 +43,18 @@ class LLMResult:
     turns: int = 0
     raw: dict = field(default_factory=dict)
 
+    @property
+    def tokens(self):
+        """{"in", "cached", "out"} from whichever usage shape the provider returned (all zero when it gave none)."""
+        u = (self.raw or {}).get("usage") or {}
+        cached = u.get("cache_read_input_tokens") or (u.get("input_tokens_details") or {}).get("cached_tokens") \
+            or (u.get("prompt_tokens_details") or {}).get("cached_tokens") or 0
+        fresh = (u.get("input_tokens") if u.get("input_tokens") is not None else u.get("prompt_tokens")) or 0
+        if "cache_read_input_tokens" not in u:   # OpenAI-style: cached tokens are already counted in the input
+            fresh = max(0, fresh - cached)
+        fresh += u.get("cache_creation_input_tokens") or 0
+        return {"in": int(fresh), "cached": int(cached), "out": int(u.get("output_tokens") or u.get("completion_tokens") or 0)}
+
 
 def agent_settings(cfg, agent_id):
     llm = cfg["llm"]
@@ -225,16 +237,22 @@ class Anthropic(APIBackend):
                  "input_schema": schema}]
         if search:
             spec.append({"type": "web_search_20250305", "name": "web_search", "max_uses": 5})
-        messages, cost, turns, force = [{"role": "user", "content": prompt}], 0.0, 0, not search
+        # The system prompt (rubric, voice, facts about you) is the same on every call an agent makes in a run, so
+        # it is cached: a repeat read costs a tenth. The Editor sends the same whole request several times.
+        ephemeral = {"type": "ephemeral"}
+        content = [{"type": "text", "text": prompt, **({"cache_control": ephemeral} if agent_id == "editor" else {})}]
+        messages, cost, turns, force = [{"role": "user", "content": content}], 0.0, 0, not search
+        system_blocks = [{"type": "text", "text": system, "cache_control": ephemeral}]
         while turns < 8:
             turns += 1
-            r = self.post("/messages", {"model": model, "max_tokens": max_tokens, "system": system,
+            r = self.post("/messages", {"model": model, "max_tokens": max_tokens, "system": system_blocks,
                                         "messages": messages, "tools": spec,
                                         "tool_choice": {"type": "tool", "name": "respond"} if force else {"type": "auto"}},
                           timeout)
             u = r.get("usage") or {}
-            cost += self.cost(model, u.get("input_tokens", 0) + u.get("cache_read_input_tokens", 0)
-                              + u.get("cache_creation_input_tokens", 0), u.get("output_tokens", 0),
+            # cache reads cost 0.1x the input price, cache writes 1.25x
+            cost += self.cost(model, u.get("input_tokens", 0) + 0.1 * u.get("cache_read_input_tokens", 0)
+                              + 1.25 * u.get("cache_creation_input_tokens", 0), u.get("output_tokens", 0),
                               (u.get("server_tool_use") or {}).get("web_search_requests", 0))
             for block in r.get("content") or []:
                 if block.get("type") == "tool_use" and block.get("name") == "respond":

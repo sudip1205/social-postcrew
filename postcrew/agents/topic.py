@@ -1,6 +1,7 @@
 """Topic agent: decides what today's post is about, from the day's category and what was posted before."""
 from datetime import timedelta
 
+from .. import brief as briefmod
 from ..checks import repeat_problem
 from ..render import tracers
 from .base import Agent, AgentError, guidance_block, recent_block
@@ -20,6 +21,26 @@ SCHEMA = {
 }
 
 
+_SYSTEM = {"type": "object", "required": ["id", "label", "kind"], "additionalProperties": False,
+           "properties": {"id": {"type": "string"}, "label": {"type": "string"},
+                          "kind": {"type": "string", "enum": briefmod.COMPONENT_KINDS}, "note": {"type": "string"}}}
+_STEP = {"type": "object", "required": ["from", "to", "label"], "additionalProperties": False,
+         "properties": {"from": {"type": "string"}, "to": {"type": "string"}, "label": {"type": "string"},
+                        "kind": {"type": "string", "enum": briefmod.STEP_KINDS}, "payload": {"type": "string"},
+                        "caption": {"type": "string"}, "scene": {"type": "string"}}}
+BRIEF_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "context": {"type": "string"}, "example": {"type": "string"}, "takeaway": {"type": "string"},
+        "pattern": {"type": "string", "enum": list(briefmod.PATTERNS)}, "question": {"type": "string"},
+        "systems": {"type": "array", "items": _SYSTEM, "maxItems": 8},
+        "flow": {"type": "array", "items": _STEP, "maxItems": 12},
+    },
+    "required": ["context", "example", "takeaway", "pattern", "question", "systems", "flow"],
+    "additionalProperties": False,
+}
+
+
 class TopicAgent(Agent):
     id = "topic"
     title = "Topic Scout"
@@ -27,7 +48,7 @@ class TopicAgent(Agent):
     role = "Picks today's topic from the schedule, avoiding anything already posted."
 
     def run(self, ctx, guidance):
-        planned = None if guidance else planned_for(ctx.ws, ctx.day, ctx.category)
+        planned = None if guidance else planned_for(ctx.ws, ctx.day, ctx.category, ctx.platform)
         if planned:  # the Week Planner or the owner already chose this day's topic
             return self._planned(ctx, planned)
         if ctx.cat["media"] == "animation":
@@ -42,7 +63,8 @@ class TopicAgent(Agent):
                      f"{(ctx.day - timedelta(days=age)).isoformat()} and {ctx.day.isoformat()}. Older news is "
                      f"rejected.\n" if age else "")
                   + f"Category: {ctx.category} - {ctx.cat['label']}\n"
-                  f"What this category is: {ctx.cat['brief']}\n\n"
+                  f"What this category is: {ctx.cat['brief']}\n"
+                  + (briefmod.cat_context(ctx.cat) + "\n" if briefmod.cat_context(ctx.cat) else "") + "\n"
                   f"Recent posts (do NOT repeat these topics or angles):\n{recent_block(ctx)}"
                   + guidance_block(guidance))
         tools = ["WebSearch"] if ctx.cat.get("research") == "required" else []
@@ -53,6 +75,9 @@ class TopicAgent(Agent):
                "search_queries": e.get("search_queries", []), "planned": e.get("source", "planner")}
         if e.get("algo") in tracers.TRACERS:
             return dict(out, algo=e["algo"])
+        brief = self._brief(ctx, e, out)
+        if brief:
+            out["brief"] = brief
         if ctx.category == "week-recap":
             return dict(self._recap(ctx), planned="auto")
         if ctx.cat["media"] == "animation":
@@ -68,6 +93,32 @@ class TopicAgent(Agent):
             out.update(why_now=got.get("why_now", out["why_now"]), search_queries=got.get("search_queries", []))
         return out
 
+    def _brief(self, ctx, e, out):
+        """The owner's brief for this day (checked), completed by AI when the category says briefing=auto."""
+        mode = briefmod.briefing_mode(ctx.cat)
+        if mode == "off" or not e.get("brief") or ctx.cat["media"] == "animation" or ctx.category == "week-recap":
+            return {}
+        try:
+            brief = briefmod.normalize(e["brief"])
+        except briefmod.BriefError as err:
+            ctx.run.event(self.id, "brief", f"the brief for this day was ignored: {err}", level="warning")
+            return {}
+        gaps = briefmod.missing(brief, ctx.cat) if mode == "auto" else []
+        if gaps:
+            try:
+                got = self.ask(ctx, self.prompt(ctx, "brief", category=ctx.cat["label"]),
+                               f"Topic: {out['topic']}\nAngle: {out['angle']}\nFill in ONLY these fields: {', '.join(gaps)}.\n"
+                               f"What the owner already wrote (keep consistent with it):\n"
+                               f"{briefmod.to_text(brief)}", BRIEF_SCHEMA)
+                brief = briefmod.merge_generated(brief, got, gaps)
+                ctx.run.event(self.id, "brief", f"filled in: {', '.join(brief.get('generated', []))}")
+            except (AgentError, briefmod.BriefError) as err:
+                if getattr(err, "fatal", False):
+                    raise
+                ctx.run.event(self.id, "brief", f"could not complete the brief, using it as written: {err}",
+                              level="warning")
+        return brief
+
     def _algorithm(self, ctx):
         texts = [f"{p.get('topic', '')} {p.get('text', '')}" for p in ctx.recent(200)]
         algo = tracers.next_algo(texts)
@@ -79,7 +130,7 @@ class TopicAgent(Agent):
 
     def _recap(self, ctx):
         since = (ctx.day - timedelta(days=7)).isoformat()
-        week = [p for p in ctx.ws.history() if since <= p.get("date", "") < ctx.day.isoformat()]
+        week = [p for p in ctx.ws.history() if (p.get("platform") or "linkedin") == ctx.platform and since <= p.get("date", "") < ctx.day.isoformat()]
         if not week:
             raise AgentError("nothing was published in the last 7 days, so there is no week to recap", fatal=True)
         return {"topic": f"Week in review {ctx.day.isoformat()}", "angle": "the three most useful takeaways",

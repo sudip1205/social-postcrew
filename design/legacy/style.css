@@ -192,3 +192,7 @@ ul.lessons { margin: 0; padding-left: 18px; } ul.lessons li { margin: 4px 0; } u
 .mem ul { margin: 4px 0 0; padding-left: 18px; } .mem .lbl { font: 600 10px var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
 .memory-list { max-height: 420px; overflow: auto; }
 .bad { color: var(--bad); }
+
+.app-sel { margin-left: auto; margin-right: 8px; width: auto; padding: 4px 8px; }
+details.app { border-top: 1px solid var(--line, #e1e7f2); padding: 10px 0; }
+details.app > summary { cursor: pointer; }

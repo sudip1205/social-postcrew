@@ -24,6 +24,14 @@ DEFAULT_CONFIG = {
         "credential_check_time": "09:00",
         "days": {"mon": "algorithm", "tue": "ai-news", "wed": "build-guide", "thu": "tool-spotlight",
                  "fri": "security", "sat": "dev-tip", "sun": "week-recap"},
+        # How often to post: weekly (the days above), every_n_days (from start_date, cycling `rotation`) or dates
+        # (only the dates listed). `dates` adds one-off days in any mode; `day_times` gives a weekday its own time.
+        "frequency": "weekly",
+        "every_n": 2,
+        "start_date": "",
+        "rotation": [],
+        "dates": [],                     # [{"date": "2026-11-03", "category": "dev-tip", "time": "10:00"}]
+        "day_times": {},                 # {"sat": "10:30"}
     },
     "planning": {
         # The Week Planner drafts the rest of this week's topics on this day, so you can review and change them.
@@ -39,6 +47,66 @@ DEFAULT_CONFIG = {
         # dry_run: the publisher logs exactly what it would send and sends nothing. Turn off when you are ready.
         "dry_run": True,
         "linkedin_api_version": "202601",
+    },
+    "platforms": {
+        # LinkedIn is configured by the settings above. Every other app has its own schedule, plan, topics and
+        # publishing settings here, and is switched on separately.
+        "linkedin": {"enabled": True},
+        "youtube": {
+            "enabled": False,
+            "schedule": {
+                "timezone": "America/Chicago", "generate_time": "19:00", "post_time": "17:00", "lead_days": 2,
+                "days": {"tue": "explainer", "fri": "short-tip"}, "frequency": "weekly", "every_n": 3, "start_date": "", "rotation": [], "dates": [],
+                "day_times": {},
+            },
+            "planning": {"enabled": True, "weekday": "mon", "time": "10:00", "focus": ""},
+            "publishing": {
+                "approval": "manual", "dry_run": True,
+                "visibility": "public",          # what the video is once it goes live: public | unlisted | private
+                "category_id": "28",             # YouTube's own category number (28 = Science & Technology)
+                "made_for_kids": False,
+            },
+            # The default kind of video: "short" (vertical, up to 60 s) or "long" (16:9). A topic, a plan day or a single
+            # run may override format and target_seconds.
+            "video": {
+                "format": "short", "target_seconds": 45,
+                "voice": {"provider": "elevenlabs", "voice_id": "", "voice_name": "", "model": "eleven_multilingual_v2",
+                          "speed": 1.0},
+                "renderer": "ffmpeg",            # ffmpeg: built-in slides. blackboard: drawn by hand to the voice. mcp: an animation MCP server
+                "mcp": {"command": "", "args": [], "tool": "", "timeout_s": 600},
+                "captions": True,
+            },
+            "categories": {
+                "short-tip": {
+                    "label": "Short: one quick tip", "media": "video", "research": "off", "fact_check": False,
+                    "format": "short", "target_seconds": 40, "kicker": "QUICK TIP",
+                    "brief": "A vertical Short with ONE practical tip. Hook in the first 3 seconds (the problem or a "
+                             "surprising result, never 'hi guys'), the tip in 2-4 steps, what the viewer will see when it "
+                             "works, then one line asking them to try it. Short sentences, spoken words, no filler.",
+                },
+                "explainer": {
+                    "label": "Long: explain one idea", "media": "video", "research": "optional", "fact_check": False,
+                    "format": "long", "target_seconds": 480, "kicker": "EXPLAINED",
+                    "brief": "A 16:9 explainer a mid-level professional can follow in one watch. Cold open with the problem "
+                             "(15 s), why it matters, the idea built up in 3-5 scenes with one concrete example, the common "
+                             "mistake, what to do next. One idea per scene; narration as you would say it aloud.",
+                },
+                "tutorial": {
+                    "label": "Long: step-by-step tutorial", "media": "video", "research": "optional", "fact_check": False,
+                    "format": "long", "target_seconds": 600, "kicker": "TUTORIAL",
+                    "brief": "A complete tutorial the viewer can finish with free tools. What we build and what you need, "
+                             "numbered steps each with the exact command or code on screen (correct and runnable, short), "
+                             "what you should see when it works, where to take it next.",
+                },
+                "news-brief": {
+                    "label": "Short: this week's news, sourced", "media": "video", "research": "required", "fact_check": True,
+                    "format": "short", "target_seconds": 55, "kicker": "NEWS", "max_source_age_days": 10,
+                    "brief": "A vertical Short on the most useful development of the last 7 days: the sourced fact first, what "
+                             "happened in the sources' own tense and qualifiers, what it means (labelled as opinion), one "
+                             "thing to try. Every number must come from a verified source.",
+                },
+            },
+        },
     },
     "llm": {
         # claude-code: your Claude Pro / Max / Team login through the Claude Code CLI (no API key).
@@ -152,6 +220,19 @@ DEFAULT_CONFIG = {
                      "Well-established facts and correct RFC numbers only. Hook; the flow in 4-6 numbered steps; 'The "
                      "common mistake'; 'Do this instead'; a question; hashtags.",
         },
+        "briefed": {
+            "label": "Deep dive from your brief (real-world example + system animation)", "media": "auto",
+            "research": "optional", "fact_check": False, "briefing": "auto",
+            "context": "AI and identity security for practitioners: how authentication, authorization and SSO change when "
+                       "AI agents act on behalf of people. Real-world, generic scenarios; the author is an identity "
+                       "platform engineering leader.",
+            "plan_context": "Plan a series: each day one concrete problem, the system involved and one change to make. "
+                            "Alternate stories (before/after), walkthroughs and checklists. Do not repeat a component "
+                            "flow used earlier in the week.",
+            "brief": "A deep dive built from the owner's brief for the day (Plan > Brief): the real-world example, the "
+                     "writing pattern and the system animation come from it. Without a brief: one concrete scenario, "
+                     "the flow in 4-6 numbered steps, what goes wrong, the fix, a question, hashtags.",
+        },
         "dev-tip": {
             "label": "Quick developer tip with code", "media": "poster", "layouts": ["code"], "kicker": "DEV TIP",
             "research": "off", "min_chars": 400, "max_chars": 1500, "fact_check": False,
@@ -172,4 +253,6 @@ DEFAULT_CONFIG = {
 # Secrets live in workspace/secrets.json (chmod 600). These are the keys the Studio knows about.
 SECRET_KEYS = ["linkedin_client_id", "linkedin_client_secret", "linkedin_access_token", "linkedin_token_expires_at",
                "linkedin_person_urn", "linkedin_name", "gmail_address", "gmail_app_password", "email_to",
-               "telegram_bot_token", "telegram_chat_id", "anthropic_api_key", "openai_api_key", "llm_api_key"]
+               "telegram_bot_token", "telegram_chat_id", "anthropic_api_key", "openai_api_key", "llm_api_key",
+               "youtube_client_id", "youtube_client_secret", "youtube_refresh_token", "youtube_channel_title",
+               "elevenlabs_api_key"]

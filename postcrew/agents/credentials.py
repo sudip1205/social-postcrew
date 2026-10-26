@@ -13,6 +13,7 @@ import urllib.error
 import urllib.request
 from datetime import datetime, timezone
 
+from .. import platforms
 from ..linkedin import LinkedIn, LinkedInError
 from ..llm import BACKENDS, KEY_ENV, LLMError
 from ..notify import notify
@@ -92,6 +93,42 @@ def check_api(cfg, secrets, opener=urllib.request.urlopen):
     return {"state": "ok", "message": f"{PROVIDER[name]} is ready ({b.base}).", "provider": PROVIDER[name]}
 
 
+def check_youtube(ws, cfg, live=True, client_factory=None):
+    """Is YouTube connected and does Google still accept the refresh token? (cfg: the full config)"""
+    from ..youtube import YouTube, YouTubeError
+    client_factory = client_factory or YouTube
+    s = ws.secrets()
+    if not (s.get("youtube_client_id") and s.get("youtube_client_secret")):
+        return {"state": "missing", "message": "YouTube app not configured: add the Google OAuth client ID and secret in "
+                                               "Credentials, then click Connect YouTube."}
+    if not s.get("youtube_refresh_token"):
+        return {"state": "missing", "message": "Not connected to YouTube yet: click Connect YouTube."}
+    out = {"name": s.get("youtube_channel_title", "")}
+    if live:
+        try:
+            ch = client_factory(s["youtube_client_id"], s["youtube_client_secret"], s["youtube_refresh_token"]).channel()
+            out["name"] = ch.get("title", out["name"])
+        except YouTubeError as e:
+            if e.kind == "auth":
+                return {**out, "state": "invalid", "message": f"Google rejected the YouTube connection ({e}). Reconnect."}
+            return {**out, "state": "unreachable", "message": f"Could not reach YouTube just now ({e})."}
+    return {**out, "state": "ok", "message": f"Connected to YouTube{' as ' + out['name'] if out['name'] else ''}."}
+
+
+def check_elevenlabs(ws, live=True, opener=None):
+    from .. import voice
+    key = ws.secrets().get("elevenlabs_api_key")
+    if not key:
+        return {"state": "missing", "message": "No ElevenLabs API key: add it in Credentials to make voice-overs."}
+    if not live:
+        return {"state": "ok", "message": "ElevenLabs key saved."}
+    try:
+        r = voice.check_key(key, opener=opener)
+    except voice.VoiceError as e:
+        return {"state": "invalid" if e.kind == "auth" else "unreachable", "message": str(e)}
+    return {"state": "ok" if r["ok"] else "invalid", "message": r["message"], "characters_left": r.get("characters_left")}
+
+
 def check_ai(ws, cfg, runner=subprocess.run, opener=urllib.request.urlopen):
     name = cfg["llm"]["backend"]
     if name == "demo":
@@ -107,6 +144,15 @@ def run_check(ws, live=True, notify_user=True, client_factory=LinkedIn, runner=s
     status = {"checked_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
               "linkedin": check_linkedin(ws, cfg, live, client_factory), "ai": check_ai(ws, cfg, runner, opener)}
     status["ok"] = status["linkedin"]["state"] in GOOD and status["ai"]["state"] == "ok"
+    secrets = ws.secrets()
+    if platforms.is_enabled(cfg, "youtube") or secrets.get("youtube_client_id") or secrets.get("elevenlabs_api_key"):
+        status["youtube"] = check_youtube(ws, cfg, live)
+        status["elevenlabs"] = check_elevenlabs(ws, live)
+        yt = status["youtube"]
+        if (notify_user and platforms.is_enabled(cfg, "youtube") and yt["state"] not in ("ok", "unreachable")
+                and not cfg["platforms"]["youtube"]["publishing"]["dry_run"]):
+            notify(ws, "YouTube connection needs attention", yt["message"], level="error", key=f"youtube-{yt['state']}",
+                   action={"label": "Open Credentials", "tab": "credentials"})
     ws.save_state("credentials", status)
     if notify_user:
         li, cl = status["linkedin"], status["ai"]
@@ -138,6 +184,12 @@ class CredentialsAgent(Agent):
     def validate(self, ctx, out):
         if out["ai"]["state"] != "ok":
             raise AgentError(out["ai"]["message"], fatal=True)
+        if ctx.platform == "youtube":
+            yt = out.get("youtube") or {"state": "missing", "message": "YouTube is not switched on."}
+            if yt["state"] not in GOOD and not ctx.cfg["publishing"]["dry_run"]:
+                ctx.run.event(self.id, "warning", f"{yt['message']} The video will be made and queued, but cannot be "
+                                                  f"uploaded until you reconnect.", level="warning")
+            return []
         li = out["linkedin"]
         if li["state"] not in GOOD and not ctx.cfg["publishing"]["dry_run"]:
             ctx.run.event(self.id, "warning", f"{li['message']} The post will be written and queued, but cannot "
@@ -145,4 +197,6 @@ class CredentialsAgent(Agent):
         return []
 
     def summary(self, out):
+        if out.get("youtube"):
+            return f"YouTube: {out['youtube']['state']} · {out['ai']['provider']}: {out['ai']['state']}"
         return f"LinkedIn: {out['linkedin']['state']} · {out['ai']['provider']}: {out['ai']['state']}"

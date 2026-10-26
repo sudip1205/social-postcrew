@@ -148,7 +148,7 @@ class TeamTests(unittest.TestCase):
     def test_editor_rejection_counts_against_the_chosen_writer(self, _):
         with TempWorkspace() as ws:
             team_ws(ws, research_n=1, writer_n=1, pre_review=False)
-            llm = ScriptedLLM(base_script(editor=[review(60, fixes=["hook"])] * 3 + [review()]))
+            llm = ScriptedLLM(base_script(editor=[review(60, fixes=["hook"])] * 1 + [review()]))
             res = run_crew(ws, TUESDAY, llm=llm, fetch=fake_fetch())
             self.assertTrue(res["ok"], res)
             maya = next(m for m in team.load(ws)["members"] if m["name"] == "Maya")
@@ -198,7 +198,7 @@ class EditorRewindTests(unittest.TestCase):
             team_ws(ws, research_n=1, writer_n=1, pre_review=False)
             llm = ScriptedLLM(base_script(
                 editor=[review(60, flags=["poster_text_mismatch"], fixes=["Writer: tighten the hook",
-                                                                          "Media: use the post's wording on the poster"])] * 3
+                                                                          "Media: use the post's wording on the poster"])] * 1
                 + [review()],
                 supervisor=[{"action": "rewind", "target": "writer", "instructions": ["tighten the hook"],
                              "reason": "text"}]))

@@ -4,25 +4,56 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Postcrew Studio</title>
-<link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/fonts.css">
+<link rel="stylesheet" href="/static/tailwind.css">
+<link rel="stylesheet" href="/static/studio.css">
 </head>
-<body>
-<header class="top">
-  <div class="brand"><span class="dot"></span>Postcrew Studio</div>
-  <nav class="tabs" id="tabs">
-    <a href="#overview" data-tab="overview">Overview</a>
-    <a href="#plan" data-tab="plan">Plan</a>
-    <a href="#team" data-tab="team">Crew</a>
-    <a href="#workflow" data-tab="workflow">Workflow</a>
-    <a href="#queue" data-tab="queue">Queue</a>
-    <a href="#settings" data-tab="settings">Settings</a>
-    <a href="#credentials" data-tab="credentials">Credentials</a>
-  </nav>
-  <button class="bell" id="bell" title="Notifications" aria-label="Notifications">🔔<span class="count" id="bell-count" hidden></span></button>
+<body class="bg-slate-50 text-slate-800 font-body min-h-screen antialiased flex flex-col">
+<!-- TOP BAR: the shell from design/stitch/overview-dashboard.html -->
+<header class="top-0 sticky z-40 bg-white border-b border-slate-200 shadow-sm">
+<div class="w-full px-6 py-3 flex items-center justify-between mx-auto">
+<div class="flex items-center gap-8">
+<a class="font-headline font-black text-lg text-slate-900 flex items-center gap-2.5" href="#overview">
+<div class="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-600 to-indigo-700 flex items-center justify-center text-white shadow-sm shadow-violet-200">
+<span class="material-symbols-outlined text-white font-bold">smart_toy</span></div>
+<span class="tracking-tight">Postcrew Studio</span></a>
+<nav class="hidden lg:flex items-center gap-1 font-label text-sm" id="tabs"></nav>
+</div>
+<div class="flex items-center gap-3">
+<div class="bg-slate-100 p-1 rounded-xl flex items-center border border-slate-200" id="app-sel" hidden></div>
+<div class="h-5 w-px bg-slate-200 hidden sm:block"></div>
+<a class="w-9 h-9 rounded-lg flex items-center justify-center text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors" title="Documentation &amp; help" href="https://github.com/sudip1205/social-postcrew/tree/main/docs" target="_blank" rel="noopener">
+<span class="material-symbols-outlined">help</span></a>
+<button class="relative w-9 h-9 rounded-lg flex items-center justify-center text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors" id="bell" title="Notifications" aria-label="Notifications">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute top-2 right-2 w-2 h-2 rounded-full bg-violet-600 ring-2 ring-white" id="bell-dot" hidden></span></button>
+</div>
+</div>
 </header>
-<main id="view"><p class="muted">Loading…</p></main>
-<aside class="drawer" id="drawer" hidden></aside>
-<div id="toast" role="status"></div>
+<section id="banner"></section>
+<main class="flex-1 w-full" id="view"><p class="p-8 text-slate-500">Loading…</p></main>
+<aside class="fixed right-0 top-0 h-full w-[420px] max-w-full bg-white border-l border-slate-200 shadow-xl z-50 p-6 overflow-y-auto custom-scrollbar" id="drawer" hidden></aside>
+<div id="toast" role="status" class="px-4 py-2.5 rounded-xl bg-slate-900 text-white text-sm font-medium shadow-lg"></div>
+<footer class="mt-auto border-t border-slate-200 bg-white py-4 px-6">
+<div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-2">
+<div class="flex items-center gap-2"><span class="font-bold text-slate-800">Postcrew Studio</span><span>•</span>
+<span>Autonomous Multi-Agent Content Orchestration</span></div>
+<div class="flex items-center gap-4">
+<span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-emerald-500" id="foot-dot"></span><span id="foot-state">Studio</span></span>
+<a class="hover:text-slate-800 transition-colors" href="https://github.com/sudip1205/social-postcrew/tree/main/docs" target="_blank" rel="noopener">Documentation</a>
+<a class="hover:text-slate-800 transition-colors" href="https://github.com/sudip1205/social-postcrew/blob/main/SECURITY.md" target="_blank" rel="noopener">Agent Guardrails</a>
+</div></div>
+</footer>
+<script src="/static/ui.js"></script>
 <script src="/static/app.js"></script>
+<script src="/static/views/overview.js"></script>
+<script src="/static/views/plan.js"></script>
+<script src="/static/views/crew.js"></script>
+<script src="/static/views/workflow.js"></script>
+<script src="/static/views/queue.js"></script>
+<script src="/static/views/settings.js"></script>
+<script src="/static/views/credentials.js"></script>
+<script src="/static/views/upload.js"></script>
+<script>boot();</script>
 </body>
 </html>

@@ -40,6 +40,8 @@ class RunContext:
     previous: dict = field(default_factory=dict)     # an agent's last output before it was sent back
     memory: object = None                             # RunMemory: what went wrong earlier in this run
     reviews: list = field(default_factory=list)       # the Editor's earlier rounds in this run
+    platform: str = "linkedin"                        # the app this post is for; cfg is that app's view of the config
+    options: dict = field(default_factory=dict)       # one-off overrides for this run (e.g. a video's format and length)
 
     @property
     def cat(self):
@@ -49,8 +51,16 @@ class RunContext:
     def profile(self):
         return self.cfg["profile"]
 
+    @property
+    def video(self):
+        """The kind of video this run makes (YouTube): format, target_seconds, max_words."""
+        from .. import platforms
+        from .planner import planned_for
+        return platforms.video_spec(self.cfg, self.cat, planned_for(self.ws, self.day, self.category, self.platform),
+                                    self.options)
+
     def recent(self, n=20):
-        return self.ws.recent_posts(n)
+        return self.ws.recent_posts(n, self.platform)
 
 
 class Agent:
@@ -74,17 +84,29 @@ class Agent:
         return ""
 
     # ---------- helpers ----------
+    @staticmethod
+    def _prompt_file(ctx, name):
+        """Your own prompts/<app>/<name>.md, the built-in one for that app, your prompts/<name>.md, the built-in one."""
+        root = Path(ctx.ws.root) / "prompts"
+        platform = getattr(ctx, "platform", "linkedin")
+        for path in ((root / platform / f"{name}.md", PROMPTS / platform / f"{name}.md") if platform != "linkedin" else ()) \
+                + (root / f"{name}.md", PROMPTS / f"{name}.md"):
+            if path.exists():
+                return path
+        raise FileNotFoundError(f"no prompt {name}.md")
+
     def prompt(self, ctx, name=None, **values):
         name = name or self.id
-        override = Path(ctx.ws.root) / "prompts" / f"{name}.md"
-        text = (override if override.exists() else PROMPTS / f"{name}.md").read_text()
+        text = self._prompt_file(ctx, name).read_text()
         p = ctx.profile
         base = {"audience": p.get("audience", ""), "voice": p.get("voice", ""),
                 "about": "\n".join(f"- {a}" for a in p.get("about", [])) or "- (nothing listed)",
                 "name": p.get("name", "") or "the account owner"}
         if "{{rubric}}" in text:  # the scoring guide the Writer writes to and the Editor scores by
-            rubric = Path(ctx.ws.root) / "prompts" / "rubric.md"
-            base["rubric"] = (rubric if rubric.exists() else PROMPTS / "rubric.md").read_text().strip()
+            base["rubric"] = self._prompt_file(ctx, "rubric").read_text().strip()
+        if "{{brief_rules}}" in text:  # the owner's per-post brief, as the reviewers must judge it
+            from .. import brief as briefmod
+            base["brief_rules"] = briefmod.editor_rules(briefmod.of(ctx))
         base.update(values)
         for k, v in base.items():
             text = text.replace("{{" + k + "}}", str(v))
@@ -102,6 +124,7 @@ class Agent:
             ctx.run.add_cost(self.id, e.cost_usd)
             raise AgentError(f"LLM {e.kind}: {e}", fatal=e.kind in ("not_installed", "auth", "limit"))
         ctx.run.add_cost(self.id, res.cost_usd)
+        ctx.run.add_tokens(self.id, res.tokens)
         who = f"{member['name']}: " if member else ""
         ctx.run.event(self.id, "llm", f"{who}{res.model or 'model'} answered in {res.duration_s}s "
                                       f"(${res.cost_usd:.4f}, {res.turns} turns)",
@@ -141,7 +164,7 @@ def guidance_block(guidance):
         out += "\nWHY IT FAILED:\n" + "\n".join(f"- {w}" for w in why)
     if before:
         out += ("\n\nALSO SENT BACK EARLIER IN THIS RUN FOR (already fixed once - do not bring these back):\n"
-                + "\n".join(f"- {b}" for b in before[-8:]))
+                + "\n".join(f"- {b}" for b in before[-4:]))
     if instructions and getattr(guidance, "exact", False):
         out += ("\n\nTHE REVIEWER'S FIXES - apply each one exactly as written (they are minimal edits; use the "
                 "replacement wording given). Change nothing else: every sentence no fix mentions stays word for word.\n"

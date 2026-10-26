@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "postcrew"
-version = "0.1.0"
+version = "0.2.0"
 description = "A supervised crew of AI agents that writes, fact-checks, designs, reviews and publishes your LinkedIn posts."
 readme = "README.md"
 urls = {Homepage = "https://github.com/sudip1205/social-postcrew", Documentation = "https://github.com/sudip1205/social-postcrew/tree/main/docs", Issues = "https://github.com/sudip1205/social-postcrew/issues"}
@@ -20,4 +20,4 @@ postcrew = "postcrew.__main__:main"
 include = ["postcrew*"]
 
 [tool.setuptools.package-data]
-postcrew = ["prompts/*.md", "studio/static/*", "render/fonts/*"]
+postcrew = ["prompts/*.md", "studio/static/*", "studio/static/views/*", "studio/static/fonts/*", "render/fonts/*"]

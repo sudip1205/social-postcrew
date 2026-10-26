@@ -15,10 +15,11 @@ import json
 import os
 import re
 import threading
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 
 from .defaults import AGENT_IDS, DEFAULT_CONFIG, SECRET_KEYS
+from .platforms import FREQUENCIES, LINKEDIN, PLATFORM_IDS, view
 
 CODE_ROOT = Path(__file__).resolve().parent.parent
 
@@ -32,7 +33,7 @@ def default_root(name="workspace"):
 _lock = threading.RLock()
 WEEKDAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
 APPROVAL_MODES = ["auto_with_veto", "manual", "immediate"]
-MEDIA_KINDS = ["poster", "video", "animation", "none"]
+MEDIA_KINDS = ["auto", "poster", "video", "sysflow", "animation", "none"]
 POSTER_LAYOUTS = ["points", "steps", "code", "flow"]
 RESEARCH_MODES = ["required", "optional", "off"]
 TIME_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
@@ -66,70 +67,158 @@ def deep_merge(base, override):
     return out
 
 
-def validate_config(cfg):
-    """Return a list of human-readable problems. Empty list = valid."""
+VIDEO_FORMATS = ["short", "long"]
+_SECONDS_HINT = "15-60 for a short, 60-1800 for a long video"
+
+
+def _seconds_ok(fmt, v):
+    return isinstance(v, int) and not isinstance(v, bool) and ((15 <= v <= 60) if fmt == "short" else (60 <= v <= 1800))
+
+
+RENDERERS = ("ffmpeg", "blackboard", "mcp")
+
+
+def _validate_video(v, pre):
     errs = []
+    if v.get("format") not in VIDEO_FORMATS:
+        errs.append(f"{pre}video.format must be one of {VIDEO_FORMATS}")
+    elif not _seconds_ok(v.get("format"), v.get("target_seconds")):
+        errs.append(f"{pre}video.target_seconds must be {_SECONDS_HINT}")
+    if v.get("renderer") not in RENDERERS:
+        errs.append(f"{pre}video.renderer must be one of {RENDERERS}")
+    voice = v.get("voice") or {}
+    if voice.get("provider", "elevenlabs") != "elevenlabs":
+        errs.append(f"{pre}video.voice.provider must be elevenlabs")
+    if not (isinstance(voice.get("speed", 1.0), (int, float)) and 0.7 <= voice.get("speed", 1.0) <= 1.2):
+        errs.append(f"{pre}video.voice.speed must be between 0.7 and 1.2")
+    mcp = v.get("mcp") or {}
+    if v.get("renderer") == "mcp":
+        if not str(mcp.get("command", "")).strip() or not str(mcp.get("tool", "")).strip():
+            errs.append(f"{pre}video.mcp: name the command and the tool of the animation MCP server")
+    if not isinstance(mcp.get("args", []), list) or not all(isinstance(a, str) for a in mcp.get("args", [])):
+        errs.append(f"{pre}video.mcp.args must be a list of strings")
+    if not (isinstance(mcp.get("timeout_s", 600), int) and 30 <= mcp.get("timeout_s", 600) <= 3600):
+        errs.append(f"{pre}video.mcp.timeout_s must be 30-3600 seconds")
+    return errs
+
+
+def validate_platform(cfg, pre="", primary=True):
+    """Problems in one platform's schedule, topics, planning and publishing. `cfg` is that platform's view of the config
+    (see platforms.view); `pre` prefixes the setting names in messages; `primary` = LinkedIn's own settings."""
+    errs = []
+    s = cfg.get("schedule", {})
     try:
         from zoneinfo import ZoneInfo
-        ZoneInfo(cfg["schedule"]["timezone"])
+        ZoneInfo(s["timezone"])
     except Exception:
-        errs.append(f"schedule.timezone {cfg.get('schedule', {}).get('timezone')!r} is not a valid IANA time zone "
+        errs.append(f"{pre}schedule.timezone {s.get('timezone')!r} is not a valid IANA time zone "
                     f"(example: America/Chicago)")
-    s = cfg.get("schedule", {})
-    for key in ("generate_time", "post_time", "credential_check_time"):
+    for key in ("generate_time", "post_time") + (("credential_check_time",) if primary else ()):
         if not TIME_RE.match(str(s.get(key, ""))):
-            errs.append(f"schedule.{key} must be HH:MM (24h)")
+            errs.append(f"{pre}schedule.{key} must be HH:MM (24h)")
     if not isinstance(s.get("lead_days"), int) or not 0 <= s["lead_days"] <= 7:
-        errs.append("schedule.lead_days must be a whole number 0-7")
+        errs.append(f"{pre}schedule.lead_days must be a whole number 0-7")
     cats = cfg.get("categories", {})
     days = s.get("days", {})
     for d in WEEKDAYS:
         v = days.get(d, "")
         if v and v not in cats:
-            errs.append(f"schedule.days.{d} uses unknown category {v!r}")
-    if not any(days.get(d) for d in WEEKDAYS):
-        errs.append("schedule.days: pick a category for at least one day")
+            errs.append(f"{pre}schedule.days.{d} uses unknown category {v!r}")
+    freq = s.get("frequency", "weekly")
+    if freq not in FREQUENCIES:
+        errs.append(f"{pre}schedule.frequency must be one of {FREQUENCIES}")
+    if freq == "weekly" and not any(days.get(d) for d in WEEKDAYS):
+        errs.append(f"{pre}schedule.days: pick a category for at least one day")
+    if freq == "every_n_days":
+        if not (isinstance(s.get("every_n"), int) and 1 <= s["every_n"] <= 60):
+            errs.append(f"{pre}schedule.every_n must be a whole number 1-60")
+        try:
+            date.fromisoformat(str(s.get("start_date", "")))
+        except ValueError:
+            errs.append(f"{pre}schedule.start_date must be a date, YYYY-MM-DD")
+        rot = s.get("rotation") or []
+        if any(c not in cats for c in rot):
+            errs.append(f"{pre}schedule.rotation uses an unknown category")
+        if not (rot or any(days.get(d) for d in WEEKDAYS)):
+            errs.append(f"{pre}schedule.rotation: list the categories to cycle through")
+    for t in (s.get("day_times") or {}).items():
+        if t[0] not in WEEKDAYS or not TIME_RE.match(str(t[1])):
+            errs.append(f"{pre}schedule.day_times: use a weekday (mon-sun) and HH:MM, not {t[0]!r}: {t[1]!r}")
+    ds = s.get("dates") or []
+    if not isinstance(ds, list) or len(ds) > 400:
+        errs.append(f"{pre}schedule.dates must be a list of at most 400 dates")
+    else:
+        for e in ds:
+            try:
+                date.fromisoformat(str(e.get("date", "")))
+            except (ValueError, AttributeError):
+                errs.append(f"{pre}schedule.dates: {e!r} needs a date, YYYY-MM-DD")
+                continue
+            if e.get("category") and e["category"] not in cats:
+                errs.append(f"{pre}schedule.dates {e['date']} uses unknown category {e['category']!r}")
+            if e.get("time") and not TIME_RE.match(str(e["time"])):
+                errs.append(f"{pre}schedule.dates {e['date']}: time must be HH:MM (24h)")
+        if freq == "dates" and not ds:
+            errs.append(f"{pre}schedule.dates: add at least one date")
     for cid, c in cats.items():
-        where = f"categories.{cid}"
+        where = f"{pre}categories.{cid}"
         if not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,30}", cid):
             errs.append(f"{where}: id must be lowercase letters, digits and dashes")
         if not str(c.get("label", "")).strip():
             errs.append(f"{where}.label is required")
         if c.get("media") not in MEDIA_KINDS:
             errs.append(f"{where}.media must be one of {MEDIA_KINDS}")
-        if c.get("media") in ("poster", "video"):
-            lay = c.get("layouts") or []
-            if not lay or any(x not in POSTER_LAYOUTS for x in lay):
-                errs.append(f"{where}.layouts must be a non-empty subset of {POSTER_LAYOUTS}")
+        if any(x not in POSTER_LAYOUTS for x in c.get("layouts") or []):
+            errs.append(f"{where}.layouts must be a subset of {POSTER_LAYOUTS}")
         if c.get("research", "optional") not in RESEARCH_MODES:
             errs.append(f"{where}.research must be one of {RESEARCH_MODES}")
-        lo, hi = c.get("min_chars"), c.get("max_chars")
-        if not (isinstance(lo, int) and isinstance(hi, int) and 50 <= lo < hi <= 3000):
-            errs.append(f"{where}: need 50 <= min_chars < max_chars <= 3000 (LinkedIn's limit)")
         if not str(c.get("brief", "")).strip():
             errs.append(f"{where}.brief: describe what this kind of post should contain")
+        if c.get("renderer") not in (None, "ffmpeg", "blackboard"):
+            errs.append(f"{where}.renderer must be ffmpeg or blackboard")
+        if "format" in c and c["format"] not in VIDEO_FORMATS:
+            errs.append(f"{where}.format must be one of {VIDEO_FORMATS}")
+        elif "target_seconds" in c and not _seconds_ok(c.get("format") or (cfg.get("video") or {}).get("format"), c["target_seconds"]):
+            errs.append(f"{where}.target_seconds must be {_SECONDS_HINT}")
         ideas = c.get("ideas", [])
-        if not (isinstance(ideas, list) and len(ideas) <= 60 and all(isinstance(i, str) and 3 <= len(i) <= 150
-                                                                     for i in ideas)):
-            errs.append(f"{where}.ideas: up to 60 topic ideas, each 3-150 characters")
+        if not (isinstance(ideas, list) and len(ideas) <= 60 and all(
+                isinstance(i, str) and 3 <= len(i) <= 600 and len(i.split("::")[0].strip()) <= 150 for i in ideas)):
+            errs.append(f"{where}.ideas: up to 60 topic ideas, each 3-600 characters ('Title :: context'; the title up to 150)")
+    pn = cfg.get("planning", {})
+    if pn.get("weekday") not in WEEKDAYS:
+        errs.append(f"{pre}planning.weekday must be one of {WEEKDAYS}")
+    if not TIME_RE.match(str(pn.get("time", ""))):
+        errs.append(f"{pre}planning.time must be HH:MM (24h)")
+    if len(str(pn.get("focus", ""))) > 600:
+        errs.append(f"{pre}planning.focus: keep it under 600 characters")
+    p = cfg.get("publishing", {})
+    if p.get("approval") not in APPROVAL_MODES:
+        errs.append(f"{pre}publishing.approval must be one of {APPROVAL_MODES}")
+    if "visibility" in p and p["visibility"] not in ("public", "unlisted", "private"):
+        errs.append(f"{pre}publishing.visibility must be public, unlisted or private")
+    if "video" in cfg:
+        errs += _validate_video(cfg["video"], pre)
+    if primary and not re.fullmatch(r"\d{6}", str(p.get("linkedin_api_version", ""))):
+        errs.append("publishing.linkedin_api_version must be YYYYMM, e.g. 202601")
+    return errs
+
+
+def validate_config(cfg):
+    """Return a list of human-readable problems. Empty list = valid."""
+    errs = validate_platform(cfg)
+    for pid, own in (cfg.get("platforms") or {}).items():
+        if pid == LINKEDIN:
+            continue
+        if pid not in PLATFORM_IDS:
+            errs.append(f"platforms.{pid}: unknown platform (known: {PLATFORM_IDS})")
+        elif own.get("enabled"):   # a platform that is switched off is not checked until you turn it on
+            errs += validate_platform(view(cfg, pid), pre=f"platforms.{pid}.", primary=False)
     tm = cfg.get("team", {})
     for k, lo, hi in (("research", 1, 4), ("writer", 1, 4), ("fire_window", 3, 20), ("polish_rounds", 0, 3)):
         if not (isinstance(tm.get(k), int) and lo <= tm[k] <= hi):
             errs.append(f"team.{k} must be a whole number {lo}-{hi}")
     if not (isinstance(tm.get("fire_min_success"), (int, float)) and 0 <= tm["fire_min_success"] <= 1):
         errs.append("team.fire_min_success must be between 0 and 1")
-    pn = cfg.get("planning", {})
-    if pn.get("weekday") not in WEEKDAYS:
-        errs.append(f"planning.weekday must be one of {WEEKDAYS}")
-    if not TIME_RE.match(str(pn.get("time", ""))):
-        errs.append("planning.time must be HH:MM (24h)")
-    if len(str(pn.get("focus", ""))) > 600:
-        errs.append("planning.focus: keep it under 600 characters")
-    p = cfg.get("publishing", {})
-    if p.get("approval") not in APPROVAL_MODES:
-        errs.append(f"publishing.approval must be one of {APPROVAL_MODES}")
-    if not re.fullmatch(r"\d{6}", str(p.get("linkedin_api_version", ""))):
-        errs.append("publishing.linkedin_api_version must be YYYYMM, e.g. 202601")
     if not re.fullmatch(r"https?://[^\s]+", str(cfg.get("notifications", {}).get("studio_url", "http://localhost"))):
         errs.append("notifications.studio_url must start with http:// or https://")
     llm = cfg.get("llm", {})
@@ -172,6 +261,23 @@ def validate_config(cfg):
     return errs
 
 
+def normalize_categories(cfg):
+    """Topics no longer carry a poster style, poster label, length limits or a research switch: the picture and its
+    label come from the day's context, the length is whatever the post needs (LinkedIn's hard limit is 3000), and
+    research always runs. Older configs are read through this, so nothing breaks."""
+    for own in (p for p in (cfg.get("platforms") or {}).values() if p.get("categories")):
+        normalize_categories(own)
+    for cid, c in (cfg.get("categories") or {}).items():
+        c["min_chars"], c["max_chars"] = 50, 3000
+        if c.get("media") == "poster":
+            c["media"] = "auto"
+        if c.get("research") == "off" and c.get("media") != "animation" and cid != "week-recap":
+            c["research"] = "optional"
+        c.setdefault("context", "")
+        c.setdefault("plan_context", "")
+    return cfg
+
+
 class Workspace:
     def __init__(self, root=None):
         self.root = Path(root or os.environ.get("POSTCREW_HOME") or default_root()).resolve()
@@ -194,7 +300,7 @@ class Workspace:
 
     # ---------- config ----------
     def config(self):
-        return deep_merge(DEFAULT_CONFIG, read_json(self.root / "config.json", {}))
+        return normalize_categories(deep_merge(DEFAULT_CONFIG, read_json(self.root / "config.json", {})))
 
     def save_config(self, cfg):
         errs = validate_config(cfg)
@@ -223,7 +329,7 @@ class Workspace:
         """What the browser may see: whether each secret is set, never its value (except harmless ids)."""
         s = self.secrets()
         visible = {"linkedin_client_id", "linkedin_token_expires_at", "linkedin_name", "gmail_address", "email_to",
-                   "telegram_chat_id"}
+                   "telegram_chat_id", "youtube_client_id", "youtube_channel_title"}
         return {k: (s[k] if k in visible else bool(s[k])) if k in s else None for k in SECRET_KEYS}
 
     # ---------- queue & history ----------
@@ -253,10 +359,12 @@ class Workspace:
             write_json(self.root / "history.json", {"posts": h})
             return gone
 
-    def recent_posts(self, n=30):
-        """Published + queued posts, oldest first: what the crew must not repeat."""
+    def recent_posts(self, n=30, platform=None):
+        """Published + queued posts, oldest first: what the crew must not repeat. platform: only that app's."""
         items = [dict(p, status="published") for p in self.history()] + [p for p in self.queue()
                                                                            if p.get("status") != "vetoed"]
+        if platform:
+            items = [p for p in items if (p.get("platform") or LINKEDIN) == platform]
         return sorted(items, key=lambda p: p.get("date", ""))[-n:]
 
     # ---------- state ----------

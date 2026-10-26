@@ -1,0 +1,35 @@
+{
+  "project": "12643280043223938531",
+  "screens": {
+    "upload-your-own-youtube": {
+      "id": "8756f30d8d644248b1ec132498ff7d38",
+      "title": "Upload your own (YouTube)",
+      "sha": "fc810676e1470653"
+    },
+    "workflow-live-youtube-run": {
+      "id": "9b5d6d00910a49209590c7d1c58d48c1",
+      "title": "Workflow > Live YouTube Run",
+      "sha": "3664856813e803d0"
+    },
+    "queue": {
+      "id": "b0b0338252cb4527a3dfe5760bc35b7a",
+      "title": "Queue",
+      "sha": "0b4a45119a21baed"
+    },
+    "settings-apps-schedules": {
+      "id": "84aa2b8110794f14a33170e5f55a81c2",
+      "title": "Settings > Apps & Schedules",
+      "sha": "e1a0204d8dfd6d69"
+    },
+    "plan-weekly-editorial-board": {
+      "id": "aae9f43f535e4625bfeb3cb4c2b2eabc",
+      "title": "Plan > Weekly Editorial Board",
+      "sha": "34eb8aa2e5b9a17f"
+    },
+    "overview-dashboard": {
+      "id": "f9e911626e34418484d73a862538047d",
+      "title": "Overview Dashboard",
+      "sha": "fe5db4f75e2bb95f"
+    }
+  }
+}

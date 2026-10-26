@@ -8,6 +8,7 @@ PAUSE
 
 # local developer tools (not part of the project)
 .claude/
+.serena/
 .mcp.json
 .ignore
 graft/
@@ -21,3 +22,6 @@ venv/
 dist/
 build/
 *.egg-info/
+
+# UI asset build (scripts/build_ui_assets.py): the compiled output in postcrew/studio/static is committed, the tools are not
+design/.build/

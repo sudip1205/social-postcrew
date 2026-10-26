@@ -11,6 +11,7 @@ import time
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
+from .. import platforms
 from ..linkedin import LinkedIn, LinkedInError
 from ..notify import notify
 from ..runlog import RunLog
@@ -23,13 +24,15 @@ COMMENT_MAX_TRIES = 3            # later publish checks retry a failed first com
 
 
 def scheduled_at(cfg, day):
-    hh, mm = map(int, cfg["schedule"]["post_time"].split(":"))
+    """When the post for `day` goes out: that day's own time from the platform's schedule."""
+    hh, mm = map(int, platforms.post_time_for(cfg["schedule"], day).split(":"))
     local = datetime(day.year, day.month, day.day, hh, mm, tzinfo=ZoneInfo(cfg["schedule"]["timezone"]))
     return local.astimezone(timezone.utc).isoformat(timespec="seconds")
 
 
 def enqueue(ws, cfg, run_id, day, category, final, review):
-    pid = f"{day.isoformat()}-{category}"
+    platform = cfg.get("platform", platforms.LINKEDIN)
+    pid = f"{day.isoformat()}-{category}" if platform == platforms.LINKEDIN else f"{day.isoformat()}-{platform}-{category}"
     media = None
     if final.get("media_path"):
         dest = ws.root / "media" / f"{pid}{'.mp4' if final['media_kind'] == 'video' else '.png'}"
@@ -42,7 +45,8 @@ def enqueue(ws, cfg, run_id, day, category, final, review):
         shutil.copy2(final["poster_path"], dest)
         poster_image = str(dest.relative_to(ws.root))
     mode = cfg["publishing"]["approval"]
-    post = {"id": pid, "run_id": run_id, "date": day.isoformat(), "category": category, "topic": final["title"],
+    post = {"id": pid, "platform": platform, "run_id": run_id, "date": day.isoformat(), "category": category,
+            "topic": final["title"],
             "text": final["text"], "first_comment": final.get("first_comment", ""), "media": media,
             "media_kind": final.get("media_kind"), "poster_image": poster_image, "status": "awaiting_approval" if mode == "manual" else "queued",
             "scheduled_at": scheduled_at(cfg, day) if mode != "immediate" else datetime.now(timezone.utc).isoformat(),
@@ -59,15 +63,21 @@ def post_url(urn):
 
 def post_rows(ws, post, *extra):
     """The table rows that describe a post in notification emails."""
-    cfg = ws.config()
+    cfg = platforms.view(ws.config(), platforms.platform_of(post))
     cat = cfg["categories"].get(post.get("category"), {}).get("label", post.get("category", ""))
     review = (post.get("review") or {}).get("overall")
     rows = [("Topic", post.get("topic", "")), ("Kind of post", cat), ("Post date", post.get("date", ""))]
+    if platforms.platform_of(post) != platforms.LINKEDIN:
+        rows.insert(0, ("App", platforms.label(platforms.platform_of(post))))
     if post.get("scheduled_at") and post.get("status") in ("queued", "approved", "awaiting_approval"):
         local = datetime.fromisoformat(post["scheduled_at"]).astimezone(ZoneInfo(cfg["schedule"]["timezone"]))
         rows.append(("Publishes at", local.strftime("%a %d %b %Y, %H:%M ") + cfg["schedule"]["timezone"]))
     if review is not None:
         rows.append(("Editor score", f"{review} / 100"))
+    if platforms.platform_of(post) == "youtube":
+        yt = post.get("youtube") or {}
+        rows.append(("Video", f"{yt.get('format', 'video').title()}, {yt.get('seconds', 0):.0f} seconds, voice: {yt.get('voice', 'none')}"))
+        return rows + list(extra)
     rows.append(("Length", f"{len(post.get('text', ''))} characters"))
     if post.get("media_kind"):
         rows.append(("Picture", "Animated poster video" if post.get("poster_image") else
@@ -202,18 +212,30 @@ def publish_one(ws, post, client_factory=LinkedIn, log=print, sleep=time.sleep):
     return post
 
 
-def publish_due(ws, now=None, client_factory=LinkedIn, log=print, sleep=time.sleep):
+def publish_post(ws, post, client_factory=LinkedIn, log=print, sleep=time.sleep, yt_factory=None):
+    """Publish one post through the client of its app."""
+    if platforms.platform_of(post) == "youtube":
+        from . import yt_publish
+        kw = {"client_factory": yt_factory} if yt_factory else {}
+        return yt_publish.publish_one(ws, post, log=log, **kw)
+    return publish_one(ws, post, client_factory, log, sleep)
+
+
+def publish_due(ws, now=None, client_factory=LinkedIn, log=print, sleep=time.sleep, yt_factory=None):
     now = now or datetime.now(timezone.utc)
     retry_comments(ws, client_factory, log, sleep)
-    results = []
+    results, done = [], set()
     for p in sorted(ws.queue(), key=lambda p: p["scheduled_at"]):
+        app = platforms.platform_of(p)
+        if app in done:
+            continue   # at most one post per app and publish window
         if p["status"] in DUE and datetime.fromisoformat(p["scheduled_at"]) <= now:
-            updated = publish_one(ws, dict(p), client_factory, log, sleep)
+            updated = publish_post(ws, dict(p), client_factory, log, sleep, yt_factory)
             ws.save_queue([updated if q["id"] == p["id"] else q for q in ws.queue()]
                           if updated["status"] != "published" else [q for q in ws.queue() if q["id"] != p["id"]])
             results.append(updated)
             if updated["status"] in ("published", "dry_run"):
-                break  # at most one post per publish window
+                done.add(app)
     return results
 
 
@@ -221,12 +243,17 @@ class PublisherAgent(Agent):
     id = "publisher"
     title = "Publisher"
     name = "Echo"
-    role = "Queues the approved post for post time (or for your approval) and publishes it to LinkedIn."
+    role = "Queues the approved post or video for its time (or for your approval) and publishes it to its app."
     uses_llm = False
 
     def run(self, ctx, guidance):
-        post = enqueue(ctx.ws, ctx.cfg, ctx.run.status["run_id"], ctx.day, ctx.category, ctx.outputs["formatter"],
-                       ctx.outputs["editor"])
+        if ctx.platform == "youtube":
+            from .yt_publish import enqueue_youtube
+            post = enqueue_youtube(ctx.ws, ctx.cfg, ctx.run.status["run_id"], ctx.day, ctx.category, ctx.outputs,
+                                   ctx.outputs["editor"])
+        else:
+            post = enqueue(ctx.ws, ctx.cfg, ctx.run.status["run_id"], ctx.day, ctx.category, ctx.outputs["formatter"],
+                           ctx.outputs["editor"])
         mode = ctx.cfg["publishing"]["approval"]
         if mode == "immediate":
             published = publish_due(ctx.ws)
@@ -234,7 +261,7 @@ class PublisherAgent(Agent):
                 raise AgentError("immediate publish found nothing due")
             return {"post_id": post["id"], "status": published[-1]["status"], "mode": mode}
         notify(ctx.ws, "Post ready" if mode != "manual" else "Post waiting for your approval",
-               f"{post['topic']} - {'publishes ' + post['date'] + ' ' + ctx.cfg['schedule']['post_time'] if mode != 'manual' else 'approve it in the Queue'}",
+               f"{post['topic']} - {'publishes ' + post['date'] + ' ' + platforms.post_time_for(ctx.cfg['schedule'], ctx.day) if mode != 'manual' else 'approve it in the Queue'}",
                level="info", action={"label": "Review in Queue", "tab": "queue"},
                details=post_details(ctx.ws, post, ("Cost of this run", f"${ctx.run.cost:.2f} at API prices"),
                                     ("What to do", "Nothing: it goes out at the time above. Veto or edit it in the "

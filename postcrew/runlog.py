@@ -14,6 +14,7 @@ from .workspace import write_json
 
 # The order steps appear in the workflow graph.
 STEPS = ["credentials", "topic", "research", "writer", "media", "editor", "formatter", "publisher"]
+YOUTUBE_STEPS = ["credentials", "topic", "research", "writer", "editor", "voice", "media", "publisher"]
 STATES = ["pending", "running", "passed", "failed", "retrying", "skipped", "blocked", "waiting"]
 
 
@@ -22,7 +23,7 @@ def now_iso():
 
 
 class RunLog:
-    def __init__(self, run_dir, run_id=None, meta=None, echo=False):
+    def __init__(self, run_dir, run_id=None, meta=None, echo=False, steps=None):
         self.dir = Path(run_dir)
         self.dir.mkdir(parents=True, exist_ok=True)
         self.echo = echo
@@ -34,7 +35,7 @@ class RunLog:
             self.status = {"run_id": run_id or self.dir.name, "state": "running", "started_at": now_iso(),
                            "finished_at": None, "result": None, "cost_usd": 0.0, "meta": meta or {},
                            "steps": {s: {"state": "pending", "attempts": 0, "started_at": None, "finished_at": None,
-                                         "summary": "", "errors": [], "cost_usd": 0.0} for s in STEPS},
+                                         "summary": "", "errors": [], "cost_usd": 0.0} for s in (steps or STEPS)},
                            "interventions": 0}
             self._flush()
 
@@ -75,6 +76,16 @@ class RunLog:
             self.status["cost_usd"] = round(self.status["cost_usd"] + usd, 6)
             st = self.status["steps"].setdefault(step, {})
             st["cost_usd"] = round(st.get("cost_usd", 0.0) + usd, 6)
+            self._flush()
+
+    def add_tokens(self, step, tokens):
+        """tokens: {"in": fresh input, "cached": input read from the provider's cache, "out": output}."""
+        if not tokens or not any(tokens.values()):
+            return
+        with self._lock:
+            for st in (self.status.setdefault("tokens", {}), self.status["steps"].setdefault(step, {}).setdefault("tokens", {})):
+                for k, v in tokens.items():
+                    st[k] = st.get(k, 0) + int(v or 0)
             self._flush()
 
     def artifact(self, name, data):

@@ -12,7 +12,9 @@
 <p align="center">
   <a href="https://github.com/sudip1205/social-postcrew/blob/main/docs/getting-started.md"><b>Getting started</b></a> ·
   <a href="https://github.com/sudip1205/social-postcrew/blob/main/docs/studio-guide.md">Studio guide</a> ·
+  <a href="https://github.com/sudip1205/social-postcrew/blob/main/docs/topic-briefs.md">Topic briefs</a> ·
   <a href="https://github.com/sudip1205/social-postcrew/blob/main/docs/configuration.md">Configuration</a> ·
+  <a href="https://github.com/sudip1205/social-postcrew/blob/main/docs/video-and-voice.md">YouTube videos</a> ·
   <a href="https://github.com/sudip1205/social-postcrew/blob/main/docs/agents.md">How the crew works</a> ·
   <a href="https://github.com/sudip1205/social-postcrew/blob/main/docs/troubleshooting.md">Troubleshooting</a>
 </p>
@@ -43,13 +45,20 @@ at the time you choose. You watch all of it live in the Studio, and nothing goes
 - **Accuracy you can audit.** Postcrew downloads every source page itself and rejects any quote that isn't on
   it. Every price, percent and big number must come from a verified source. Code on posters must parse.
 - **Strict review that converges.** The writers and the Editor use the same scoring guide. The Editor scores
-  each post three times and the worst score counts. A post that falls short comes back with at most four
+  each post up to three times and the worst score counts. A post that falls short comes back with at most four
   exact fixes, one per weak criterion, which the writer applies word for word.
 - **It learns.** Problems fixed in approved runs become lessons for the next run. Team members whose work is
   consistently weak are replaced, and the team writes down what went wrong.
 - **Visual by default.** 1080×1350 posters (points, steps, code, flow), or the same poster as an animated video
   that builds up piece by piece, for any topic. Algorithm posts get an MP4 where the line of Java being executed
   lights up as the data moves.
+- **More than LinkedIn.** Each app has its own schedule, plan and crew run. YouTube: scripted, voiced with ElevenLabs and
+  rendered locally, as a Short or a long video, reviewed like any post, then uploaded; or bring your own script, voice or video.
+- **Draw-and-explain videos.** Pick the *Blackboard* renderer and the script is drawn by hand on a chalkboard, timed to the
+  voice that was recorded first: each box, arrow, bullet and line of code appears as the narrator says it. Diagram scenes turn
+  system-design, architecture, cryptography and algorithm topics into boxes-and-arrows videos.
+- **Ideas with context.** Give a topic ideas like `Circuit breaker :: closed, open, half-open; Resilience4j` plus notes about
+  the topic, so the planner and the writer know exactly what to cover.
 - **You stay in control.** Practice mode is on until you turn it off. Publish automatically with a veto
   window, wait for your approval, or publish right away.
 - **Private and local.** No server, no database, no telemetry. Your settings, secrets and posts stay in one
@@ -129,6 +138,8 @@ Every tab, panel and button is explained in the [Studio guide](https://github.co
 | [Getting started](https://github.com/sudip1205/social-postcrew/blob/main/docs/getting-started.md) | install, first rehearsal, go live, update, uninstall |
 | [AI providers](https://github.com/sudip1205/social-postcrew/blob/main/docs/ai-providers.md) | Claude plan, Claude API, OpenAI API, Ollama and other OpenAI-compatible servers |
 | [Connect LinkedIn](https://github.com/sudip1205/social-postcrew/blob/main/docs/linkedin-setup.md) | the developer app, OAuth, token expiry, the first comment |
+| [Connect YouTube](https://github.com/sudip1205/social-postcrew/blob/main/docs/youtube-setup.md) | the Google app, OAuth, quota, unverified-app limits |
+| [YouTube videos](https://github.com/sudip1205/social-postcrew/blob/main/docs/video-and-voice.md) | script, ElevenLabs voice, Short or long, diagram and blackboard videos, ideas with context, your own files, animation MCP |
 | [Studio guide](https://github.com/sudip1205/social-postcrew/blob/main/docs/studio-guide.md) | every tab and button |
 | [Configuration reference](https://github.com/sudip1205/social-postcrew/blob/main/docs/configuration.md) | every setting in `config.json`, categories, secrets, the workspace folder, prompts |
 | [The crew](https://github.com/sudip1205/social-postcrew/blob/main/docs/agents.md) | each agent, the review loop, memory, the roster |
@@ -144,6 +155,7 @@ postcrew demo [--port 8765]              # a full run on scripted answers, in it
 postcrew init | serve | doctor | check | status
 postcrew serve [--port 8765] [--no-scheduler]
 postcrew run [--date YYYY-MM-DD] [--category ai-news] [--dry-run]
+postcrew run --platform youtube [--format short|long] [--seconds 45]   # a video for another app
 postcrew publish                         # publish whatever is due
 postcrew plan                            # draft the rest of this week's topics now
 postcrew import posts.json               # posts published elsewhere, never repeated

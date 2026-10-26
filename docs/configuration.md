@@ -42,6 +42,19 @@ When posts are written and published. Studio: **Settings > 2. Weekly schedule**,
 | `credential_check_time` | `"09:00"` | When the daily credential check runs. |
 | `days` | see below | Which category is posted on each day: `mon` ... `sun`, each a category id from [categories](#categories), or `""` for no post. At least one day must have a category. |
 
+### How often: `frequency`, `dates`, `day_times`
+
+| Key | Default | What it does |
+|---|---|---|
+| `frequency` | `"weekly"` | `weekly`: the weekdays set in `days`. `every_n_days`: every `every_n` days counting from `start_date`, cycling through `rotation`. `dates`: only on the dates listed in `dates`. |
+| `every_n` | `2` | For `every_n_days`: post every this many days (1-60). |
+| `start_date` | `""` | For `every_n_days`: the first posting day, `YYYY-MM-DD`. |
+| `rotation` | `[]` | For `every_n_days`: the category ids to cycle through. Empty = the categories used in `days`. |
+| `dates` | `[]` | One-off days, in any mode: `[{"date": "2026-11-03", "category": "dev-tip", "time": "10:00"}]`. `category` and `time` are optional. |
+| `day_times` | `{}` | A weekday that posts at its own time: `{"sat": "10:30"}`. |
+
+Studio: **Settings > Apps and schedules**.
+
 Default week: Monday `algorithm`, Tuesday `ai-news`, Wednesday `build-guide`, Thursday `tool-spotlight`,
 Friday `security`, Saturday `dev-tip`, Sunday `week-recap`.
 
@@ -55,6 +68,43 @@ Friday `security`, Saturday `dev-tip`, Sunday `week-recap`.
 4. From `post_time` on, every 15 minutes: publishes whatever is due, and retries first comments that failed.
 
 Missed a time because the computer was asleep? The scheduler catches up as soon as it runs again the same day.
+
+## platforms
+
+Every app Postcrew posts to has its own `schedule`, `planning`, `categories` and `publishing`. LinkedIn's are the
+top-level sections described on this page. Any other app keeps its own copy under `platforms.<id>` (same keys, so
+everything here applies to it too) and is switched on with `platforms.<id>.enabled`:
+
+```json
+"platforms": {
+  "linkedin": {"enabled": true},
+  "youtube":  {"enabled": false, "schedule": {...}, "planning": {...}, "categories": {...}, "publishing": {...}}
+}
+```
+
+An app that is switched off is not validated and never scheduled. Each app has its own week plan
+(`state/plan-<id>.json`), its own scheduler state and its own queue entries (`platform` field). CLI:
+`postcrew run --platform youtube`, `postcrew plan --platform youtube`.
+
+### YouTube (`platforms.youtube`)
+
+Same `schedule`, `planning`, `categories` and `publishing` keys as above, plus:
+
+| Key | Default | What it does |
+|---|---|---|
+| `publishing.visibility` | `"public"` | What the video is once uploaded: `public`, `unlisted` or `private`. |
+| `publishing.category_id` | `"28"` | YouTube's category number (28 = Science & Technology). |
+| `publishing.made_for_kids` | `false` | Whether the videos are made for kids (YouTube's own flag). |
+| `video.format` | `"short"` | The default kind of video: `short` (vertical, 15-60 s) or `long` (16:9, 1-30 min). |
+| `video.target_seconds` | `45` | About how long. The script gets 2.5 words a second of this. |
+| `video.voice` | see below | `provider` (`elevenlabs`), `voice_id`, `voice_name`, `model` (`eleven_multilingual_v2`), `speed` (0.7-1.2). |
+| `video.renderer` | `"ffmpeg"` | `ffmpeg` (slides and captions) or `mcp` (an animation MCP server, with `video.mcp` = `command`, `args`, `tool`, `timeout_s`). |
+| `video.captions` | `true` | Burn captions into the video. |
+
+A YouTube topic (category) takes the usual keys (`label`, `brief`, `research`, `fact_check`, `ideas`, `max_source_age_days`) with
+`"media": "video"`, and may set its own `format` and `target_seconds`. Default topics: `short-tip`, `explainer`, `tutorial`,
+`news-brief`. Secrets: `youtube_client_id`, `youtube_client_secret`, `youtube_refresh_token`, `elevenlabs_api_key`.
+See [Connect YouTube](youtube-setup.md) and [Videos, voice and your own files](video-and-voice.md).
 
 ## planning
 
@@ -131,7 +181,7 @@ Quality bar and hard limits for one post. Studio: **Settings > Advanced > Qualit
 |---|---|---|
 | `min_overall` | `80` | The Editor's overall score a post needs to be queued (0-100). |
 | `min_subscore` | `70` | Every single criterion (accuracy, clarity, hook, value, tone, format) must reach this too. A post at 85 overall with a weak hook (66) is sent back. |
-| `review_runs` | `3` | The Editor reviews the post this many times independently; the **worst** result counts. 1-5. |
+| `review_runs` | `3` | The Editor reviews the post this many times independently; the **worst** result counts. 1-5. The Editor stops at the first read that fails the bar, because more reads cannot lift the worst score: the draft goes back at once, which saves two calls. |
 | `max_attempts_per_step` | `4` | Tries per agent before the Supervisor gives up on that step. 1-10. |
 | `max_total_attempts` | `16` | Tries across the whole run, rewinds included. 1-40. |
 | `max_run_budget_usd` | `5.0` | Hard stop for one post (API-equivalent dollars). Up to 100. |

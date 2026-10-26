@@ -8,6 +8,8 @@ more than a skipped day. Be consistent too: the same draft must get the same sco
 for problems the criteria miss. If any red flag applies, overall must be below 70. Red flags (only for real
 problems): {{red_flags}}. Personal experience not listed in <about_the_owner> is the red flag invented_experience.
 
+{{brief_rules}}
+
 "fixes": at most 4, ONE per criterion that keeps the post from passing (lowest score first). Each fix is an
 exact, minimal edit the writer can apply as written: quote the words to change and give the replacement
 wording ("Replace line 1 with: '...'", "Delete the paragraph starting '...'"). Rules for fixes:

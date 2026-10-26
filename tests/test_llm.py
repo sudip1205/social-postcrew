@@ -53,6 +53,31 @@ class AnthropicTests(unittest.TestCase):
         self.assertEqual(req["body"]["tool_choice"], {"type": "tool", "name": "respond"})
         self.assertEqual(req["headers"]["X-api-key"], "sk-test")
 
+    def test_the_system_prompt_is_cached_and_cache_reads_cost_a_tenth(self):
+        usage = {"input_tokens": 100_000, "cache_read_input_tokens": 900_000, "cache_creation_input_tokens": 0,
+                 "output_tokens": 0}
+        http = FakeHTTP({"/messages": [{"content": [{"type": "tool_use", "name": "respond", "input": {"ok": True}}],
+                                        "stop_reason": "tool_use", "usage": usage}]})
+        b = make_backend(cfg_for("anthropic"), {"anthropic_api_key": "sk-test"})
+        b.opener = http
+        res = b.call("editor", "the rubric", "the draft", SCHEMA)
+        body = http.requests[0]["body"]
+        self.assertEqual(body["system"], [{"type": "text", "text": "the rubric", "cache_control": {"type": "ephemeral"}}])
+        self.assertEqual(body["messages"][0]["content"][0]["cache_control"], {"type": "ephemeral"})  # the Editor repeats it
+        self.assertAlmostEqual(res.cost_usd, (100_000 + 90_000) / 1e6 * 3.0)     # not 1M tokens at full price
+        self.assertEqual(res.tokens, {"in": 100_000, "cached": 900_000, "out": 0})
+        b.call("writer", "sys", "hi", SCHEMA)                                       # other agents only cache the system part
+        self.assertNotIn("cache_control", http.requests[1]["body"]["messages"][0]["content"][0])
+
+    def test_token_counts_read_every_providers_usage_shape(self):
+        from postcrew.llm import LLMResult
+        self.assertEqual(LLMResult({}, raw={"usage": {"input_tokens": 50, "output_tokens": 7,
+                                                      "input_tokens_details": {"cached_tokens": 20}}}).tokens,
+                         {"in": 30, "cached": 20, "out": 7})                        # OpenAI: cached is inside the input
+        self.assertEqual(LLMResult({}, raw={"usage": {"prompt_tokens": 9, "completion_tokens": 3}}).tokens,
+                         {"in": 9, "cached": 0, "out": 3})
+        self.assertEqual(LLMResult({}).tokens, {"in": 0, "cached": 0, "out": 0})
+
     def test_web_search_runs_server_side_then_it_must_answer_through_the_tool(self):
         http = FakeHTTP({"/messages": [
             {"content": [{"type": "server_tool_use", "name": "web_search"}], "stop_reason": "pause_turn",

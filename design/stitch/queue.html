@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+
+<html class="h-full bg-slate-50" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Postcrew Studio — Review &amp; Publish Queue</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {},
+          borderRadius: {
+            "DEFAULT": "0.5rem",
+            "lg": "1rem",
+            "xl": "1.5rem",
+            "full": "9999px"
+          },
+          spacing: {},
+          fontFamily: {
+            headline: ["Plus Jakarta Sans", "sans-serif"],
+            display: ["Plus Jakarta Sans", "sans-serif"],
+            body: ["Inter", "sans-serif"],
+            label: ["Inter", "sans-serif"]
+          },
+          fontSize: {}
+        },
+      },
+    }
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      line-height: 1;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      vertical-align: middle;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 9999px;
+    }
+  </style>
+</head>
+<body class="h-full font-body text-slate-800 bg-[#F8FAFC] antialiased flex flex-col">
+<!-- Shared TopNavBar Header -->
+<header class="docked full-width top-0 sticky z-40 bg-white border-b border-slate-200 shadow-sm">
+<div class="w-full px-6 py-3 flex items-center justify-between mx-auto">
+<!-- Left: Brand Logo & Main Nav -->
+<div class="flex items-center gap-8">
+<a class="font-headline font-black text-lg text-slate-900 flex items-center gap-2" href="#">
+<div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-violet-600 to-indigo-500 flex items-center justify-center text-white shadow-sm shadow-violet-200">
+<span class="material-symbols-outlined text-xl">smart_toy</span>
+</div>
+<span class="tracking-tight font-extrabold text-slate-900">Postcrew Studio</span>
+</a>
+<!-- Global Navigation Items -->
+<nav class="hidden md:flex items-center gap-1 font-label text-sm">
+<a class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-slate-600 font-medium hover:text-slate-900 hover:bg-slate-100 transition-colors duration-150 active:scale-95" href="#">
+<span class="material-symbols-outlined text-[20px] text-slate-400">dashboard</span>
+<span>Overview</span>
+</a>
+<a class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-slate-600 font-medium hover:text-slate-900 hover:bg-slate-100 transition-colors duration-150 active:scale-95" href="#">
+<span class="material-symbols-outlined text-[20px] text-slate-400">calendar_month</span>
+<span>Plan</span>
+</a>
+<a class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-slate-600 font-medium hover:text-slate-900 hover:bg-slate-100 transition-colors duration-150 active:scale-95" href="#">
+<span class="material-symbols-outlined text-[20px] text-slate-400">group_work</span>
+<span>Crew</span>
+</a>
+<a class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-slate-600 font-medium hover:text-slate-900 hover:bg-slate-100 transition-colors duration-150 active:scale-95" href="#">
+<span class="material-symbols-outlined text-[20px] text-slate-400">schema</span>
+<span>Workflow</span>
+</a>
+<!-- Active Queue Tab per semantic intent -->
+<a class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-violet-50 text-violet-700 font-semibold active:scale-95 transition-transform duration-100 ease-in-out" href="#">
+<span class="material-symbols-outlined text-[20px] text-violet-600">outbox</span>
+<span>Queue</span>
+<span class="bg-violet-200 text-violet-800 text-xs px-1.5 py-0.2 rounded-full font-bold">14</span>
+</a>
+<a class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-slate-600 font-medium hover:text-slate-900 hover:bg-slate-100 transition-colors duration-150 active:scale-95" href="#">
+<span class="material-symbols-outlined text-[20px] text-slate-400">settings</span>
+<span>Settings</span>
+</a>
+</nav>
+</div>
+<!-- Right Header Actions & Connectors -->
+<div class="flex items-center gap-3">
+<!-- Connected Platforms Status Pills -->
+<div class="hidden lg:flex items-center gap-2 px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg">
+<div class="flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium text-slate-700">
+<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+<span class="font-bold text-[#0A66C2]">in</span>
+<span class="text-slate-600">LinkedIn</span>
+</div>
+<div class="w-px h-3.5 bg-slate-200"></div>
+<div class="flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium text-slate-700">
+<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+<span class="material-symbols-outlined text-[15px] text-[#FF0033]">smart_display</span>
+<span class="text-slate-600">YouTube</span>
+</div>
+</div>
+<!-- Secondary Action: Practice Mode -->
+<button class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-sky-700 bg-sky-50 border border-sky-200 rounded-lg hover:bg-sky-100 active:scale-95 transition-all" type="button">
+<span class="material-symbols-outlined text-base text-sky-600">science</span>
+<span>Practice mode</span>
+</button>
+<!-- Notification & Help Icons -->
+<div class="flex items-center border-l border-slate-200 pl-3 gap-1">
+<button class="p-2 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 relative active:scale-95 transition-colors" type="button">
+<span class="material-symbols-outlined text-[22px]">notifications</span>
+<span class="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-500 rounded-full"></span>
+</button>
+<button class="p-2 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 active:scale-95 transition-colors" type="button">
+<span class="material-symbols-outlined text-[22px]">help</span>
+</button>
+</div>
+<!-- Primary Action "Run now" -->
+<button class="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-700 text-white font-label font-medium text-sm shadow-sm shadow-violet-200 active:scale-95 transition-all" type="button">
+<span class="material-symbols-outlined text-base">bolt</span>
+<span>Run now</span>
+</button>
+<!-- Agent Command Avatar -->
+<div class="w-8 h-8 rounded-full bg-gradient-to-br from-violet-600 via-indigo-600 to-sky-500 p-0.5 shadow cursor-pointer ml-1" title="Agent Command Avatar">
+<div class="w-full h-full rounded-full bg-white flex items-center justify-center">
+<span class="text-xs font-bold text-violet-700">AC</span>
+</div>
+</div>
+</div>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="flex-1 w-full max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col gap-6" data-active-view="queue">
+<!-- Page Header & Control Hub -->
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-5">
+<div>
+<div class="flex items-center gap-2 text-xs font-medium text-slate-500 mb-1">
+<span>Production Studio</span>
+<span class="material-symbols-outlined text-[14px]">chevron_right</span>
+<span class="text-violet-600 font-semibold">Review Queue</span>
+</div>
+<h1 class="font-headline font-bold text-2xl text-slate-900 tracking-tight flex items-center gap-3">
+<span>Review &amp; Publish Queue</span>
+<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+<span class="material-symbols-outlined text-[14px] text-amber-600">hourglass_top</span>
+<span>3 Pending Veto Windows</span>
+</span>
+</h1>
+<p class="text-sm text-slate-600 mt-1">
+          Inspect agent-synthesized drafts, inspect quality scores, override assets, or approve autonomous broadcasts.
+        </p>
+</div>
+<!-- Action Group -->
+<div class="flex items-center flex-wrap gap-2.5">
+<button class="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 shadow-sm active:scale-95 transition-all" type="button">
+<span class="material-symbols-outlined text-[18px] text-slate-500">refresh</span>
+<span>Refresh</span>
+</button>
+<button class="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-amber-800 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 active:scale-95 transition-all" type="button">
+<span class="material-symbols-outlined text-[18px] text-amber-600">pause_circle</span>
+<span>Pause Auto-Publish</span>
+</button>
+<button class="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm shadow-emerald-200 active:scale-95 transition-all" type="button">
+<span class="material-symbols-outlined text-[18px]">done_all</span>
+<span>Bulk Approve (3)</span>
+</button>
+</div>
+</div>
+<!-- Filter Sub-bar & Filter Controls -->
+<div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-white p-2.5 rounded-xl border border-slate-200 shadow-sm">
+<!-- Filter Chips -->
+<div class="flex items-center gap-1.5 overflow-x-auto custom-scrollbar pb-1 lg:pb-0">
+<!-- All (Active) -->
+<button class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-900 text-white shadow-sm" type="button">
+<span>All</span>
+<span class="bg-slate-700 text-white px-1.5 py-0.2 rounded-full text-[11px]">14</span>
+</button>
+<!-- LinkedIn Filter -->
+<button class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors" type="button">
+<span class="w-2 h-2 rounded-full bg-[#0A66C2]"></span>
+<span>LinkedIn</span>
+<span class="bg-slate-100 text-slate-600 px-1.5 py-0.2 rounded-full text-[11px]">8</span>
+</button>
+<!-- YouTube Filter -->
+<button class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors" type="button">
+<span class="w-2 h-2 rounded-full bg-[#FF0033]"></span>
+<span>YouTube</span>
+<span class="bg-slate-100 text-slate-600 px-1.5 py-0.2 rounded-full text-[11px]">6</span>
+</button>
+<div class="w-px h-4 bg-slate-200 mx-1"></div>
+<!-- Awaiting Approval -->
+<button class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-amber-700 bg-amber-50/70 border border-amber-200/60 hover:bg-amber-100 transition-colors" type="button">
+<span class="material-symbols-outlined text-[14px] text-[#D97706]">schedule</span>
+<span>Awaiting approval</span>
+<span class="bg-amber-200 text-amber-800 px-1.5 py-0.2 rounded-full text-[11px] font-bold">5</span>
+</button>
+<!-- Scheduled -->
+<button class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-100 transition-colors" type="button">
+<span class="material-symbols-outlined text-[14px] text-[#059669]">check_circle</span>
+<span>Scheduled</span>
+<span class="bg-slate-100 text-slate-600 px-1.5 py-0.2 rounded-full text-[11px]">7</span>
+</button>
+<!-- Failed -->
+<button class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-100 transition-colors" type="button">
+<span class="material-symbols-outlined text-[14px] text-[#E11D48]">error</span>
+<span>Failed</span>
+<span class="bg-rose-100 text-rose-700 px-1.5 py-0.2 rounded-full text-[11px] font-semibold">2</span>
+</button>
+</div>
+<!-- Right Side: Search, View Mode & Sort Dropdown -->
+<div class="flex items-center gap-2.5 self-end lg:self-auto">
+<!-- Search Field -->
+<div class="relative">
+<span class="material-symbols-outlined text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 text-[18px]">search</span>
+<input class="w-48 sm:w-56 pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-violet-500 focus:bg-white text-slate-800 placeholder-slate-400" placeholder="Search queue..." type="text"/>
+</div>
+<!-- Sort Select -->
+<div class="relative">
+<select class="appearance-none bg-slate-50 border border-slate-200 text-slate-700 text-xs font-medium rounded-lg pl-2.5 pr-7 py-1.5 hover:bg-slate-100 focus:outline-none focus:ring-1 focus:ring-violet-500 cursor-pointer">
+<option>Publish date (soonest)</option>
+<option>Quality Score (highest)</option>
+<option>Veto window expiring</option>
+<option>Platform (grouped)</option>
+</select>
+<span class="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 text-[16px] text-slate-400 pointer-events-none">expand_more</span>
+</div>
+<!-- View Mode Switcher -->
+<div class="flex items-center p-0.5 bg-slate-100 rounded-lg border border-slate-200">
+<button class="p-1 rounded bg-white text-slate-800 shadow-xs" title="Cards View" type="button">
+<span class="material-symbols-outlined text-[18px]">view_agenda</span>
+</button>
+<button class="p-1 rounded text-slate-500 hover:text-slate-800" title="Compact Table" type="button">
+<span class="material-symbols-outlined text-[18px]">table_rows</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Queue Feed / Cards Container -->
+<div class="space-y-6">
+<!-- CARD 1: LinkedIn — Awaiting Approval -->
+<article class="bg-white rounded-xl border border-slate-200 border-l-[6px] border-l-[#0A66C2] shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
+<!-- Card Header Info -->
+<div class="px-6 py-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3 bg-gradient-to-r from-blue-50/25 to-white">
+<div class="flex items-center gap-3">
+<div class="flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#0A66C2]/10 text-[#0A66C2] font-semibold text-xs border border-[#0A66C2]/20">
+<span class="font-bold">in</span>
+<span>LinkedIn · Carousel &amp; Post</span>
+</div>
+<div class="flex items-center gap-1 text-xs text-slate-500">
+<span class="material-symbols-outlined text-[16px] text-slate-400">schedule</span>
+<span>Scheduled slot:</span>
+<span class="font-semibold text-slate-700">Tomorrow at 4:30 PM</span>
+</div>
+</div>
+<!-- Status Chip: Amber Clock -->
+<div class="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-700 text-xs font-medium">
+<span class="material-symbols-outlined text-[16px] text-[#D97706]">schedule</span>
+<span>Awaiting approval</span>
+<span class="text-amber-500 font-normal">|</span>
+<span class="font-semibold text-amber-800">veto window: 2h 15m remaining</span>
+</div>
+</div>
+<!-- Card Body Bento Grid -->
+<div class="p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+<!-- Left Column: Realistic LinkedIn Post Preview (7 cols) -->
+<div class="lg:col-span-7 flex flex-col justify-between">
+<div>
+<div class="flex items-center justify-between mb-2">
+<span class="text-xs font-bold uppercase tracking-wider text-slate-400">Post Hook &amp; Narrative</span>
+<span class="text-xs text-violet-600 font-medium inline-flex items-center gap-1 hover:underline cursor-pointer">
+<span class="material-symbols-outlined text-[14px]">edit</span>
+                  Inline edit
+                </span>
+</div>
+<h2 class="text-base font-bold text-slate-900 mb-3 hover:text-violet-700 transition-colors cursor-pointer group flex items-start justify-between">
+<span>5 Architectural Patterns for Multi-Agent Systems in Production</span>
+<span class="material-symbols-outlined text-slate-300 text-sm opacity-0 group-hover:opacity-100 transition-opacity">open_in_new</span>
+</h2>
+<!-- Mock LinkedIn Frame -->
+<div class="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-3">
+<div class="flex items-center gap-2.5">
+<div class="w-9 h-9 rounded-full bg-gradient-to-tr from-violet-600 to-indigo-500 text-white flex items-center justify-center font-bold text-xs">
+                    AR
+                  </div>
+<div>
+<div class="flex items-center gap-1">
+<p class="text-xs font-bold text-slate-900">Alex Rivera</p>
+<span class="text-[10px] text-slate-400">· 1st</span>
+</div>
+<p class="text-[11px] text-slate-500">Autonomous systems via <span class="text-violet-600 font-medium">Postcrew Agent</span> · 2m</p>
+</div>
+</div>
+<div class="text-xs text-slate-700 leading-relaxed space-y-1">
+<p>Autonomous workflows fail silently without deterministic boundary contracts. Here is how we structured our 7-agent pipeline across distributed message queues...</p>
+<p class="text-slate-400 text-[11px] italic">...see more (5-slide technical breakdown below)</p>
+</div>
+<!-- Carousel Visual Mockup Card -->
+<div class="rounded-lg border border-slate-200 bg-white overflow-hidden shadow-xs">
+<div class="h-36 bg-gradient-to-r from-slate-900 to-indigo-950 p-4 text-white flex flex-col justify-between relative overflow-hidden">
+<div class="flex justify-between items-center z-10">
+<span class="text-[10px] uppercase font-bold tracking-widest text-indigo-300">Technical Brief · Slide 1 of 5</span>
+<span class="material-symbols-outlined text-slate-400 text-sm">view_carousel</span>
+</div>
+<div class="z-10">
+<p class="text-xs text-indigo-200 font-medium">Deterministic State Isolation</p>
+<p class="text-sm font-bold text-white tracking-tight mt-0.5">Pattern 01: The Supervisor-Worker Contract</p>
+</div>
+<div class="absolute -right-6 -bottom-6 w-32 h-32 bg-indigo-600/30 rounded-full blur-xl pointer-events-none"></div>
+</div>
+<div class="px-3 py-2 bg-slate-100 flex items-center justify-between text-[11px] text-slate-600">
+<span class="font-medium">multi-agent-production-patterns.pdf (5 pages)</span>
+<button class="text-violet-600 hover:text-violet-800 font-semibold text-[11px]" type="button">Preview slides</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Agent Signature Helper -->
+<p class="text-[11px] text-slate-400 mt-2 flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[15px] text-teal-600">psychology</span>
+<span>Drafted by <strong class="text-slate-600">Research &amp; Writing Pods</strong> using <span class="border-b border-dotted border-slate-400">Architecture Archetype v3</span></span>
+</p>
+</div>
+<!-- Right Column: Quality Score Ring & Gate Indicators (5 cols) -->
+<div class="lg:col-span-5 bg-slate-50/70 rounded-xl border border-slate-200/80 p-5 flex flex-col justify-between">
+<div>
+<div class="flex items-center justify-between pb-3 border-b border-slate-200">
+<span class="text-xs font-bold uppercase tracking-wider text-slate-500">Quality Assurance</span>
+<span class="text-[11px] px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full font-semibold flex items-center gap-1">
+<span class="material-symbols-outlined text-[13px] text-emerald-600">check_circle</span>
+                  Passed Quality Gates
+                </span>
+</div>
+<!-- Overall Score Ring + Verdict -->
+<div class="flex items-center gap-4 my-4">
+<div class="relative w-16 h-16 flex items-center justify-center shrink-0">
+<svg class="w-full h-full -rotate-90" viewbox="0 0 36 36">
+<path class="text-slate-200" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-width="3.5"></path>
+<path class="text-emerald-500" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-dasharray="92, 100" stroke-linecap="round" stroke-width="3.5"></path>
+</svg>
+<div class="absolute inset-0 flex flex-col items-center justify-center">
+<span class="text-sm font-extrabold text-slate-900 leading-none">92</span>
+<span class="text-[9px] text-slate-500 font-medium">/100</span>
+</div>
+</div>
+<div>
+<h3 class="text-xs font-bold text-slate-900">Autonomous Gate Pass</h3>
+<p class="text-[11px] text-slate-500 leading-snug mt-0.5">High signal-to-noise ratio. Claim validation verified against arXiv:2401.03428.</p>
+</div>
+</div>
+<!-- 6 Detailed Rating Bars -->
+<div class="space-y-2 pt-2">
+<!-- Accuracy -->
+<div>
+<div class="flex justify-between text-[11px] mb-0.5">
+<span class="text-slate-600 font-medium">Accuracy</span>
+<span class="font-bold text-emerald-600">98%</span>
+</div>
+<div class="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
+<div class="h-full bg-emerald-500 rounded-full" style="width: 98%"></div>
+</div>
+</div>
+<!-- Clarity -->
+<div>
+<div class="flex justify-between text-[11px] mb-0.5">
+<span class="text-slate-600 font-medium">Clarity</span>
+<span class="font-bold text-emerald-600">94%</span>
+</div>
+<div class="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
+<div class="h-full bg-emerald-500 rounded-full" style="width: 94%"></div>
+</div>
+</div>
+<!-- Hook -->
+<div>
+<div class="flex justify-between text-[11px] mb-0.5">
+<span class="text-slate-600 font-medium">Hook</span>
+<span class="font-bold text-emerald-600">91%</span>
+</div>
+<div class="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
+<div class="h-full bg-emerald-500 rounded-full" style="width: 91%"></div>
+</div>
+</div>
+<!-- Value -->
+<div>
+<div class="flex justify-between text-[11px] mb-0.5">
+<span class="text-slate-600 font-medium">Value</span>
+<span class="font-bold text-emerald-600">95%</span>
+</div>
+<div class="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
+<div class="h-full bg-emerald-500 rounded-full" style="width: 95%"></div>
+</div>
+</div>
+<!-- Tone -->
+<div>
+<div class="flex justify-between text-[11px] mb-0.5">
+<span class="text-slate-600 font-medium">Tone</span>
+<span class="font-bold text-emerald-600">90%</span>
+</div>
+<div class="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
+<div class="h-full bg-emerald-500 rounded-full" style="width: 90%"></div>
+</div>
+</div>
+<!-- Format -->
+<div>
+<div class="flex justify-between text-[11px] mb-0.5">
+<span class="text-slate-600 font-medium">Format</span>
+<span class="font-bold text-amber-600">84%</span>
+</div>
+<div class="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
+<div class="h-full bg-amber-500 rounded-full" style="width: 84%"></div>
+</div>
+</div>
+</div>
+</div>
+<p class="text-[10px] text-slate-400 mt-3 pt-2 border-t border-slate-200">
+              Evaluated by <strong class="text-indigo-600">Quality Agent (Indigo Pod)</strong>. Pass threshold is set to 80%.
+            </p>
+</div>
+</div>
+<!-- Card Footer Actions Bar -->
+<div class="px-6 py-3 bg-slate-50 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
+<div class="flex items-center gap-2">
+<!-- Primary Approve -->
+<button class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs shadow-xs active:scale-95 transition-all" type="button">
+<span class="material-symbols-outlined text-[17px]">check_circle</span>
+<span>Approve</span>
+</button>
+<!-- Secondary Edit Draft -->
+<button class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-medium text-xs active:scale-95 transition-all" type="button">
+<span class="material-symbols-outlined text-[17px] text-slate-500">edit_note</span>
+<span>Edit draft</span>
+</button>
+<!-- Veto Action -->
+<button class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-50 border border-rose-200 hover:bg-rose-100 text-rose-700 font-medium text-xs active:scale-95 transition-all" type="button">
+<span class="material-symbols-outlined text-[17px] text-rose-600">cancel</span>
+<span>Veto</span>
+</button>
+</div>
+<div class="flex items-center gap-2">
+<!-- Publish Now -->
+<button class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-200/70 text-xs font-medium transition-colors" type="button">
+<span class="material-symbols-outlined text-[16px] text-slate-500">send</span>
+<span>Publish now</span>
+</button>
+<!-- Overflow Three-dot -->
+<div class="relative">
+<button class="p-1.5 rounded-lg hover:bg-slate-200/70 text-slate-500 transition-colors" title="More actions" type="button">
+<span class="material-symbols-outlined text-[18px]">more_vert</span>
+</button>
+</div>
+</div>
+</div>
+</article>
+<!-- CARD 2: YouTube Shorts — Awaiting Approval with Override Slots -->
+<article class="bg-white rounded-xl border border-slate-200 border-l-[6px] border-l-[#FF0033] shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
+<!-- Card Header Info -->
+<div class="px-6 py-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3 bg-gradient-to-r from-red-50/20 to-white">
+<div class="flex items-center gap-3">
+<div class="flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#FF0033]/10 text-[#FF0033] font-semibold text-xs border border-[#FF0033]/20">
+<span class="material-symbols-outlined text-[15px] text-[#FF0033]">play_circle</span>
+<span>YouTube Shorts</span>
+</div>
+<div class="flex items-center gap-1 text-xs text-slate-500">
+<span class="material-symbols-outlined text-[16px] text-slate-400">schedule</span>
+<span>Scheduled slot:</span>
+<span class="font-semibold text-slate-700">Tue, Nov 26 at 2:00 PM</span>
+</div>
+</div>
+<!-- Status Chip: Amber Clock -->
+<div class="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-700 text-xs font-medium">
+<span class="material-symbols-outlined text-[16px] text-[#D97706]">schedule</span>
+<span>Awaiting approval</span>
+<span class="text-amber-500 font-normal">|</span>
+<span class="font-semibold text-amber-800">veto window: 1h 40m remaining</span>
+</div>
+</div>
+<!-- Body Grid -->
+<div class="p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+<!-- Left Column: Video & Media Asset Preview (7 cols) -->
+<div class="lg:col-span-7 flex flex-col justify-between space-y-4">
+<div>
+<div class="flex items-center justify-between mb-1.5">
+<span class="text-xs font-bold uppercase tracking-wider text-slate-400">Short Video &amp; Voiceover Synthesis</span>
+<span class="text-xs font-semibold text-slate-500">Duration: 42s</span>
+</div>
+<h2 class="text-base font-bold text-slate-900 mb-3 hover:text-rose-700 transition-colors cursor-pointer">
+                Agentic LLM Swarms Explained in 40 Seconds
+              </h2>
+<div class="grid grid-cols-1 sm:grid-cols-12 gap-4 bg-slate-50/70 p-4 rounded-xl border border-slate-200">
+<!-- 9:16 Vertical Video Preview -->
+<div class="sm:col-span-4 flex flex-col items-center">
+<div class="relative w-28 sm:w-full aspect-[9/16] rounded-lg bg-slate-900 border border-slate-800 overflow-hidden shadow-md flex items-center justify-center group cursor-pointer">
+<img class="absolute inset-0 w-full h-full object-cover opacity-80 group-hover:scale-105 transition-transform duration-300" data-alt="Futuristic high-contrast 3D conceptual graphic illustrating glowing interconnected artificial intelligence nodes forming an agent swarm against a sleek slate studio backdrop with subtle volumetric lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBSJVzpMS915TANa5vBX9BdUAxiUIllMQSjq-Fn7bX0OcGgsqqVmtADTZH18XN7OfU9bGnKke2_vdbJjgV6p3HrJn9Cnn4-0TTbqi5JrSq_KTS7E5avvZb-y8n3e0GFIEh2vKQE90PQilP1cE5pJqiETsETm-ufZ8eK6y_ad70ML3yQDgkt7OIb2y9iEgNpjYzoLZvuIb4pBg64AdnJFa0Us-H3zNG8I8eeOXWT2oghHP3wKvBMjjsZNCNS-AoAAVOughf4xWWZpJZB"/>
+<div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/40"></div>
+<button class="w-9 h-9 rounded-full bg-white/90 text-[#FF0033] flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform z-10" type="button">
+<span class="material-symbols-outlined text-[22px] ml-0.5">play_arrow</span>
+</button>
+<div class="absolute top-2 left-2 px-1.5 py-0.5 rounded bg-black/60 backdrop-blur-xs text-[10px] text-white font-mono font-medium">
+                      0:42
+                    </div>
+<div class="absolute bottom-2 left-2 right-2 flex justify-between items-center text-[10px] text-slate-300">
+<span class="font-mono">1080x1920</span>
+<span class="bg-red-600 text-white font-bold text-[9px] px-1 rounded">60fps</span>
+</div>
+</div>
+<span class="text-[10px] text-slate-400 mt-1.5">Click to play preview</span>
+</div>
+<!-- Voiceover & Script Breakdown -->
+<div class="sm:col-span-8 flex flex-col justify-between space-y-3">
+<!-- ElevenLabs Voice Pill -->
+<div class="p-2.5 rounded-lg border border-slate-200 bg-white flex items-center justify-between">
+<div class="flex items-center gap-2">
+<div class="w-7 h-7 rounded-full bg-indigo-50 border border-indigo-200 flex items-center justify-center text-indigo-700">
+<span class="material-symbols-outlined text-[16px]">record_voice_over</span>
+</div>
+<div>
+<div class="flex items-center gap-1.5">
+<span class="text-xs font-bold text-slate-900">ElevenLabs · Rachel</span>
+<span class="text-[10px] px-1.5 py-0.2 rounded bg-indigo-50 text-indigo-700 font-medium">AI Voice</span>
+</div>
+<p class="text-[11px] text-slate-500">Energetic &amp; Direct · 24kHz studio stream</p>
+</div>
+</div>
+<button class="p-1.5 rounded-full hover:bg-slate-100 text-slate-600" title="Listen to Voiceover Sample" type="button">
+<span class="material-symbols-outlined text-[18px]">volume_up</span>
+</button>
+</div>
+<!-- Script Scene Timeline Bar -->
+<div>
+<div class="flex items-center justify-between text-[11px] text-slate-500 mb-1">
+<span class="font-semibold text-slate-700">Scene Progression Timeline</span>
+<span class="font-mono">4 Scenes (Total 42s)</span>
+</div>
+<div class="grid grid-cols-12 gap-1 h-6 rounded-md overflow-hidden bg-slate-200 p-0.5 text-[10px] font-bold text-white text-center">
+<div class="col-span-2 bg-indigo-500 rounded-xs flex items-center justify-center truncate px-0.5" title="01: Hook [0-6s]">01 Hook</div>
+<div class="col-span-3 bg-sky-500 rounded-xs flex items-center justify-center truncate px-0.5" title="02: Problem [7-18s]">02 Problem</div>
+<div class="col-span-5 bg-violet-600 rounded-xs flex items-center justify-center truncate px-0.5" title="03: Agent Architecture [19-34s]">03 Architecture</div>
+<div class="col-span-2 bg-emerald-500 rounded-xs flex items-center justify-center truncate px-0.5" title="04: CTA [35-42s]">04 CTA</div>
+</div>
+<div class="flex justify-between text-[9px] text-slate-400 font-mono mt-1">
+<span>0s</span>
+<span>6s</span>
+<span>18s</span>
+<span>34s</span>
+<span>42s</span>
+</div>
+</div>
+<!-- Quick Override Slot Buttons -->
+<div>
+<p class="text-[11px] font-medium text-slate-600 mb-1.5">Asset Overrides (Bypass Pod Output):</p>
+<div class="flex flex-wrap gap-1.5">
+<button class="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium text-slate-700 bg-white border border-slate-200 rounded hover:bg-slate-100 active:scale-95 transition-all" type="button">
+<span class="material-symbols-outlined text-[14px] text-slate-500">video_call</span>
+<span>Use my own video</span>
+</button>
+<button class="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium text-slate-700 bg-white border border-slate-200 rounded hover:bg-slate-100 active:scale-95 transition-all" type="button">
+<span class="material-symbols-outlined text-[14px] text-slate-500">mic</span>
+<span>Use my own voice</span>
+</button>
+<button class="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium text-slate-700 bg-white border border-slate-200 rounded hover:bg-slate-100 active:scale-95 transition-all" type="button">
+<span class="material-symbols-outlined text-[14px] text-slate-500">description</span>
+<span>Use my own script</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Plain-language Helper Note -->
+<p class="text-[11px] text-slate-400 flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[15px] text-sky-500">info</span>
+<span>Audio and background visuals generated autonomously. You can replace any layer prior to veto expiry.</span>
+</p>
+</div>
+<!-- Right Column: Quality Score Ring & Review Breakdown (5 cols) -->
+<div class="lg:col-span-5 bg-slate-50/70 rounded-xl border border-slate-200/80 p-5 flex flex-col justify-between">
+<div>
+<div class="flex items-center justify-between pb-3 border-b border-slate-200">
+<span class="text-xs font-bold uppercase tracking-wider text-slate-500">Shorts Retention Score</span>
+<span class="text-[11px] px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full font-semibold flex items-center gap-1">
+<span class="material-symbols-outlined text-[13px] text-emerald-600">check_circle</span>
+                  Passed Quality Gates
+                </span>
+</div>
+<!-- Score Ring -->
+<div class="flex items-center gap-4 my-4">
+<div class="relative w-16 h-16 flex items-center justify-center shrink-0">
+<svg class="w-full h-full -rotate-90" viewbox="0 0 36 36">
+<path class="text-slate-200" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-width="3.5"></path>
+<path class="text-emerald-500" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-dasharray="88, 100" stroke-linecap="round" stroke-width="3.5"></path>
+</svg>
+<div class="absolute inset-0 flex flex-col items-center justify-center">
+<span class="text-sm font-extrabold text-slate-900 leading-none">88</span>
+<span class="text-[9px] text-slate-500 font-medium">/100</span>
+</div>
+</div>
+<div>
+<h3 class="text-xs font-bold text-slate-900">Optimal Hook Pacing</h3>
+<p class="text-[11px] text-slate-500 leading-snug mt-0.5">Estimated viewer retention through second 5 is 79%. Voice clarity high.</p>
+</div>
+</div>
+<!-- 6 Bars -->
+<div class="space-y-2 pt-2">
+<div>
+<div class="flex justify-between text-[11px] mb-0.5">
+<span class="text-slate-600 font-medium">Accuracy</span>
+<span class="font-bold text-emerald-600">96%</span>
+</div>
+<div class="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
+<div class="h-full bg-emerald-500 rounded-full" style="width: 96%"></div>
+</div>
+</div>
+<div>
+<div class="flex justify-between text-[11px] mb-0.5">
+<span class="text-slate-600 font-medium">Clarity</span>
+<span class="font-bold text-emerald-600">92%</span>
+</div>
+<div class="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
+<div class="h-full bg-emerald-500 rounded-full" style="width: 92%"></div>
+</div>
+</div>
+<div>
+<div class="flex justify-between text-[11px] mb-0.5">
+<span class="text-slate-600 font-medium">Hook</span>
+<span class="font-bold text-amber-600">79%</span>
+</div>
+<div class="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
+<div class="h-full bg-amber-500 rounded-full" style="width: 79%"></div>
+</div>
+</div>
+<div>
+<div class="flex justify-between text-[11px] mb-0.5">
+<span class="text-slate-600 font-medium">Value</span>
+<span class="font-bold text-emerald-600">90%</span>
+</div>
+<div class="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
+<div class="h-full bg-emerald-500 rounded-full" style="width: 90%"></div>
+</div>
+</div>
+<div>
+<div class="flex justify-between text-[11px] mb-0.5">
+<span class="text-slate-600 font-medium">Tone</span>
+<span class="font-bold text-emerald-600">89%</span>
+</div>
+<div class="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
+<div class="h-full bg-emerald-500 rounded-full" style="width: 89%"></div>
+</div>
+</div>
+<div>
+<div class="flex justify-between text-[11px] mb-0.5">
+<span class="text-slate-600 font-medium">Format</span>
+<span class="font-bold text-emerald-600">95%</span>
+</div>
+<div class="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
+<div class="h-full bg-emerald-500 rounded-full" style="width: 95%"></div>
+</div>
+</div>
+</div>
+</div>
+<p class="text-[10px] text-slate-400 mt-3 pt-2 border-t border-slate-200">
+              Generated with YouTube SEO tags: <span class="text-slate-600 font-mono">#LLM #Agents #AIEngineering</span>
+</p>
+</div>
+</div>
+<!-- Footer Actions -->
+<div class="px-6 py-3 bg-slate-50 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
+<div class="flex items-center gap-2">
+<button class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs shadow-xs active:scale-95 transition-all" type="button">
+<span class="material-symbols-outlined text-[17px]">check_circle</span>
+<span>Approve</span>
+</button>
+<button class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-medium text-xs active:scale-95 transition-all" type="button">
+<span class="material-symbols-outlined text-[17px] text-slate-500">tune</span>
+<span>Edit script &amp; timeline</span>
+</button>
+<button class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-50 border border-rose-200 hover:bg-rose-100 text-rose-700 font-medium text-xs active:scale-95 transition-all" type="button">
+<span class="material-symbols-outlined text-[17px] text-rose-600">cancel</span>
+<span>Veto</span>
+</button>
+</div>
+<div class="flex items-center gap-2">
+<button class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-200/70 text-xs font-medium transition-colors" type="button">
+<span class="material-symbols-outlined text-[16px] text-slate-500">send</span>
+<span>Publish now</span>
+</button>
+<button class="p-1.5 rounded-lg hover:bg-slate-200/70 text-slate-500 transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px]">more_vert</span>
+</button>
+</div>
+</div>
+</article>
+<!-- CARD 3: YouTube Shorts — Scheduled (Approved) -->
+<article class="bg-white rounded-xl border border-slate-200 border-l-[6px] border-l-[#FF0033] shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
+<div class="px-6 py-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3 bg-gradient-to-r from-red-50/10 to-white">
+<div class="flex items-center gap-3">
+<div class="flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#FF0033]/10 text-[#FF0033] font-semibold text-xs border border-[#FF0033]/20">
+<span class="material-symbols-outlined text-[15px] text-[#FF0033]">play_circle</span>
+<span>YouTube Shorts</span>
+</div>
+<div class="flex items-center gap-1 text-xs text-slate-500">
+<span class="material-symbols-outlined text-[16px] text-slate-400">event</span>
+<span>Slot:</span>
+<span class="font-semibold text-slate-700">Tue at 5:00 PM</span>
+</div>
+</div>
+<!-- Status Chip: Green Scheduled -->
+<div class="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-medium">
+<span class="material-symbols-outlined text-[16px] text-[#059669]">check_circle</span>
+<span>Scheduled for Tue 5:00 PM</span>
+</div>
+</div>
+<div class="p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+<div class="lg:col-span-8 flex items-center gap-4">
+<div class="relative w-20 aspect-[9/16] rounded-md bg-slate-900 border border-slate-700 overflow-hidden shrink-0 shadow-sm">
+<img class="w-full h-full object-cover opacity-85" data-alt="High-tech server room with glowing fiber optic data cables and violet telemetry streams representing rapid computing throughput and distributed pipelines in a clean architectural layout" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAt3gOF7MSpXLWtIb7cGpqjEG7eEeuZzx1ZDdNkUAoeNAi0knWDvELCOSPaHdwFCzvpKqHekEIvSXdW2C-3l03OtbDJxoL89Ab4sUf-SucU3HOF__y0E6Sq7qlloU8IZNx2SCb4fZzqfUywmsOZDe9-QxBa2pjLZ-qBm9NPEWRIDD_qC3CNtXJgPIdoYqrZa5puyxoVfGnQm7-14YoJZXmf3_dL9yNLigeQOTnzsDAyh7iTL8jjCNKwTwDp6MVYOwQ9RIY_Hz5XRIq-"/>
+<span class="absolute bottom-1 right-1 text-[9px] font-mono bg-black/70 text-white px-1 rounded">0:45</span>
+</div>
+<div>
+<span class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Approved Broadcast</span>
+<h3 class="text-sm font-bold text-slate-900">Building High-Throughput Pipelines with Agent Swarms</h3>
+<div class="flex items-center gap-3 mt-1.5 text-xs text-slate-500">
+<span class="inline-flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px] text-indigo-500">record_voice_over</span>
+                  ElevenLabs · Adam (Authoritative)
+                </span>
+<span>·</span>
+<span class="text-emerald-600 font-semibold">Scene timeline locked</span>
+</div>
+</div>
+</div>
+<!-- Quality Score mini -->
+<div class="lg:col-span-4 flex items-center justify-between lg:justify-end gap-6 border-t lg:border-t-0 pt-3 lg:pt-0 border-slate-100">
+<div class="text-right">
+<div class="text-xs font-bold text-slate-900">Score: 96/100</div>
+<div class="text-[11px] text-emerald-600 font-medium">All gates verified</div>
+</div>
+<div class="flex items-center gap-2">
+<button class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-medium text-slate-700 hover:bg-slate-50" type="button">
+<span class="material-symbols-outlined text-[15px] text-slate-400">calendar_today</span>
+<span>Reschedule</span>
+</button>
+<button class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-medium text-slate-700 hover:bg-slate-50" type="button">
+<span class="material-symbols-outlined text-[15px] text-slate-400">edit</span>
+<span>Edit</span>
+</button>
+<button class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-rose-50 text-rose-700 border border-rose-200 text-xs font-medium hover:bg-rose-100" type="button">
+<span class="material-symbols-outlined text-[15px] text-rose-600">close</span>
+<span>Veto</span>
+</button>
+</div>
+</div>
+</div>
+</article>
+<!-- CARD 4: LinkedIn Card — Failed / Needs Attention -->
+<article class="bg-white rounded-xl border border-slate-200 border-l-[6px] border-l-[#E11D48] shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
+<div class="px-6 py-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3 bg-gradient-to-r from-rose-50/30 to-white">
+<div class="flex items-center gap-3">
+<div class="flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#0A66C2]/10 text-[#0A66C2] font-semibold text-xs border border-[#0A66C2]/20">
+<span class="font-bold">in</span>
+<span>LinkedIn · Single Image Post</span>
+</div>
+<div class="flex items-center gap-1 text-xs text-slate-500">
+<span class="material-symbols-outlined text-[16px] text-slate-400">event_busy</span>
+<span>Halted at slot: Yesterday 11:00 AM</span>
+</div>
+</div>
+<!-- Status Chip: Red Alert -->
+<div class="flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">
+<span class="material-symbols-outlined text-[16px] text-[#E11D48]">error</span>
+<span>Failed · Fact-check divergence</span>
+</div>
+</div>
+<div class="p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+<div class="lg:col-span-8 space-y-3">
+<h3 class="text-base font-bold text-slate-900">
+              "Why 94% of Fortune 500 Companies Run Dual-Agent LLMs"
+            </h3>
+<!-- Red Alert Message Box -->
+<div class="p-3.5 rounded-lg bg-rose-50/80 border border-rose-200 flex items-start gap-3">
+<span class="material-symbols-outlined text-[#E11D48] text-xl shrink-0 mt-0.5">warning</span>
+<div class="text-xs">
+<p class="font-bold text-rose-900">Research pod flagged unverified claim on benchmark statistics.</p>
+<p class="text-rose-700 mt-0.5">The figure "94%" could not be validated against Gartner or Forrester 2024 index reports. Review source citation before publishing.</p>
+</div>
+</div>
+<p class="text-xs text-slate-500 leading-relaxed">
+              Snippet: "Enterprise engineering heads are standardizing on twin-loop validation models... <span class="bg-rose-100 text-rose-800 px-1 font-mono font-medium rounded">[Citation Missing for statistic]</span>"
+            </p>
+</div>
+<!-- Quality Score Breakdown (Divergent Accuracy) -->
+<div class="lg:col-span-4 bg-slate-50/80 rounded-xl p-4 border border-slate-200 flex flex-col justify-between">
+<div>
+<div class="flex justify-between items-center mb-2">
+<span class="text-xs font-bold text-slate-700">Gate Failure Details</span>
+<span class="text-xs font-extrabold text-rose-600 bg-rose-100 px-2 py-0.5 rounded-full">Score: 61/100</span>
+</div>
+<div class="space-y-1.5">
+<div>
+<div class="flex justify-between text-[11px]">
+<span class="text-slate-600">Accuracy (Gate Vetoed)</span>
+<span class="font-bold text-rose-600">54%</span>
+</div>
+<div class="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
+<div class="h-full bg-rose-500 rounded-full" style="width: 54%"></div>
+</div>
+</div>
+<div>
+<div class="flex justify-between text-[11px]">
+<span class="text-slate-600">Clarity</span>
+<span class="font-bold text-emerald-600">92%</span>
+</div>
+<div class="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
+<div class="h-full bg-emerald-500 rounded-full" style="width: 92%"></div>
+</div>
+</div>
+<div>
+<div class="flex justify-between text-[11px]">
+<span class="text-slate-600">Value</span>
+<span class="font-bold text-amber-600">71%</span>
+</div>
+<div class="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
+<div class="h-full bg-amber-500 rounded-full" style="width: 71%"></div>
+</div>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-2 mt-4 pt-3 border-t border-slate-200">
+<button class="flex-1 py-1.5 px-2 bg-violet-600 hover:bg-violet-700 text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-1 active:scale-95 transition-all" type="button">
+<span class="material-symbols-outlined text-[15px]">auto_fix_high</span>
+<span>Fix &amp; Regenerate</span>
+</button>
+<button class="py-1.5 px-2.5 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-medium" title="Inspect Audit Log" type="button">
+<span class="material-symbols-outlined text-[16px] text-slate-500">history_edu</span>
+</button>
+<button class="py-1.5 px-2.5 bg-rose-50 border border-rose-200 hover:bg-rose-100 text-rose-700 rounded-lg text-xs font-medium" title="Discard draft" type="button">
+<span class="material-symbols-outlined text-[16px]">delete</span>
+</button>
+</div>
+</div>
+</div>
+</article>
+</div>
+<!-- Bottom Queue Summary Bar -->
+<div class="mt-2 mb-8 bg-white border border-slate-200 rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-3 shadow-xs">
+<div class="flex items-center gap-2">
+<span class="w-2.5 h-2.5 rounded-full bg-violet-600 animate-ping"></span>
+<span class="font-medium text-slate-700">Autonomous Broadcast Engine:</span>
+<span class="text-slate-600">Veto countdown active for 3 items. Auto-dispatch will execute upon window lapse.</span>
+</div>
+<div class="flex items-center gap-4">
+<span>Showing 4 of 14 queued items</span>
+<div class="flex items-center gap-1">
+<button class="px-2 py-1 border border-slate-200 rounded hover:bg-slate-50 text-slate-400 cursor-not-allowed" type="button">Previous</button>
+<button class="px-2 py-1 border border-slate-200 rounded hover:bg-slate-50 text-slate-700 font-semibold" type="button">Next</button>
+</div>
+</div>
+</div>
+</main>
+</body></html>

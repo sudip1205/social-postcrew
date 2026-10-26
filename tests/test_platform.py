@@ -28,11 +28,11 @@ class ConfigTests(unittest.TestCase):
         c["schedule"]["timezone"] = "Mars/Base"
         c["schedule"]["post_time"] = "25:00"
         c["schedule"]["days"]["mon"] = "nope"
-        c["categories"]["ai-news"]["max_chars"] = 5000
+        c["categories"]["ai-news"]["layouts"] = ["bogus"]
         c["publishing"]["approval"] = "sometimes"
         c["llm"]["agents"]["writer"]["timeout_s"] = 5
         errs = "\n".join(validate_config(c))
-        for frag in ("timezone", "post_time", "unknown category 'nope'", "3000", "approval", "timeout_s"):
+        for frag in ("timezone", "post_time", "unknown category 'nope'", "layouts", "approval", "timeout_s"):
             self.assertIn(frag, errs)
 
     def test_save_refuses_invalid_config(self):

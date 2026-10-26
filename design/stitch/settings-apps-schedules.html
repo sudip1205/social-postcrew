@@ -1,0 +1,1040 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Postcrew Studio — Settings: Apps &amp; Schedules</title>
+<!-- Google Fonts: Plus Jakarta Sans & Inter -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols Outlined -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS CDN -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          borderRadius: {
+            "DEFAULT": "0.5rem",
+            "lg": "1rem",
+            "xl": "1.5rem",
+            "2xl": "1.75rem",
+            "full": "9999px"
+          },
+          fontFamily: {
+            headline: ["Plus Jakarta Sans", "sans-serif"],
+            display: ["Plus Jakarta Sans", "sans-serif"],
+            body: ["Inter", "sans-serif"],
+            label: ["Inter", "sans-serif"]
+          }
+        },
+      }
+    }
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      font-size: 20px;
+      line-height: 1;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      vertical-align: middle;
+    }
+    .material-symbols-outlined.fill {
+      font-variation-settings: 'FILL' 1;
+    }
+    .tooltip-anchor {
+      text-decoration-line: underline;
+      text-decoration-style: dotted;
+      text-underline-offset: 3px;
+      cursor: help;
+    }
+    /* Custom subtle slider styling */
+    input[type=range]::-webkit-slider-thumb {
+      appearance: none;
+      height: 18px;
+      width: 18px;
+      border-radius: 9999px;
+      background: #dc2626;
+      cursor: pointer;
+      border: 2px solid #ffffff;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-body min-h-screen antialiased flex flex-col pb-24">
+<!-- TOP BAR (Postcrew Studio Standard Navigation) -->
+<header class="docked full-width top-0 sticky z-40 bg-white border-b border-slate-200 shadow-sm">
+<div class="w-full px-6 py-3 flex items-center justify-between mx-auto">
+<!-- Brand Logo & Main Nav -->
+<div class="flex items-center gap-8">
+<a class="font-headline font-black text-lg text-slate-900 flex items-center gap-2.5" href="#">
+<div class="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-600 to-indigo-700 flex items-center justify-center text-white shadow-sm shadow-violet-200">
+<span class="material-symbols-outlined text-white font-bold" data-icon="smart_toy">smart_toy</span>
+</div>
+<span class="tracking-tight">Postcrew Studio</span>
+</a>
+<!-- Desktop Navigation Items -->
+<nav class="hidden lg:flex items-center gap-1 font-label text-sm">
+<a class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-slate-600 font-medium hover:text-slate-900 hover:bg-slate-100 transition-colors duration-150 active:scale-95" href="#">
+<span class="material-symbols-outlined text-slate-500" data-icon="dashboard">dashboard</span>
+<span>Overview</span>
+</a>
+<a class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-slate-600 font-medium hover:text-slate-900 hover:bg-slate-100 transition-colors duration-150 active:scale-95" href="#">
+<span class="material-symbols-outlined text-slate-500" data-icon="calendar_month">calendar_month</span>
+<span>Plan</span>
+</a>
+<a class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-slate-600 font-medium hover:text-slate-900 hover:bg-slate-100 transition-colors duration-150 active:scale-95" href="#">
+<span class="material-symbols-outlined text-slate-500" data-icon="groups">groups</span>
+<span>Crew</span>
+</a>
+<a class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-slate-600 font-medium hover:text-slate-900 hover:bg-slate-100 transition-colors duration-150 active:scale-95" href="#">
+<span class="material-symbols-outlined text-slate-500" data-icon="schema">schema</span>
+<span>Workflow</span>
+</a>
+<a class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-slate-600 font-medium hover:text-slate-900 hover:bg-slate-100 transition-colors duration-150 active:scale-95" href="#">
+<span class="material-symbols-outlined text-slate-500" data-icon="format_list_bulleted">format_list_bulleted</span>
+<span>Queue</span>
+</a>
+<!-- Settings (Active) -->
+<a class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-violet-50 text-violet-700 font-semibold transition-colors duration-150 active:scale-95" href="#">
+<span class="material-symbols-outlined text-violet-700" data-icon="settings">settings</span>
+<span>Settings</span>
+</a>
+<a class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-slate-600 font-medium hover:text-slate-900 hover:bg-slate-100 transition-colors duration-150 active:scale-95" href="#">
+<span class="material-symbols-outlined text-slate-500" data-icon="key">key</span>
+<span>Credentials</span>
+</a>
+</nav>
+</div>
+<!-- Trailing Controls -->
+<div class="flex items-center gap-3">
+<!-- App Switcher Segmented Control -->
+<div class="bg-slate-100 p-1 rounded-xl flex items-center border border-slate-200">
+<button class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium text-slate-600 hover:text-slate-900 transition-colors">
+<span class="w-4 h-4 rounded bg-[#0A66C2] text-white flex items-center justify-center text-[10px] font-bold">in</span>
+<span>LinkedIn</span>
+</button>
+<button class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-white text-slate-900 shadow-sm border border-slate-200/80 transition-all">
+<span class="w-4 h-4 rounded bg-[#FF0033] text-white flex items-center justify-center text-[9px] font-black">▶</span>
+<span>YouTube</span>
+</button>
+</div>
+<div class="h-5 w-px bg-slate-200 hidden sm:block"></div>
+<button class="w-9 h-9 rounded-lg flex items-center justify-center text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors" title="Help &amp; Knowledge Base">
+<span class="material-symbols-outlined" data-icon="help">help</span>
+</button>
+<button class="relative w-9 h-9 rounded-lg flex items-center justify-center text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors" title="Notifications">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+<span class="absolute top-2 right-2 w-2 h-2 rounded-full bg-violet-600 ring-2 ring-white"></span>
+</button>
+<div class="h-5 w-px bg-slate-200"></div>
+<!-- Agent Command Avatar -->
+<div class="flex items-center gap-2 pl-1 cursor-pointer">
+<div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-violet-600 via-indigo-600 to-sky-400 p-0.5 shadow-sm">
+<div class="w-full h-full bg-slate-900 rounded-[10px] flex items-center justify-center text-white text-xs font-bold font-headline">
+              CMD
+            </div>
+</div>
+<div class="hidden xl:flex flex-col text-left">
+<span class="text-xs font-semibold text-slate-900 leading-none">Agent Command</span>
+<span class="text-[11px] text-slate-500 leading-none mt-1">Lead Orchestrator</span>
+</div>
+</div>
+</div>
+</div>
+</header>
+<!-- SUBHEADER / SETTINGS BREADCRUMB & TABS -->
+<div class="bg-white border-b border-slate-200 px-6 py-3.5">
+<div class="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
+<div>
+<div class="flex items-center gap-2 text-xs text-slate-500 mb-1">
+<a class="hover:text-slate-800 transition-colors flex items-center gap-1" href="#">
+<span class="material-symbols-outlined text-sm" data-icon="settings">settings</span>
+<span>Settings</span>
+</a>
+<span class="text-slate-300">/</span>
+<span class="text-slate-900 font-semibold">Apps and schedules</span>
+</div>
+<h1 class="text-2xl font-bold font-headline text-slate-900 tracking-tight flex items-center gap-2.5">
+<span>Apps &amp; Publishing Schedules</span>
+<span class="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-0.5 rounded-full bg-violet-50 text-violet-700 border border-violet-200">
+<span class="material-symbols-outlined text-xs" data-icon="auto_schedule">auto_schedule</span>
+<span>Automated Cadence</span>
+</span>
+</h1>
+<p class="text-xs text-slate-500 mt-1">
+          Configure distribution channels, automated run schedules, and post-approval guardrails for each connected platform.
+        </p>
+</div>
+<!-- Settings Sub-Navigation Tabs -->
+<div class="flex items-center gap-1.5 p-1 bg-slate-100/90 rounded-xl border border-slate-200 text-xs font-medium self-start md:self-auto">
+<a class="px-3 py-1.5 rounded-lg bg-white text-slate-900 shadow-sm font-semibold flex items-center gap-1.5" href="#">
+<span class="material-symbols-outlined text-violet-600 text-sm" data-icon="tune">tune</span>
+<span>Apps &amp; Schedules</span>
+</a>
+<a class="px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition-colors flex items-center gap-1.5" href="#">
+<span class="material-symbols-outlined text-slate-400 text-sm" data-icon="palette">palette</span>
+<span>Brand Voice &amp; Tone</span>
+</a>
+<a class="px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition-colors flex items-center gap-1.5" href="#">
+<span class="material-symbols-outlined text-slate-400 text-sm" data-icon="shield">shield</span>
+<span>Quality Gates</span>
+</a>
+</div>
+</div>
+</div>
+<!-- MAIN TWO-COLUMN WORKSPACE -->
+<main class="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1" data-active-view="settings">
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+<!-- LEFT COLUMN: APP SELECTOR CARDS (4 cols) -->
+<aside class="lg:col-span-4 space-y-4">
+<div class="flex items-center justify-between px-1">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-slate-600 text-base" data-icon="apps">apps</span>
+<h2 class="text-sm font-bold uppercase tracking-wider text-slate-600 font-headline">Connected Apps</h2>
+</div>
+<span class="text-xs text-slate-600 font-medium">2 Active</span>
+</div>
+<div class="space-y-3">
+<!-- CARD 1: LinkedIn (Active app, but YouTube is currently chosen in the editor below) -->
+<div class="bg-white rounded-xl p-4 border border-slate-200 shadow-sm hover:border-slate-300 transition-all cursor-pointer relative group">
+<div class="flex items-start justify-between gap-3">
+<div class="flex items-center gap-3">
+<div class="w-12 h-12 rounded-xl bg-[#0A66C2] flex items-center justify-center text-white shadow-sm shadow-blue-200 shrink-0">
+<span class="font-headline font-black text-xl tracking-tight">in</span>
+</div>
+<div>
+<div class="flex items-center gap-2">
+<h3 class="font-bold text-slate-900 text-base leading-tight">LinkedIn</h3>
+<span class="w-2 h-2 rounded-full bg-emerald-500" title="Connected"></span>
+</div>
+<p class="text-xs text-slate-500 mt-0.5">Articles, text posts &amp; polls</p>
+<span class="inline-flex items-center gap-1 text-[11px] font-medium text-slate-600 mt-1.5">
+<span class="material-symbols-outlined text-xs text-slate-400" data-icon="calendar_today">calendar_today</span>
+<span>4 days/week · 04:30 PM</span>
+</span>
+</div>
+</div>
+<!-- On/Off Switch -->
+<label class="relative inline-flex items-center cursor-pointer shrink-0 mt-1" onclick="event.stopPropagation()">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-9 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#0A66C2]"></div>
+</label>
+</div>
+<div class="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+<span class="flex items-center gap-1 text-emerald-600 font-medium">
+<span class="material-symbols-outlined text-xs" data-icon="check_circle">check_circle</span>
+<span>Active schedule</span>
+</span>
+<span class="text-violet-600 font-semibold group-hover:underline flex items-center gap-0.5">
+<span>Configure</span>
+<span class="material-symbols-outlined text-xs" data-icon="chevron_right">chevron_right</span>
+</span>
+</div>
+</div>
+<!-- CARD 2: YouTube (CHOSEN APP — Highlighted with Red Brand Accent) -->
+<div class="bg-white rounded-xl p-4 border-2 border-[#FF0033] shadow-md shadow-red-50 relative group">
+<div class="absolute -top-2.5 right-4 px-2 py-0.5 rounded-full bg-[#FF0033] text-white text-[10px] font-bold uppercase tracking-wider shadow-sm flex items-center gap-1">
+<span class="material-symbols-outlined text-[11px]" data-icon="edit">edit</span>
+<span>Currently Editing</span>
+</div>
+<div class="flex items-start justify-between gap-3">
+<div class="flex items-center gap-3">
+<div class="w-12 h-12 rounded-xl bg-[#FF0033] flex items-center justify-center text-white shadow-sm shadow-red-200 shrink-0">
+<span class="text-xl font-black">▶</span>
+</div>
+<div>
+<div class="flex items-center gap-2">
+<h3 class="font-bold text-slate-900 text-base leading-tight">YouTube</h3>
+<span class="w-2 h-2 rounded-full bg-emerald-500" title="Connected"></span>
+</div>
+<p class="text-xs text-slate-500 mt-0.5">Shorts &amp; long-form videos</p>
+<span class="inline-flex items-center gap-1 text-[11px] font-medium text-slate-600 mt-1.5">
+<span class="material-symbols-outlined text-xs text-slate-400" data-icon="videocam">videocam</span>
+<span>2 videos/week · Tue &amp; Fri</span>
+</span>
+</div>
+</div>
+<!-- On/Off Switch -->
+<label class="relative inline-flex items-center cursor-pointer shrink-0 mt-1" onclick="event.stopPropagation()">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-9 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#FF0033]"></div>
+</label>
+</div>
+<div class="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+<span class="flex items-center gap-1 text-emerald-600 font-medium">
+<span class="material-symbols-outlined text-xs" data-icon="check_circle">check_circle</span>
+<span>Active schedule</span>
+</span>
+<span class="text-xs font-bold text-[#FF0033] flex items-center gap-1">
+<span>Selected</span>
+<span class="material-symbols-outlined text-xs" data-icon="arrow_right_alt">arrow_right_alt</span>
+</span>
+</div>
+</div>
+<!-- CARD 3: Instagram (Coming Soon - Greyed) -->
+<div class="bg-slate-100/70 rounded-xl p-4 border border-dashed border-slate-300 opacity-75 relative">
+<div class="flex items-start justify-between gap-3">
+<div class="flex items-center gap-3">
+<div class="w-12 h-12 rounded-xl bg-gradient-to-tr from-slate-400 to-slate-500 flex items-center justify-center text-white shrink-0">
+<span class="material-symbols-outlined text-2xl" data-icon="photo_camera">photo_camera</span>
+</div>
+<div>
+<div class="flex items-center gap-2">
+<h3 class="font-bold text-slate-600 text-base leading-tight">Instagram</h3>
+<span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-200 text-slate-600">Coming soon</span>
+</div>
+<p class="text-xs text-slate-600 mt-0.5">Reels, carousels &amp; stories</p>
+<p class="text-[11px] text-slate-600 mt-1">Direct Graph API integration in beta.</p>
+</div>
+</div>
+<label class="relative inline-flex items-center cursor-not-allowed shrink-0 mt-1 opacity-50">
+<input class="sr-only" disabled="" type="checkbox"/>
+<div class="w-9 h-5 bg-slate-300 rounded-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4"></div>
+</label>
+</div>
+</div>
+<!-- CARD 4: TikTok (Coming Soon - Greyed) -->
+<div class="bg-slate-100/70 rounded-xl p-4 border border-dashed border-slate-300 opacity-75 relative">
+<div class="flex items-start justify-between gap-3">
+<div class="flex items-center gap-3">
+<div class="w-12 h-12 rounded-xl bg-slate-400 flex items-center justify-center text-white shrink-0">
+<span class="material-symbols-outlined text-2xl" data-icon="music_video">music_video</span>
+</div>
+<div>
+<div class="flex items-center gap-2">
+<h3 class="font-bold text-slate-600 text-base leading-tight">TikTok</h3>
+<span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-200 text-slate-600">Coming soon</span>
+</div>
+<p class="text-xs text-slate-600 mt-0.5">Short-form viral vertical clips</p>
+<p class="text-[11px] text-slate-600 mt-1">Creator Posting API rollout in Q1.</p>
+</div>
+</div>
+<label class="relative inline-flex items-center cursor-not-allowed shrink-0 mt-1 opacity-50">
+<input class="sr-only" disabled="" type="checkbox"/>
+<div class="w-9 h-5 bg-slate-300 rounded-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4"></div>
+</label>
+</div>
+</div>
+</div>
+<!-- Channel Summary Card -->
+<div class="bg-gradient-to-br from-violet-50 to-indigo-50/60 rounded-xl p-4 border border-violet-100 text-xs space-y-2 mt-4">
+<div class="flex items-center gap-2 font-semibold text-violet-900">
+<span class="material-symbols-outlined text-violet-700 text-base" data-icon="insights">insights</span>
+<span>Channel Throughput Summary</span>
+</div>
+<p class="text-slate-600 leading-relaxed">
+            Your autonomous crew currently produces <strong class="text-slate-900 font-semibold">6 pieces of content weekly</strong> across 2 platforms.
+          </p>
+<div class="pt-2 border-t border-violet-200/50 flex items-center justify-between text-[11px] text-violet-800">
+<span>OAuth Tokens Status: Valid</span>
+<a class="font-semibold underline hover:text-violet-950" href="#">Manage Credentials</a>
+</div>
+</div>
+</aside>
+<!-- RIGHT COLUMN: CONFIGURATION SECTIONS FOR YOUTUBE (8 cols) -->
+<section class="lg:col-span-8 space-y-6">
+<!-- Selected App Banner Header -->
+<div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+<div class="flex items-center gap-3.5">
+<div class="w-12 h-12 rounded-xl bg-[#FF0033] flex items-center justify-center text-white shadow-md shadow-red-200 shrink-0">
+<span class="text-2xl font-black">▶</span>
+</div>
+<div>
+<div class="flex items-center gap-2">
+<h2 class="text-xl font-bold font-headline text-slate-900">YouTube Configuration</h2>
+<span class="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-red-50 text-[#FF0033] border border-red-200">
+<span class="material-symbols-outlined text-xs" data-icon="videocam">videocam</span>
+<span>Video Channel</span>
+</span>
+</div>
+<p class="text-xs text-slate-500 mt-0.5">
+                Channel: <strong class="text-slate-700">@AgentDevStudio</strong> · Connected via Google OAuth 2.0
+              </p>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<button class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors">
+<span class="material-symbols-outlined text-sm" data-icon="sync">sync</span>
+<span>Test API</span>
+</button>
+<button class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-red-50 hover:bg-red-100 text-[#FF0033] border border-red-200 transition-colors">
+<span class="material-symbols-outlined text-sm" data-icon="pause_circle">pause_circle</span>
+<span>Pause App</span>
+</button>
+</div>
+</div>
+<!-- 1) 'HOW OFTEN' OPTION CARDS -->
+<div class="bg-white rounded-xl p-6 border border-slate-200 shadow-sm space-y-4">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2.5">
+<div class="w-8 h-8 rounded-lg bg-violet-100 text-violet-700 flex items-center justify-center">
+<span class="material-symbols-outlined" data-icon="repeat">repeat</span>
+</div>
+<div>
+<h3 class="text-base font-bold font-headline text-slate-900">How often</h3>
+<p class="text-xs text-slate-500">Determine the cadence rhythm Postcrew uses to plan video synthesis cycles.</p>
+</div>
+</div>
+<span class="text-xs font-semibold text-violet-700 bg-violet-50 px-2.5 py-1 rounded-lg">Cadence Type</span>
+</div>
+<!-- 3 Large Selectable Option Cards -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-3.5 pt-1">
+<!-- Card A: Weekly days (Selected) -->
+<div class="border-2 border-violet-600 bg-violet-50/40 rounded-xl p-4 cursor-pointer relative shadow-sm transition-all">
+<div class="absolute top-3 right-3 text-violet-600">
+<span class="material-symbols-outlined text-lg fill" data-icon="check_circle">check_circle</span>
+</div>
+<div class="w-10 h-10 rounded-lg bg-violet-100 text-violet-700 flex items-center justify-center mb-3">
+<span class="material-symbols-outlined text-xl" data-icon="date_range">date_range</span>
+</div>
+<h4 class="font-bold text-sm text-slate-900">Weekly days</h4>
+<p class="text-xs text-slate-600 mt-1 leading-relaxed">
+                Publish repeatedly on selected days of the week (e.g. every Tuesday &amp; Friday).
+              </p>
+<div class="mt-3 text-[11px] font-semibold text-violet-700 flex items-center gap-1">
+<span>Active selection</span>
+</div>
+</div>
+<!-- Card B: Every N days -->
+<div class="border border-slate-200 bg-white hover:border-slate-300 rounded-xl p-4 cursor-pointer relative transition-all">
+<div class="absolute top-3 right-3 text-slate-300">
+<span class="material-symbols-outlined text-lg" data-icon="radio_button_unchecked">radio_button_unchecked</span>
+</div>
+<div class="w-10 h-10 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center mb-3">
+<span class="material-symbols-outlined text-xl" data-icon="hourglass_top">hourglass_top</span>
+</div>
+<h4 class="font-bold text-sm text-slate-900">Every N days</h4>
+<p class="text-xs text-slate-600 mt-1 leading-relaxed">
+                Run continuously with a rolling interval gap, such as every 3 or 4 days.
+              </p>
+<div class="mt-3 text-[11px] font-medium text-slate-600">
+<span>Interval spacing</span>
+</div>
+</div>
+<!-- Card C: Specific dates -->
+<div class="border border-slate-200 bg-white hover:border-slate-300 rounded-xl p-4 cursor-pointer relative transition-all">
+<div class="absolute top-3 right-3 text-slate-300">
+<span class="material-symbols-outlined text-lg" data-icon="radio_button_unchecked">radio_button_unchecked</span>
+</div>
+<div class="w-10 h-10 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center mb-3">
+<span class="material-symbols-outlined text-xl" data-icon="event_note">event_note</span>
+</div>
+<h4 class="font-bold text-sm text-slate-900">Specific dates</h4>
+<p class="text-xs text-slate-600 mt-1 leading-relaxed">
+                Manual editorial calendar: only create content on hand-picked milestone dates.
+              </p>
+<div class="mt-3 text-[11px] font-medium text-slate-600">
+<span>Custom ad-hoc dates</span>
+</div>
+</div>
+</div>
+<p class="text-[11px] text-slate-500 pt-1">
+<span class="tooltip-anchor" title="Weekly recurrence synchronizes agent research pods to deliver drafts 24 hours prior to release">Weekly days</span> guarantees steady audience retention. You can still supplement with one-off dates below.
+          </p>
+</div>
+<!-- 2) WEEK GRID OF 7 DAY CHIPS (MON-SUN) -->
+<div class="bg-white rounded-xl p-6 border border-slate-200 shadow-sm space-y-5">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2.5">
+<div class="w-8 h-8 rounded-lg bg-sky-100 text-sky-700 flex items-center justify-center">
+<span class="material-symbols-outlined" data-icon="view_week">view_week</span>
+</div>
+<div>
+<h3 class="text-base font-bold font-headline text-slate-900">Weekly cadence schedule</h3>
+<p class="text-xs text-slate-500">Toggle active days, assign topical focus themes, and specify per-day timeslots.</p>
+</div>
+</div>
+<span class="text-xs font-semibold px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200">
+              2 of 7 Days Active
+            </span>
+</div>
+<!-- Day Grid Cards: Mon to Sun -->
+<div class="grid grid-cols-1 md:grid-cols-7 gap-3">
+<!-- MON (Off) -->
+<div class="rounded-xl border border-slate-200 bg-slate-50/60 p-3 flex flex-col justify-between opacity-70 hover:opacity-100 transition-all">
+<div class="flex items-center justify-between">
+<span class="font-bold text-xs text-slate-600">Mon</span>
+<input class="w-4 h-4 rounded text-[#FF0033] focus:ring-red-400 border-slate-300" type="checkbox"/>
+</div>
+<div class="my-3 text-center">
+<span class="text-[11px] text-slate-600 font-medium italic">Off day</span>
+</div>
+<div class="text-[10px] text-slate-600 border-t border-slate-200 pt-1.5 text-center">No video</div>
+</div>
+<!-- TUE (Active - YouTube Red Highlighted Day) -->
+<div class="rounded-xl border-2 border-[#FF0033] bg-red-50/30 p-3 flex flex-col justify-between shadow-sm">
+<div class="flex items-center justify-between">
+<span class="font-bold text-xs text-[#FF0033] flex items-center gap-1">
+<span>Tue</span>
+<span class="w-1.5 h-1.5 rounded-full bg-[#FF0033]"></span>
+</span>
+<input checked="" class="w-4 h-4 rounded text-[#FF0033] focus:ring-red-400 border-slate-300" type="checkbox"/>
+</div>
+<div class="my-2 space-y-1.5">
+<!-- Topic selector: Amber/Orange theme -->
+<div class="relative">
+<select class="w-full text-[11px] font-semibold py-1 pl-2 pr-5 rounded-md border-amber-300 bg-amber-50 text-amber-900 focus:ring-1 focus:ring-amber-500 appearance-none">
+<option selected="">Deep Dive Tech</option>
+<option>Product Teaser</option>
+<option>Quick Tip / Short</option>
+</select>
+<span class="material-symbols-outlined text-xs text-amber-700 absolute right-1 top-1.5 pointer-events-none" data-icon="expand_more">expand_more</span>
+</div>
+<!-- Custom Time Input -->
+<div class="flex items-center gap-1 bg-white border border-slate-200 rounded-md px-1.5 py-0.5">
+<span class="material-symbols-outlined text-slate-400 text-xs" data-icon="schedule">schedule</span>
+<input class="w-full text-[11px] font-medium border-0 p-0 text-slate-700 focus:ring-0" type="text" value="02:00 PM"/>
+</div>
+</div>
+<div class="text-[10px] text-[#FF0033] font-semibold border-t border-red-200 pt-1 flex items-center justify-between">
+<span>Long video</span>
+<span class="w-3 h-3 rounded bg-[#FF0033] text-white flex items-center justify-center text-[7px]">▶</span>
+</div>
+</div>
+<!-- WED (Off) -->
+<div class="rounded-xl border border-slate-200 bg-slate-50/60 p-3 flex flex-col justify-between opacity-70 hover:opacity-100 transition-all">
+<div class="flex items-center justify-between">
+<span class="font-bold text-xs text-slate-600">Wed</span>
+<input class="w-4 h-4 rounded text-[#FF0033] focus:ring-red-400 border-slate-300" type="checkbox"/>
+</div>
+<div class="my-3 text-center">
+<span class="text-[11px] text-slate-600 font-medium italic">Off day</span>
+</div>
+<div class="text-[10px] text-slate-600 border-t border-slate-200 pt-1.5 text-center">No video</div>
+</div>
+<!-- THU (Off) -->
+<div class="rounded-xl border border-slate-200 bg-slate-50/60 p-3 flex flex-col justify-between opacity-70 hover:opacity-100 transition-all">
+<div class="flex items-center justify-between">
+<span class="font-bold text-xs text-slate-600">Thu</span>
+<input class="w-4 h-4 rounded text-[#FF0033] focus:ring-red-400 border-slate-300" type="checkbox"/>
+</div>
+<div class="my-3 text-center">
+<span class="text-[11px] text-slate-600 font-medium italic">Off day</span>
+</div>
+<div class="text-[10px] text-slate-600 border-t border-slate-200 pt-1.5 text-center">No video</div>
+</div>
+<!-- FRI (Active - YouTube Red Highlighted Day) -->
+<div class="rounded-xl border-2 border-[#FF0033] bg-red-50/30 p-3 flex flex-col justify-between shadow-sm">
+<div class="flex items-center justify-between">
+<span class="font-bold text-xs text-[#FF0033] flex items-center gap-1">
+<span>Fri</span>
+<span class="w-1.5 h-1.5 rounded-full bg-[#FF0033]"></span>
+</span>
+<input checked="" class="w-4 h-4 rounded text-[#FF0033] focus:ring-red-400 border-slate-300" type="checkbox"/>
+</div>
+<div class="my-2 space-y-1.5">
+<!-- Topic selector: Sky/Blue theme -->
+<div class="relative">
+<select class="w-full text-[11px] font-semibold py-1 pl-2 pr-5 rounded-md border-sky-300 bg-sky-50 text-sky-900 focus:ring-1 focus:ring-sky-500 appearance-none">
+<option selected="">Weekly Shorts</option>
+<option>Industry Pulse</option>
+<option>Q&amp;A Highlights</option>
+</select>
+<span class="material-symbols-outlined text-xs text-sky-700 absolute right-1 top-1.5 pointer-events-none" data-icon="expand_more">expand_more</span>
+</div>
+<!-- Custom Time Input -->
+<div class="flex items-center gap-1 bg-white border border-slate-200 rounded-md px-1.5 py-0.5">
+<span class="material-symbols-outlined text-slate-400 text-xs" data-icon="schedule">schedule</span>
+<input class="w-full text-[11px] font-medium border-0 p-0 text-slate-700 focus:ring-0" type="text" value="11:00 AM"/>
+</div>
+</div>
+<div class="text-[10px] text-[#FF0033] font-semibold border-t border-red-200 pt-1 flex items-center justify-between">
+<span>Shorts clip</span>
+<span class="material-symbols-outlined text-[10px]" data-icon="bolt">bolt</span>
+</div>
+</div>
+<!-- SAT (Off) -->
+<div class="rounded-xl border border-slate-200 bg-slate-50/60 p-3 flex flex-col justify-between opacity-70 hover:opacity-100 transition-all">
+<div class="flex items-center justify-between">
+<span class="font-bold text-xs text-slate-600">Sat</span>
+<input class="w-4 h-4 rounded text-[#FF0033] focus:ring-red-400 border-slate-300" type="checkbox"/>
+</div>
+<div class="my-3 text-center">
+<span class="text-[11px] text-slate-600 font-medium italic">Off day</span>
+</div>
+<div class="text-[10px] text-slate-600 border-t border-slate-200 pt-1.5 text-center">No video</div>
+</div>
+<!-- SUN (Off) -->
+<div class="rounded-xl border border-slate-200 bg-slate-50/60 p-3 flex flex-col justify-between opacity-70 hover:opacity-100 transition-all">
+<div class="flex items-center justify-between">
+<span class="font-bold text-xs text-slate-600">Sun</span>
+<input class="w-4 h-4 rounded text-[#FF0033] focus:ring-red-400 border-slate-300" type="checkbox"/>
+</div>
+<div class="my-3 text-center">
+<span class="text-[11px] text-slate-600 font-medium italic">Off day</span>
+</div>
+<div class="text-[10px] text-slate-600 border-t border-slate-200 pt-1.5 text-center">No video</div>
+</div>
+</div>
+<!-- Color-coded Topic Legend & Helper -->
+<div class="flex flex-wrap items-center justify-between gap-3 pt-2 text-xs border-t border-slate-100">
+<div class="flex items-center gap-4">
+<span class="text-slate-600 font-medium">Topic Color Tagging:</span>
+<span class="inline-flex items-center gap-1.5 text-[11px] font-semibold text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+<span class="w-2 h-2 rounded-full bg-amber-500"></span>
+<span>Deep Dive Tech</span>
+</span>
+<span class="inline-flex items-center gap-1.5 text-[11px] font-semibold text-sky-800 bg-sky-50 px-2 py-0.5 rounded border border-sky-200">
+<span class="w-2 h-2 rounded-full bg-sky-500"></span>
+<span>Weekly Shorts</span>
+</span>
+<span class="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+<span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+<span>Product Teaser</span>
+</span>
+</div>
+<span class="text-[11px] text-slate-500">
+              Each day slot receives an individual prompt recipe assigned to the <span class="tooltip-anchor" title="Authoring pod writes scripts customized to the selected channel's audience">Writing Pod</span>.
+            </span>
+</div>
+</div>
+<!-- 3) MONTHLY CALENDAR FOR ONE-OFF POSTS -->
+<div class="bg-white rounded-xl p-6 border border-slate-200 shadow-sm space-y-4">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2.5">
+<div class="w-8 h-8 rounded-lg bg-red-100 text-[#FF0033] flex items-center justify-center">
+<span class="material-symbols-outlined" data-icon="calendar_month">calendar_month</span>
+</div>
+<div>
+<h3 class="text-base font-bold font-headline text-slate-900">One-off special dates</h3>
+<p class="text-xs text-slate-500">Click individual dates on the calendar to inject standalone broadcast milestones outside recurring days.</p>
+</div>
+</div>
+<!-- Month navigation -->
+<div class="flex items-center gap-2">
+<span class="text-xs font-bold text-slate-800">November 2024</span>
+<div class="flex items-center bg-slate-100 rounded-lg p-0.5 border border-slate-200">
+<button class="w-6 h-6 flex items-center justify-center text-slate-600 hover:text-slate-900">
+<span class="material-symbols-outlined text-sm" data-icon="chevron_left">chevron_left</span>
+</button>
+<button class="w-6 h-6 flex items-center justify-center text-slate-600 hover:text-slate-900">
+<span class="material-symbols-outlined text-sm" data-icon="chevron_right">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Monthly Calendar Matrix -->
+<div class="border border-slate-200 rounded-xl overflow-hidden bg-slate-50/40">
+<div class="grid grid-cols-7 text-center bg-slate-100/70 border-b border-slate-200 text-[11px] font-semibold text-slate-500 py-2">
+<span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
+</div>
+<div class="grid grid-cols-7 text-xs divide-x divide-y divide-slate-200/60 bg-white">
+<!-- Row 1: Oct overflow + Nov 1-3 -->
+<div class="p-2 text-slate-300 min-h-[64px] bg-slate-50/30">27</div>
+<div class="p-2 text-slate-300 min-h-[64px] bg-slate-50/30">28</div>
+<div class="p-2 text-slate-300 min-h-[64px] bg-slate-50/30">29</div>
+<div class="p-2 text-slate-300 min-h-[64px] bg-slate-50/30">30</div>
+<div class="p-2 text-slate-300 min-h-[64px] bg-slate-50/30">31</div>
+<div class="p-2 font-medium text-slate-700 min-h-[64px] hover:bg-slate-50 cursor-pointer">1</div>
+<div class="p-2 font-medium text-slate-700 min-h-[64px] hover:bg-slate-50 cursor-pointer">2</div>
+<!-- Row 2: Nov 3 - 9 -->
+<div class="p-2 font-medium text-slate-700 min-h-[64px] hover:bg-slate-50 cursor-pointer">3</div>
+<div class="p-2 font-medium text-slate-700 min-h-[64px] hover:bg-slate-50 cursor-pointer">4</div>
+<!-- Nov 5: Recurring Tue -->
+<div class="p-2 font-medium text-slate-800 min-h-[64px] bg-red-50/20 border-l-2 border-l-[#FF0033]">
+<div class="flex justify-between items-center">
+<span class="font-bold text-slate-900">5</span>
+<span class="text-[9px] text-red-600 font-bold">Tue</span>
+</div>
+<div class="mt-1 text-[10px] text-slate-600 truncate bg-white px-1 py-0.5 rounded border border-red-100">Long Video</div>
+</div>
+<div class="p-2 font-medium text-slate-700 min-h-[64px] hover:bg-slate-50 cursor-pointer">6</div>
+<div class="p-2 font-medium text-slate-700 min-h-[64px] hover:bg-slate-50 cursor-pointer">7</div>
+<!-- Nov 8: Recurring Fri -->
+<div class="p-2 font-medium text-slate-800 min-h-[64px] bg-red-50/20 border-l-2 border-l-[#FF0033]">
+<div class="flex justify-between items-center">
+<span class="font-bold text-slate-900">8</span>
+<span class="text-[9px] text-red-600 font-bold">Fri</span>
+</div>
+<div class="mt-1 text-[10px] text-slate-600 truncate bg-white px-1 py-0.5 rounded border border-red-100">Shorts Clip</div>
+</div>
+<div class="p-2 font-medium text-slate-700 min-h-[64px] hover:bg-slate-50 cursor-pointer">9</div>
+<!-- Row 3: Nov 10 - 16 -->
+<div class="p-2 font-medium text-slate-700 min-h-[64px] hover:bg-slate-50 cursor-pointer">10</div>
+<div class="p-2 font-medium text-slate-700 min-h-[64px] hover:bg-slate-50 cursor-pointer">11</div>
+<!-- Nov 12: Recurring Tue -->
+<div class="p-2 font-medium text-slate-800 min-h-[64px] bg-red-50/20 border-l-2 border-l-[#FF0033]">
+<div class="flex justify-between items-center"><span class="font-bold">12</span><span class="text-[9px] text-red-600 font-bold">Tue</span></div>
+<div class="mt-1 text-[10px] text-slate-600 truncate bg-white px-1 py-0.5 rounded border border-red-100">Long Video</div>
+</div>
+<div class="p-2 font-medium text-slate-700 min-h-[64px] hover:bg-slate-50 cursor-pointer">13</div>
+<!-- Nov 14: ONE-OFF DATE SELECTED BY USER (App's brand colour red styling) -->
+<div class="p-2 font-medium min-h-[64px] bg-[#FF0033] text-white rounded-lg shadow-sm m-0.5 relative group cursor-pointer ring-2 ring-red-400">
+<div class="flex justify-between items-center">
+<span class="font-black text-sm">14</span>
+<span class="w-3.5 h-3.5 rounded-full bg-white text-[#FF0033] flex items-center justify-center text-[9px] font-bold">★</span>
+</div>
+<div class="mt-1 text-[10px] font-bold leading-tight">Keynote Recap</div>
+<span class="text-[9px] text-red-100 block">One-off special</span>
+</div>
+<!-- Nov 15: Recurring Fri -->
+<div class="p-2 font-medium text-slate-800 min-h-[64px] bg-red-50/20 border-l-2 border-l-[#FF0033]">
+<div class="flex justify-between items-center"><span class="font-bold">15</span><span class="text-[9px] text-red-600 font-bold">Fri</span></div>
+<div class="mt-1 text-[10px] text-slate-600 truncate bg-white px-1 py-0.5 rounded border border-red-100">Shorts Clip</div>
+</div>
+<div class="p-2 font-medium text-slate-700 min-h-[64px] hover:bg-slate-50 cursor-pointer">16</div>
+<!-- Row 4: Nov 17 - 23 -->
+<div class="p-2 font-medium text-slate-700 min-h-[64px] hover:bg-slate-50 cursor-pointer">17</div>
+<div class="p-2 font-medium text-slate-700 min-h-[64px] hover:bg-slate-50 cursor-pointer">18</div>
+<div class="p-2 font-medium text-slate-800 min-h-[64px] bg-red-50/20 border-l-2 border-l-[#FF0033]">
+<div class="flex justify-between items-center"><span class="font-bold">19</span><span class="text-[9px] text-red-600 font-bold">Tue</span></div>
+<div class="mt-1 text-[10px] text-slate-600 truncate bg-white px-1 py-0.5 rounded border border-red-100">Long Video</div>
+</div>
+<div class="p-2 font-medium text-slate-700 min-h-[64px] hover:bg-slate-50 cursor-pointer">20</div>
+<div class="p-2 font-medium text-slate-700 min-h-[64px] hover:bg-slate-50 cursor-pointer">21</div>
+<div class="p-2 font-medium text-slate-800 min-h-[64px] bg-red-50/20 border-l-2 border-l-[#FF0033]">
+<div class="flex justify-between items-center"><span class="font-bold">22</span><span class="text-[9px] text-red-600 font-bold">Fri</span></div>
+<div class="mt-1 text-[10px] text-slate-600 truncate bg-white px-1 py-0.5 rounded border border-red-100">Shorts Clip</div>
+</div>
+<div class="p-2 font-medium text-slate-700 min-h-[64px] hover:bg-slate-50 cursor-pointer">23</div>
+<!-- Row 5: Nov 24 - 30 -->
+<div class="p-2 font-medium text-slate-700 min-h-[64px] hover:bg-slate-50 cursor-pointer">24</div>
+<div class="p-2 font-medium text-slate-700 min-h-[64px] hover:bg-slate-50 cursor-pointer">25</div>
+<div class="p-2 font-medium text-slate-800 min-h-[64px] bg-red-50/20 border-l-2 border-l-[#FF0033]">
+<div class="flex justify-between items-center"><span class="font-bold">26</span><span class="text-[9px] text-red-600 font-bold">Tue</span></div>
+<div class="mt-1 text-[10px] text-slate-600 truncate bg-white px-1 py-0.5 rounded border border-red-100">Long Video</div>
+</div>
+<!-- Nov 27: ANOTHER ONE-OFF DATE (Selected in red) -->
+<div class="p-2 font-medium min-h-[64px] bg-[#FF0033] text-white rounded-lg shadow-sm m-0.5 relative group cursor-pointer ring-2 ring-red-400">
+<div class="flex justify-between items-center">
+<span class="font-black text-sm">27</span>
+<span class="w-3.5 h-3.5 rounded-full bg-white text-[#FF0033] flex items-center justify-center text-[9px] font-bold">★</span>
+</div>
+<div class="mt-1 text-[10px] font-bold leading-tight">Product Drop</div>
+<span class="text-[9px] text-red-100 block">One-off special</span>
+</div>
+<div class="p-2 font-medium text-slate-700 min-h-[64px] hover:bg-slate-50 cursor-pointer">28</div>
+<div class="p-2 font-medium text-slate-800 min-h-[64px] bg-red-50/20 border-l-2 border-l-[#FF0033]">
+<div class="flex justify-between items-center"><span class="font-bold">29</span><span class="text-[9px] text-red-600 font-bold">Fri</span></div>
+<div class="mt-1 text-[10px] text-slate-600 truncate bg-white px-1 py-0.5 rounded border border-red-100">Shorts Clip</div>
+</div>
+<div class="p-2 font-medium text-slate-700 min-h-[64px] hover:bg-slate-50 cursor-pointer">30</div>
+</div>
+</div>
+<!-- Helper text with dotted tooltip -->
+<div class="flex items-center justify-between text-[11px] text-slate-500 pt-1">
+<span class="flex items-center gap-1.5">
+<span class="w-2.5 h-2.5 rounded-full bg-[#FF0033]"></span>
+<span>Selected dates will trigger dedicated <span class="tooltip-anchor" title="One-off runs operate with priority allocation over scheduled weekly queues">single-run pods</span>. Click any unselected date to add.</span>
+</span>
+<span class="font-semibold text-slate-700">2 one-off posts added for Nov</span>
+</div>
+</div>
+<!-- 4) 'TIME AND TIMEZONE' WITH FRIENDLY TIME PICKER & LIVE PREVIEW -->
+<div class="bg-white rounded-xl p-6 border border-slate-200 shadow-sm space-y-4">
+<div class="flex items-center gap-2.5">
+<div class="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center">
+<span class="material-symbols-outlined" data-icon="schedule">schedule</span>
+</div>
+<div>
+<h3 class="text-base font-bold font-headline text-slate-900">Time and timezone</h3>
+<p class="text-xs text-slate-500">Configure default publication release hours and synchronize with your audience's active time zone.</p>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+<!-- Time Picker Input -->
+<div>
+<label class="flex items-center gap-1.5 text-xs font-semibold text-slate-700 mb-1.5">
+<span class="material-symbols-outlined text-slate-400 text-sm" data-icon="alarm">alarm</span>
+<span>Default release time</span>
+</label>
+<div class="relative">
+<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+<span class="material-symbols-outlined text-base" data-icon="schedule">schedule</span>
+</div>
+<input class="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-slate-200 bg-white text-slate-800 font-semibold focus:ring-2 focus:ring-red-500 focus:border-red-500" type="text" value="05:00 PM"/>
+</div>
+<p class="text-[11px] text-slate-400 mt-1">Default hour for days without a specific override time.</p>
+</div>
+<!-- Timezone Selector -->
+<div>
+<label class="flex items-center gap-1.5 text-xs font-semibold text-slate-700 mb-1.5">
+<span class="material-symbols-outlined text-slate-400 text-sm" data-icon="public">public</span>
+<span>Target timezone</span>
+</label>
+<div class="relative">
+<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+<span class="material-symbols-outlined text-base" data-icon="map">map</span>
+</div>
+<select class="w-full pl-9 pr-8 py-2 text-sm rounded-lg border border-slate-200 bg-white text-slate-800 font-medium focus:ring-2 focus:ring-red-500 focus:border-red-500 appearance-none">
+<option selected="">America/New_York (EST, UTC-5)</option>
+<option>America/Los_Angeles (PST, UTC-8)</option>
+<option>Europe/London (GMT, UTC+0)</option>
+<option>Asia/Tokyo (JST, UTC+9)</option>
+</select>
+<div class="absolute inset-y-0 right-0 pr-2.5 flex items-center pointer-events-none text-slate-400">
+<span class="material-symbols-outlined text-base" data-icon="expand_more">expand_more</span>
+</div>
+</div>
+<p class="text-[11px] text-slate-400 mt-1">Times adjust automatically for daylight saving shifts.</p>
+</div>
+</div>
+<!-- Live Preview Banner Card -->
+<div class="bg-gradient-to-r from-red-50 via-slate-50 to-indigo-50 border border-red-100 rounded-xl p-3.5 flex items-center justify-between">
+<div class="flex items-center gap-3">
+<div class="w-9 h-9 rounded-lg bg-[#FF0033] text-white flex items-center justify-center font-black text-sm shadow-sm">
+                ▶
+              </div>
+<div>
+<span class="text-[11px] font-semibold text-red-700 uppercase tracking-wider block">Live Delivery Forecast</span>
+<div class="text-sm font-bold text-slate-900 mt-0.5">
+                  Next post: <span class="text-[#FF0033]">Tue 3 Nov at 5:00 PM</span> (EST)
+                </div>
+</div>
+</div>
+<div class="hidden sm:flex items-center gap-1.5 text-xs text-slate-500 bg-white/80 px-2.5 py-1 rounded-lg border border-slate-200">
+<span class="material-symbols-outlined text-emerald-600 text-xs" data-icon="check_circle">check_circle</span>
+<span>Cadence validated</span>
+</div>
+</div>
+</div>
+<!-- 5) FOR YOUTUBE ONLY: VIDEO TYPE, DURATION SLIDER & VOICE PICKER -->
+<div class="bg-white rounded-xl p-6 border-2 border-red-200 shadow-sm space-y-5 relative overflow-hidden">
+<div class="absolute -right-12 -top-12 w-32 h-32 bg-red-50 rounded-full pointer-events-none"></div>
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2.5">
+<div class="w-8 h-8 rounded-lg bg-red-100 text-[#FF0033] flex items-center justify-center">
+<span class="material-symbols-outlined" data-icon="movie_edit">movie_edit</span>
+</div>
+<div>
+<div class="flex items-center gap-2">
+<h3 class="text-base font-bold font-headline text-slate-900">YouTube Video Settings</h3>
+<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-[#FF0033] uppercase">Exclusive to YouTube</span>
+</div>
+<p class="text-xs text-slate-500">Configure visual aspect ratio format, synthesis duration ceiling, and ElevenLabs voice actor.</p>
+</div>
+</div>
+</div>
+<!-- Video Type Segmented Control -->
+<div>
+<label class="flex items-center gap-1.5 text-xs font-semibold text-slate-700 mb-2">
+<span class="material-symbols-outlined text-slate-400 text-sm" data-icon="aspect_ratio">aspect_ratio</span>
+<span>Video type &amp; aspect framing</span>
+</label>
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+<!-- Short Option (Checked) -->
+<label class="border-2 border-[#FF0033] bg-red-50/40 rounded-xl p-3.5 flex items-center justify-between cursor-pointer shadow-sm">
+<div class="flex items-center gap-3">
+<div class="w-9 h-9 rounded-lg bg-[#FF0033] text-white flex items-center justify-center font-bold">
+<span class="material-symbols-outlined text-xl" data-icon="stay_current_portrait">stay_current_portrait</span>
+</div>
+<div>
+<span class="text-sm font-bold text-slate-900 block">Short</span>
+<span class="text-xs text-slate-500">Vertical (9:16), up to 60s runtime</span>
+</div>
+</div>
+<input checked="" class="w-4 h-4 text-[#FF0033] focus:ring-red-400 border-slate-300" name="video_type" type="radio"/>
+</label>
+<!-- Long Option -->
+<label class="border border-slate-200 bg-white hover:border-slate-300 rounded-xl p-3.5 flex items-center justify-between cursor-pointer">
+<div class="flex items-center gap-3">
+<div class="w-9 h-9 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center font-bold">
+<span class="material-symbols-outlined text-xl" data-icon="laptop_chromebook">laptop_chromebook</span>
+</div>
+<div>
+<span class="text-sm font-bold text-slate-900 block">Long</span>
+<span class="text-xs text-slate-500">Horizontal (16:9), chapters &amp; b-roll</span>
+</div>
+</div>
+<input class="w-4 h-4 text-[#FF0033] focus:ring-red-400 border-slate-300" name="video_type" type="radio"/>
+</label>
+</div>
+<p class="text-[11px] text-slate-400 mt-1.5">
+              Shorts are routed to the algorithmic feed; long-form compiles comprehensive multi-scene timelines with chapters.
+            </p>
+</div>
+<!-- Duration Slider -->
+<div class="pt-2 border-t border-slate-100">
+<div class="flex items-center justify-between mb-2">
+<label class="flex items-center gap-1.5 text-xs font-semibold text-slate-700">
+<span class="material-symbols-outlined text-slate-400 text-sm" data-icon="timer">timer</span>
+<span>Target video duration</span>
+</label>
+<span class="text-xs font-bold text-[#FF0033] bg-red-50 border border-red-200 px-2 py-0.5 rounded-md">
+                45 seconds
+              </span>
+</div>
+<input class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-[#FF0033]" max="60" min="15" type="range" value="45"/>
+<div class="flex justify-between text-[10px] text-slate-400 mt-1">
+<span>15s (Snappy)</span>
+<span>30s (Recommended)</span>
+<span>45s (Selected)</span>
+<span>60s (Max Short)</span>
+</div>
+<p class="text-[11px] text-slate-400 mt-1">The synthesis pod script length will be calibrated to match this exact audio timing.</p>
+</div>
+<!-- ElevenLabs Voice Picker with Play-Sample Button -->
+<div class="pt-2 border-t border-slate-100">
+<label class="flex items-center gap-1.5 text-xs font-semibold text-slate-700 mb-1.5">
+<span class="material-symbols-outlined text-slate-400 text-sm" data-icon="record_voice_over">record_voice_over</span>
+<span>AI Voice Narrator (ElevenLabs)</span>
+</label>
+<div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+<div class="relative flex-1">
+<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+<span class="material-symbols-outlined text-base" data-icon="mic">mic</span>
+</div>
+<select class="w-full pl-9 pr-8 py-2 text-sm rounded-lg border border-slate-200 bg-white text-slate-800 font-medium focus:ring-2 focus:ring-red-500 focus:border-red-500 appearance-none">
+<option selected="">Adam — Deep, Authoritative &amp; Energetic (ElevenLabs)</option>
+<option>Rachel — Warm, Conversational &amp; Clear</option>
+<option>Josh — Tech Explainer, Casual &amp; Engaging</option>
+<option>Bella — Narrative, Storytelling &amp; Expressive</option>
+</select>
+<div class="absolute inset-y-0 right-0 pr-2.5 flex items-center pointer-events-none text-slate-400">
+<span class="material-symbols-outlined text-base" data-icon="expand_more">expand_more</span>
+</div>
+</div>
+<!-- Play-Sample Button -->
+<button class="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-lg bg-slate-900 text-white hover:bg-slate-800 shadow-sm transition-all active:scale-95 shrink-0" type="button">
+<span class="material-symbols-outlined text-sm text-red-400" data-icon="play_arrow">play_arrow</span>
+<span>Play sample</span>
+</button>
+</div>
+<p class="text-[11px] text-slate-400 mt-1">
+              Sample renders a 4-second audio waveform using your linked ElevenLabs voice model clone.
+            </p>
+</div>
+</div>
+<!-- 6) 'WHEN A POST IS READY' RADIO CARDS -->
+<div class="bg-white rounded-xl p-6 border border-slate-200 shadow-sm space-y-4">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2.5">
+<div class="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center">
+<span class="material-symbols-outlined" data-icon="gavel">gavel</span>
+</div>
+<div>
+<h3 class="text-base font-bold font-headline text-slate-900">When a post is ready</h3>
+<p class="text-xs text-slate-500">Autonomous governance rules for when the agents finish generating drafts.</p>
+</div>
+</div>
+<span class="text-xs font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-600">Approval Policy</span>
+</div>
+<!-- 3 Distinct Colored Radio Cards -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-3.5 pt-1">
+<!-- 1. Publish unless I veto (Green) -->
+<label class="border-2 border-emerald-500 bg-emerald-50/30 rounded-xl p-4 cursor-pointer relative transition-all shadow-sm">
+<div class="flex items-start justify-between">
+<div class="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center mb-2">
+<span class="material-symbols-outlined text-lg" data-icon="shield">shield</span>
+</div>
+<input checked="" class="w-4 h-4 text-emerald-600 focus:ring-emerald-400 border-slate-300" name="approval_mode" type="radio"/>
+</div>
+<h4 class="font-bold text-sm text-emerald-900 mt-1">Publish unless I veto</h4>
+<p class="text-xs text-slate-600 mt-1 leading-relaxed">
+                Autonomous publishing with a 4-hour countdown window to cancel or edit before broadcast.
+              </p>
+<div class="mt-3 text-[11px] font-semibold text-emerald-700 flex items-center gap-1">
+<span class="material-symbols-outlined text-xs" data-icon="verified">verified</span>
+<span>Active policy</span>
+</div>
+</label>
+<!-- 2. Wait for my approval (Amber) -->
+<label class="border border-amber-300 bg-amber-50/20 hover:border-amber-400 rounded-xl p-4 cursor-pointer relative transition-all">
+<div class="flex items-start justify-between">
+<div class="w-8 h-8 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center mb-2">
+<span class="material-symbols-outlined text-lg" data-icon="hourglass_empty">hourglass_empty</span>
+</div>
+<input class="w-4 h-4 text-amber-600 focus:ring-amber-400 border-slate-300" name="approval_mode" type="radio"/>
+</div>
+<h4 class="font-bold text-sm text-amber-950 mt-1">Wait for my approval</h4>
+<p class="text-xs text-slate-600 mt-1 leading-relaxed">
+                Draft stays queued indefinitely until manually reviewed and signed off in the Review Queue.
+              </p>
+<div class="mt-3 text-[11px] font-medium text-amber-800">
+<span>Manual human-in-loop</span>
+</div>
+</label>
+<!-- 3. Publish right away (Red-outlined caution) -->
+<label class="border-2 border-dashed border-rose-400 bg-rose-50/20 hover:border-rose-500 rounded-xl p-4 cursor-pointer relative transition-all">
+<div class="flex items-start justify-between">
+<div class="w-8 h-8 rounded-lg bg-rose-100 text-rose-700 flex items-center justify-center mb-2">
+<span class="material-symbols-outlined text-lg" data-icon="warning">warning</span>
+</div>
+<input class="w-4 h-4 text-rose-600 focus:ring-rose-400 border-slate-300" name="approval_mode" type="radio"/>
+</div>
+<div class="flex items-center gap-1.5 mt-1">
+<h4 class="font-bold text-sm text-rose-950">Publish right away</h4>
+<span class="text-[9px] font-bold uppercase px-1 rounded bg-rose-200 text-rose-800">Caution</span>
+</div>
+<p class="text-xs text-slate-600 mt-1 leading-relaxed">
+                Direct zero-touch dispatch instantly as soon as all automated quality checks pass.
+              </p>
+<div class="mt-3 text-[11px] font-medium text-rose-700 flex items-center gap-1">
+<span class="material-symbols-outlined text-xs" data-icon="bolt">bolt</span>
+<span>Fully autonomous</span>
+</div>
+</label>
+</div>
+<p class="text-[11px] text-slate-400 pt-1">
+<span class="tooltip-anchor" title="Veto window triggers push and Slack notifications when the draft is synthesized">Veto window</span> protects brand voice while preserving full hands-off automation.
+          </p>
+</div>
+<!-- 7) PRACTICE MODE SWITCH WITH BLUE INFO ICON -->
+<div class="bg-blue-50/60 border border-blue-200 rounded-xl p-5 flex items-start justify-between gap-4">
+<div class="flex items-start gap-3">
+<div class="w-10 h-10 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center shrink-0 mt-0.5">
+<span class="material-symbols-outlined text-xl" data-icon="info">info</span>
+</div>
+<div>
+<div class="flex items-center gap-2">
+<h3 class="font-bold text-sm text-blue-950">Practice mode</h3>
+<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-200 text-blue-800 uppercase tracking-wider">Dry-Run Shield</span>
+</div>
+<p class="text-xs text-blue-900 mt-1 leading-relaxed">
+                Simulate full end-to-end agent cycles, video prompt synthesis, and render pipeline tests without publishing to the live YouTube API or notifying subscribers.
+              </p>
+<p class="text-[11px] text-blue-700 mt-1.5 flex items-center gap-1">
+<span class="material-symbols-outlined text-xs" data-icon="help_outline">help_outline</span>
+<span>Useful for testing voice tone and script cadence before going live.</span>
+</p>
+</div>
+</div>
+<!-- Toggle Switch -->
+<label class="relative inline-flex items-center cursor-pointer shrink-0 mt-1">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+</label>
+</div>
+</section>
+</div>
+</main>
+<!-- STICKY BOTTOM SAVE BAR -->
+<aside aria-label="Unsaved changes bar" class="fixed bottom-0 inset-x-0 bg-white/95 backdrop-blur-md border-t border-slate-200 shadow-xl z-50 py-3.5 px-6">
+<div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
+<!-- Unsaved Changes Notice in Amber -->
+<div class="flex items-center gap-2.5">
+<div class="w-8 h-8 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-lg" data-icon="pending">pending</span>
+</div>
+<div>
+<div class="flex items-center gap-2">
+<span class="text-sm font-bold text-amber-900 flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+<span>Unsaved changes</span>
+</span>
+<span class="text-xs text-slate-500 hidden md:inline">• You modified YouTube video duration and recurring Tuesday timeslot</span>
+</div>
+<p class="text-[11px] text-slate-400">Autonomous scheduler will not apply updates until saved.</p>
+</div>
+</div>
+<!-- Action Buttons -->
+<div class="flex items-center gap-3 w-full sm:w-auto justify-end">
+<button class="px-4 py-2 text-xs font-semibold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors" type="button">
+          Discard changes
+        </button>
+<button class="inline-flex items-center gap-2 px-5 py-2 text-xs font-semibold rounded-lg bg-violet-600 hover:bg-violet-700 text-white shadow-sm shadow-violet-200 transition-all active:scale-95" type="button">
+<span class="material-symbols-outlined text-sm" data-icon="save">save</span>
+<span>Save schedule</span>
+</button>
+</div>
+</div>
+</aside>
+</body>
+</html>

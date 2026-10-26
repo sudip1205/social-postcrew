@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Postcrew Studio - Plan</title>
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Plus+Jakarta+Sans:wght@500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols Outlined -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {},
+          borderRadius: {
+            DEFAULT: "0.5rem",
+            lg: "1rem",
+            xl: "1.5rem",
+            full: "9999px"
+          },
+          fontFamily: {
+            headline: ["Plus Jakarta Sans", "sans-serif"],
+            display: ["Plus Jakarta Sans", "sans-serif"],
+            body: ["Inter", "sans-serif"],
+            label: ["Inter", "sans-serif"]
+          }
+        },
+      },
+    }
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      display: inline-block;
+      vertical-align: middle;
+      line-height: 1;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      height: 6px;
+      width: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: #f1f5f9;
+      border-radius: 9999px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 9999px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+    .dotted-tip {
+      text-decoration-line: underline;
+      text-decoration-style: dotted;
+      text-underline-offset: 3px;
+      cursor: help;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-900 font-body antialiased min-h-screen flex flex-col selection:bg-violet-100 selection:text-violet-800">
+<!-- TOP APP BAR (Shared Navigation Anchors from JSON) -->
+<header class="bg-white border-b border-slate-200 docked full-width top-0 sticky z-40 shadow-sm">
+<div class="w-full px-6 py-3 flex items-center justify-between mx-auto">
+<!-- Brand & Channel Switcher Cluster -->
+<div class="flex items-center gap-6">
+<a class="font-headline font-black text-lg text-slate-900 flex items-center gap-2 group" href="#">
+<div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-violet-600 via-indigo-600 to-violet-500 flex items-center justify-center text-white shadow-sm shadow-violet-200">
+<span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">robot_2</span>
+</div>
+<span class="tracking-tight">Postcrew Studio</span>
+</a>
+<!-- Header Integrated App Switcher Pill -->
+<div class="hidden sm:flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200/80 gap-1 text-xs font-semibold">
+<button class="flex items-center gap-1.5 px-3 py-1 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 transition-all">
+<span class="w-2 h-2 rounded-full bg-[#0A66C2]"></span>
+<span>LinkedIn</span>
+<span class="text-[10px] px-1.5 py-0.2 bg-slate-200 text-slate-600 rounded-md font-mono">4</span>
+</button>
+<button class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-white text-slate-900 shadow-xs border border-slate-200/50">
+<span class="w-2 h-2 rounded-full bg-[#FF0033]"></span>
+<span>YouTube</span>
+<span class="text-[10px] px-1.5 py-0.2 bg-red-50 text-red-600 rounded-md font-mono">2</span>
+</button>
+</div>
+</div>
+<!-- Navigation Links -->
+<nav class="hidden md:flex items-center gap-1 font-label text-sm">
+<a class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-slate-600 font-medium hover:text-slate-900 hover:bg-slate-100 transition-colors duration-150" href="#">
+<span class="material-symbols-outlined text-[18px]">dashboard</span>
+<span>Overview</span>
+</a>
+<!-- ACTIVE: Plan Tab -->
+<a class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-violet-50 text-violet-700 font-semibold transition-colors duration-150 shadow-xs border border-violet-100" href="#">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1;">calendar_view_week</span>
+<span>Plan</span>
+</a>
+<a class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-slate-600 font-medium hover:text-slate-900 hover:bg-slate-100 transition-colors duration-150" href="#">
+<span class="material-symbols-outlined text-[18px]">groups_2</span>
+<span>Crew</span>
+</a>
+<a class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-slate-600 font-medium hover:text-slate-900 hover:bg-slate-100 transition-colors duration-150" href="#">
+<span class="material-symbols-outlined text-[18px]">alt_route</span>
+<span>Workflow</span>
+</a>
+<a class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-slate-600 font-medium hover:text-slate-900 hover:bg-slate-100 transition-colors duration-150" href="#">
+<span class="material-symbols-outlined text-[18px]">view_timeline</span>
+<span>Queue</span>
+<span class="px-1.5 py-0.5 text-[10px] font-bold bg-amber-100 text-amber-800 rounded-full border border-amber-200">14</span>
+</a>
+<a class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-slate-600 font-medium hover:text-slate-900 hover:bg-slate-100 transition-colors duration-150" href="#">
+<span class="material-symbols-outlined text-[18px]">settings</span>
+<span>Settings</span>
+</a>
+</nav>
+<!-- Trailing Action Cluster -->
+<div class="flex items-center gap-3">
+<!-- Practice / Autonomous Run Switcher -->
+<div class="hidden lg:flex items-center bg-blue-50 border border-blue-200 rounded-lg px-2.5 py-1 text-xs text-blue-700 font-medium gap-1.5">
+<span class="material-symbols-outlined text-[16px] text-blue-600" style="font-variation-settings: 'FILL' 1;">info</span>
+<span>Practice mode</span>
+</div>
+<button class="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-700 text-white font-label font-medium text-xs shadow-sm shadow-violet-200 active:scale-95 transition-all">
+<span class="material-symbols-outlined text-[16px]">play_circle</span>
+<span>Run now</span>
+</button>
+<div class="h-5 w-px bg-slate-200"></div>
+<button class="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors relative" title="Notifications">
+<span class="material-symbols-outlined text-[20px]">notifications</span>
+<span class="absolute top-1 right-1 w-2 h-2 bg-rose-500 rounded-full"></span>
+</button>
+<button class="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors" title="Documentation &amp; Help">
+<span class="material-symbols-outlined text-[20px]">help</span>
+</button>
+<!-- Command Avatar -->
+<div class="relative pl-1">
+<div class="w-8 h-8 rounded-full bg-gradient-to-tr from-violet-600 to-indigo-500 ring-2 ring-violet-200 flex items-center justify-center text-white text-xs font-bold shadow-xs">
+            CQ
+          </div>
+<div class="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-white rounded-full"></div>
+</div>
+</div>
+</div>
+</header>
+<!-- SUB-HEADER / EDITORIAL PLANNING CONTROLS -->
+<div class="bg-white border-b border-slate-200 px-6 py-4">
+<div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+<!-- Breadcrumbs & Heading -->
+<div>
+<nav class="flex items-center gap-2 text-xs text-slate-500 font-label mb-1">
+<span>Production Studio</span>
+<span class="text-slate-300">/</span>
+<span class="text-violet-700 font-medium">Content Planning</span>
+</nav>
+<div class="flex items-center gap-3">
+<h1 class="font-headline font-bold text-2xl text-slate-900 tracking-tight">Editorial Week Plan</h1>
+<!-- Date Navigator Pill -->
+<div class="flex items-center bg-slate-100 border border-slate-200 rounded-xl px-2.5 py-1 text-xs font-medium text-slate-700 gap-1.5">
+<button class="hover:bg-slate-200 p-0.5 rounded text-slate-500 hover:text-slate-800 transition">
+<span class="material-symbols-outlined text-[16px]">chevron_left</span>
+</button>
+<span class="material-symbols-outlined text-[16px] text-slate-500">date_range</span>
+<span class="font-semibold text-slate-900">Oct 21 – Oct 27, 2024</span>
+<span class="text-violet-600 bg-violet-100 px-1.5 py-0.2 rounded font-medium text-[11px]">(This Week)</span>
+<button class="hover:bg-slate-200 p-0.5 rounded text-slate-500 hover:text-slate-800 transition">
+<span class="material-symbols-outlined text-[16px]">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Segmented Format Control & Actions -->
+<div class="flex flex-wrap items-center gap-3">
+<!-- App Toggle Tabs (YouTube Active) -->
+<div class="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 font-medium text-xs">
+<button class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition-colors">
+<span class="w-2.5 h-2.5 rounded-sm bg-[#0A66C2]"></span>
+<span>LinkedIn</span>
+<span class="bg-slate-200 text-slate-700 text-[10px] px-1.5 py-0.2 rounded-full font-mono">4 scheduled</span>
+</button>
+<button class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white text-slate-900 shadow-sm border border-slate-200 font-semibold">
+<span class="material-symbols-outlined text-[16px] text-[#FF0033]" style="font-variation-settings: 'FILL' 1;">smart_display</span>
+<span>YouTube</span>
+<span class="bg-red-50 text-[#FF0033] border border-red-200 text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold">2 scheduled</span>
+</button>
+</div>
+<!-- Plan Progress Counter Chip -->
+<div class="hidden xl:flex items-center gap-1.5 text-xs font-medium text-slate-600 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl">
+<span class="material-symbols-outlined text-[16px] text-amber-500">pie_chart</span>
+<span>5 of 7 days planned</span>
+<span class="text-slate-400">•</span>
+<span class="text-amber-700 font-semibold">2 slots open</span>
+</div>
+<!-- Action Buttons -->
+<div class="flex items-center gap-2">
+<!-- Re-plan Outline Button -->
+<button class="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-xs active:scale-95 transition-all group" title="Re-runs agent brainstorming on unwritten slots">
+<span class="material-symbols-outlined text-[16px] text-slate-500 group-hover:rotate-180 transition-transform duration-300">sync</span>
+<span>Re-plan this week</span>
+</button>
+<!-- Plan Open Days Primary Button -->
+<button class="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold shadow-sm shadow-violet-200 active:scale-95 transition-all">
+<span class="material-symbols-outlined text-[16px]" style="font-variation-settings: 'FILL' 1;">auto_awesome</span>
+<span>Plan the open days</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+<!-- MAIN CANVAS / TWO-COLUMN WORKSPACE -->
+<main class="flex-1 flex overflow-hidden" data-active-view="plan">
+<!-- LEFT / MAIN 7-DAY EDITORIAL BOARD (Horizontal Scroll) -->
+<section class="flex-1 overflow-x-auto custom-scrollbar p-6 bg-slate-50/60">
+<div class="min-w-[1360px] grid grid-cols-7 gap-4.5">
+<!-- ================= DAY 1: MON OCT 21 ================= -->
+<div class="flex flex-col gap-3 min-w-[185px]">
+<!-- Column Header -->
+<div class="flex items-center justify-between pb-2 border-b border-slate-200">
+<div>
+<div class="font-headline font-bold text-sm text-slate-900">Mon 21</div>
+<div class="text-[11px] text-slate-500 font-medium">Oct 21, 2024</div>
+</div>
+<span class="text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+<span class="material-symbols-outlined text-[13px] text-emerald-600">check_circle</span>
+<span>1 item</span>
+</span>
+</div>
+<!-- YouTube Card: Written State -->
+<div class="bg-white rounded-xl border-l-4 border-l-[#FF0033] border-y border-r border-slate-200 shadow-sm p-3.5 flex flex-col gap-3 hover:shadow-md transition-shadow group">
+<!-- Card Header: Badges -->
+<div class="flex items-center justify-between gap-1 flex-wrap">
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-red-50 text-[#FF0033] text-[10px] font-bold border border-red-100">
+<span class="material-symbols-outlined text-[12px]" style="font-variation-settings: 'FILL' 1;">smart_display</span>
+<span>Short · 45s</span>
+</span>
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-semibold border border-emerald-200" title="Script and voiceover ready">
+<span class="material-symbols-outlined text-[12px] text-emerald-600">check_circle</span>
+<span>Written</span>
+</span>
+</div>
+<!-- Topic Category Pill -->
+<div>
+<span class="inline-block px-2 py-0.5 rounded text-[10px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100">
+                System Architecture
+              </span>
+</div>
+<!-- Editable Topic Title -->
+<div class="relative group/title">
+<h3 class="font-headline font-semibold text-xs text-slate-900 leading-snug pr-4">
+                5 Architectural Patterns for Multi-Agent Systems in Production
+              </h3>
+<span class="material-symbols-outlined text-[14px] text-slate-400 absolute right-0 top-0 opacity-0 group-hover/title:opacity-100 cursor-pointer hover:text-violet-600">
+                edit
+              </span>
+</div>
+<!-- Hook Narrative -->
+<p class="text-[11px] text-slate-600 leading-relaxed line-clamp-3">
+              Most developers connect LLMs in dumb chains. Here are the 5 patterns leading engineering teams use for persistent state &amp; tool orchestration.
+            </p>
+<!-- Script Outline Bullets -->
+<div class="bg-slate-50 rounded-lg p-2.5 border border-slate-100 text-[10px] space-y-1 font-mono text-slate-600">
+<div class="flex items-start gap-1.5">
+<span class="text-violet-600 font-bold">1.</span>
+<span>Hook: Why straight linear chains fail</span>
+</div>
+<div class="flex items-start gap-1.5">
+<span class="text-violet-600 font-bold">2.</span>
+<span>Router + State machine visual</span>
+</div>
+<div class="flex items-start gap-1.5">
+<span class="text-violet-600 font-bold">3.</span>
+<span>CTA: Template in description repo</span>
+</div>
+</div>
+<!-- Card Trailing Utility -->
+<div class="pt-2 border-t border-slate-100 flex items-center justify-between text-[10px]">
+<span class="text-slate-400 flex items-center gap-1">
+<span class="material-symbols-outlined text-[12px]">lock</span>
+<span>Locked by Quinn</span>
+</span>
+<button class="text-slate-400 hover:text-violet-600 flex items-center gap-0.5 font-medium transition" title="Ask Agent to propose fresh variant">
+<span class="material-symbols-outlined text-[13px]">auto_awesome</span>
+<span>Suggest</span>
+</button>
+</div>
+<p class="text-[9px] text-slate-400 italic">Render scheduled at 08:30 PST</p>
+</div>
+</div>
+<!-- ================= DAY 2: TUE OCT 22 ================= -->
+<div class="flex flex-col gap-3 min-w-[185px]">
+<!-- Column Header -->
+<div class="flex items-center justify-between pb-2 border-b border-slate-200">
+<div>
+<div class="font-headline font-bold text-sm text-slate-900">Tue 22</div>
+<div class="text-[11px] text-slate-500 font-medium">Oct 22, 2024</div>
+</div>
+<span class="text-[11px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+<span class="material-symbols-outlined text-[13px] text-blue-600">calendar_today</span>
+<span>1 item</span>
+</span>
+</div>
+<!-- YouTube Card: Planned State -->
+<div class="bg-white rounded-xl border-l-4 border-l-[#FF0033] border-y border-r border-slate-200 shadow-sm p-3.5 flex flex-col gap-3 hover:shadow-md transition-shadow group">
+<div class="flex items-center justify-between gap-1 flex-wrap">
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-red-50 text-[#FF0033] text-[10px] font-bold border border-red-100">
+<span class="material-symbols-outlined text-[12px]" style="font-variation-settings: 'FILL' 1;">play_circle</span>
+<span>Long · 8 min</span>
+</span>
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-[10px] font-semibold border border-blue-200">
+<span class="material-symbols-outlined text-[12px] text-blue-600">event</span>
+<span>Planned</span>
+</span>
+</div>
+<div>
+<span class="inline-block px-2 py-0.5 rounded text-[10px] font-semibold bg-teal-50 text-teal-700 border border-teal-100">
+                AI Engineering
+              </span>
+</div>
+<div class="relative group/title">
+<h3 class="font-headline font-semibold text-xs text-slate-900 leading-snug pr-4">
+                Why Agent Evaluators Fail Silently in High-Load Systems
+              </h3>
+<span class="material-symbols-outlined text-[14px] text-slate-400 absolute right-0 top-0 opacity-0 group-hover/title:opacity-100 cursor-pointer hover:text-violet-600">
+                edit
+              </span>
+</div>
+<p class="text-[11px] text-slate-600 leading-relaxed line-clamp-3">
+              Deep dive benchmarks examining synthetic prompt injections and LLM drift that current LangSmith alerts miss during traffic surges.
+            </p>
+<div class="bg-slate-50 rounded-lg p-2.5 border border-slate-100 text-[10px] space-y-1 font-mono text-slate-600">
+<div class="flex items-start gap-1.5">
+<span class="text-violet-600 font-bold">1.</span>
+<span>Hook: 30% silent failure rate</span>
+</div>
+<div class="flex items-start gap-1.5">
+<span class="text-violet-600 font-bold">2.</span>
+<span>Live demo test suite</span>
+</div>
+<div class="flex items-start gap-1.5">
+<span class="text-violet-600 font-bold">3.</span>
+<span>Defensive guardrail setup</span>
+</div>
+</div>
+<div class="pt-2 border-t border-slate-100 flex items-center justify-between text-[10px]">
+<span class="text-amber-600 flex items-center gap-1 font-medium">
+<span class="material-symbols-outlined text-[12px]">pending_actions</span>
+<span>Writer assigned</span>
+</span>
+<button class="text-slate-400 hover:text-violet-600 flex items-center gap-0.5 font-medium transition">
+<span class="material-symbols-outlined text-[13px]">auto_awesome</span>
+<span>Suggest</span>
+</button>
+</div>
+<p class="text-[9px] text-slate-400 italic">Drafting triggers tonight at 23:00</p>
+</div>
+</div>
+<!-- ================= DAY 3: WED OCT 23 ================= -->
+<div class="flex flex-col gap-3 min-w-[185px]">
+<div class="flex items-center justify-between pb-2 border-b border-slate-200">
+<div>
+<div class="font-headline font-bold text-sm text-slate-900">Wed 23</div>
+<div class="text-[11px] text-slate-500 font-medium">Oct 23, 2024</div>
+</div>
+<span class="text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+<span class="material-symbols-outlined text-[13px] text-emerald-600">check_circle</span>
+<span>1 item</span>
+</span>
+</div>
+<!-- YouTube Card: Short Written -->
+<div class="bg-white rounded-xl border-l-4 border-l-[#FF0033] border-y border-r border-slate-200 shadow-sm p-3.5 flex flex-col gap-3 hover:shadow-md transition-shadow group">
+<div class="flex items-center justify-between gap-1 flex-wrap">
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-red-50 text-[#FF0033] text-[10px] font-bold border border-red-100">
+<span class="material-symbols-outlined text-[12px]" style="font-variation-settings: 'FILL' 1;">smart_display</span>
+<span>Short · 60s</span>
+</span>
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-semibold border border-emerald-200">
+<span class="material-symbols-outlined text-[12px] text-emerald-600">check_circle</span>
+<span>Written</span>
+</span>
+</div>
+<div>
+<span class="inline-block px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-800 border border-amber-200">
+                Founder Lessons
+              </span>
+</div>
+<div class="relative group/title">
+<h3 class="font-headline font-semibold text-xs text-slate-900 leading-snug pr-4">
+                What $40,000 in OpenAI API Bills Taught Us About Caching
+              </h3>
+<span class="material-symbols-outlined text-[14px] text-slate-400 absolute right-0 top-0 opacity-0 group-hover/title:opacity-100 cursor-pointer hover:text-violet-600">
+                edit
+              </span>
+</div>
+<p class="text-[11px] text-slate-600 leading-relaxed line-clamp-3">
+              We burnt tens of thousands on naive prompt chaining. Semantic caching + Redis cut 83% of inference expenses in 48 hours.
+            </p>
+<div class="bg-slate-50 rounded-lg p-2.5 border border-slate-100 text-[10px] space-y-1 font-mono text-slate-600">
+<div class="flex items-start gap-1.5">
+<span class="text-violet-600 font-bold">1.</span>
+<span>Invoice screenshot shock</span>
+</div>
+<div class="flex items-start gap-1.5">
+<span class="text-violet-600 font-bold">2.</span>
+<span>Semantic vector threshold diagram</span>
+</div>
+<div class="flex items-start gap-1.5">
+<span class="text-violet-600 font-bold">3.</span>
+<span>How to implement tomorrow</span>
+</div>
+</div>
+<div class="pt-2 border-t border-slate-100 flex items-center justify-between text-[10px]">
+<span class="text-slate-400 flex items-center gap-1">
+<span class="material-symbols-outlined text-[12px]">mic</span>
+<span>Audio rendered</span>
+</span>
+<button class="text-slate-400 hover:text-violet-600 flex items-center gap-0.5 font-medium transition">
+<span class="material-symbols-outlined text-[13px]">auto_awesome</span>
+<span>Suggest</span>
+</button>
+</div>
+<p class="text-[9px] text-slate-400 italic">Thumbnail approved by Design Agent</p>
+</div>
+</div>
+<!-- ================= DAY 4: THU OCT 24 (OPEN SLOT) ================= -->
+<div class="flex flex-col gap-3 min-w-[185px]">
+<div class="flex items-center justify-between pb-2 border-b border-slate-200">
+<div>
+<div class="font-headline font-bold text-sm text-slate-900">Thu 24</div>
+<div class="text-[11px] text-slate-500 font-medium">Oct 24, 2024</div>
+</div>
+<span class="text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+<span class="material-symbols-outlined text-[13px] text-amber-600">radio_button_unchecked</span>
+<span>Open slot</span>
+</span>
+</div>
+<!-- Empty Slot Drop Zone -->
+<div class="border-2 border-dashed border-slate-300 hover:border-violet-400 rounded-xl p-5 flex flex-col items-center justify-center text-center gap-2.5 bg-white/50 hover:bg-violet-50/40 transition-all cursor-pointer group min-h-[310px]">
+<div class="w-10 h-10 rounded-full bg-slate-100 group-hover:bg-violet-100 flex items-center justify-center text-slate-400 group-hover:text-violet-600 transition-colors">
+<span class="material-symbols-outlined text-[20px]">add</span>
+</div>
+<div>
+<p class="font-headline font-semibold text-xs text-slate-700 group-hover:text-violet-900">
+                Slot is open
+              </p>
+<p class="text-[10px] text-slate-400 mt-1 max-w-[130px] leading-tight">
+                Drag from Idea Bank or tap to auto-brainstorm
+              </p>
+</div>
+<button class="mt-2 inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white border border-slate-200 group-hover:border-violet-300 text-slate-700 group-hover:text-violet-700 text-[10px] font-semibold shadow-xs">
+<span class="material-symbols-outlined text-[12px] text-violet-600">auto_awesome</span>
+<span>Let Agent draft</span>
+</button>
+</div>
+</div>
+<!-- ================= DAY 5: FRI OCT 25 ================= -->
+<div class="flex flex-col gap-3 min-w-[185px]">
+<div class="flex items-center justify-between pb-2 border-b border-slate-200">
+<div>
+<div class="font-headline font-bold text-sm text-slate-900">Fri 25</div>
+<div class="text-[11px] text-slate-500 font-medium">Oct 25, 2024</div>
+</div>
+<span class="text-[11px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+<span class="material-symbols-outlined text-[13px] text-blue-600">calendar_today</span>
+<span>1 item</span>
+</span>
+</div>
+<!-- YouTube Card: Planned Short -->
+<div class="bg-white rounded-xl border-l-4 border-l-[#FF0033] border-y border-r border-slate-200 shadow-sm p-3.5 flex flex-col gap-3 hover:shadow-md transition-shadow group">
+<div class="flex items-center justify-between gap-1 flex-wrap">
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-red-50 text-[#FF0033] text-[10px] font-bold border border-red-100">
+<span class="material-symbols-outlined text-[12px]" style="font-variation-settings: 'FILL' 1;">smart_display</span>
+<span>Short · 45s</span>
+</span>
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-[10px] font-semibold border border-blue-200">
+<span class="material-symbols-outlined text-[12px] text-blue-600">event</span>
+<span>Planned</span>
+</span>
+</div>
+<div>
+<span class="inline-block px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100">
+                Scale Metrics
+              </span>
+</div>
+<div class="relative group/title">
+<h3 class="font-headline font-semibold text-xs text-slate-900 leading-snug pr-4">
+                The Real P99 Latency of Autonomous Agent Swarms
+              </h3>
+<span class="material-symbols-outlined text-[14px] text-slate-400 absolute right-0 top-0 opacity-0 group-hover/title:opacity-100 cursor-pointer hover:text-violet-600">
+                edit
+              </span>
+</div>
+<p class="text-[11px] text-slate-600 leading-relaxed line-clamp-3">
+              Unpacking data from 1.2M production executions: tool overhead vs tokens per second vs multi-turn context payload compaction.
+            </p>
+<div class="bg-slate-50 rounded-lg p-2.5 border border-slate-100 text-[10px] space-y-1 font-mono text-slate-600">
+<div class="flex items-start gap-1.5">
+<span class="text-violet-600 font-bold">1.</span>
+<span>Latency timeline waterfall</span>
+</div>
+<div class="flex items-start gap-1.5">
+<span class="text-violet-600 font-bold">2.</span>
+<span>Bottleneck: JSON schema serialization</span>
+</div>
+<div class="flex items-start gap-1.5">
+<span class="text-violet-600 font-bold">3.</span>
+<span>Takeaway: Pre-warmed runners</span>
+</div>
+</div>
+<div class="pt-2 border-t border-slate-100 flex items-center justify-between text-[10px]">
+<span class="text-slate-400 flex items-center gap-1">
+<span class="material-symbols-outlined text-[12px]">schedule</span>
+<span>Queue Fri 11:00 AM</span>
+</span>
+<button class="text-slate-400 hover:text-violet-600 flex items-center gap-0.5 font-medium transition">
+<span class="material-symbols-outlined text-[13px]">auto_awesome</span>
+<span>Suggest</span>
+</button>
+</div>
+<p class="text-[9px] text-slate-400 italic">Topic aligns with YouTube Tech trending</p>
+</div>
+</div>
+<!-- ================= DAY 6: SAT OCT 26 ================= -->
+<div class="flex flex-col gap-3 min-w-[185px]">
+<div class="flex items-center justify-between pb-2 border-b border-slate-200">
+<div>
+<div class="font-headline font-bold text-sm text-slate-900">Sat 26</div>
+<div class="text-[11px] text-slate-500 font-medium">Oct 26, 2024</div>
+</div>
+<span class="text-[11px] font-semibold text-slate-500 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+<span class="material-symbols-outlined text-[13px] text-slate-400">nightlight</span>
+<span>Rest day</span>
+</span>
+</div>
+<!-- Rest Day State Card -->
+<div class="bg-slate-100/70 border border-slate-200 rounded-xl p-4 flex flex-col items-center justify-center text-center gap-2 min-h-[160px]">
+<div class="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-slate-500">
+<span class="material-symbols-outlined text-[18px]">bedtime</span>
+</div>
+<div class="text-xs font-semibold text-slate-700">Scheduled Rest</div>
+<p class="text-[10px] text-slate-500 max-w-[120px]">
+              Algorithms deprioritize weekend algorithmic velocity for this channel.
+            </p>
+<button class="mt-1 text-[10px] font-medium text-violet-600 hover:text-violet-800 flex items-center gap-1">
+<span class="material-symbols-outlined text-[12px]">add</span>
+<span>Add slot anyway</span>
+</button>
+</div>
+</div>
+<!-- ================= DAY 7: SUN OCT 27 (OPEN SLOT) ================= -->
+<div class="flex flex-col gap-3 min-w-[185px]">
+<div class="flex items-center justify-between pb-2 border-b border-slate-200">
+<div>
+<div class="font-headline font-bold text-sm text-slate-900">Sun 27</div>
+<div class="text-[11px] text-slate-500 font-medium">Oct 27, 2024</div>
+</div>
+<span class="text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+<span class="material-symbols-outlined text-[13px] text-amber-600">radio_button_unchecked</span>
+<span>Open slot</span>
+</span>
+</div>
+<!-- Empty Slot Drop Zone -->
+<div class="border-2 border-dashed border-slate-300 hover:border-violet-400 rounded-xl p-5 flex flex-col items-center justify-center text-center gap-2.5 bg-white/50 hover:bg-violet-50/40 transition-all cursor-pointer group min-h-[310px]">
+<div class="w-10 h-10 rounded-full bg-slate-100 group-hover:bg-violet-100 flex items-center justify-center text-slate-400 group-hover:text-violet-600 transition-colors">
+<span class="material-symbols-outlined text-[20px]">add</span>
+</div>
+<div>
+<p class="font-headline font-semibold text-xs text-slate-700 group-hover:text-violet-900">
+                Weekly Recap Slot
+              </p>
+<p class="text-[10px] text-slate-400 mt-1 max-w-[130px] leading-tight">
+                Recommended: Community Short summarizing key lessons
+              </p>
+</div>
+<button class="mt-2 inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white border border-slate-200 group-hover:border-violet-300 text-slate-700 group-hover:text-violet-700 text-[10px] font-semibold shadow-xs">
+<span class="material-symbols-outlined text-[12px] text-violet-600">auto_awesome</span>
+<span>Draft recap</span>
+</button>
+</div>
+</div>
+</div>
+</section>
+<!-- RIGHT / IDEATION BANK DRAWER (Side Panel) -->
+<aside class="w-[340px] border-l border-slate-200 bg-white flex flex-col shrink-0">
+<!-- Panel Header -->
+<div class="p-4 border-b border-slate-200">
+<div class="flex items-center justify-between mb-1.5">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-amber-500 text-[20px]" style="font-variation-settings: 'FILL' 1;">lightbulb</span>
+<h2 class="font-headline font-bold text-sm text-slate-900">Your Ideas Bank</h2>
+</div>
+<span class="text-[10px] font-mono font-semibold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
+            6 in backlog
+          </span>
+</div>
+<p class="text-[11px] text-slate-500 leading-normal">
+          Drag any idea onto an open day card or click <span class="font-semibold text-slate-700">Assign</span>. Used ideas sync automatically with agent memory.
+        </p>
+<!-- Quick Capture Input -->
+<div class="mt-3 relative">
+<input class="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg pl-3 pr-8 py-2 placeholder-slate-400 focus:outline-hidden focus:ring-1 focus:ring-violet-500 focus:bg-white transition" placeholder="+ Quick drop a new idea..." type="text"/>
+<button class="absolute right-2 top-2 text-slate-400 hover:text-violet-600">
+<span class="material-symbols-outlined text-[16px]">subdirectory_arrow_left</span>
+</button>
+</div>
+<!-- Filter & Search Bar -->
+<div class="mt-2.5 relative">
+<span class="material-symbols-outlined text-[16px] text-slate-400 absolute left-2.5 top-2">search</span>
+<input class="w-full text-xs bg-white border border-slate-200 rounded-lg pl-8 pr-3 py-1.5 placeholder-slate-400 text-slate-800 focus:outline-hidden focus:ring-1 focus:ring-violet-500" placeholder="Search by theme, hook, or tag..." type="text"/>
+</div>
+<!-- Topic Filter Chips -->
+<div class="flex items-center gap-1 mt-2.5 overflow-x-auto no-scrollbar text-[10px] font-medium">
+<button class="px-2.5 py-1 rounded-md bg-violet-100 text-violet-700 font-semibold shrink-0">All Topics</button>
+<button class="px-2.5 py-1 rounded-md bg-slate-100 text-slate-600 hover:bg-slate-200 shrink-0">AI Infra</button>
+<button class="px-2.5 py-1 rounded-md bg-slate-100 text-slate-600 hover:bg-slate-200 shrink-0">Product</button>
+<button class="px-2.5 py-1 rounded-md bg-slate-100 text-slate-600 hover:bg-slate-200 shrink-0">Founders</button>
+</div>
+</div>
+<!-- Scrollable Ideas List -->
+<div class="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-2.5 bg-slate-50/50">
+<!-- IDEA CARD 1: Unused / Available -->
+<div class="p-3 bg-white rounded-xl border border-slate-200 hover:border-violet-300 hover:shadow-xs transition-all cursor-grab active:cursor-grabbing group">
+<div class="flex items-start justify-between gap-2">
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[16px] text-slate-300 group-hover:text-slate-500">drag_indicator</span>
+<span class="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-cyan-50 text-cyan-700 border border-cyan-100">
+                AI Infra
+              </span>
+</div>
+<button class="text-[10px] font-semibold text-violet-600 hover:text-violet-800 bg-violet-50 hover:bg-violet-100 px-2 py-0.5 rounded transition flex items-center gap-0.5">
+<span>Assign</span>
+<span class="material-symbols-outlined text-[11px]">arrow_forward</span>
+</button>
+</div>
+<p class="font-headline font-semibold text-xs text-slate-800 mt-2 leading-snug">
+            LLM Router benchmarking against GPT-4o mini for high-throughput agents
+          </p>
+<p class="text-[11px] text-slate-500 mt-1 line-clamp-2">
+            Comparing Semantic Router vs Instructor. Cost dropped 6x with identical tool selection accuracy.
+          </p>
+<div class="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-400">
+<span class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[12px]">schedule</span>
+<span>Added 2d ago</span>
+</span>
+<span class="text-violet-600 font-medium hover:underline cursor-pointer">Preview notes</span>
+</div>
+</div>
+<!-- IDEA CARD 2: Unused / Available -->
+<div class="p-3 bg-white rounded-xl border border-slate-200 hover:border-violet-300 hover:shadow-xs transition-all cursor-grab active:cursor-grabbing group">
+<div class="flex items-start justify-between gap-2">
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[16px] text-slate-300 group-hover:text-slate-500">drag_indicator</span>
+<span class="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100">
+                System Architecture
+              </span>
+</div>
+<button class="text-[10px] font-semibold text-violet-600 hover:text-violet-800 bg-violet-50 hover:bg-violet-100 px-2 py-0.5 rounded transition flex items-center gap-0.5">
+<span>Assign</span>
+<span class="material-symbols-outlined text-[11px]">arrow_forward</span>
+</button>
+</div>
+<p class="font-headline font-semibold text-xs text-slate-800 mt-2 leading-snug">
+            The Death of Static Prompts: Dynamic Context Injection
+          </p>
+<p class="text-[11px] text-slate-500 mt-1 line-clamp-2">
+            Why rigid 2,000-token system prompts degrade model performance; how we dynamically hydrate schemas.
+          </p>
+<div class="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-400">
+<span class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[12px]">schedule</span>
+<span>Added 3d ago</span>
+</span>
+<span class="text-violet-600 font-medium hover:underline cursor-pointer">Preview notes</span>
+</div>
+</div>
+<!-- IDEA CARD 3: Used / Assigned State -->
+<div class="p-3 bg-emerald-50/40 rounded-xl border border-emerald-200/80 transition-all opacity-85">
+<div class="flex items-start justify-between gap-2">
+<span class="px-2 py-0.5 rounded text-[9px] font-semibold bg-emerald-100 text-emerald-800 flex items-center gap-1">
+<span class="material-symbols-outlined text-[11px]">check</span>
+<span>Assigned to Tue 22</span>
+</span>
+<span class="text-[10px] text-emerald-700 font-mono font-medium">In Production</span>
+</div>
+<p class="font-headline font-semibold text-xs text-slate-700 mt-2 leading-snug line-through text-slate-500">
+            Why Agent Evaluators Fail Silently in High-Load Systems
+          </p>
+<div class="mt-2 text-[10px] text-slate-400 flex items-center justify-between">
+<span>Synced to Planning Memory</span>
+<button class="text-slate-400 hover:text-slate-600 text-[10px] underline">Unassign</button>
+</div>
+</div>
+<!-- IDEA CARD 4: Unused / Available -->
+<div class="p-3 bg-white rounded-xl border border-slate-200 hover:border-violet-300 hover:shadow-xs transition-all cursor-grab active:cursor-grabbing group">
+<div class="flex items-start justify-between gap-2">
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[16px] text-slate-300 group-hover:text-slate-500">drag_indicator</span>
+<span class="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-amber-50 text-amber-800 border border-amber-200">
+                Founder Lessons
+              </span>
+</div>
+<button class="text-[10px] font-semibold text-violet-600 hover:text-violet-800 bg-violet-50 hover:bg-violet-100 px-2 py-0.5 rounded transition flex items-center gap-0.5">
+<span>Assign</span>
+<span class="material-symbols-outlined text-[11px]">arrow_forward</span>
+</button>
+</div>
+<p class="font-headline font-semibold text-xs text-slate-800 mt-2 leading-snug">
+            3 Ways Non-Technical Teams Veto Good Content When Reviewing Drafts
+          </p>
+<p class="text-[11px] text-slate-500 mt-1 line-clamp-2">
+            How to structure guardrails so marketing stakeholders critique tone rather than breaking technical accuracy.
+          </p>
+<div class="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-400">
+<span class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[12px]">schedule</span>
+<span>Added 5d ago</span>
+</span>
+<span class="text-violet-600 font-medium hover:underline cursor-pointer">Preview notes</span>
+</div>
+</div>
+</div>
+<!-- Panel Footer Status -->
+<div class="p-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-[11px] text-slate-500">
+<span class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px] text-emerald-600">sync</span>
+<span>Vector memory synced</span>
+</span>
+<button class="text-violet-700 hover:underline font-medium">Export CSV</button>
+</div>
+</aside>
+</main>
+</body></html>
