@@ -125,9 +125,16 @@ The full walkthrough is in [Getting started](https://github.com/sudip1205/social
 
 | | |
 |---|---|
-| <img src="https://raw.githubusercontent.com/sudip1205/social-postcrew/main/docs/assets/screens/overview.png" alt="Overview" width="100%"> **Overview**: what's next, warnings, run the crew now, recent runs | <img src="https://raw.githubusercontent.com/sudip1205/social-postcrew/main/docs/assets/screens/queue.png" alt="Queue" width="100%"> **Queue**: LinkedIn-style previews; approve, edit, veto or publish now |
+| <img src="https://raw.githubusercontent.com/sudip1205/social-postcrew/main/docs/assets/screens/overview.png" alt="Overview" width="100%"> **Overview**: what's next, warnings, run the crew now, recent runs | <img src="https://raw.githubusercontent.com/sudip1205/social-postcrew/main/docs/assets/screens/queue.png" alt="Queue" width="100%"> **Queue**: post previews; approve, edit, veto or publish now |
 | <img src="https://raw.githubusercontent.com/sudip1205/social-postcrew/main/docs/assets/screens/team.png" alt="Crew" width="100%"> **Crew**: every agent by team, the roster, lessons and long-term memory | <img src="https://raw.githubusercontent.com/sudip1205/social-postcrew/main/docs/assets/screens/plan.png" alt="Plan" width="100%"> **Plan**: this week's topics; edit any day or ask for another |
 | <img src="https://raw.githubusercontent.com/sudip1205/social-postcrew/main/docs/assets/screens/settings.png" alt="Settings" width="100%"> **Settings**: topics, schedule, about you, models and limits | <img src="https://raw.githubusercontent.com/sudip1205/social-postcrew/main/docs/assets/screens/credentials.png" alt="Credentials" width="100%"> **Credentials**: LinkedIn, Claude Code, Gmail, Telegram |
+
+
+YouTube has its own tab set: the app switcher in the header flips the Queue, Plan, Workflow and Settings between LinkedIn and YouTube.
+
+| | |
+|---|---|
+| <img src="https://raw.githubusercontent.com/sudip1205/social-postcrew/main/docs/assets/screens/youtube-queue.png" alt="YouTube queue" width="100%"> **YouTube queue**: the finished video with its voice, scene timeline and Editor score; use your own video, voice or script | <img src="https://raw.githubusercontent.com/sudip1205/social-postcrew/main/docs/assets/screens/youtube-workflow.png" alt="YouTube run" width="100%"> **YouTube run**: Voice first, then the Blackboard Producer draws the video to it |
 
 Every tab, panel and button is explained in the [Studio guide](https://github.com/sudip1205/social-postcrew/blob/main/docs/studio-guide.md).
 
