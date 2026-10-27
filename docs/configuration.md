@@ -102,8 +102,8 @@ Same `schedule`, `planning`, `categories` and `publishing` keys as above, plus:
 | `video.captions` | `true` | Burn captions into the video. |
 
 A YouTube topic (category) takes the usual keys (`label`, `brief`, `research`, `fact_check`, `ideas`, `max_source_age_days`) with
-`"media": "video"`, and may set its own `format` and `target_seconds`. Default topics: `short-tip`, `explainer`, `tutorial`,
-`news-brief`. Secrets: `youtube_client_id`, `youtube_client_secret`, `youtube_refresh_token`, `elevenlabs_api_key`.
+`"media": "video"`, and may set its own `format` and `target_seconds`. YouTube starts with no topics: create yours in Settings > Topics
+(each can set its own `format`, `target_seconds` and `renderer`), and only those appear in the weekly schedule. Secrets: `youtube_client_id`, `youtube_client_secret`, `youtube_refresh_token`, `elevenlabs_api_key`.
 See [Connect YouTube](youtube-setup.md) and [Videos, voice and your own files](video-and-voice.md).
 
 ## planning

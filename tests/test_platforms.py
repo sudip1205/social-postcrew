@@ -90,8 +90,7 @@ class ConfigTests(unittest.TestCase):
         with TempWorkspace() as ws:
             cfg = with_youtube(ws)
             v = platforms.view(cfg, "youtube")
-            self.assertIn("dev-tip", v["categories"])
-            self.assertIn("short-tip", v["categories"])
+            self.assertEqual(list(v["categories"]), ["dev-tip"])   # the app's own topics, nothing predefined
             self.assertEqual(v["schedule"]["post_time"], "17:00")
             self.assertEqual(v["profile"], cfg["profile"])
             self.assertIs(platforms.view(cfg, "linkedin"), cfg)

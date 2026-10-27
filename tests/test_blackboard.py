@@ -134,6 +134,16 @@ class WiringTests(unittest.TestCase):
             self.assertEqual(ids(crew_for("youtube", dict(cfg, categories=cats), "short-tip")), [BlackboardAgent])
             self.assertEqual(ids(crew_for("youtube", dict(cfg, categories=cats), "explainer")), [VideoAgent])
 
+    def test_youtube_starts_with_no_predefined_topics(self):
+        from postcrew.defaults import DEFAULT_CONFIG
+        yt = DEFAULT_CONFIG["platforms"]["youtube"]
+        self.assertEqual((yt["categories"], yt["schedule"]["days"]), ({}, {}))
+        cfg = json.loads(json.dumps(DEFAULT_CONFIG))
+        cfg["platforms"]["youtube"]["enabled"] = True
+        errs = validate_config(cfg)   # switched on with no topics yet: it says what to do, nothing else is wrong
+        self.assertEqual(len(errs), 1)
+        self.assertIn("add a topic", errs[0])
+
     def test_config_accepts_the_blackboard_renderer_and_rejects_others(self):
         with TempWorkspace() as ws:
             cfg = ws.config()

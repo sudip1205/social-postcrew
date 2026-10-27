@@ -128,7 +128,8 @@ def validate_platform(cfg, pre="", primary=True):
     if freq not in FREQUENCIES:
         errs.append(f"{pre}schedule.frequency must be one of {FREQUENCIES}")
     if freq == "weekly" and not any(days.get(d) for d in WEEKDAYS):
-        errs.append(f"{pre}schedule.days: pick a category for at least one day")
+        errs.append(f"{pre}schedule.days: " + ("pick a topic for at least one day" if cfg.get("categories")
+                    else "add a topic under Topics first, then pick it for a day"))
     if freq == "every_n_days":
         if not (isinstance(s.get("every_n"), int) and 1 <= s["every_n"] <= 60):
             errs.append(f"{pre}schedule.every_n must be a whole number 1-60")

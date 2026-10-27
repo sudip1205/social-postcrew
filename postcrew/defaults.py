@@ -56,7 +56,7 @@ DEFAULT_CONFIG = {
             "enabled": False,
             "schedule": {
                 "timezone": "America/Chicago", "generate_time": "19:00", "post_time": "17:00", "lead_days": 2,
-                "days": {"tue": "explainer", "fri": "short-tip"}, "frequency": "weekly", "every_n": 3, "start_date": "", "rotation": [], "dates": [],
+                "days": {}, "frequency": "weekly", "every_n": 3, "start_date": "", "rotation": [], "dates": [],
                 "day_times": {},
             },
             "planning": {"enabled": True, "weekday": "mon", "time": "10:00", "focus": ""},
@@ -76,36 +76,7 @@ DEFAULT_CONFIG = {
                 "mcp": {"command": "", "args": [], "tool": "", "timeout_s": 600},
                 "captions": True,
             },
-            "categories": {
-                "short-tip": {
-                    "label": "Short: one quick tip", "media": "video", "research": "off", "fact_check": False,
-                    "format": "short", "target_seconds": 40, "kicker": "QUICK TIP",
-                    "brief": "A vertical Short with ONE practical tip. Hook in the first 3 seconds (the problem or a "
-                             "surprising result, never 'hi guys'), the tip in 2-4 steps, what the viewer will see when it "
-                             "works, then one line asking them to try it. Short sentences, spoken words, no filler.",
-                },
-                "explainer": {
-                    "label": "Long: explain one idea", "media": "video", "research": "optional", "fact_check": False,
-                    "format": "long", "target_seconds": 480, "kicker": "EXPLAINED",
-                    "brief": "A 16:9 explainer a mid-level professional can follow in one watch. Cold open with the problem "
-                             "(15 s), why it matters, the idea built up in 3-5 scenes with one concrete example, the common "
-                             "mistake, what to do next. One idea per scene; narration as you would say it aloud.",
-                },
-                "tutorial": {
-                    "label": "Long: step-by-step tutorial", "media": "video", "research": "optional", "fact_check": False,
-                    "format": "long", "target_seconds": 600, "kicker": "TUTORIAL",
-                    "brief": "A complete tutorial the viewer can finish with free tools. What we build and what you need, "
-                             "numbered steps each with the exact command or code on screen (correct and runnable, short), "
-                             "what you should see when it works, where to take it next.",
-                },
-                "news-brief": {
-                    "label": "Short: this week's news, sourced", "media": "video", "research": "required", "fact_check": True,
-                    "format": "short", "target_seconds": 55, "kicker": "NEWS", "max_source_age_days": 10,
-                    "brief": "A vertical Short on the most useful development of the last 7 days: the sourced fact first, what "
-                             "happened in the sources' own tense and qualifiers, what it means (labelled as opinion), one "
-                             "thing to try. Every number must come from a verified source.",
-                },
-            },
+            "categories": {},   # the topics you create in Settings > Topics (YOUTUBE_EXAMPLE_TOPICS has four to copy from)
         },
     },
     "llm": {
@@ -256,3 +227,37 @@ SECRET_KEYS = ["linkedin_client_id", "linkedin_client_secret", "linkedin_access_
                "telegram_bot_token", "telegram_chat_id", "anthropic_api_key", "openai_api_key", "llm_api_key",
                "youtube_client_id", "youtube_client_secret", "youtube_refresh_token", "youtube_channel_title",
                "elevenlabs_api_key"]
+
+
+# Four YouTube topics to copy from. They are NOT part of the default settings: YouTube starts with no topics, and only the
+# topics you create in Settings > Topics appear in the weekly schedule. The tests use them as a ready-made set.
+YOUTUBE_EXAMPLE_TOPICS = {
+                "short-tip": {
+                    "label": "Short: one quick tip", "media": "video", "research": "off", "fact_check": False,
+                    "format": "short", "target_seconds": 40, "kicker": "QUICK TIP",
+                    "brief": "A vertical Short with ONE practical tip. Hook in the first 3 seconds (the problem or a "
+                             "surprising result, never 'hi guys'), the tip in 2-4 steps, what the viewer will see when it "
+                             "works, then one line asking them to try it. Short sentences, spoken words, no filler.",
+                },
+                "explainer": {
+                    "label": "Long: explain one idea", "media": "video", "research": "optional", "fact_check": False,
+                    "format": "long", "target_seconds": 480, "kicker": "EXPLAINED",
+                    "brief": "A 16:9 explainer a mid-level professional can follow in one watch. Cold open with the problem "
+                             "(15 s), why it matters, the idea built up in 3-5 scenes with one concrete example, the common "
+                             "mistake, what to do next. One idea per scene; narration as you would say it aloud.",
+                },
+                "tutorial": {
+                    "label": "Long: step-by-step tutorial", "media": "video", "research": "optional", "fact_check": False,
+                    "format": "long", "target_seconds": 600, "kicker": "TUTORIAL",
+                    "brief": "A complete tutorial the viewer can finish with free tools. What we build and what you need, "
+                             "numbered steps each with the exact command or code on screen (correct and runnable, short), "
+                             "what you should see when it works, where to take it next.",
+                },
+                "news-brief": {
+                    "label": "Short: this week's news, sourced", "media": "video", "research": "required", "fact_check": True,
+                    "format": "short", "target_seconds": 55, "kicker": "NEWS", "max_source_age_days": 10,
+                    "brief": "A vertical Short on the most useful development of the last 7 days: the sourced fact first, what "
+                             "happened in the sources' own tense and qualifiers, what it means (labelled as opinion), one "
+                             "thing to try. Every number must come from a verified source.",
+                },
+}

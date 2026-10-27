@@ -1,8 +1,10 @@
 """Test doubles: a scripted LLM, a fake web, and a fake LinkedIn. No network, no tokens spent."""
+import copy
 import shutil
 import tempfile
 from datetime import date
 
+from postcrew.defaults import YOUTUBE_EXAMPLE_TOPICS
 from postcrew.llm import LLMError, LLMResult
 from postcrew.workspace import Workspace
 
@@ -158,6 +160,9 @@ class TempWorkspace:
         cfg["profile"]["handle"] = "example.com/test"
         cfg["team"].update(research=1, writer=1, pre_review=False)  # the crew tests use one of each
         cfg["llm"]["claude_path"] = "/nonexistent/claude"  # a test that forgets to fake the LLM fails, never calls Claude
+        yt = cfg["platforms"]["youtube"]   # YouTube starts with no topics; the tests use the four example topics
+        yt["categories"] = copy.deepcopy(YOUTUBE_EXAMPLE_TOPICS)
+        yt["schedule"]["days"] = {"tue": "explainer", "fri": "short-tip"}
         ws.save_config(cfg)
         self.ws = ws
         return ws

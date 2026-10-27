@@ -34,6 +34,8 @@ def ui_files(args):
 
 def css_has(css, cls):
     esc = re.sub(r"([^a-zA-Z0-9_-])", r"\\\1", cls)
+    if esc[:1].isdigit():   # CSS writes a leading digit as a hex escape: 2xl:grid-cols-7 -> .\32xl\:grid-cols-7
+        esc = "\\3" + esc[0] + " " + esc[1:] if esc[1:2] in " ,{" else "\\3" + esc
     return "." + esc in css
 
 

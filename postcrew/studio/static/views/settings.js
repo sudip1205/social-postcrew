@@ -153,7 +153,7 @@ const settingsView = (() => {
 
       <div class="${CARD} space-y-5">${head("view_week", "sky", "Weekly cadence schedule", "Toggle active days, assign a topic and optionally a different time for each day.",
         `<span data-daycount="${id}" class="text-xs font-semibold px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200"></span>`)}
-        <div class="grid grid-cols-1 md:grid-cols-7 gap-3" data-days="${id}"></div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-7 gap-3" data-days="${id}"></div>
         <div class="flex flex-wrap items-center justify-between gap-3 pt-2 text-xs border-t border-slate-100"><div class="flex flex-wrap items-center gap-4" data-legend="${id}"></div>
           <span class="text-[11px] text-slate-500">Each day slot gets its own topic, planned and written by the ${tip("Writing team", "The crew agents that research and write the post for that day's topic.")}.</span></div></div>
 
@@ -465,7 +465,8 @@ const settingsView = (() => {
         ${ta("plan_context", "How to plan it", k.plan_context || "", 3, "How the week planner should choose topics of this type.", "Guidance for the Week Planner.")}
         ${ta("brief", yt ? "What this kind of video must contain" : "What this kind of post must contain", k.brief, 3, "", yt ? "The script, scenes and thumbnail come from each day's plan and brief." : "Research always runs. The picture and its label come from each day's plan and brief.")}
         ${yt ? `<div class="grid grid-cols-2 gap-3"><label class="block"><span class="text-xs font-semibold text-slate-700">Format (optional)</span><select data-c="format" class="${FIELD} mt-1 appearance-none">${opts([["", "Inherit"], ["short", "Short"], ["long", "Long"]], k.format || "")}</select></label>
-          <label class="block"><span class="text-xs font-semibold text-slate-700">Length (seconds)</span><input data-c="target_seconds" type="number" min="15" max="1800" value="${esc(k.target_seconds ?? "")}" placeholder="Inherit" class="${FIELD} mt-1"></label></div>` : ""}</div>`; }).join("");
+          <label class="block"><span class="text-xs font-semibold text-slate-700">Length (seconds)</span><input data-c="target_seconds" type="number" min="15" max="1800" value="${esc(k.target_seconds ?? "")}" placeholder="Inherit" class="${FIELD} mt-1"></label>
+          <label class="block col-span-2"><span class="text-xs font-semibold text-slate-700">Video style (optional)</span><select data-c="renderer" class="${FIELD} mt-1 appearance-none">${opts([["", "Same as the app's video setting"], ["ffmpeg", "Slides with captions"], ["blackboard", "Blackboard: drawn by hand to the voice"]], k.renderer || "")}</select></label></div>` : ""}</div>`; }).join("");
     document.querySelectorAll(`#topics-${app} [data-delcat]`).forEach(b => b.onclick = () => {
       const id = b.dataset.delcat;
       if (!confirm(`Remove the topic "${cats[id].label}"? Days that use it will have no post.`)) return;
@@ -500,7 +501,7 @@ const settingsView = (() => {
         if (f === "layouts") v = v.split(",").map(s => s.trim()).filter(Boolean);
         if (f === "ideas") v = v.split("\n").map(s => s.trim()).filter(Boolean);
         if (["min_chars", "max_chars"].includes(f)) v = parseInt(v, 10);
-        if (f === "format") { if (!v) delete k[f]; else k[f] = v; return; }
+        if (f === "format" || f === "renderer") { if (!v) delete k[f]; else k[f] = v; return; }
         if (f === "target_seconds") { v = parseInt(v, 10); if (!v) delete k[f]; else k[f] = v; return; }
         if (f === "max_source_age_days") { if (v === "") { delete k[f]; return; } v = parseInt(v, 10); }
         k[f] = v;
