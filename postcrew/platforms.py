@@ -127,6 +127,8 @@ def parse_day(value):
 
 # ---------- video ----------
 WORDS_PER_SECOND = 2.5   # how fast a voice-over is read: the script's word budget and every scene's timing
+PACE_WPS = {"normal": 2.5, "slow": 2.0}   # a teacher's pace leaves room for pauses and for the picture to build up
+SHORT_MAX_S = 180        # YouTube allows Shorts of up to three minutes
 
 
 def renderer_for(cfg, category=None):
@@ -147,8 +149,11 @@ def video_spec(cfg, category=None, entry=None, options=None):
         if src.get("target_seconds"):
             spec["target_seconds"] = int(src["target_seconds"])
     if spec["format"] == "short":
-        spec["target_seconds"] = max(15, min(60, spec["target_seconds"]))
+        spec["target_seconds"] = max(15, min(SHORT_MAX_S, spec["target_seconds"]))
     else:
         spec["target_seconds"] = max(60, min(1800, spec["target_seconds"]))
-    spec["max_words"] = int(spec["target_seconds"] * WORDS_PER_SECOND)
+    spec["pace"] = base.get("pace") if base.get("pace") in PACE_WPS else "normal"
+    spec["wps"] = PACE_WPS[spec["pace"]]
+    spec["max_words"] = int(spec["target_seconds"] * spec["wps"])
+    spec["renderer"] = renderer_for(cfg, None) if not category else (category.get("renderer") or renderer_for(cfg, None))
     return spec

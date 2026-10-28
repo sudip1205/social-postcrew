@@ -177,8 +177,8 @@ def check_video(path, fmt):
     out.append({"label": "Aspect ratio", "ok": ok,
                 "detail": f"{w}x{h}" + ("" if ok else f"; a {fmt} video should be {'vertical 9:16' if th > tw else '16:9'}")})
     if fmt == "short":
-        ok = 0 < secs <= 60
-        det = f"{secs:.1f} s" + ("" if ok else "; Shorts must be 60 s or less")
+        ok = 0 < secs <= 180
+        det = f"{secs:.1f} s" + ("" if ok else "; Shorts must be 3 minutes or less")
     else:
         ok = 0 < secs <= 12 * 3600
         det = f"{secs:.1f} s" + ("; under a minute, fine but not a long video" if ok and secs < 60 else "")

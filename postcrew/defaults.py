@@ -4,7 +4,7 @@ Everything here can be changed in the Studio (Settings tab) or by editing config
 Secrets (LinkedIn app, tokens, Telegram) never live here; they go to workspace/secrets.json.
 """
 
-AGENT_IDS = ["planner", "topic", "research", "writer", "reviewer", "media", "editor", "formatter", "publisher", "supervisor", "credentials"]
+AGENT_IDS = ["planner", "topic", "research", "writer", "reviewer", "media", "editor", "formatter", "publisher", "supervisor", "credentials", "video_review", "explainroo"]
 
 DEFAULT_CONFIG = {
     "version": 1,
@@ -66,14 +66,17 @@ DEFAULT_CONFIG = {
                 "category_id": "28",             # YouTube's own category number (28 = Science & Technology)
                 "made_for_kids": False,
             },
-            # The default kind of video: "short" (vertical, up to 60 s) or "long" (16:9). A topic, a plan day or a single
+            # The default kind of video: "short" (vertical, up to 3 minutes) or "long" (16:9). A topic, a plan day or a single
             # run may override format and target_seconds.
             "video": {
-                "format": "short", "target_seconds": 45,
+                "format": "short", "target_seconds": 90,
+                "pace": "slow",                  # slow: a teacher's pace, longer pauses. normal: brisk
                 "voice": {"provider": "elevenlabs", "voice_id": "", "voice_name": "", "model": "eleven_multilingual_v2",
                           "speed": 1.0},
-                "renderer": "ffmpeg",            # ffmpeg: built-in slides. blackboard: drawn by hand to the voice. mcp: an animation MCP server
+                "renderer": "explainer",         # explainer: slow animated explanation to the voice. ffmpeg: plain slides. blackboard: chalk. mcp: an animation MCP server
                 "mcp": {"command": "", "args": [], "tool": "", "timeout_s": 600},
+                # renderer "explainroo": https://www.explainroo.com, installed in `path` (see docs/video-and-voice.md)
+                "explainroo": {"path": "", "theme": "midnight", "music": "calm", "watermark": False, "review": True},
                 "captions": True,
             },
             "categories": {},   # the topics you create in Settings > Topics (YOUTUBE_EXAMPLE_TOPICS has four to copy from)
@@ -116,6 +119,8 @@ DEFAULT_CONFIG = {
             "reviewer": {"model": "sonnet", "timeout_s": 300, "max_budget_usd": 0.4},
             "media": {"model": "haiku", "timeout_s": 300, "max_budget_usd": 0.3},
             "editor": {"model": "sonnet", "timeout_s": 300, "max_budget_usd": 0.4},
+            "video_review": {"model": "sonnet", "timeout_s": 300, "max_budget_usd": 0.4},   # the Video Editor, after the video is drawn
+            "explainroo": {"model": "sonnet", "timeout_s": 900, "max_budget_usd": 2.0},   # writes the pictures of an explainroo video
             "supervisor": {"model": "haiku", "timeout_s": 180, "max_budget_usd": 0.2},
         },
     },

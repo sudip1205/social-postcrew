@@ -56,6 +56,23 @@ class PlannerTests(unittest.TestCase):
             self.assertIn("something about Docker", llm.calls[0]["prompt"])
             self.assertIn("rejected", llm.calls[1]["prompt"])
 
+    def test_a_youtube_day_is_planned_for_the_length_of_its_video(self):
+        with TempWorkspace() as ws:
+            cfg = ws.config()
+            cfg["platforms"]["youtube"]["enabled"] = True
+            cfg["platforms"]["youtube"]["categories"]["short-tip"].update(target_seconds=80)
+            ws.save_config(cfg)
+            llm = ScriptedLLM({"planner": [{"days": [day_answer("2026-10-16", "Why caches go stale")]}]})
+            planner.PlannerAgent().plan(ws, [date(2026, 10, 16)], llm=llm, platform="youtube", force=True)
+            prompt = llm.calls[0]["prompt"]
+            self.assertIn("Length: a short video of about 80 seconds", prompt)
+            self.assertIn("Plan ONE main idea", prompt)                      # one idea per 25 s, not four subtopics
+            self.assertIn("FIT THE LENGTH", llm.calls[0]["system"])
+        with TempWorkspace() as ws:                                          # LinkedIn has no video length
+            llm = ScriptedLLM({"planner": [{"days": [day_answer("2026-10-16", "Git worktrees")]}]})
+            planner.PlannerAgent().plan(ws, [date(2026, 10, 16)], llm=llm, force=True)
+            self.assertNotIn("Length:", llm.calls[0]["prompt"])
+
     def test_used_up_usage_limit_stops_at_once_with_the_reason(self):
         from postcrew.llm import LLMError
         with TempWorkspace() as ws:

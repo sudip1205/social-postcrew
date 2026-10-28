@@ -150,7 +150,7 @@ async function renderOverview() {
             <label class="flex items-center gap-1.5 text-xs font-semibold text-slate-700 mb-1.5" for="run-date">${icon("event", "text-slate-400 text-sm")}<span>Target publication slot</span></label>
             <div class="relative">
               <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">${icon("calendar_today", "text-base")}</div>
-              <input id="run-date" type="date" value="${esc(o.next.generate_for)}" class="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-slate-200 bg-slate-50/50 text-slate-800 font-medium focus:ring-2 focus:ring-violet-500 focus:border-violet-500 cursor-pointer"/>
+              <input id="run-date" type="date" value="${esc(o.next.run_for || o.next.generate_for)}" class="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-slate-200 bg-slate-50/50 text-slate-800 font-medium focus:ring-2 focus:ring-violet-500 focus:border-violet-500 cursor-pointer"/>
             </div>
             <p class="text-[11px] text-slate-400 mt-1">Select the calendar cadence slot where drafts will be queued.</p>
           </div>

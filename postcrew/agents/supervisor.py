@@ -24,8 +24,10 @@ from .publisher import PublisherAgent
 from .research import ResearchAgent
 from .script import ScriptWriter
 from .topic import TopicAgent
-from .blackboard import BlackboardAgent
+from .blackboard import BlackboardAgent, ExplainerAgent
+from .explainroo import ExplainrooAgent
 from .video import VideoAgent
+from .video_review import VideoReviewAgent
 from .voice import VoiceAgent
 from .writer import WriterAgent
 
@@ -34,7 +36,7 @@ CREW = [CredentialsAgent(), TopicAgent(), ResearchAgent(), WriterAgent(), MediaA
 # The YouTube crew: the same supervisor, topic scout, researchers, writer team (as the Script Writer) and Editor. The Editor
 # reviews the SCRIPT, so the voice and the video are only made after it passes: nothing is spent on a script sent back.
 YOUTUBE_CREW = [CredentialsAgent(), TopicAgent(), ResearchAgent(), ScriptWriter(), EditorAgent(), VoiceAgent(), VideoAgent(),
-                PublisherAgent()]
+                VideoReviewAgent(), PublisherAgent()]
 CREWS = {"linkedin": CREW, "youtube": YOUTUBE_CREW}
 ORDER = [a.id for a in CREW]
 FIXABLE = ["topic", "research", "writer", "voice", "media"]   # steps the supervisor may send work back to
@@ -44,8 +46,9 @@ def crew_for(platform, cfg=None, category=None):
     """The agents of one run. cfg: that app's view of the config (platforms.view); with the blackboard renderer the
     Blackboard Producer replaces the Video Producer."""
     crew = CREWS.get(platform) or CREW
-    if cfg and platforms.renderer_for(cfg, category) == "blackboard":
-        crew = [BlackboardAgent() if a.id == "media" else a for a in crew]
+    drawn = {"blackboard": BlackboardAgent, "explainer": ExplainerAgent, "explainroo": ExplainrooAgent}.get(platforms.renderer_for(cfg, category)) if cfg else None
+    if drawn:
+        crew = [drawn() if a.id == "media" else a for a in crew]
     return crew
 
 SCHEMA = {

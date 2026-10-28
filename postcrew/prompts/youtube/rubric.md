@@ -14,19 +14,30 @@ value
   <70   nothing to do but "keep this in mind".
 
 clarity - pacing and structure for ears, not eyes
-  90+   one idea per scene; short spoken sentences; a term the audience may not know is explained in a few common
-        words; the on-screen words are the KEY words, not the narration repeated; every scene earns its seconds.
-  70-89 one confusing scene, a long sentence a voice would trip on, or on-screen text that duplicates the narration.
-  <70   a list of terms, out of order, or needs re-watching.
+  90+   one idea per scene; simple English in short spoken sentences (20 words or fewer); EVERY uncommon technical term
+        is explained in one plain sentence the first time it is said, and then used consistently; the order is what it
+        is, why, how step by step, an example, the common mistake; "..." marks a few deliberate beats; the on-screen
+        words are the KEY words, not the narration repeated; every scene earns its seconds.
+  70-89 one unexplained term, one confusing scene, a long sentence a voice would trip on, on-screen text that
+        duplicates the narration, or a scene that redraws everything or adds more than 3 new things at once.
+        The picture is built for the voice: scenes of 12-25 seconds that each add at most 3 boxes or arrows, which the
+        narration names as they appear; consecutive diagram scenes reuse the same box labels so one picture grows; each
+        scene has its own 2-4 word title; real values and real tool names, not placeholders.
+        An algorithm is shown on a small real example whose data and pointers move step by step (trace scenes); a system is
+        shown by one concrete request travelling through its components with the real data on each arrow (flow scenes).
+        An algorithm or architecture video with only labels, bullet lists or static boxes loses points here (75 at best).
+  <70   a list of terms with no explanations, jargon piled on jargon, out of order, or needs re-watching.
 
 accuracy
-  90+   every factual or technical sentence is backed by the sources, code or reference facts with their qualifiers;
-        numbers match exactly; code is correct and runnable; opinions are labelled.
+  90+   specifics (numbers, versions, defaults, named-product behaviour) are backed by the sources or reference facts with
+        their qualifiers; standard concepts are explained correctly in carefully hedged words; numbers match exactly; code
+        is correct and runnable; examples are introduced as examples; opinions are labelled.
   70-89 one claim slightly stronger or vaguer than its source.
   <70   any claim the sources do not support (also a red flag: unsupported_claim / factual_error).
 
-tone    spoken, plain, professional; contractions are fine; no hype words, no sales pitch, no begging for likes.
-        90+ sounds like a practitioner explaining to a colleague.
+tone    an online teacher: calm, clear and encouraging, spoken, plain; contractions are fine; no hype words, no sales
+        pitch, no begging for likes.
+        90+ sounds like a good instructor walking a learner through it, using the real technical names.
 format  the right length for the video's target (the word count matches the seconds), the right number of scenes, a
         title of 40-70 characters that matches the content, a useful description, 5-12 tags, thumbnail text of 2-4
         words, no markdown or web addresses in the narration, and the last scene ends with one clear next step.

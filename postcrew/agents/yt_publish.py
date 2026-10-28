@@ -48,6 +48,9 @@ def enqueue_youtube(ws, cfg, run_id, day, category, outputs, review):
             "video_id": None, "url": None,
         },
     }
+    check = outputs.get("video_review")   # the Video Editor's verdict on the finished video (blackboard videos)
+    if check:
+        post["youtube"]["video_review"] = {k: check.get(k) for k in ("verdict", "score", "first_score", "redrawn", "summary", "measured")}
     ws.save_queue([p for p in ws.queue() if p["id"] != pid] + [post])
     return post
 

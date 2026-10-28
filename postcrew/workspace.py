@@ -68,14 +68,14 @@ def deep_merge(base, override):
 
 
 VIDEO_FORMATS = ["short", "long"]
-_SECONDS_HINT = "15-60 for a short, 60-1800 for a long video"
+_SECONDS_HINT = "15-180 for a short, 60-1800 for a long video"
 
 
 def _seconds_ok(fmt, v):
-    return isinstance(v, int) and not isinstance(v, bool) and ((15 <= v <= 60) if fmt == "short" else (60 <= v <= 1800))
+    return isinstance(v, int) and not isinstance(v, bool) and ((15 <= v <= 180) if fmt == "short" else (60 <= v <= 1800))
 
 
-RENDERERS = ("ffmpeg", "blackboard", "mcp")
+RENDERERS = ("ffmpeg", "explainer", "explainroo", "blackboard", "mcp")
 
 
 def _validate_video(v, pre):
@@ -84,6 +84,8 @@ def _validate_video(v, pre):
         errs.append(f"{pre}video.format must be one of {VIDEO_FORMATS}")
     elif not _seconds_ok(v.get("format"), v.get("target_seconds")):
         errs.append(f"{pre}video.target_seconds must be {_SECONDS_HINT}")
+    if v.get("pace", "normal") not in ("slow", "normal"):
+        errs.append(f"{pre}video.pace must be slow or normal")
     if v.get("renderer") not in RENDERERS:
         errs.append(f"{pre}video.renderer must be one of {RENDERERS}")
     voice = v.get("voice") or {}
@@ -175,8 +177,8 @@ def validate_platform(cfg, pre="", primary=True):
             errs.append(f"{where}.research must be one of {RESEARCH_MODES}")
         if not str(c.get("brief", "")).strip():
             errs.append(f"{where}.brief: describe what this kind of post should contain")
-        if c.get("renderer") not in (None, "ffmpeg", "blackboard"):
-            errs.append(f"{where}.renderer must be ffmpeg or blackboard")
+        if c.get("renderer") not in (None, "ffmpeg", "explainer", "blackboard"):
+            errs.append(f"{where}.renderer must be ffmpeg, explainer or blackboard")
         if "format" in c and c["format"] not in VIDEO_FORMATS:
             errs.append(f"{where}.format must be one of {VIDEO_FORMATS}")
         elif "target_seconds" in c and not _seconds_ok(c.get("format") or (cfg.get("video") or {}).get("format"), c["target_seconds"]):

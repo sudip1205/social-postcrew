@@ -14,7 +14,7 @@ import re
 import shutil
 from pathlib import Path
 
-from .platforms import WORDS_PER_SECOND
+from .platforms import SHORT_MAX_S, WORDS_PER_SECOND
 
 KINDS = {"script": ((".txt", ".md"), 200_000), "voice": ((".mp3", ".wav", ".m4a"), 100 * 2**20),
          "video": ((".mp4", ".mov"), 2**30)}
@@ -179,16 +179,16 @@ def describe(ws, platform, day, cfg):
                 info.update(scenes=[{"narration": sc["narration"], "seconds": sc["seconds"]} for sc in s["scenes"]],
                             words=words, seconds=secs)
                 info["checks"] = [{"label": "Scenes", "ok": len(s["scenes"]) >= 3, "detail": f"{len(s['scenes'])} scenes"},
-                                  {"label": "Length", "ok": spec["format"] == "long" or secs <= 63,
+                                  {"label": "Length", "ok": spec["format"] == "long" or secs <= SHORT_MAX_S + 3,
                                    "detail": f"about {secs} s ({words} words)"
-                                             + ("" if spec["format"] == "long" or secs <= 63 else ": too long for a Short")}]
+                                             + ("" if spec["format"] == "long" or secs <= SHORT_MAX_S + 3 else ": too long for a Short")}]
             elif kind == "voice":
                 from . import voice
                 secs = voice.audio_seconds(path)
                 info.update(seconds=round(secs, 1))
                 info["checks"] = [{"label": "Duration", "ok": secs >= 5, "detail": f"{secs:.0f} s"},
-                                  {"label": "Fits a Short", "ok": spec["format"] == "long" or secs <= 61,
-                                   "detail": "under 60 s" if secs <= 61 else "longer than 60 s: use a long video"}]
+                                  {"label": "Fits a Short", "ok": spec["format"] == "long" or secs <= SHORT_MAX_S + 1,
+                                   "detail": "under 3 minutes" if secs <= SHORT_MAX_S + 1 else "longer than 3 minutes: use a long video"}]
             else:
                 from .render import video as vid
                 p = vid.probe(path)

@@ -106,6 +106,20 @@ class ScriptCheckTests(unittest.TestCase):
         for frag in ("title", "tags", "thumbnail_text"):
             self.assertIn(frag, text)
 
+    def test_teaching_style_rules_long_sentences_and_pause_tags(self):
+        s = script()
+        long = " ".join(["word"] * 34) + "."
+        s["scenes"][1]["narration"] = long
+        s = finish(s)
+        self.assertTrue(any("sentence of 34 words" in p for p in script_problems(s, self.spec, self.cat, self.profile)), s)
+        s = script()
+        s["scenes"][2]["narration"] = "Here is the idea. [pause] Now the next part."
+        s = finish(s)
+        self.assertTrue(any("no [pause] or <break>" in p for p in script_problems(s, self.spec, self.cat, self.profile)))
+        s = script()
+        s["scenes"][2]["narration"] = "Here is the idea... Now the next part."
+        self.assertEqual([p for p in script_problems(finish(s), self.spec, self.cat, self.profile) if "pause" in p or "sentence" in p], [])
+
     def test_filler_urls_markdown_and_blocked_phrases_are_rejected(self):
         s = script()
         s["scenes"][0]["narration"] = "Hey guys, visit https://example.com and **smash** my employer " + narration(15)
@@ -125,7 +139,7 @@ class VideoSpecTests(unittest.TestCase):
         cfg = {"video": {"format": "short", "target_seconds": 45}}
         self.assertEqual(platforms.video_spec(cfg)["max_words"], 112)
         self.assertEqual(platforms.video_spec(cfg, {"format": "long", "target_seconds": 600})["target_seconds"], 600)
-        self.assertEqual(platforms.video_spec(cfg, {"target_seconds": 600})["target_seconds"], 60)   # a Short stays a Short
+        self.assertEqual(platforms.video_spec(cfg, {"target_seconds": 600})["target_seconds"], 180)   # a Short stays a Short (3 min)
         self.assertEqual(platforms.video_spec(cfg, {}, {"format": "long"}, {"target_seconds": 300})["target_seconds"], 300)
 
     def test_config_validation_covers_the_video_settings(self):
@@ -191,8 +205,8 @@ class YouTubeCrewTests(unittest.TestCase):
             self.assertTrue(res["ok"], res)
             steps = json.loads((ws.runs_dir / res["run_id"] / "status.json").read_text())["steps"]
             self.assertEqual({k: v["state"] for k, v in steps.items()},
-                             {s: "passed" for s in ("credentials", "topic", "research", "writer", "editor", "voice", "media",
-                                                    "publisher")})
+                             {**{s: "passed" for s in ("credentials", "topic", "research", "writer", "editor", "voice", "media",
+                                                      "publisher")}, "video_review": "skipped"})   # slides videos: no second review
             self.assertEqual(llm.agents_called().count("editor"), 3)      # reviewed like any post
             post = ws.queue()[0]
             self.assertEqual((post["platform"], post["status"], post["id"]), ("youtube", "awaiting_approval",

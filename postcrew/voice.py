@@ -4,6 +4,7 @@ Standard library only. ffmpeg/ffprobe are used (when present) to join long narra
 """
 import hashlib
 import json
+import re
 import shutil
 import subprocess
 import tempfile
@@ -94,13 +95,55 @@ def check_key(api_key, opener=None):
     return {"ok": True, "message": f"ElevenLabs key works, {left:,} characters left", "characters_left": left}
 
 
-def synthesize(text, voice_id, api_key, out_path, model=DEFAULT_MODEL, speed=1.0, opener=None):
+# Words an all-caps spelling makes the voice spell out ("UP" -> "U P"). Real acronyms stay capitals so they are read as letters.
+ACRONYMS = frozenset("""API APIS SQL NOSQL TCP UDP HTTP HTTPS DNS CDN JWT JWE JWS TLS SSL AES RSA ECC SHA MD URL URI CPU GPU TPU RAM ROM SSD HDD
+AWS GCP CI CD UI UX IO OS ID IDS JSON XML YAML TOML REST GRPC SDK CLI GUI VPN VPC LB HSM MFA OTP OIDC OAUTH SAML SSO RBAC ABAC IAM
+KMS ACID CAP NAT IP IPV4 IPV6 DB DBA AI ML LLM LLMS RAG MCP QPS RPS TTL LRU LFU FIFO LIFO OSI MAC LAN WAN SSH FTP SMTP IMAP CORS CSRF
+XSS SQLI DOS DDOS WAF IDE JVM JDK JRE JIT GC PR QA SLA SLO SLI MTTR CRUD ORM DTO DAO URN UUID GUID ASCII UTF CSV PDF PNG GIF
+HTML CSS DOM SPA SSR CSR SEO PWA IOT NFS S3 EC2 ECS EKS GKE SQS SNS AMQP MQTT RPC SOAP OLTP OLAP ETL BFS DFS DP""".split())
+CAPS_WORD = re.compile(r"\b[A-Z]{2,}\b")
+
+
+def humanize(text):
+    """What the voice should read: an all-caps ordinary word ("UP", "NOT", "LOAD") is lowercased so it is said as a word, not as
+    letters. Known acronyms (API, SQL, TCP ...) keep their capitals and are spelled out, which is how they are said."""
+    def fix(m):
+        w = m.group(0)
+        return w if w in ACRONYMS or (len(w) <= 3 and w.isupper() and w not in COMMON_CAPS) else w.lower()
+    return CAPS_WORD.sub(fix, str(text or ""))
+
+
+COMMON_CAPS = frozenset("UP IN ON OR IF IS IT NO SO DO GO OK AS AT BE BY HE ME MY OF TO US WE AN AM ALL AND ANY ARE BUT CAN DID FOR GET "
+                        "HAS HER HIM HIS HOW ITS LET MAY NEW NOT NOW OFF OLD ONE OUR OUT SEE THE TWO USE WAS WAY WHO WHY YES YET YOU "
+                        "RUN SET MAP KEY PUT TOP END MIN MAX SUM AVG".split())
+PAUSES = {"normal": (0.35, 0.8), "slow": (0.6, 1.2)}   # seconds after a sentence, and after a deliberate "..."
+
+
+def prepare(text, model=DEFAULT_MODEL, pace="normal"):
+    """The narration as ElevenLabs should read it: pauses made explicit. The script keeps clean text (captions, word counts
+    and timing use that); only what is sent to the voice has <break> tags. A sentence end gets a short pause, a "..." a longer
+    one. Models that do not understand break tags (eleven_v3) get the text unchanged: they pause at the punctuation."""
+    text = humanize(" ".join(str(text or "").split()))
+    if "<break" in text or str(model).startswith("eleven_v3"):
+        return text
+    sentence_s, beat_s = PAUSES.get(pace, PAUSES["normal"])
+    text = re.sub(r"\s*(?:\.\.\.|\u2026)\s*", f' <break time="{beat_s}s" /> ', text)
+    return re.sub(r"([.!?])\s+(?=[A-Z0-9\"'(])", rf'\1 <break time="{sentence_s}s" /> ', text).strip()
+
+
+# Natural but steady. Lower stability and any "style" make the voice drift and invent sounds on short words ("a", "the") or after a
+# pause (a stray "ooo"), so both stay conservative; raise them per voice with video.voice.stability / style if you like the result.
+HUMAN = {"stability": 0.5, "similarity_boost": 0.8, "style": 0.0, "use_speaker_boost": True}
+
+
+def synthesize(text, voice_id, api_key, out_path, model=DEFAULT_MODEL, speed=1.0, opener=None, settings=None):
     if not (text or "").strip():
         raise VoiceError("nothing to say: the narration is empty", "invalid")
     if not voice_id:
         raise VoiceError("no voice chosen: pick an ElevenLabs voice first", "invalid")
+    text = prepare(text, model)
     body = {"text": text, "model_id": model,
-            "voice_settings": {"stability": 0.5, "similarity_boost": 0.75, "speed": speed}}
+            "voice_settings": dict(HUMAN, **(settings or {}), speed=speed)}
     audio = _request("POST", f"/v1/text-to-speech/{urllib.parse.quote(voice_id, safe='')}?output_format=mp3_44100_128",
                      api_key, body, opener)
     if not audio:
@@ -159,19 +202,22 @@ def cached_synthesize(root, text, voice_cfg, api_key, opener=None):
     voice_id = voice_cfg.get("voice_id", "")
     model = voice_cfg.get("model") or DEFAULT_MODEL
     speed = float(voice_cfg.get("speed", 1.0) or 1.0)
-    key = hashlib.sha1(json.dumps([voice_id, model, speed, text], ensure_ascii=False).encode()).hexdigest()
+    pace = voice_cfg.get("pace") or "normal"
+    settings = {k: voice_cfg[k] for k in ("stability", "similarity_boost", "style") if isinstance(voice_cfg.get(k), (int, float))}
+    key = hashlib.sha1(json.dumps([voice_id, model, speed, text, "human-2", pace, settings], ensure_ascii=False).encode()).hexdigest()
     out = Path(root) / "cache" / "voice" / f"{key}.mp3"
     if not out.exists():
         out.parent.mkdir(parents=True, exist_ok=True)
-        pieces = split_text(text)
+        spoken = prepare(text, model, pace)   # pauses first: the request size limit counts the break tags
+        pieces = split_text(spoken)
         if len(pieces) <= 1:
-            synthesize(text, voice_id, api_key, out, model, speed, opener)
+            synthesize(spoken, voice_id, api_key, out, model, speed, opener, settings)
         else:
             parts = []
             try:
                 for n, piece in enumerate(pieces):
                     p = out.with_name(f"{key}.part{n}.mp3")
-                    synthesize(piece, voice_id, api_key, p, model, speed, opener)
+                    synthesize(piece, voice_id, api_key, p, model, speed, opener, settings)
                     parts.append(p)
                 tmp = out.with_name(f"{key}.joined.mp3")
                 _concat(parts, tmp)
@@ -179,4 +225,4 @@ def cached_synthesize(root, text, voice_cfg, api_key, opener=None):
             finally:
                 for p in parts:
                     p.unlink(missing_ok=True)
-    return {"path": str(out), "seconds": audio_seconds(out), "characters": len(text)}
+    return {"path": str(out), "seconds": audio_seconds(out), "characters": len(prepare(text, model, pace))}

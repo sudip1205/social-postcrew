@@ -64,7 +64,8 @@ const TEAMS = { command: ["Command", "#7c3aed", "#a855f7"], plan: ["Planning", "
 const AGENTS = { supervisor: ["Orion", "command", "hub"], planner: ["Vega", "plan", "calendar_month"], topic: ["Nova", "plan", "radar"],
   research: ["Research team", "research", "search"], writer: ["Writing team", "writing", "edit_note"], reviewer: ["Iris", "writing", "visibility"],
   media: ["Pixel", "design", "image"], editor: ["Quinn", "quality", "fact_check"], formatter: ["Kai", "quality", "format_align_left"],
-  credentials: ["Aegis", "ops", "shield"], publisher: ["Echo", "ops", "send"], voice: ["Echo Voice", "design", "mic"], video: ["Reel", "design", "movie"] };
+  credentials: ["Aegis", "ops", "shield"], publisher: ["Echo", "ops", "send"], voice: ["Echo Voice", "design", "mic"], video: ["Reel", "design", "movie"],
+  video_review: ["Cut", "quality", "movie"] };
 const teamOf = id => TEAMS[AGENTS[id]?.[1]] || TEAMS.ops;
 const avatar = (id, size = "w-9 h-9") => { const [team, h1, h2] = teamOf(id);
   return `<span class="${size} rounded-full flex items-center justify-center text-white shrink-0" style="background:linear-gradient(135deg,${h1},${h2})" title="${esc(team)}">${icon(AGENTS[id]?.[2] || "hub", "text-white")}</span>`; };

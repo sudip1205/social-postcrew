@@ -60,7 +60,7 @@ class VoiceTests(unittest.TestCase):
         h = {k.lower(): v for k, v in q["headers"].items()}
         self.assertEqual(h["xi-api-key"], "KEY")
         self.assertEqual(json.loads(q["data"]), {"text": "Hello there.", "model_id": "m1", "voice_settings": {
-            "stability": 0.5, "similarity_boost": 0.75, "speed": 1.1}})
+            "stability": 0.5, "similarity_boost": 0.8, "style": 0.0, "use_speaker_boost": True, "speed": 1.1}})
         self.assertTrue(Path(r["path"]).exists())
         self.assertEqual(r["characters"], 12)
         self.assertGreater(r["seconds"], 0)
@@ -131,6 +131,15 @@ class VoiceTests(unittest.TestCase):
         finally:
             voice.shutil.which = orig
 
+    def test_pauses_are_added_for_the_voice_only(self):
+        said = "A hash is a fingerprint. It never changes... Why does that matter? It lets you compare files."
+        out = voice.prepare(said)
+        self.assertEqual(out.count('<break time="0.35s" />'), 2)       # after a sentence that is followed by another
+        self.assertEqual(out.count('<break time="0.8s" />'), 1)        # the deliberate beat
+        self.assertEqual(voice.prepare(out), out)                       # never twice
+        self.assertEqual(voice.prepare(said, "eleven_v3"), said)        # v3 has no break tags: it follows the punctuation
+        self.assertNotIn("<break", said)
+
     @unittest.skipUnless(FFMPEG, "ffmpeg/ffprobe not installed")
     def test_long_text_is_synthesized_in_parts_and_joined(self):
         tone = self.root / "tone.mp3"
@@ -138,13 +147,13 @@ class VoiceTests(unittest.TestCase):
                         "-b:a", "128k", str(tone)], check=True)
         http = FakeHTTP(tone.read_bytes())
         text = " ".join(f"Sentence number {i} is here." for i in range(400))
-        n = len(voice.split_text(text))
+        n = len(voice.split_text(voice.prepare(text)))   # the pauses count towards ElevenLabs' size limit
         r = voice.cached_synthesize(self.root, text, {"voice_id": "v"}, "K", http)
         self.assertEqual(len(http.requests), n)
         for q in http.requests:
             self.assertLessEqual(len(json.loads(q["data"])["text"]), 4500)
         self.assertAlmostEqual(r["seconds"], float(n), delta=0.5 * n)
-        self.assertEqual(r["characters"], len(text))
+        self.assertEqual(r["characters"], len(voice.prepare(text)))
         self.assertEqual(list((self.root / "cache" / "voice").glob("*.part*")), [])
         voice.cached_synthesize(self.root, text, {"voice_id": "v"}, "K", http)
         self.assertEqual(len(http.requests), n)
@@ -158,3 +167,17 @@ class VoiceTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class HumanVoiceTests(unittest.TestCase):
+    def test_capitalised_words_are_read_as_words_and_acronyms_as_letters(self):
+        out = voice.prepare("Move UP the list. The API is NOT slow, and TCP uses LOAD balancing.")
+        self.assertIn("Move up the list", out)
+        self.assertIn("is not slow", out)
+        self.assertIn("API", out)
+        self.assertIn("TCP", out)
+        self.assertIn("load balancing", out)
+
+    def test_the_voice_settings_stay_steady_so_it_does_not_invent_sounds(self):
+        self.assertGreaterEqual(voice.HUMAN["stability"], 0.5)
+        self.assertEqual(voice.HUMAN["style"], 0)

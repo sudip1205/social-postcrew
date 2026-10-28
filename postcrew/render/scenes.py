@@ -156,16 +156,55 @@ def _code(p, g, scene):
         cy += lh
 
 
+ICONS = ("client", "phone", "server", "database", "cache", "queue", "gateway", "user", "cloud", "lock", "key", "file",
+         "terminal", "globe", "service", "generic")
+
+
+def split_node(n):
+    """A diagram box as written: 'API Gateway' or 'API Gateway|gateway' -> (label, icon hint or '')."""
+    label, _, icon = str(n or "").partition("|")
+    return label.strip(), icon.strip().lower()
+
+
 def parse_edge(edge, nodes):
     """'Client > Load Balancer: request' -> (from index, to index, label), or None when it names a box that is not there."""
     m = re.match(r"^\s*(.+?)\s*(?:>|->|→)\s*(.+?)\s*(?::\s*(.*))?$", str(edge or ""))
     if not m:
         return None
-    low = [n.lower() for n in nodes]
+    low = [split_node(n)[0].lower() for n in nodes]
     a, b = m.group(1).lower(), m.group(2).lower()
     if a not in low or b not in low or a == b:
         return None
     return low.index(a), low.index(b), (m.group(3) or "").strip()[:24]
+
+
+def parse_pointer(text):
+    """'left=0' -> ('left', 0); None when it is not a name and a position."""
+    m = re.match(r"^\s*([A-Za-z][\w ]{0,9}?)\s*[=:@]\s*(\d{1,2})\s*$", str(text or ""))
+    return (m.group(1).strip(), int(m.group(2))) if m else None
+
+
+def trace_problem(sc):
+    """What is wrong with a data-walkthrough scene (cells + steps), or '' when it can be drawn."""
+    cells, steps = [str(c).strip() for c in sc.get("cells") or []], sc.get("steps") or []
+    if not 2 <= len(cells) <= 10 or any(not c or len(c) > 6 for c in cells):
+        return "a trace needs 2-10 cells of at most 6 characters each"
+    if not 2 <= len(steps) <= 12:
+        return "a trace needs 2-12 steps"
+    for k, st in enumerate(steps, 1):
+        if not str(st.get("say") or "").strip():
+            return f"step {k}: 'say' (the words the voice says at this step) is empty"
+        if len(str(st.get("note") or "")) > 60:
+            return f"step {k}: the note is over 60 characters"
+        for ptr in st.get("pointers") or []:
+            q = parse_pointer(ptr)
+            if not q or q[1] >= len(cells):
+                return f"step {k}: pointer {ptr!r} must be 'name=position' with a position inside the cells"
+        if any(not isinstance(i, int) or not 0 <= i < len(cells) for key in ("active", "found", "out") for i in st.get(key) or []):
+            return f"step {k}: active, found and out must be positions inside the cells"
+        if len(st.get("memo") or []) > 6:
+            return f"step {k}: at most 6 memo entries"
+    return ""
 
 
 def _levels(n, edges):
@@ -200,24 +239,24 @@ def place_diagram(g, edges, count, y):
     boxes = {}
     n_lv = len(rows)
     if vertical:   # depth runs down the screen; boxes of one depth sit side by side
-        bh = max(54, min(120, (bot - y) / (n_lv * 2.0)))
+        bh = max(54, min(g.get("max_bh", 120), (bot - y) / (n_lv * 2.0)))
         gap_y = (bot - y - n_lv * bh) / max(1, n_lv - 1) if n_lv > 1 else 0
         for lv, row in enumerate(rows):
             k = len(row)
             gap = 36
-            bw = min(480, (x1 - x0 - gap * (k - 1)) / k)
+            bw = min(g.get("max_bw", 480), (x1 - x0 - gap * (k - 1)) / k)
             left = x0 + (x1 - x0 - (bw * k + gap * (k - 1))) / 2
             t = y + lv * (bh + gap_y) if n_lv > 1 else y + (bot - y - bh) / 2
             for c, i in enumerate(row):
                 boxes[i] = (left + c * (bw + gap), t, left + c * (bw + gap) + bw, t + bh)
     else:          # depth runs left to right; boxes of one depth are stacked
-        bw = min(300, (x1 - x0) / (n_lv + 0.8 * max(1, n_lv - 1)))
+        bw = min(g.get("max_bw", 300), (x1 - x0) / (n_lv + 0.8 * max(1, n_lv - 1)))
         gap_x = min(460, (x1 - x0 - bw * n_lv) / max(1, n_lv - 1)) if n_lv > 1 else 0
         left = x0 + (x1 - x0 - (bw * n_lv + gap_x * (n_lv - 1))) / 2
         for lv, row in enumerate(rows):
             k = len(row)
             gap = 26
-            bh = min(130, (bot - y - gap * (k - 1)) / k)
+            bh = min(g.get("max_bh", 130), (bot - y - gap * (k - 1)) / k)
             t0 = y + (bot - y - (bh * k + gap * (k - 1))) / 2
             for c, i in enumerate(row):
                 boxes[i] = (left + lv * (bw + gap_x), t0 + c * (bh + gap), left + lv * (bw + gap_x) + bw, t0 + c * (bh + gap) + bh)
@@ -227,7 +266,7 @@ def place_diagram(g, edges, count, y):
 def _diagram(p, g, scene):
     """Up to 6 boxes placed by depth (the first box at the top / left, what it talks to below / to the right) and arrows between
     them. The arrows appear one by one as scene["_reveal"] goes from 0 to 1, so the picture builds up while the voice explains."""
-    nodes = [str(n).strip()[:18] for n in (scene.get("nodes") or []) if str(n).strip()][:6]
+    nodes = [split_node(n)[0][:18] for n in (scene.get("nodes") or []) if split_node(n)[0]][:6]
     if len(nodes) < 2:
         return _statement(p, g, scene)
     edges = [e for e in (parse_edge(x, nodes) for x in (scene.get("edges") or [])) if e][:8]

@@ -128,3 +128,126 @@ Write narration that names things in the order they are drawn ("A client sends a
 `diagram` scenes; the writer is told this automatically for blackboard videos. Without a voice (rehearsal) the pace is the
 word count. The hand-written look uses Chalkboard / Marker Felt when the machine has them (any machine: Inter Bold instead).
 Word times are estimates, so a stroke can be a fraction of a second early or late; they are not read from ElevenLabs.
+
+## Teaching tone and pauses
+
+Scripts are written like an online lesson: simple English, one idea per sentence (20 words or fewer, 25 at the very most), the
+real technical names used consistently, and **every uncommon term explained in one plain sentence the first time it is said**.
+The order is what it is, why it exists, how it works step by step, an example, the common mistake. The Editor scores this under
+"clarity" and "tone", and an automatic check sends a script back if any sentence is longer than 30 words.
+
+Pauses are made from punctuation, so the script itself stays clean text (captions, word counts and timing are unaffected):
+
+| In the script | What ElevenLabs gets |
+|---|---|
+| a full stop, question mark or exclamation mark | a 0.35 s pause after the sentence |
+| a comma | a short breath (the voice's own) |
+| `...` (the writer uses at most one per scene, after a question, a new term or before the key point) | a 0.8 s pause |
+
+The pause tags (`<break time="0.35s" />`) are added only when the voice is requested, and the same text is never sent twice
+(cached audio is reused). Models that do not understand break tags (`eleven_v3`) follow the punctuation instead. Pauses add a few
+seconds to a Short, so the Voice step still stops a Short that would run past 60 seconds and sends the script back to be shortened.
+Writers are told not to write `[pause]` or `<break>` themselves; a script that does is sent back.
+
+## The second Editor: does the picture go with the voice?
+
+The first Editor reviews the **script**. Nothing used to look at the finished **video**. For blackboard videos the **Video Editor**
+(agent "Cut", step *video_review*) now does, right after the video is drawn:
+
+1. **Measures the sync.** It listens to each scene's recorded voice for the real pauses after sentences and lines the narration up
+   with them, then compares when every box, arrow, bullet and line of code was drawn with when the narrator says its name. It
+   reports things drawn more than a second late or 1.5 seconds early, things drawn that the voice never says, an explanation that
+   jumps back to something already drawn, and stretches of seven seconds or more where the voice talks over an unchanging board.
+   The result is a sync score out of 100.
+2. **Fixes the order for free.** If the arrows or bullets are listed in a different order than the narrator explains them, they are
+   put in the spoken order, with no AI call.
+3. **Asks an AI reviewer.** It reads each scene's narration, what is drawn and the timeline, and may replace the graphics of the
+   scenes that do not follow the voice (labels in the narrator's own words, arrows in spoken order, a busier or simpler board).
+   A replacement that breaks a rule (for example a diagram with one box) is ignored.
+4. **Draws only the changed scenes again.** The unchanged scenes keep their pictures, and the video is joined again.
+
+**The voice is never made again.** The reviewer never sees the narration as something it can edit, and the redraw uses the audio
+files the Voice step already recorded, so no ElevenLabs characters are spent. It runs at most two review rounds. If a mismatch is
+still left, the video is queued anyway and the Workflow and the Queue show the score and what is left for you to judge.
+
+Notes: it only runs for the blackboard renderer, and not when you supplied your own voice file (it cannot tell which scene is
+which in one file). In a rehearsal there is no voice, so the timing is estimated from the word count and the score says so. The
+check uses the pauses in the audio; it does not understand the words, so it trusts the narration text for what is said when.
+
+## Explainer videos (the default look)
+
+The default video style is the **Explainer**: a slow, clean animation on a dark screen, modelled on what the best system-design
+channels do (KodeKloud and TechPrep, studied for this). It is drawn locally with Pillow and joined with ffmpeg; nothing else
+to install. Pick the style in Settings > YouTube > Video renderer, or per topic with its **Video style** field.
+
+What the style does, and how the agents are trained for it:
+
+- **One picture that keeps growing.** Consecutive diagram scenes that share a box are drawn on the same canvas. The boxes of the
+  scene before are already on screen and only the new boxes and arrows animate in. The writer is told to reuse the same box
+  labels, add at most three new things per scene, and name each one in the narration at the moment it should appear.
+- **Attention.** Each box pops in as its name is spoken; each arrow draws itself and a dot travels along it; the thing being
+  explained glows (dashed outline) while the rest dims for a few seconds.
+- **Icons.** Boxes carry an icon (client, phone, user, server, service, database, cache, queue, gateway, cloud, globe, lock, key,
+  file, terminal). The writer picks one with `"Cache|cache"`; if it does not, one is guessed from the name.
+- **Handwritten chapter titles** (2-4 words per scene, changing with the idea), a title card for the opening, a numbered card list
+  for points, an animated editor for code with syntax colours.
+- **Captions:** two to four words at a time on a highlighted bar, timed to the real voice.
+- **Slow pace** (Settings > Pace, on by default): the script budget is about 2 words per second instead of 2.5, the voice
+  pauses 0.6 s after a sentence and 1.2 s at a "...", and nothing is added faster than it is explained.
+- **Shorts up to 3 minutes.** YouTube allows it, and these channels' Shorts run 1.5 to 3 minutes. A Short can be 15 to 180
+  seconds (a long video 1 to 30 minutes).
+
+The Video Editor (see above) checks explainer videos too: it measures every box and arrow against the voice and fixes the
+graphics without making the voice again.
+
+### Watch the example move: trace and flow scenes
+
+Labels on boxes do not teach an algorithm or a system; watching real data move does. The explainer renderer has two scenes for that,
+and the Script Writer is told to use them (and the Editor to ask for them when they are missing):
+
+- **trace** (algorithms, data structures): an example array (`cells`) and the moves (`steps`). Each step says when it happens
+  (`say`: two or three words of the narration), where each pointer is (`pointers: ["left=0", "right=3"]`, which slide smoothly to the
+  next cell), which cells are being compared (`active`), ruled out (`out`) or the answer (`found`), the arithmetic or decision
+  (`note`: "2 + 15 = 17, too big") and what is remembered (`memo`: a hash map or a target). Two Sum with two pointers is the model case.
+- **flow** (system design, architecture): the `nodes` and `edges` of a diagram, but the edges are one concrete request in the order it
+  travels, each with the real data on the wire ("Client > Load Balancer: GET /cart?user=42", "Database > Server 1: 3 items"). A dot
+  carries the data along each arrow, and finished hops stay numbered on screen.
+
+Steps are timed to the real voice like every other thing on the screen, so the Video Editor can check and fix them. Only the explainer
+renderer draws them; the slide and blackboard renderers show the heading only.
+
+### Explainroo: the video made by an open-source animation tool
+
+[explainroo](https://www.explainroo.com) (MIT licence, runs on your computer) turns a `script.md` (the words) and a `scenes.js` (what
+is drawn, each thing on a spoken word) into an MP4 with hand-drawn lines, 1,800 icons, charts, code that changes step by step, a camera
+that follows the narration, sound effects and quiet music. Choose **Settings > YouTube > Video renderer > Explainroo** (or per topic).
+
+Install it once, in its own folder, outside Postcrew:
+
+```bash
+git clone https://github.com/vincentsch/explainroo.git
+cd explainroo && npm install && node bin/explainroo.js doctor --fetch   # about 400 MB of voice and timing models, once
+```
+
+Needs Node.js 20.11+, ffmpeg and Chrome. Then put the folder in `platforms.youtube.video.explainroo.path`. How a run goes: the Voice
+step records the approved script with ElevenLabs, as usual; the **Explainroo Producer** gives each scene's recording to explainroo as the
+narration, an AI agent (the same Claude Code login) writes `scenes.js` from the script's picture plan (the example array and its
+pointers, the request and the data on each arrow) tied to the words that are spoken, Postcrew runs explainroo's own layout and timing
+checks and sends every problem back to the agent, the agent looks at the contact sheet once, then it renders and verifies the file. The
+words in `script.md` are checked against the approved script, so the picture agent can never change what the voice says. Settings:
+`theme` (paper, clean, chalk, blueprint, midnight, editorial), `music`, `watermark` (explainroo asks you to keep its small credit),
+`review`. The Video Editor step is skipped: explainroo does its own checks.
+
+### Going further: Remotion, Manim, After Effects
+
+I looked at what people use to make this kind of video. The built-in renderer is the practical, dependency-free choice. If you
+want richer motion graphics later:
+
+| Tool | Good for | Fit |
+|---|---|---|
+| **Remotion** (React, renders with Chromium) | Anything a web page can do; official agent skills teach Claude Code to write it; scales with cloud rendering | The best upgrade. Needs Node and Chromium; free for individuals and small teams, a company licence above that. Use it through the animation MCP renderer setting. |
+| **Manim** (Python) | Maths: equations, graphs, geometry | Good for algorithm and maths scenes; render a scene to a clip and use it as a clip. |
+| **Motion Canvas / Revideo** (TypeScript) | Hand-tuned narrated explainers | Great with a human at the keyboard; weaker for unattended runs. |
+| **After Effects + MCP** | Studio-quality motion graphics | Needs a paid Adobe licence and the app open with a bridge panel running; not suitable for an unattended pipeline. |
+
+Sources: the Remotion, Manim and Motion Canvas comparisons and the After Effects MCP repositories listed in the pull request notes.

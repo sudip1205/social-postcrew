@@ -10,7 +10,7 @@ from http.server import ThreadingHTTPServer
 from unittest import mock
 
 from helpers import TempWorkspace
-from postcrew import voice
+from postcrew import crew, voice
 from postcrew.studio.server import Studio, make_handler
 
 DAY = "2026-11-03"
@@ -47,6 +47,42 @@ class YouTubeStudioTests(unittest.TestCase):
         except urllib.error.HTTPError as e:
             with e:
                 return e.code, json.loads(e.read() or b"{}"), e.headers
+
+    # ---------- starting a run ----------
+    def test_a_run_for_a_day_with_no_post_says_why_instead_of_silently_doing_nothing(self):
+        code, d, _ = self.req("POST", "/api/runs", {"platform": "youtube", "date": "2026-11-04"})   # a Wednesday
+        self.assertEqual(code, 400)
+        self.assertIn("nothing is scheduled for YouTube on Wednesday 2026-11-04", d["error"])
+        self.assertIn("Choose a topic", d["error"])
+        code, d, _ = self.req("POST", "/api/runs", {"platform": "youtube", "date": "2026-11-04", "category": "nope"})
+        self.assertEqual(code, 400)
+        self.assertIn("no topic 'nope'", d["error"])
+
+    def test_a_chosen_topic_is_written_for_any_date_and_the_run_exists_before_the_answer(self):
+        def fake(ws, day, category, **kw):
+            d = ws.runs_dir / kw["run_id"]
+            d.mkdir(parents=True)
+            (d / "status.json").write_text("{}")
+            return {"ok": True, "run_id": kw["run_id"]}
+        with mock.patch.object(crew, "run_crew", side_effect=fake) as m:
+            code, d, _ = self.req("POST", "/api/runs", {"platform": "youtube", "date": "2026-11-04", "category": "short-tip",
+                                                       "dry_run": True})
+        self.assertEqual(code, 200)
+        self.assertTrue((self.ws.runs_dir / d["run_id"] / "status.json").exists())
+        self.assertEqual(m.call_args.args[2], "short-tip")
+
+    def test_a_run_the_crew_refuses_to_start_is_reported(self):
+        refusal = {"ok": False, "reason": "another crew run is in progress", "run_id": None}
+        with mock.patch.object(crew, "run_crew", return_value=refusal):
+            code, d, _ = self.req("POST", "/api/runs", {"platform": "youtube", "date": DAY})
+        self.assertEqual(code, 400)
+        self.assertIn("another crew run is in progress", d["error"])
+
+    def test_run_now_defaults_to_a_date_that_has_a_post(self):
+        code, d, _ = self.req("GET", "/api/overview?platform=youtube")
+        self.assertEqual(code, 200)
+        from postcrew import platforms
+        self.assertTrue(platforms.category_for(self.ws.config()["platforms"]["youtube"]["schedule"], d["next"]["run_for"]))
 
     # ---------- credentials ----------
     def test_credentials_are_write_only_and_checked(self):

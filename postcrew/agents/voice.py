@@ -6,6 +6,7 @@ script costs nothing. A rehearsal (dry run) never calls ElevenLabs. If the owner
 is skipped and the Video step uses that file.
 """
 from .. import assets as assets_mod
+from .. import platforms
 from .. import voice as voice_mod
 from .base import Agent, AgentError
 
@@ -22,7 +23,7 @@ class VoiceAgent(Agent):
 
     def run(self, ctx, guidance):
         scenes = ctx.outputs["writer"]["scenes"]
-        cfg = ctx.cfg["video"]["voice"]
+        cfg = dict(ctx.cfg["video"]["voice"], pace=ctx.cfg["video"].get("pace", "normal"))   # slow pace: longer pauses
         if ctx.dry_run:
             ctx.run.event(self.id, "rehearsal", "rehearsal: no voice is generated (no ElevenLabs characters are spent)")
             return {"mode": "rehearsal", "files": [], "seconds": [], "total_seconds": 0, "characters": 0, "voice": "none"}
@@ -54,9 +55,9 @@ class VoiceAgent(Agent):
         problems = []
         if len(out["files"]) != len(scenes) or any(s <= 0 for s in out["seconds"]):
             problems.append("a scene came back without audio")
-        if ctx.video["format"] == "short" and out["total_seconds"] > 60.5:
-            problems.append(f"the voice-over runs {out['total_seconds']:.0f} seconds: too long for a Short (60 s). Shorten the "
-                            f"narration by about {out['total_seconds'] - 58:.0f} seconds of words")
+        if ctx.video["format"] == "short" and out["total_seconds"] > platforms.SHORT_MAX_S + 0.5:
+            problems.append(f"the voice-over runs {out['total_seconds']:.0f} seconds: too long for a Short (3 minutes). Shorten the "
+                            f"narration by about {out['total_seconds'] - platforms.SHORT_MAX_S + 3:.0f} seconds of words")
         return problems
 
     def summary(self, out):

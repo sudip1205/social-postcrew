@@ -140,6 +140,7 @@ prompt), Researchers, writer team and Editor. Two agents are different or new:
 | **Quinn**, Editor | Scores the script on hook (first 3 seconds), value, clarity, accuracy, tone and format; up to three reads, the worst counts, a failing read ends the review. | same bar as posts |
 | **Echo Voice** (new) | Reads each scene with ElevenLabs, after the Editor passed. Cached; never runs in a rehearsal. | one clip per scene; a Short stays under 60 s |
 | **Reel**, Video Producer (new) | Draws the scenes and captions, adds the voice, renders the video and a 1280x720 thumbnail with ffmpeg (or an animation MCP server). | format (9:16 or 16:9), length, audio track, readable file |
+| **Cut**, Video Editor (new) | After a blackboard video is drawn: measures each box, arrow and bullet against the real voice, fixes graphics that are out of step (never the voice, which is not made again) and draws only the changed scenes again. | sync score; what is left is shown in the Queue |
 | **Chalk**, Blackboard Producer (new) | Replaces Reel when the video renderer is *Blackboard*: draws the script by hand on a chalkboard, timed to the voice recorded first (boxes, arrows, bullets and code appear as they are spoken). | same checks as Reel |
 | **Echo**, Publisher | Queues the video, then uploads it at its time with the YouTube Data API. | approval mode, practice mode, quota and connection checks |
 

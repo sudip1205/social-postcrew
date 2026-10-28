@@ -95,6 +95,7 @@ No Stitch screen exists for either view. Both are derived from the shell, design
 
 - Settings > Topics (YouTube): each topic card also has "Video style" (slides or blackboard) beside Format and Length; it overrides the app's video renderer for that topic. Not in the Stitch screen (the Topics editor is not either); same field component.
 - Settings > Weekly cadence: the day cards use 2 columns on small, 4 on normal and 7 only on very wide screens (Stitch: always 7), so a topic name such as "Short: system design" and the time are readable instead of cut to "Short:" and "11:0".
+- Settings > YouTube video settings: a "Pace" select (slow or normal) sits beside the "Video renderer" select, whose options are now Explainer (default), Plain slides, Blackboard and Animation MCP. The Short length slider runs 15 s to 3 min. None of this is in the Stitch screen; same field and select components.
 - Settings: "Burn in captions" switch, "Video renderer" select, the MCP fields (command, tool, arguments, timeout) and the docs link are not in the Stitch screen; they use the same card, field and switch components.
 - Settings: visibility select and "Made for kids" switch were added under the approval cards of the YouTube "When a post is ready" card (not in Stitch).
 - Settings: YouTube topic cards show "Format" and "Length (seconds)" fields (optional, omitted from config when inherit/empty); LinkedIn topic cards are unchanged.

@@ -208,12 +208,12 @@ const settingsView = (() => {
   }
   // YouTube-only settings: video format, length, ElevenLabs voice, renderer. Fields carry data-k so collectSettings() saves them.
   const DOCS = "https://github.com/sudip1205/social-postcrew/blob/main/docs/";
-  const VRANGE = { short: { min: 15, max: 60, step: 5, def: 45, ticks: ["15s", "30s", "45s", "60s"] },
+  const VRANGE = { short: { min: 15, max: 180, step: 5, def: 90, ticks: ["15s", "1 min", "2 min", "3 min"] },
     long: { min: 60, max: 1800, step: 30, def: 480, ticks: ["1 min", "10 min", "20 min", "30 min"] } };
   const secsLabel = (f, n) => f === "long" ? `${n % 60 ? (n / 60).toFixed(1) : n / 60} min` : `${n} seconds`;
   const SPIN = "inline-flex items-center justify-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-lg bg-slate-900 text-white shadow-sm shrink-0 disabled:opacity-50 disabled:cursor-not-allowed";
   function typeCards(f) {
-    const items = [["short", "stay_current_portrait", "Short", "Vertical (9:16), up to 60s runtime"], ["long", "laptop_chromebook", "Long", "Horizontal (16:9), chapters & b-roll"]];
+    const items = [["short", "stay_current_portrait", "Short", "Vertical (9:16), up to 3 minutes"], ["long", "laptop_chromebook", "Long", "Horizontal (16:9), chapters & b-roll"]];
     return items.map(([v, ic, t, d]) => `<div data-vtype="${v}" class="${v === f ? "border-2 border-red-500 bg-red-50/40" : "border border-slate-200 bg-white hover:border-slate-300"} rounded-xl p-3.5 flex items-center justify-between cursor-pointer transition-all">
       <div class="flex items-center gap-3"><div class="w-9 h-9 rounded-lg ${v === f ? "bg-red-500 text-white" : "bg-slate-100 text-slate-600"} flex items-center justify-center">${icon(ic, "text-xl")}</div>
         <div><span class="text-sm font-bold text-slate-900 block">${t}</span><span class="text-xs text-slate-500">${esc(d)}</span></div></div>
@@ -221,7 +221,7 @@ const settingsView = (() => {
   }
   const ticksHtml = f => VRANGE[f].ticks.map(t => `<span>${t}</span>`).join("");
   function youtubeCard() {
-    const v = own("youtube").video || {}, f = v.format === "long" ? "long" : "short", R = VRANGE[f], vo = v.voice || {}, m = v.mcp || {}, k = p => K("youtube", "video." + p);
+    const v = own("youtube").video || {}, f = v.format === "long" ? "long" : "short", R = VRANGE[f], vo = v.voice || {}, m = v.mcp || {}, er = v.explainroo || {}, k = p => K("youtube", "video." + p);
     const secs = Math.min(R.max, Math.max(R.min, parseInt(v.target_seconds, 10) || R.def)), ytAccent = brand("youtube").accent;
     const voiceOpt = vo.voice_id ? `<option value="${esc(vo.voice_id)}" selected>${esc(vo.voice_name || vo.voice_id)}</option>` : "";
     return `<div class="bg-white rounded-xl p-6 border-2 border-red-200 shadow-sm space-y-5 relative overflow-hidden" data-ytcard><div class="absolute -right-12 -top-12 w-32 h-32 bg-red-50 rounded-full pointer-events-none"></div>
@@ -243,8 +243,13 @@ const settingsView = (() => {
             <button class="${SPIN}" type="button" id="yt-play">${icon("play_arrow", "text-sm text-red-400")}<span>Play sample</span></button></div>
           <p class="text-[11px] text-slate-400 mt-1" id="yt-voice-msg">A short sample of the chosen ElevenLabs voice.</p></div>
         <div class="pt-2 border-t border-slate-100 space-y-4"><div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          ${field("Video renderer", "movie", sel(k("renderer"), v.renderer || "ffmpeg", [["ffmpeg", "Built-in slides + captions"], ["blackboard", "Blackboard: drawn by hand to the voice"], ["mcp", "Animation MCP server"]]).replace("<select ", '<select id="yt-renderer" '), "How the picture is made.")}
+          ${field("Pace", "speed", sel(k("pace"), v.pace || "slow", [["slow", "Slow, like a teacher (recommended)"], ["normal", "Normal, brisk"]]), "Slow leaves room for longer pauses and for the picture to build up.")}
+          ${field("Video renderer", "movie", sel(k("renderer"), v.renderer || "ffmpeg", [["explainroo", "Explainroo: hand-drawn explainer with a moving camera (recommended)"], ["explainer", "Explainer: slow animation to the voice"], ["ffmpeg", "Plain slides + captions"], ["blackboard", "Blackboard: chalk to the voice"], ["mcp", "Animation MCP server"]]).replace("<select ", '<select id="yt-renderer" '), "How the picture is made.")}
           <div class="flex items-end">${swRow(k("captions"), v.captions !== false, "Burn in captions", "Subtitles drawn on the video.").replace('class="flex items-start', 'class="w-full flex items-start')}</div></div>
+          <div id="yt-explainroo" class="grid grid-cols-1 md:grid-cols-2 gap-4 ${v.renderer === "explainroo" ? SHOWN : HIDDEN}">
+            ${field("Explainroo folder", "folder", inp(k("explainroo.path"), er.path || "", "text", 'placeholder="/path/to/explainroo"'), "Where explainroo is installed (git clone, npm install, doctor --fetch).")}
+            ${field("Look", "palette", sel(k("explainroo.theme"), er.theme || "midnight", [["midnight", "Midnight: dark, glowing colours"], ["clean", "Clean: flat cards"], ["blueprint", "Blueprint: engineering"], ["chalk", "Chalk: teaching board"], ["paper", "Paper: hand drawn"], ["editorial", "Editorial: magazine"]]), "The look of every video.")}
+            ${field("Music", "music_note", sel(k("explainroo.music"), er.music || "calm", [["calm", "Calm"], ["tech", "Tech"], ["warm", "Warm"], ["upbeat", "Upbeat"], ["playful", "Playful"]]), "Quiet background music that dips under the voice.")}</div>
           <div id="yt-mcp" class="grid grid-cols-1 md:grid-cols-2 gap-4 ${v.renderer === "mcp" ? SHOWN : HIDDEN}">
             ${field("Command", "terminal", inp(k("mcp.command"), m.command || "", "text", 'placeholder="npx"'), "The program that starts the MCP server.")}
             ${field("Tool name", "build", inp(k("mcp.tool"), m.tool || "", "text", 'placeholder="render_scene"'), "The tool called once per scene.")}
@@ -466,7 +471,7 @@ const settingsView = (() => {
         ${ta("brief", yt ? "What this kind of video must contain" : "What this kind of post must contain", k.brief, 3, "", yt ? "The script, scenes and thumbnail come from each day's plan and brief." : "Research always runs. The picture and its label come from each day's plan and brief.")}
         ${yt ? `<div class="grid grid-cols-2 gap-3"><label class="block"><span class="text-xs font-semibold text-slate-700">Format (optional)</span><select data-c="format" class="${FIELD} mt-1 appearance-none">${opts([["", "Inherit"], ["short", "Short"], ["long", "Long"]], k.format || "")}</select></label>
           <label class="block"><span class="text-xs font-semibold text-slate-700">Length (seconds)</span><input data-c="target_seconds" type="number" min="15" max="1800" value="${esc(k.target_seconds ?? "")}" placeholder="Inherit" class="${FIELD} mt-1"></label>
-          <label class="block col-span-2"><span class="text-xs font-semibold text-slate-700">Video style (optional)</span><select data-c="renderer" class="${FIELD} mt-1 appearance-none">${opts([["", "Same as the app's video setting"], ["ffmpeg", "Slides with captions"], ["blackboard", "Blackboard: drawn by hand to the voice"]], k.renderer || "")}</select></label></div>` : ""}</div>`; }).join("");
+          <label class="block col-span-2"><span class="text-xs font-semibold text-slate-700">Video style (optional)</span><select data-c="renderer" class="${FIELD} mt-1 appearance-none">${opts([["", "Same as the app's video setting"], ["explainroo", "Explainroo: hand-drawn explainer with a moving camera"], ["explainer", "Explainer: slow animation to the voice"], ["ffmpeg", "Plain slides with captions"], ["blackboard", "Blackboard: chalk to the voice"]], k.renderer || "")}</select></label></div>` : ""}</div>`; }).join("");
     document.querySelectorAll(`#topics-${app} [data-delcat]`).forEach(b => b.onclick = () => {
       const id = b.dataset.delcat;
       if (!confirm(`Remove the topic "${cats[id].label}"? Days that use it will have no post.`)) return;
@@ -573,7 +578,7 @@ const settingsView = (() => {
       } else if (t.dataset.dayval) drawDays(t.closest("[data-days]").dataset.days);
       if (t.dataset.appon) syncApp(t.dataset.appon);
       if (t.id === "yt-voice") $("#yt-voice-name").value = t.value ? t.selectedOptions[0].text.replace(/ \([^)]*\)$/, "") : "";
-      if (t.id === "yt-renderer") $("#yt-mcp").classList.toggle("hidden", t.value !== "mcp");
+      if (t.id === "yt-renderer") { $("#yt-mcp").classList.toggle("hidden", t.value !== "mcp"); $("#yt-explainroo").classList.toggle("hidden", t.value !== "explainroo"); }
       dirty(); drawAll();
     };
     view.onclick = async e => {

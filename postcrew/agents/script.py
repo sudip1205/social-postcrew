@@ -16,21 +16,41 @@ from . import team
 from .base import AgentError, guidance_block, recent_block
 from .writer import WriterAgent, research_block, revision_block
 
+STEP = {
+    "type": "object",
+    "properties": {
+        "say": {"type": "string", "description": "two or three words of the narration, said just as this step happens"},
+        "pointers": {"type": "array", "items": {"type": "string"}, "maxItems": 4,
+                     "description": "where each pointer is now, 'left=0', 'right=3' (name=cell position, counted from 0)"},
+        "active": {"type": "array", "items": {"type": "integer"}, "description": "cells being looked at now"},
+        "found": {"type": "array", "items": {"type": "integer"}, "description": "cells that are the answer"},
+        "out": {"type": "array", "items": {"type": "integer"}, "description": "cells already ruled out"},
+        "note": {"type": "string", "description": "the sum or the decision, at most 60 characters: '2 + 15 = 17, too big'"},
+        "memo": {"type": "array", "items": {"type": "string"}, "maxItems": 6,
+                 "description": "what is remembered at this step (a hash map, a visited set): ['2 -> 0', '7 -> 1']"},
+    },
+    "required": ["say", "pointers", "active", "found", "out", "note", "memo"],
+    "additionalProperties": False,
+}
 SCENE = {
     "type": "object",
     "properties": {
-        "layout": {"type": "string", "enum": ["title", "statement", "points", "code", "diagram"]},
+        "layout": {"type": "string", "enum": ["title", "statement", "points", "code", "diagram", "trace", "flow"]},
         "narration": {"type": "string", "description": "what the voice says; spoken sentences, no markdown"},
         "on_screen": {"type": "string", "description": "the key words shown big (or the heading above the points)"},
         "items": {"type": "array", "items": {"type": "string"}, "maxItems": 5},
         "code": {"type": "string"}, "language": {"type": "string"},
         "nodes": {"type": "array", "items": {"type": "string"}, "maxItems": 6,
-                  "description": "diagram: the boxes, 2-6 short labels (at most 18 characters)"},
+                  "description": "diagram: the boxes, 2-6 short labels (at most 18 characters), optionally with an icon: 'API Gateway|gateway'"},
         "edges": {"type": "array", "items": {"type": "string"}, "maxItems": 8,
                   "description": "diagram: arrows in the order the voice explains them, 'Client > Load Balancer: request'"},
+        "cells": {"type": "array", "items": {"type": "string"}, "maxItems": 10,
+                  "description": "trace: the example data, e.g. an array: ['2','7','11','15'] (at most 6 characters each)"},
+        "steps": {"type": "array", "maxItems": 12, "items": STEP,
+                  "description": "trace: what happens to the data, one entry per move, in the order the voice says it"},
         "seconds": {"type": "number"},
     },
-    "required": ["layout", "narration", "on_screen", "items", "code", "language", "nodes", "edges", "seconds"],
+    "required": ["layout", "narration", "on_screen", "items", "code", "language", "nodes", "edges", "cells", "steps", "seconds"],
     "additionalProperties": False,
 }
 SCHEMA = {
@@ -46,7 +66,7 @@ SCHEMA = {
 }
 
 FORMAT_RULES = {
-    "short": "A vertical 9:16 Short: 3-8 scenes, one idea, the hook inside the first 3 seconds, under 60 seconds in all.",
+    "short": "A vertical 9:16 Short (up to 3 minutes): one idea built up scene by scene, the hook inside the first 3 seconds.",
     "long": "A 16:9 video: open with a 15-second cold open, then one idea per scene (about 4-12 scenes per ten minutes), "
             "and finish with one clear next step.",
 }
@@ -61,6 +81,8 @@ def finish(script):
         sc["items"] = [i for i in sc.get("items") or [] if i]
         sc["nodes"] = [n.strip() for n in sc.get("nodes") or [] if n and n.strip()]
         sc["edges"] = [e.strip() for e in sc.get("edges") or [] if e and e.strip()]
+        sc["cells"] = [str(c).strip() for c in sc.get("cells") or [] if str(c).strip()]
+        sc["steps"] = [st for st in sc.get("steps") or [] if isinstance(st, dict)]
         words = len(sc["narration"].split())
         sc["seconds"] = round(words / platforms.WORDS_PER_SECOND, 1) if words else 0
         scenes.append(sc)
@@ -111,14 +133,14 @@ class ScriptWriter(WriterAgent):
         topic, spec = ctx.outputs["topic"], ctx.video
         lo, hi = int(spec["max_words"] * 0.7), spec["max_words"]
         system = (self.prompt(ctx, format=spec["format"], target_seconds=spec["target_seconds"], min_words=lo, max_words=hi,
-                              format_rules=FORMAT_RULES[spec["format"]],
+                              format_rules=FORMAT_RULES[spec["format"]], wps=spec.get("wps", 2.5),
                               shorts_rule="Do not write #Shorts yourself: the app adds it to Shorts.")
                   + team.persona_block(ctx.ws, member))
         notes = briefmod.cat_context(ctx.cat)
-        if platforms.renderer_for(ctx.cfg, ctx.category) == "blackboard":
-            notes += ("\nHOW IT IS SHOWN: drawn by hand on a blackboard while the voice talks. Use diagram scenes for flows and "
-                      "structures; name each box in the narration at the moment it should appear and explain the arrows in "
-                      "the order they are drawn; keep on_screen and labels to a few words.")
+        if platforms.renderer_for(ctx.cfg, ctx.category) in ("blackboard", "explainer"):
+            notes += ("\nHOW IT IS SHOWN: animated while the voice talks. One diagram that keeps growing: reuse the same box "
+                      "labels in consecutive diagram scenes. Name each box in the narration at the moment it should appear and "
+                      "explain the arrows in the order they are listed; keep on_screen titles and labels to a few words.")
         prompt = (f"Category: {ctx.cat['label']}\nWhat this category needs: {ctx.cat['brief']}\n"
                   + (notes + "\n" if notes else "")
                   + f"Video: {spec['format']}, about {spec['target_seconds']} seconds ({lo}-{hi} words of narration)\n"
@@ -135,9 +157,9 @@ class ScriptWriter(WriterAgent):
             words = len(out["text"].split())
             spec = dict(spec, target_seconds=max(15, round(words / platforms.WORDS_PER_SECOND)), max_words=max(words, 1))
             problems = script_problems(out, spec, ctx.cat, ctx.profile)
-            if spec["format"] == "short" and words / platforms.WORDS_PER_SECOND > 63:
+            if spec["format"] == "short" and words / platforms.WORDS_PER_SECOND > platforms.SHORT_MAX_S + 3:
                 problems.append(f"your script runs about {words / platforms.WORDS_PER_SECOND:.0f} seconds: too long for a "
-                                f"Short (60 s at most). Cut it or make a long video")
+                                f"Short (3 minutes at most). Cut it or make a long video")
             return problems
         problems = script_problems(out, spec, ctx.cat, ctx.profile)
         dup = repeat_problem("", out.get("text", ""), ctx.recent(60))

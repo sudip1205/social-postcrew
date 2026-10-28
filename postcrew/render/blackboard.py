@@ -5,15 +5,17 @@ the voice (render/timeline.py): each thing begins when the narrator says its nam
 Frames are drawn with Pillow at 15 fps (identical frames are written once) and put together with ffmpeg; the audio is the voice
 generated before, scene by scene.
 """
+import json
 import math
 import random
+import sys
 from functools import lru_cache
 from pathlib import Path
 
 from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont
 
 from . import timeline
-from .scenes import FORMATS, _exit_point, parse_edge, place_diagram, split_captions
+from .scenes import FORMATS, _exit_point, parse_edge, place_diagram, split_captions, split_node
 from .theme import FONT_DIR
 from .video import ENC, FPS, VideoError, _run, _scene_lengths, assemble, probe
 
@@ -120,6 +122,7 @@ def _wobble(pts, rnd, amp, step=12):
 
 
 class Strokes:
+    what = ""
     """Chalk strokes drawn one after the other (a box, an arrow with its head, an underline, a bullet)."""
 
     def __init__(self, strokes, color, width, cue=None, dur=0.6, seed=0):
@@ -143,6 +146,7 @@ class Strokes:
 
 
 class Text:
+    what = ""
     """Chalk writing, revealed from left to right line by line."""
 
     def __init__(self, lines, font, color, x, y, size, anchor="lt", cue=None, dur=None, lh=1.25):
@@ -223,6 +227,11 @@ def _arrow(pts, color, width, **kw):
     return Strokes([pts] + head, color, width, **kw)
 
 
+def _tag(item, what):
+    item.what = what
+    return item
+
+
 def _heading(g, text, items):
     text = _clean(text)
     if not text:
@@ -282,11 +291,11 @@ def _routes(g, boxes, rows, vertical, edges, y):
     return out
 
 
-def build(scene, fmt):
+def build(scene, fmt, group=None):
     """The things to draw for one scene, in order: [Text | Path] each with a `cue` (words that say when) and a `dur`."""
     g, items = _geom(fmt), []
     layout, shown = scene.get("layout"), _clean(scene.get("on_screen"))
-    nodes = [_clean(n)[:18] for n in (scene.get("nodes") or []) if _clean(n)][:6]
+    nodes = [_clean(split_node(n)[0])[:18] for n in (scene.get("nodes") or []) if _clean(split_node(n)[0])][:6]
     width = g["x1"] - g["x0"]
     if layout == "diagram" and len(nodes) >= 2:
         y = _heading(g, shown, items)
@@ -299,17 +308,17 @@ def build(scene, fmt):
                 return
             drawn.add(i)
             l, t, r, b = boxes[i]
-            items.append(Strokes([_box_pts(l, t, r, b)], WHITE, g["lw"], cue=nodes[i], dur=0.7, seed=len(items)))
+            items.append(_tag(Strokes([_box_pts(l, t, r, b)], WHITE, g["lw"], cue=nodes[i], dur=0.7, seed=len(items)), "box"))
             lines, size, f = _fit(nodes[i], r - l - 28, b - t - 16, g["body"], 14, 1.15)
-            items.append(Text(lines, f, WHITE, (l + r) / 2, (t + b) / 2, size, "mm", cue=nodes[i], dur=0.45, lh=1.15))
+            items.append(_tag(Text(lines, f, WHITE, (l + r) / 2, (t + b) / 2, size, "mm", cue=nodes[i], dur=0.45, lh=1.15), "box label"))
 
         small = g["body"] * 0.72
         for k, ((i, j, label), (pts, pos, anchor, color)) in enumerate(zip(edges, _routes(g, boxes, rows, vertical, edges, y))):
             box(i)
             box(j)
-            items.append(_arrow(pts, color, g["lw"], cue=label or nodes[j], dur=0.6, seed=len(items)))
+            items.append(_tag(_arrow(pts, color, g["lw"], cue=label or nodes[j], dur=0.6, seed=len(items)), "arrow"))
             if label:
-                items.append(Text([_clean(label)], chalk_font(small), color, pos[0], pos[1], small, anchor, cue=label, dur=0.4))
+                items.append(_tag(Text([_clean(label)], chalk_font(small), color, pos[0], pos[1], small, anchor, cue=label, dur=0.4), "arrow label"))
         for i in range(len(nodes)):
             box(i)
     elif layout == "points" and scene.get("items"):
@@ -320,8 +329,8 @@ def build(scene, fmt):
             size -= 2
         for t in pts:
             lines = _wrap(t, chalk_font(size), width - 60)
-            items.append(Strokes([_circle(g["x0"] + 14, y + size * 0.62, size * 0.17)], PINK, g["lw"], cue=t, dur=0.25, seed=len(items)))
-            items.append(Text(lines, chalk_font(size), WHITE, g["x0"] + 50, y, size, cue=t))
+            items.append(_tag(Strokes([_circle(g["x0"] + 14, y + size * 0.62, size * 0.17)], PINK, g["lw"], cue=t, dur=0.25, seed=len(items)), "bullet"))
+            items.append(_tag(Text(lines, chalk_font(size), WHITE, g["x0"] + 50, y, size, cue=t), "bullet text"))
             y += len(lines) * size * 1.25 + size * 0.2
     elif layout == "code" and (scene.get("code") or "").strip():
         y = _heading(g, shown, items)
@@ -404,13 +413,14 @@ def thumbnail(script, kicker, handle, out_path):
     return out_path
 
 
-def render_scene(scene, fmt, length, wd, n, count, kicker="", handle="", captions=True, fps=DRAW_FPS):
-    """Draw one scene against its voice: returns ([(png, seconds)], [(start, end)] of every drawn thing)."""
+def render_scene(scene, fmt, length, wd, n, count, kicker="", handle="", captions=True, fps=DRAW_FPS, audio=None, group=None):
+    """Draw one scene against its voice: returns ([(png, seconds)], [(start, end)] of every drawn thing). `audio`: this scene's
+    voice file; with it the word times are measured on the real voice instead of estimated."""
     g = _geom(fmt)
     size = (g["w"], g["h"])
     items = build(scene, fmt)
     narration = str(scene.get("narration", ""))
-    words = timeline.word_times(narration, length)
+    words, _measured = timeline.voice_words(narration, length, audio)
     slots = timeline.schedule([{"cue": it.cue, "dur": it.dur} for it in items], words, length)
     chunks = split_captions(narration) if captions else []
     bounds, run = [], 0
@@ -460,9 +470,23 @@ def _segment(frames, length, out):
           "-frames:v", str(n), "-an"] + ENC + [str(out)], "Encoding a scene")
 
 
-def render(scenes, out_path, fmt, workdir, audio=None, handle="", kicker="", captions=True, progress=None):
+def timed(items):
+    """The things in this scene that are drawn one after the other (all of them, for the blackboard)."""
+    return items
+
+
+def plan_groups(scenes):
+    return [None] * len(scenes)
+
+
+def render(scenes, out_path, fmt, workdir, audio=None, handle="", kicker="", captions=True, progress=None, redo=None, engine=None):
     """The whole video. `audio`: the voice, one file per scene (its lengths are the scenes' lengths), or one file, or None
-    (then the scenes' own word counts set the pace). Returns the file's facts plus the timeline of every scene."""
+    (then the scenes' own word counts set the pace). Returns the file's facts plus the timeline of every scene: when each thing
+    was drawn and which words say it (the Video Editor checks that against the voice).
+    redo: scene numbers (0-based) to draw again; the other scenes keep the pictures already drawn and are only joined again.
+    The voice is never made here: it is the files the Voice step already recorded.
+    engine: the module that draws (build, timed, plan_groups, render_scene): this one, or render/explainer.py."""
+    eng = engine or sys.modules[__name__]
     if fmt not in FORMATS:
         raise VideoError(f"unknown format '{fmt}'")
     scenes = list(scenes or [])
@@ -470,18 +494,31 @@ def render(scenes, out_path, fmt, workdir, audio=None, handle="", kicker="", cap
         raise VideoError("no scenes to render")
     wd = Path(workdir)
     wd.mkdir(parents=True, exist_ok=True)
+    cache = wd / "timeline.json"
+    old = json.loads(cache.read_text()) if cache.exists() else {}
     lengths = _scene_lengths(scenes, audio)
+    per_scene = audio if isinstance(audio, (list, tuple)) else [None] * len(scenes)
+    groups = eng.plan_groups(scenes)
     segs, tl, at = [], [], 0.0
     for i, (sc, ln) in enumerate(zip(scenes, lengths)):
-        frames, slots = render_scene(sc, fmt, ln, wd, i, len(scenes), kicker, handle, captions)
         seg = wd / f"seg-{i:02d}.mp4"
-        _segment(frames, ln, seg)
+        kept = old.get(str(i))
+        if redo is not None and i not in redo and seg.exists() and kept and abs(kept["seconds"] - ln) < 0.02:
+            things, measured = kept["things"], kept["measured"]   # untouched scene: keep its picture
+        else:
+            frames, slots = eng.render_scene(sc, fmt, ln, wd, i, len(scenes), kicker, handle, captions, audio=per_scene[i], group=groups[i])
+            _segment(frames, ln, seg)
+            things = [{"cue": it.cue or "", "what": it.what, "start": round(s, 2), "end": round(e, 2)}
+                      for it, (s, e) in zip(eng.timed(eng.build(sc, fmt, groups[i])), slots)]
+            measured = timeline.voice_words(str(sc.get("narration", "")), ln, per_scene[i])[1]
         segs.append(seg)
-        tl.append({"scene": i + 1, "start": round(at, 2), "seconds": round(ln, 2),
-                   "drawn": [[round(at + s, 2), round(at + e, 2)] for s, e in slots]})
+        tl.append({"scene": i + 1, "start": round(at, 2), "seconds": round(ln, 2), "measured": measured, "things": things,
+                   "drawn": [[round(at + t["start"], 2), round(at + t["end"], 2)] for t in things]})
         at += ln
         if progress:
             progress(i + 1, len(scenes))
+    cache.write_text(json.dumps({str(i): {"seconds": e["seconds"], "things": e["things"], "measured": e["measured"]}
+                                 for i, e in enumerate(tl)}))
     assemble(segs, lengths, audio, out_path)
     info = probe(out_path)
     return {"path": str(out_path), "seconds": info["seconds"], "width": info["width"], "height": info["height"], "timeline": tl}

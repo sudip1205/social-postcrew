@@ -187,8 +187,12 @@ class PlannerAgent(Agent):
             c, old = cfg["categories"][cat], plan.get(d.isoformat()) or {}
             avoid = [t for t in old.get("rejected", []) + ([] if replan else [old.get("topic", "")]) if t]
             ideas = [i for i in c.get("ideas", []) if not any(idea_matches(i, t) for t in covered + avoid)]
+            spec = platforms.video_spec(cfg, c, old) if ctx.platform != LINKEDIN else None
+            room = (f"\nLength: a {spec['format']} video of about {spec['target_seconds']} seconds = about {spec['max_words']} words of "
+                    f"narration, room for {max(1, spec['target_seconds'] // 25)} idea(s). Plan ONE main idea (two at most): "
+                    f"the angle and the brief must fit that length." if spec else "")
             blocks[d.isoformat()] = (f"DATE {d.isoformat()} ({d.strftime('%A')}) - category {cat}: {c['label']}\n"
-                                     f"What it needs: {c['brief']}\nResearch: {c.get('research', 'optional')}"
+                                     f"What it needs: {c['brief']}\nResearch: {c.get('research', 'optional')}{room}"
                                      + (("\n" + briefmod.cat_context(c)) if briefmod.cat_context(c) else "")
                                      + (f"\nTHE OWNER'S TOPIC IDEAS for this category, not used yet: {ideas}. Base this "
                                         f"day on one of them (the earliest that fits); use each idea once across the plan."

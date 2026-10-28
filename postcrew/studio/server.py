@@ -9,6 +9,7 @@ import mimetypes
 import re
 import secrets as pysecrets
 import threading
+import time
 import traceback
 from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -23,7 +24,8 @@ from .. import memory as memory_mod
 from ..agents.credentials import run_check
 from ..agents.publisher import publish_post, scheduled_at
 from ..agents.supervisor import CREW, Supervisor
-from ..agents.blackboard import BlackboardAgent
+from ..agents.blackboard import BlackboardAgent, ExplainerAgent
+from ..agents.video_review import VideoReviewAgent
 from ..agents.voice import VoiceAgent
 from ..llm import LLMError, agent_settings, make_backend
 from ..runlog import STEPS, read_events
@@ -74,6 +76,8 @@ class Studio:
                 "queue": {s: sum(1 for p in q if p["status"] == s) for s in
                           ("queued", "awaiting_approval", "approved", "failed", "dry_run")},
                 "next": {"generate_for": target.isoformat(), "category": crew.category_for(cfg, target),
+                         # "Run now" defaults to a date that has a post: the target date, else the next scheduled one
+                         "run_for": next((d.isoformat() for d, _s in platforms.upcoming(cfg["schedule"], target, 21)), target.isoformat()),
                          "generate_time": cfg["schedule"]["generate_time"], "post_time": cfg["schedule"]["post_time"],
                          "timezone": cfg["schedule"]["timezone"]},
                 "dry_run": cfg["publishing"]["dry_run"], "approval": cfg["publishing"]["approval"],
@@ -83,7 +87,7 @@ class Studio:
         cfg = self.ws.config()
         rows = []
         roster = team_mod.load(self.ws)["members"]
-        for a in [planner_mod.PlannerAgent()] + CREW + [VoiceAgent(), BlackboardAgent(), Supervisor()]:
+        for a in [planner_mod.PlannerAgent()] + CREW + [VoiceAgent(), BlackboardAgent(), ExplainerAgent(), VideoReviewAgent(), Supervisor()]:
             role = {"research": "research", "writer": "writer"}.get(a.id)
             members = [m["name"] for m in roster if m["role"] == role][:cfg["team"][role]] if role else []
             rows.append({"id": a.id, "title": a.title, "name": a.name, "role": a.role, "members": members,
@@ -114,6 +118,15 @@ class Studio:
         day = body.get("date") or crew.target_date(cfg).isoformat()
         datetime.strptime(day, "%Y-%m-%d")
         category = body.get("category") or None
+        when = datetime.strptime(day, "%Y-%m-%d").date()
+        if category and category not in cfg["categories"]:
+            raise ValueError(f"{platforms.label(platform)} has no topic {category!r}: pick one from the Category list")
+        if not category and not platforms.category_for(cfg["schedule"], when):
+            nxt = platforms.upcoming(cfg["schedule"], crew.local_now(cfg).date(), 21)[:3]
+            hint = "; ".join(f"{d.strftime('%a %Y-%m-%d')} ({cfg['categories'].get(s['category'], {}).get('label', s['category'])})"
+                             for d, s in nxt)
+            raise ValueError(f"nothing is scheduled for {platforms.label(platform)} on {when.strftime('%A %Y-%m-%d')}. Choose a topic "
+                             f"in Category (it is written for that date), or pick a scheduled date" + (f": {hint}" if hint else ""))
         options = {}
         if body.get("format"):
             if body["format"] not in ("short", "long"):
@@ -122,15 +135,28 @@ class Studio:
         if body.get("target_seconds"):
             options["target_seconds"] = int(body["target_seconds"])
         run_id = self.ws.new_run_id(day)
+        outcome = {}
 
         def go():
             try:
-                crew.run_crew(self.ws, day, category, dry_run=bool(body.get("dry_run")), run_id=run_id,
-                              platform=platform, options=options)
+                outcome["result"] = crew.run_crew(self.ws, day, category, dry_run=bool(body.get("dry_run")), run_id=run_id,
+                                                  platform=platform, options=options)
             except Exception as e:
                 traceback.print_exc()
+                outcome["error"] = str(e)[:300]
                 notify_mod.notify(self.ws, "Crew run crashed", str(e)[:300], level="error")
         threading.Thread(target=go, daemon=True).start()
+        # Answer only once the run exists (the Workflow page opens it next), or say at once why it could not start.
+        started = self.ws.runs_dir / run_id / "status.json"
+        for _ in range(100):
+            res = outcome.get("result")
+            if started.exists():
+                break
+            if outcome.get("error"):
+                raise ValueError(f"the crew could not start: {outcome['error']}")
+            if res is not None and not res.get("run_id"):
+                raise ValueError(f"the crew did not start: {res.get('reason', 'unknown reason')}")
+            time.sleep(0.05)
         return {"run_id": run_id}
 
     # ---------- week plan ----------

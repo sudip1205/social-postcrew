@@ -54,6 +54,8 @@ at the time you choose. You watch all of it live in the Studio, and nothing goes
   lights up as the data moves.
 - **More than LinkedIn.** Each app has its own schedule, plan and crew run. YouTube: scripted, voiced with ElevenLabs and
   rendered locally, as a Short or a long video, reviewed like any post, then uploaded; or bring your own script, voice or video.
+- **Slow, animated explainers.** The default video style builds one picture while the narrator explains it: icon boxes pop in as
+  they are named, arrows draw themselves, the thing being explained glows, and captions follow the words, at a teacher's pace.
 - **Draw-and-explain videos.** Pick the *Blackboard* renderer and the script is drawn by hand on a chalkboard, timed to the
   voice that was recorded first: each box, arrow, bullet and line of code appears as the narrator says it. Diagram scenes turn
   system-design, architecture, cryptography and algorithm topics into boxes-and-arrows videos.

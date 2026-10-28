@@ -2,7 +2,12 @@
    crew memory) comes from the old working Studio (design/legacy/app.js). Real run data only. */
 "use strict";
 
-const WF = { runs: [], steps: [], budget: null, filter: "all", search: "", graphKey: "", wfConfig: null };
+const WF = { runs: [], steps: [], budget: null, filter: "all", search: "", graphKey: "", wfConfig: null,
+  logSig: "", logN: 0, drawerSig: "", art: {}, open: new Set(), openD: new Set() };
+
+/* A poll that finds nothing new must not touch the page: redraw an element only when its HTML changed (no flicker, no restarted
+   spinners, no collapsed "View details"). Returns true when it did redraw, so the caller can attach its handlers again. */
+function wfSet(el, html) { if (!el || el.dataset.sig === html) return false; el.innerHTML = html; el.dataset.sig = html; return true; }
 
 const wfDur = info => { if (!info?.started_at) return ""; const a = new Date(info.started_at), b = info.finished_at ? new Date(info.finished_at) : new Date();
   const s = (b - a) / 1000; return s < 0 ? "" : s < 60 ? `${s.toFixed(1)}s` : `${Math.floor(s / 60)}m ${Math.round(s % 60)}s`; };
@@ -79,7 +84,7 @@ function drawCrumb() {
   const st = S.run?.status, meta = st?.meta || {}, pf = meta.platform || S.platform;
   const picker = `<select id="wf-pick" class="inline-flex items-center gap-1 font-semibold text-slate-900 bg-white px-2 py-0.5 rounded border border-slate-200 shadow-sm text-xs md:text-sm" title="Choose a run">
     ${WF.runs.map(r => `<option value="${esc(r.run_id)}" ${r.run_id === S.runId ? "selected" : ""}>${esc(r.run_id)} · ${esc(r.meta?.category || "")} · ${esc(r.state)}</option>`).join("") || "<option>No runs yet</option>"}</select>`;
-  $("#wf-crumb").innerHTML = `<div class="flex items-center gap-2 text-xs md:text-sm text-slate-500">
+  const html = `<div class="flex items-center gap-2 text-xs md:text-sm text-slate-500">
       <span class="text-slate-600 font-medium">Workflow</span>${icon("chevron_right", "text-[16px] text-slate-400")}${picker}
       ${st ? `${icon("chevron_right", "text-[16px] text-slate-400")}
       <div class="inline-flex items-center gap-2 font-headline font-bold text-slate-900 text-sm md:text-base">
@@ -87,11 +92,11 @@ function drawCrumb() {
         <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border ${appOf(pf).soft}">${appBadge(pf)}${esc(appName(pf))}${meta.dry_run ? " · practice run" : ""}</span>
       </div>` : ""}</div>
     <div class="flex items-center gap-2 text-xs text-slate-500">${icon("hub", "text-[16px] text-slate-400")}<span>${st ? `Started ${esc(fmtTime(st.started_at))}${meta.date ? ` for ${esc(meta.date)}` : ""}` : "No run selected"}</span></div>`;
-  $("#wf-pick").onchange = e => { S.runId = e.target.value; S.selected = null; WF.graphKey = ""; loadRun(true); };
+  if (wfSet($("#wf-crumb"), html)) $("#wf-pick").onchange = e => { S.runId = e.target.value; S.selected = null; WF.graphKey = ""; loadRun(true); };
 }
 
 async function loadRun(reset) {
-  if (reset) { S.events = []; S.lastT = 0; }
+  if (reset) { S.events = []; S.lastT = 0; WF.logSig = ""; WF.logN = 0; WF.drawerSig = ""; WF.open.clear(); WF.openD.clear(); }
   try {
     const d = await api(`/api/runs/${encodeURIComponent(S.runId)}?after=${S.lastT}`);
     S.run = d; S.events = S.events.concat(d.events);
@@ -113,7 +118,7 @@ function drawHead() {
   const done = Object.values(st.steps).filter(x => ["passed", "skipped"].includes(x.state)).length, total = Object.keys(st.steps).length;
   const t = st.tokens || {}, cost = st.cost_usd || 0, pct = WF.budget ? Math.min(100, cost / WF.budget * 100) : 0;
   const retries = Object.values(st.steps).reduce((a, x) => a + Math.max(0, (x.attempts || 0) - 1), 0);
-  $("#wf-head").innerHTML = `
+  const html = `
     <div class="lg:col-span-7 bg-white rounded-xl border border-slate-200 p-4 shadow-sm flex flex-wrap items-center justify-between gap-4">
       <div class="flex items-center gap-3.5">
         <div class="w-10 h-10 rounded-xl bg-violet-100 text-violet-700 flex items-center justify-center">${icon(active ? "sync" : run === "failed" ? "error" : "check_circle", `text-[24px]${active ? " animate-spin" : ""}`)}</div>
@@ -122,7 +127,7 @@ function drawHead() {
             <h1 class="font-headline font-bold text-slate-900 text-sm md:text-base">${esc(title)}${retries ? ` · ${retries} retr${retries === 1 ? "y" : "ies"}` : ""}</h1>
             ${cur ? `<span class="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1">${icon("published_with_changes", "text-[13px]")}${esc(agentName(cur[0]))}</span>` : chip(run === "passed" ? "passed" : run)}
           </div>
-          <p class="text-xs text-slate-500 mt-0.5 flex items-center gap-1.5">${icon("timer", "text-[14px] text-slate-400")}<span>Elapsed: <strong class="font-mono text-slate-700">${wfElapsed(st)}</strong></span>
+          <p class="text-xs text-slate-500 mt-0.5 flex items-center gap-1.5">${icon("timer", "text-[14px] text-slate-400")}<span>Elapsed: <strong data-el class="font-mono text-slate-700">00:00</strong></span>
             <span class="text-slate-300">•</span><span>${tip(`${st.interventions || 0} supervisor intervention(s)`, "How many times the supervisor sent work back to an earlier agent")}</span></p>
           ${st.result ? `<p class="text-xs mt-1 ${run === "failed" ? "text-rose-700" : "text-slate-500"}">${esc(st.result)}</p>` : ""}
         </div>
@@ -146,6 +151,8 @@ function drawHead() {
         </div>
       </div>
     </div>`;
+  wfSet($("#wf-head"), html);
+  const clock = $("#wf-head [data-el]"); if (clock) clock.textContent = wfElapsed(st);   // only the clock ticks
 }
 
 /* ---------- pipeline of agent nodes ---------- */
@@ -227,21 +234,22 @@ function drawLog() {
       <div class="divide-y divide-slate-100 max-h-[560px] overflow-y-auto custom-scrollbar p-2" id="wf-rows"></div>
       <div class="px-4 py-2.5 border-t border-slate-100 bg-slate-50/60 flex items-center justify-between text-[11px] text-slate-500"><span class="flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span><span id="wf-live"></span></span>
         <button id="wf-export" class="text-violet-700 font-semibold flex items-center gap-1 hover:underline">${icon("download", "text-[14px]")}<span>Export raw JSON logs</span></button></div>`;
+    $("#wf-rows").addEventListener("toggle", ev => { const k = ev.target.dataset?.ek; if (k) ev.target.open ? WF.open.add(k) : WF.open.delete(k); }, true);   // remember opened details
     $("#wf-only").onchange = drawLog;
     $("#wf-search").oninput = e => { WF.search = e.target.value; drawLog(); };
     $("#wf-export").onclick = () => { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify(S.events, null, 2)], { type: "application/json" }));
       a.download = `${S.runId}-events.json`; a.click(); };
   }
   const gates = S.events.filter(wfIsGate).length;
-  $("#wf-filters").innerHTML = WF_FILTERS.map(([k, l]) => {
+  const filtersHtml = WF_FILTERS.map(([k, l]) => {
     const on = WF.filter === k, n = k === "all" ? ` (${S.events.length})` : k === "gate" ? ` (${gates})` : "";
     return `<button data-f="${k}" class="px-3 py-1 rounded-full ${on ? "font-semibold bg-violet-600 text-white shadow-sm" : k === "gate" ? "font-medium text-rose-700 bg-rose-50 border border-rose-200 hover:bg-rose-100 flex items-center gap-1" : "font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors"}">${k === "gate" && !on ? icon("published_with_changes", "text-[13px]") : ""}<span>${l}${n}</span></button>`; }).join("");
-  $("#wf-filters").querySelectorAll("[data-f]").forEach(b => b.onclick = () => { WF.filter = b.dataset.f; drawLog(); });
+  if (wfSet($("#wf-filters"), filtersHtml)) $("#wf-filters").querySelectorAll("[data-f]").forEach(b => b.onclick = () => { WF.filter = b.dataset.f; drawLog(); });
   const evs = wfEvents(), t0 = S.run?.status.started_at ? new Date(S.run.status.started_at) : null, rows = $("#wf-rows");
   const atBottom = rows.scrollHeight - rows.scrollTop - rows.clientHeight < 40;
   $("#wf-count").textContent = `${S.events.length} events`;
   $("#wf-live").textContent = S.run?.status.state === "running" ? "Live: updating every second" : "Run finished";
-  rows.innerHTML = evs.map(e => {
+  const row = e => {
     const bad = wfIsGate(e) || e.level === "error", warn = e.level === "warning", t = t0 ? wfClock(new Date(e.ts) - t0) : esc(e.ts.slice(11, 19));
     return `<div class="p-3.5 rounded-lg ${bad ? "bg-rose-50/50 border border-rose-200 hover:bg-rose-50 my-1" : "hover:bg-slate-50"} transition-colors flex items-start gap-3.5">
       <div class="font-mono text-xs font-${bad ? "bold text-rose-700" : "semibold text-slate-500"} pt-0.5 whitespace-nowrap">${t}</div>
@@ -250,8 +258,16 @@ function drawLog() {
         <div class="flex flex-wrap items-center gap-1.5"><span class="font-headline font-bold text-xs text-slate-900">${esc(agentName(e.step))}</span>
           <span class="px-1.5 py-0.5 rounded text-[10px] font-bold border ${bad ? "bg-rose-100 text-rose-800 border-rose-300" : warn ? "bg-amber-50 text-amber-800 border-amber-200" : "bg-emerald-50 text-emerald-800 border-emerald-200"}">${esc(String(e.kind).replace(/_/g, " "))}</span></div>
         <p class="text-xs ${bad ? "text-slate-800 font-medium" : "text-slate-700"} leading-relaxed break-words">${esc(e.message)}</p>
-        ${e.data ? `<details class="text-[11px]"><summary class="text-rose-700 font-semibold cursor-pointer underline">${icon("visibility", "text-[13px] align-middle")} View details</summary><pre class="mt-1 p-2 rounded bg-slate-50 border border-slate-200 text-[11px] overflow-x-auto">${esc(JSON.stringify(e.data, null, 2))}</pre></details>` : ""}
-      </div></div>`; }).join("") || `<div class="py-8">${emptyState("receipt_long", "No events yet.")}</div>`;
+        ${e.data ? `<details data-ek="${esc(String(e.t ?? e.ts))}" ${WF.open.has(String(e.t ?? e.ts)) ? "open" : ""} class="text-[11px]"><summary class="text-rose-700 font-semibold cursor-pointer underline">${icon("visibility", "text-[13px] align-middle")} View details</summary><pre class="mt-1 p-2 rounded bg-slate-50 border border-slate-200 text-[11px] overflow-x-auto">${esc(JSON.stringify(e.data, null, 2))}</pre></details>` : ""}
+      </div></div>`; };
+  // append only the new events when nothing about the view changed: the rows already on the page (and any open "View details") stay
+  const sig = JSON.stringify([S.runId, WF.filter, WF.search, !!$("#wf-only")?.checked, $("#wf-only")?.checked ? S.selected : null]);
+  if (sig === WF.logSig && WF.logN > 0 && evs.length >= WF.logN) {
+    if (evs.length > WF.logN) rows.insertAdjacentHTML("beforeend", evs.slice(WF.logN).map(row).join(""));
+  } else {
+    rows.innerHTML = evs.map(row).join("") || `<div class="py-8">${emptyState("receipt_long", "No events yet.")}</div>`;
+  }
+  WF.logSig = sig; WF.logN = evs.length;
   if (atBottom) rows.scrollTop = rows.scrollHeight;
 }
 
@@ -265,7 +281,7 @@ function wfMemEntry(e) {
 function drawMemory() {
   const el = $("#wf-memory"); if (!el) return;
   const mem = S.run?.memory || [];
-  el.innerHTML = mem.length ? mem.slice().reverse().map(wfMemEntry).join("") : emptyState("check_circle", "Nothing yet: no agent has been sent back in this run.");
+  wfSet(el, mem.length ? mem.slice().reverse().map(wfMemEntry).join("") : emptyState("check_circle", "Nothing yet: no agent has been sent back in this run."));
 }
 
 /* ---------- selected agent drawer ---------- */
@@ -274,12 +290,18 @@ async function drawDrawer() {
   const info = st.steps[s] || {}, tk = info.tokens || {}, state = info.state || "pending";
   const back = (S.run.memory || []).filter(e => e.step === s && e.kind === "sent_back");
   const fixes = back.at(-1)?.instructions || [], working = ["running", "retrying"].includes(state);
+  const clock = el.querySelector("[data-dur]"); if (clock) clock.textContent = wfDur(info) || "-";   // the running time keeps ticking
+  const mine = (S.run.files || []).filter(f => f === `${s}.json` || f.startsWith(`${s}.rejected.`));
+  const sig = JSON.stringify([S.runId, s, { ...info, started_at: 0, finished_at: info.finished_at || 0 }, back.length, fixes, mine]);
+  if (sig === WF.drawerSig) return;   // nothing changed: leave the panel (and its video player) alone
+  WF.drawerSig = sig;
+  if (!el.dataset.bound) { el.dataset.bound = "1"; el.addEventListener("toggle", ev => { const k = ev.target.dataset?.ek; if (k) ev.target.open ? WF.openD.add(k) : WF.openD.delete(k); }, true); }
   const head = `<div class="flex items-start justify-between gap-3">
       <div class="flex items-center gap-3">${avatar(s, "w-12 h-12")}<div><div class="flex items-center gap-2"><h3 class="font-headline font-bold text-slate-900 text-lg">${esc(agentName(s))}</h3></div><p class="text-xs text-slate-500">${esc(agentTitle(s))}</p></div></div>
       ${chip(state)}</div>
     <div class="grid grid-cols-2 gap-2 text-xs">
       ${[["autorenew", "Attempts", `${info.attempts || 0}${back.length ? ` <span class="text-[10px] font-normal text-slate-400">sent back ${back.length}×</span>` : ""}`], ["payments", "Run cost", money(info.cost_usd)],
-        ["timer", "Execution time", wfDur(info) || "-"], ["memory", "Tokens", wfK(wfTok(tk))]].map(([ic, l, v]) => `<div class="p-2.5 rounded-lg bg-slate-50 border border-slate-200/80"><div class="text-[11px] text-slate-500 flex items-center gap-1">${icon(ic, "text-[13px] text-slate-400")}<span>${l}</span></div><div class="font-headline font-bold text-slate-900 text-sm mt-0.5">${v}</div></div>`).join("")}
+        ["timer", "Execution time", `<span data-dur>${wfDur(info) || "-"}</span>`], ["memory", "Tokens", wfK(wfTok(tk))]].map(([ic, l, v]) => `<div class="p-2.5 rounded-lg bg-slate-50 border border-slate-200/80"><div class="text-[11px] text-slate-500 flex items-center gap-1">${icon(ic, "text-[13px] text-slate-400")}<span>${l}</span></div><div class="font-headline font-bold text-slate-900 text-sm mt-0.5">${v}</div></div>`).join("")}
     </div>
     <div class="p-3 rounded-lg bg-violet-50/60 border border-violet-100 text-xs space-y-1.5">
       <div class="flex items-center justify-between font-semibold text-violet-900"><span class="flex items-center gap-1">${icon("memory", "text-[15px] text-violet-600")}<span>Token usage breakdown</span></span><span class="font-mono text-[11px]">${wfK(wfTok(tk))} total</span></div>
@@ -300,7 +322,8 @@ async function drawDrawer() {
         <button disabled title="Coming soon" class="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-medium text-xs transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">${icon("tune", "text-[16px] text-slate-500")}<span>Adjust threshold</span></button>
       </div></div>`;
   const base = `${head}${summary}${errs}${fixHtml}`;
-  el.innerHTML = `${base}<div id="wf-art" class="space-y-3"></div>${buttons}`;
+  const artKey = `${S.runId}|${s}`;
+  el.innerHTML = `${base}<div id="wf-art" class="space-y-3">${WF.art[artKey] || ""}</div>${buttons}`;   // the last pictures at once, refreshed below
   // artifacts of this step (output, rendered media, rejected attempts)
   let art = "";
   const rid = encodeURIComponent(S.runId), files = S.run.files || [];
@@ -312,12 +335,13 @@ async function drawDrawer() {
         art += `<h4 class="font-headline font-bold text-xs text-slate-900 uppercase tracking-wider">Rendered media</h4><div class="rounded-lg overflow-hidden border border-slate-200">${a.kind === "video" ? `<video class="w-full" src="${url}" controls muted playsinline></video>` : `<img class="w-full" src="${url}" alt="poster">`}</div>`;
       }
       if ((s === "writer" || s === "formatter") && a.text) art += `<h4 class="font-headline font-bold text-xs text-slate-900 uppercase tracking-wider">Text</h4><div class="p-3 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-800 whitespace-pre-wrap">${fmtPost(a.text)}</div>`;
-      art += `<details class="text-xs"><summary class="cursor-pointer font-semibold text-slate-600">Output (JSON)</summary><pre class="mt-1 p-2 rounded bg-slate-50 border border-slate-200 text-[11px] overflow-x-auto">${esc(JSON.stringify(a, null, 2))}</pre></details>`;
+      art += `<details data-ek="${esc(artKey)}" ${WF.openD.has(artKey) ? "open" : ""} class="text-xs"><summary class="cursor-pointer font-semibold text-slate-600">Output (JSON)</summary><pre class="mt-1 p-2 rounded bg-slate-50 border border-slate-200 text-[11px] overflow-x-auto">${esc(JSON.stringify(a, null, 2))}</pre></details>`;
     } catch (e) { /* artifact not readable yet */ }
   }
   const rej = files.filter(f => f.startsWith(`${s}.rejected.`));
   if (rej.length) art += `<h4 class="font-headline font-bold text-xs text-slate-900 uppercase tracking-wider">Rejected attempts</h4>` + rej.map(f => `<a href="/api/runs/${rid}/artifact/${encodeURIComponent(f)}" target="_blank" class="block text-[11px] font-mono text-violet-700 hover:underline">${esc(f)}</a>`).join("");
-  const slot = $("#wf-art"); if (slot && S.selected === s) slot.innerHTML = art;
+  const slot = $("#wf-art");
+  if (slot && S.selected === s && WF.art[artKey] !== art) { WF.art[artKey] = art; slot.innerHTML = art; }   // only when it really changed
 }
 
 VIEWS.workflow = renderWorkflow;

@@ -170,7 +170,23 @@ def text_problems(text, cat, profile, first_comment=""):
 
 
 YOUTUBE_TITLE_MAX, YOUTUBE_DESC_MAX, YOUTUBE_TAGS_MAX = 100, 5000, 500
-SCENE_LAYOUTS = ("title", "statement", "points", "code", "diagram")
+SCENE_LAYOUTS = ("title", "statement", "points", "code", "diagram", "trace", "flow")
+
+
+SENTENCE_MAX = 30
+
+
+def needed_visual(spec, cat):
+    """The scene a video of this topic must contain so the viewer sees the example move: 'trace' for algorithms, 'flow' for system
+    design and architecture. Only for the explainer renderer, the one that draws them."""
+    if (spec or {}).get("renderer") != "explainer":
+        return ""
+    kind = " ".join(str((cat or {}).get(k) or "") for k in ("id", "label", "kicker")).lower()
+    if any(w in kind for w in ("leetcode", "algorithm")):
+        return "trace"
+    if any(w in kind for w in ("system design", "system-design", "architecture")):
+        return "flow"
+    return ""
 
 
 def script_problems(script, spec, cat, profile):
@@ -181,13 +197,14 @@ def script_problems(script, spec, cat, profile):
     words = len(text.split())
     target, hi = spec["target_seconds"], spec["max_words"]
     lo = int(hi * 0.7)
+    wps = spec.get("wps", 2.5)
     if words > int(hi * 1.1):
-        problems.append(f"the narration is {words} words: about {words / 2.5:.0f} seconds, but this {spec['format']} video "
+        problems.append(f"the narration is {words} words: about {words / wps:.0f} seconds, but this {spec['format']} video "
                         f"should run about {target} seconds ({hi} words at most). Cut {words - hi} words")
     elif words < lo:
-        problems.append(f"the narration is only {words} words: about {words / 2.5:.0f} seconds, but this video should "
+        problems.append(f"the narration is only {words} words: about {words / wps:.0f} seconds, but this video should "
                         f"run about {target} seconds ({lo}-{hi} words)")
-    mn, mx = (3, 10) if spec["format"] == "short" else (4, 40)
+    mn, mx = (3, 24) if spec["format"] == "short" else (4, 40)
     if not mn <= len(scenes) <= mx:
         problems.append(f"{len(scenes)} scenes: a {spec['format']} video needs {mn}-{mx}")
     for i, sc in enumerate(scenes, 1):
@@ -201,12 +218,20 @@ def script_problems(script, spec, cat, profile):
                 problems.append(f"scene {i}: {code_problem}")
         elif sc.get("layout") == "points" and not 1 <= len(sc.get("items") or []) <= 5:
             problems.append(f"scene {i}: 'points' needs 1-5 items")
-        elif sc.get("layout") == "diagram":
-            from .render.scenes import parse_edge
-            nodes = [n for n in sc.get("nodes") or [] if n]
+        elif sc.get("layout") == "trace":
+            from .render.scenes import trace_problem
+            bad = trace_problem(sc)
+            if bad:
+                problems.append(f"scene {i}: {bad}")
+        elif sc.get("layout") in ("diagram", "flow"):
+            from .render.scenes import ICONS, parse_edge, split_node
+            nodes = [n for n in sc.get("nodes") or [] if split_node(n)[0]]
             edges = sc.get("edges") or []
-            if not 2 <= len(nodes) <= 6 or len(set(n.lower() for n in nodes)) != len(nodes) or any(len(n) > 18 for n in nodes):
+            labels = [split_node(n)[0] for n in nodes]
+            if not 2 <= len(nodes) <= 6 or len(set(n.lower() for n in labels)) != len(nodes) or any(len(n) > 18 for n in labels):
                 problems.append(f"scene {i}: a diagram needs 2-6 different boxes with labels of at most 18 characters")
+            elif any(split_node(n)[1] and split_node(n)[1] not in ICONS for n in nodes):
+                problems.append(f"scene {i}: an icon after | must be one of {', '.join(ICONS)}")
             elif not 1 <= len(edges) <= 8:
                 problems.append(f"scene {i}: a diagram needs 1-8 arrows")
             else:
@@ -215,6 +240,16 @@ def script_problems(script, spec, cat, profile):
                     problems.append(f"scene {i}: arrow {bad[0]!r} must be 'Box > Other box' using the exact box labels")
         elif sc.get("layout") in ("title", "statement") and not (sc.get("on_screen") or "").strip():
             problems.append(f"scene {i}: write the on-screen text")
+    stray = re.findall(r"(?<![\w'])[b-hj-z](?![\w'])", text) + re.findall(r"(?<![\w'])a(?=\s*,\s*[A-Za-z]\b)|(?<=[.!?]\s)a\s*[.,]", text)
+    if stray:
+        problems.append("the narration has a lone lowercase letter (" + ", ".join(sorted(set(stray))[:4]) + "): the voice makes stray sounds "
+                        "on them. Write example letters as capitals (A, B, C), never 'a, b, c'")
+    need = needed_visual(spec, cat)
+    if need and len(scenes) >= 3 and not any(sc.get("layout") == need for sc in scenes):
+        problems.append({"trace": "this is an algorithm video: add a 'trace' scene that walks the example array (cells) with moving "
+                                  "pointers, the arithmetic of each step in its note, ending with the answer found",
+                         "flow": "this is a system-design video: add a 'flow' scene that follows one concrete request through the "
+                                 "boxes, with the real data (GET /cart?user=42, 3 items) as each arrow's label"}[need])
     joined = " ".join((sc.get("narration") or "") for sc in scenes)
     if scenes and norm(joined) != norm(text):
         problems.append("'text' must be the scenes' narration, in order: it is what the voice reads")
@@ -242,6 +277,15 @@ def script_problems(script, spec, cat, profile):
         problems.append(f"remove hype phrases: {slop}")
     if "**" in text or "`" in text or re.search(r"(?m)^#{1,6} ", text):
         problems.append("the narration is read aloud: no markdown (**, #, backticks)")
+    if re.search(r"<\s*break|\[\s*(long )?pause", text, re.I):
+        problems.append("no [pause] or <break> tags: write full stops, commas and a '...' for a beat; the app adds the pauses")
+    for i, sc in enumerate(scenes, 1):   # a voice trips on long sentences, and a learner on long explanations
+        for s in re.split(r"(?<=[.!?])\s+", (sc.get("narration") or "").replace("...", "\u2026")):
+            n = len(s.split())
+            if n > SENTENCE_MAX:
+                problems.append(f"scene {i}: a sentence of {n} words ({' '.join(s.split()[:6])}...): split it, spoken "
+                                f"sentences are at most 25 words")
+                break
     if URL.search(text):
         problems.append("do not read a web address aloud: put links in the description")
     if re.search(r"\b(hey guys|what's up guys|smash that|don't forget to (like|subscribe))\b", text, re.I):

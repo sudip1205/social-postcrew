@@ -175,7 +175,8 @@ class BlackboardCrewTests(unittest.TestCase):
             cfg = ws.config()
             cfg["platforms"]["youtube"]["video"]["renderer"] = "blackboard"
             ws.save_config(cfg)
-            llm = ScriptedLLM({"topic": [yc.topic("Default arguments", ())], "writer": [yc.script()], "editor": [yc.review()]})
+            llm = ScriptedLLM({"topic": [yc.topic("Default arguments", ())], "writer": [yc.script()], "editor": [yc.review()],
+                               "video_review": [{"verdict": "pass", "score": 95, "summary": "in step", "scenes": []}]})
             res = run_crew(ws, yc.DAY, "short-tip", llm=llm, platform="youtube")
             self.assertTrue(res["ok"], res)
             self.assertEqual(seen["tts_calls"], 5)                    # every scene was voiced before the first stroke
