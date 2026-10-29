@@ -2,13 +2,13 @@
 
   python3 -m postcrew demo                 try it: a full crew run on scripted answers (no AI, no LinkedIn)
   python3 -m postcrew init                 create the workspace (settings, secrets, queue)
-  python3 -m postcrew serve [--port 8765]  open the Studio and start the scheduler
+  python3 -m postcrew serve [--port 8765]  open the Studio and start the scheduler (add --lan to open it to your network)
   python3 -m postcrew run [--date D] [--category C] [--dry-run]   run the crew once now
   python3 -m postcrew publish              publish whatever is due
   python3 -m postcrew check                check LinkedIn + Claude credentials
   python3 -m postcrew doctor               check everything needed is installed and configured
   python3 -m postcrew status               queue and recent runs
-  python3 -m postcrew plan                 let the Week Planner draft the rest of this week's topics now
+  python3 -m postcrew plan                 write this month's plans for your topics now (assign them to days in the Studio)
   python3 -m postcrew import FILE          add posts you published elsewhere, so they are never repeated
 """
 import argparse
@@ -168,6 +168,9 @@ def main(argv=None):
     sub.add_parser("init")
     sv = sub.add_parser("serve")
     sv.add_argument("--port", type=int, default=8765)
+    sv.add_argument("--host", default="127.0.0.1", help="address to listen on (default: this computer only)")
+    sv.add_argument("--lan", action="store_true", help="listen on the local network (same as --host 0.0.0.0); needs the access token")
+    sv.add_argument("--token", help="the access token for a Studio opened to the network (default: made once, kept in the workspace)")
     sv.add_argument("--no-scheduler", action="store_true", help="Studio only; use cron/systemd for the schedule")
     r = sub.add_parser("run")
     r.add_argument("--date", help="post date YYYY-MM-DD (default: per schedule.lead_days)")
@@ -199,7 +202,7 @@ def main(argv=None):
         return 0
     if a.cmd == "serve":
         from .studio.server import serve
-        serve(ws, a.port, scheduler=not a.no_scheduler)
+        serve(ws, a.port, scheduler=not a.no_scheduler, host="0.0.0.0" if a.lan else a.host, token=a.token)
         return 0
     if a.cmd == "doctor":
         return cmd_doctor(ws)
@@ -234,10 +237,16 @@ def main(argv=None):
     if a.cmd == "plan-import":
         return cmd_plan_import(ws, a.file, a.apply_schedule)
     if a.cmd == "plan":
-        from .agents.planner import plan_week
+        from . import monthly
         from .crew import local_now
-        for d, e in sorted(plan_week(ws, local_now(ws.config()).date(), platform=a.platform).items()):
-            print(f"  {d}  {e.get('topic') or 'FAILED: ' + e.get('error', '')}")
+        try:
+            out = monthly.generate(ws, a.platform, monthly.month_key(local_now(ws.config()).date()))
+        except ValueError as e:
+            print(e)
+            return 2
+        for topic, r in out["topics"].items():
+            print(f"  {topic}: " + (f"FAILED: {r['error']}" if isinstance(r, dict) else f"{r} plan(s) written"))
+        print(f"{out['added']} plan(s) written. Assign them to days in the Plan page.")
         return 0
     if a.cmd == "status":
         from .crew import list_runs

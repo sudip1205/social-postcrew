@@ -41,6 +41,7 @@ class RunContext:
     memory: object = None                             # RunMemory: what went wrong earlier in this run
     reviews: list = field(default_factory=list)       # the Editor's earlier rounds in this run
     platform: str = "linkedin"                        # the app this post is for; cfg is that app's view of the config
+    flags: dict = field(default_factory=dict)         # things an agent did once in this run (a retry of the step must not repeat them)
     options: dict = field(default_factory=dict)       # one-off overrides for this run (e.g. a video's format and length)
 
     @property
@@ -107,6 +108,10 @@ class Agent:
         if "{{brief_rules}}" in text:  # the owner's per-post brief, as the reviewers must judge it
             from .. import brief as briefmod
             base["brief_rules"] = briefmod.editor_rules(briefmod.of(ctx))
+        try:   # YouTube: the owner's required closing line (ctx.video exists only for a video run)
+            base["outro"] = ctx.video.get("outro") or "(none)"
+        except Exception:
+            base["outro"] = "(none)"
         base.update(values)
         for k, v in base.items():
             text = text.replace("{{" + k + "}}", str(v))

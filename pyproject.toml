@@ -20,4 +20,4 @@ postcrew = "postcrew.__main__:main"
 include = ["postcrew*"]
 
 [tool.setuptools.package-data]
-postcrew = ["prompts/*.md", "studio/static/*", "studio/static/views/*", "studio/static/fonts/*", "render/fonts/*"]
+postcrew = ["prompts/*.md", "prompts/*/*.md", "tools/*.patch", "studio/static/*", "studio/static/views/*", "studio/static/fonts/*", "render/fonts/*", "remotion/package.json", "remotion/tsconfig.json", "remotion/src/*", "hyperframes/package.json"]

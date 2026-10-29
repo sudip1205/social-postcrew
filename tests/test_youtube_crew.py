@@ -25,8 +25,12 @@ DAY = date(2026, 11, 3)
 CLAUDE_OK = {"state": "ok", "message": "logged in"}
 
 
+WORDS = "apple river cloud stone bridge garden window candle forest anchor basket meadow".split()   # real words: the voice can say them
+
+
 def narration(n_words, start="Step"):
-    return " ".join(f"{start}{i % 7}" for i in range(n_words)) + "."
+    shift = sum(map(ord, start))
+    return " ".join(WORDS[(shift + i * 5 + i // 12) % len(WORDS)] for i in range(n_words)) + "."
 
 
 def script(words_per_scene=20, scenes=5, **over):
@@ -206,7 +210,7 @@ class YouTubeCrewTests(unittest.TestCase):
             steps = json.loads((ws.runs_dir / res["run_id"] / "status.json").read_text())["steps"]
             self.assertEqual({k: v["state"] for k, v in steps.items()},
                              {**{s: "passed" for s in ("credentials", "topic", "research", "writer", "editor", "voice", "media",
-                                                      "publisher")}, "video_review": "skipped"})   # slides videos: no second review
+                                                      "hooks", "publisher")}, "video_review": "skipped"})   # slides videos: no second review
             self.assertEqual(llm.agents_called().count("editor"), 3)      # reviewed like any post
             post = ws.queue()[0]
             self.assertEqual((post["platform"], post["status"], post["id"]), ("youtube", "awaiting_approval",

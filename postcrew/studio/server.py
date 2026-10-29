@@ -3,6 +3,10 @@
 Binds to 127.0.0.1. Secrets are write-only from the browser (it only learns whether each one is set).
 Every state-changing request must carry the X-Postcrew header and a localhost Origin/Host, which blocks
 other web sites from driving the Studio through your browser (CSRF / DNS rebinding).
+
+On another interface (`serve --lan` / `--host`) the Studio can be opened from other computers, and then every request must carry
+the access token (a cookie set by the link `http://<address>:<port>/?token=...` the server prints, or `Authorization: Bearer`).
+A page on another site cannot read that cookie, and a write must come from the same site as the page that sent it.
 """
 import json
 import mimetypes
@@ -17,14 +21,16 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from .. import __version__, assets as assets_mod, crew, linkedin, notify as notify_mod, platforms, voice as voice_mod, youtube
-from ..agents import planner as planner_mod
+from .. import monthly
 from ..agents import team as team_mod
-from .. import brief as brief_mod
 from .. import memory as memory_mod
 from ..agents.credentials import run_check
 from ..agents.publisher import publish_post, scheduled_at
 from ..agents.supervisor import CREW, Supervisor
 from ..agents.blackboard import BlackboardAgent, ExplainerAgent
+from ..agents.explainroo import ExplainrooAgent
+from ..agents.frames import HyperFramesAgent, RemotionAgent, RemotionFramesAgent
+from ..agents.hooks import HooksAgent
 from ..agents.video_review import VideoReviewAgent
 from ..agents.voice import VoiceAgent
 from ..llm import LLMError, agent_settings, make_backend
@@ -37,8 +43,9 @@ SAFE_ID = re.compile(r"^[A-Za-z0-9_.-]+$")
 
 
 class Studio:
-    def __init__(self, ws, port=8765):
+    def __init__(self, ws, port=8765, token=None):
         self.ws, self.port = ws, port
+        self.token = token   # set when the Studio is reachable from other computers: every request must carry it
         self.oauth_states = {}
 
     @property
@@ -87,7 +94,7 @@ class Studio:
         cfg = self.ws.config()
         rows = []
         roster = team_mod.load(self.ws)["members"]
-        for a in [planner_mod.PlannerAgent()] + CREW + [VoiceAgent(), BlackboardAgent(), ExplainerAgent(), VideoReviewAgent(), Supervisor()]:
+        for a in [monthly.MonthPlanner()] + CREW + [VoiceAgent(), BlackboardAgent(), ExplainerAgent(), ExplainrooAgent(), HyperFramesAgent(), RemotionFramesAgent(), RemotionAgent(), VideoReviewAgent(), HooksAgent(), Supervisor()]:
             role = {"research": "research", "writer": "writer"}.get(a.id)
             members = [m["name"] for m in roster if m["role"] == role][:cfg["team"][role]] if role else []
             rows.append({"id": a.id, "title": a.title, "name": a.name, "role": a.role, "members": members,
@@ -159,126 +166,40 @@ class Studio:
             time.sleep(0.05)
         return {"run_id": run_id}
 
-    # ---------- week plan ----------
-    def plan(self, platform=None):
-        """Monday-Sunday of the current week: category, planned topic, and whether it is written or past."""
+    # ---------- monthly plan ----------
+    def plan(self, platform=None, month=None):
+        """One month of the plan: the generated plans, the days they are assigned to, and the topics they came from."""
         platform, cfg = self._view(platform)
         today = crew.local_now(cfg).date()
-        week = planner_mod.this_week(today)
-        entries = planner_mod.load_plan(self.ws, platform)
-        mine = lambda p: platforms.platform_of(p) == platform
-        queue = {p["date"]: p for p in self.ws.queue() if mine(p) and p.get("status") != "vetoed"}
-        hist = {p.get("date"): p for p in self.ws.history() if mine(p) and not p.get("imported")}
-        rows = []
-        for d in week:
-            iso, cat = d.isoformat(), crew.category_for(cfg, d) or ""
-            c = cfg["categories"].get(cat, {})
-            done = hist.get(iso) or queue.get(iso)
-            e = entries.get(iso) if (entries.get(iso) or {}).get("category") == cat else None
-            rows.append({"brief_text": brief_mod.to_text(e["brief"]) if e and e.get("brief") else "",
-                         "briefing": brief_mod.briefing_mode(c) if c else "off",
-                         "date": iso, "weekday": d.strftime("%A"), "category": cat, "label": c.get("label", ""),
-                         "plan_ahead": c.get("plan_ahead", True), "fixed": c.get("media") == "animation" or cat == "week-recap",
-                         "entry": entries.get(iso) if (entries.get(iso) or {}).get("category") == cat else None,
-                         "written": ({"status": "published" if iso in hist else done.get("status"),
-                                      "topic": done.get("topic", "")} if done else None),
-                         "past": d <= today})
-        return {"days": rows, "planning": cfg["planning"], "platform": platform,
-                "ideas": planner_mod.idea_status(self.ws, self.ws.config(), platform),
-                "week": [week[0].isoformat(), week[-1].isoformat()], "today": today.isoformat()}
+        month = month or monthly.month_key(today)
+        if not re.fullmatch(r"\d{4}-(0[1-9]|1[0-2])", month):
+            raise ValueError("month must look like 2026-11")
+        return dict(monthly.view(self.ws, platform, month, today), today=today.isoformat(), this_month=monthly.month_key(today),
+                    planning=cfg["planning"])
 
-    def _plan_day(self, day, platform=None):
-        datetime.strptime(day, "%Y-%m-%d")
-        row = next((r for r in self.plan(platform)["days"] if r["date"] == day), None)
-        if not row or not row["category"]:
-            raise ValueError(f"{day} has no post scheduled (or is outside this week)")
-        if row["past"]:
-            raise ValueError(f"{day} is today or already past; its post is already being written")
-        if row["written"]:
-            raise ValueError(f"the {day} post is already written ({row['written']['status']}); edit it in the Queue")
-        return row
+    def plan_generate(self, body):
+        """Write the plans for the month's topics (the missing ones; never a plan twice)."""
+        platform, cfg = self._view(body.get("platform"))
+        today = crew.local_now(cfg).date()
+        month = body.get("month") or monthly.month_key(today)
+        if month < monthly.month_key(today):
+            raise ValueError("that month is over: plans are written for this month or a coming one")
+        out = monthly.generate(self.ws, platform, month, today=today)
+        bad = [r["error"] for r in out["topics"].values() if isinstance(r, dict)]
+        if bad and not out["added"]:
+            raise ValueError(f"the Planner could not write the plans: {bad[0]}")
+        return dict(self.plan(platform, month), added=out["added"], failed=len(bad))
 
-    def plan_save(self, body):
-        """Save several days at once: {"days": {date: {"topic", "angle"}}}. Checked first, then all saved."""
-        days = body.get("days")
-        if not isinstance(days, dict) or not days:
-            raise ValueError("nothing to save")
+    def plan_assign(self, body):
+        platform, cfg = self._view(body.get("platform"))
+        today = crew.local_now(cfg).date()
+        item = monthly.assign(self.ws, platform, str(body.get("id") or ""), str(body.get("date") or ""), body.get("format"), today)
+        return self.plan(platform, body.get("month") or item["assigned"]["date"][:7])
+
+    def plan_unassign(self, body):
         platform = self._view(body.get("platform"))[0]
-        checked = []
-        for day, v in days.items():
-            row = self._plan_day(day, platform)
-            topic, angle = (v.get("topic") or "").strip(), (v.get("angle") or "").strip()
-            if topic and (not 5 <= len(topic) <= 90 or len(angle) > 400):
-                raise ValueError(f"{row['weekday']}: the topic must be 5-90 characters and the angle under 400")
-            extra = {}
-            for key in ("format", "target_seconds"):   # a YouTube day's own kind of video; empty = inherit
-                if key in v:
-                    val = v[key]
-                    if key == "format" and val not in ("", None, "short", "long"):
-                        raise ValueError(f"{row['weekday']}: format must be short or long")
-                    if key == "target_seconds" and val not in ("", None):
-                        if not (isinstance(val, (int, float)) or str(val).isdigit()) or not 15 <= int(val) <= 1800:
-                            raise ValueError(f"{row['weekday']}: length must be 15-1800 seconds")
-                        val = int(val)
-                    extra[key] = val or None
-            brief = None
-            if "brief" in v:   # absent = keep the saved brief; empty = clear it
-                try:
-                    brief = brief_mod.normalize(v.get("brief") or {})
-                except brief_mod.BriefError as e:
-                    raise ValueError(f"{row['weekday']}: {e}")
-            checked.append((day, row, topic, angle, brief, extra))
-        for day, row, topic, angle, brief, extra in checked:
-            self._set_topic(day, row, topic, angle, brief, platform, extra)
-        return self.plan(platform)
-
-    def plan_edit(self, day, body):
-        return self.plan_save({"days": {day: body}, "platform": body.get("platform")})
-
-    def _set_topic(self, day, row, topic, angle, brief=None, platform=platforms.LINKEDIN, extra=None):
-        old = row["entry"] or {}
-        if not topic:
-            planner_mod.set_entry(self.ws, day, None, platform)
-            return
-        brief = old.get("brief", {}) if brief is None else brief
-        extra = extra or {}
-        if (topic == old.get("topic") and angle == old.get("angle", "") and brief == old.get("brief", {})
-                and all(old.get(k) == v for k, v in extra.items())):
-            return  # unchanged: keep who chose it
-        entry = {"category": row["category"], "topic": topic, "angle": angle,
-                 "search_queries": [] if topic != old.get("topic") else old.get("search_queries", []),
-                 "source": "manual", "rejected": old.get("rejected", [])}
-        if brief:
-            entry["brief"] = brief
-        for key in ("format", "target_seconds"):
-            val = extra[key] if key in extra else old.get(key)
-            if val:
-                entry[key] = val
-        planner_mod.set_entry(self.ws, day, entry, platform)
-
-    def plan_suggest(self, day, body):
-        platform = self._view(body.get("platform"))[0]
-        self._plan_day(day, platform)
-        out = planner_mod.PlannerAgent().plan(self.ws, [datetime.strptime(day, "%Y-%m-%d").date()],
-                                              hint=(body.get("hint") or "").strip()[:300], force=True,
-                                              platform=platform)
-        if out.get(day, {}).get("error"):
-            raise ValueError(f"the planner could not find a new topic: {out[day]['error']}")
-        return self.plan(platform)
-
-    def plan_fill(self, body=None):
-        """Plan the open days; replan=True also replaces the planner's own topics (yours are kept)."""
-        platform, cfg = self._view((body or {}).get("platform"))
-        if (body or {}).get("replan"):
-            today = crew.local_now(cfg).date()
-            out = planner_mod.PlannerAgent().plan(self.ws, planner_mod.days_left(today), replan=True,
-                                                  platform=platform)
-            bad = [e["error"] for e in out.values() if "error" in e]
-            if bad:
-                raise ValueError(f"{len(bad)} day(s) could not be re-planned: {bad[0]}")
-        else:
-            planner_mod.plan_week(self.ws, crew.local_now(cfg).date(), platform=platform)
-        return self.plan(platform)
+        monthly.unassign(self.ws, platform, str(body.get("id") or ""))
+        return self.plan(platform, body.get("month"))
 
     # ---------- team ----------
     def team(self):
@@ -607,14 +528,33 @@ def make_handler(studio):
                 self.wfile.write(body)
 
         def host_ok(self):
+            if studio.token:   # reachable from the network: the access token is the guard, not the address
+                return True
             host = (self.headers.get("Host") or "").rsplit(":", 1)[0]
             return host in LOCAL_HOSTS
 
         def mutation_ok(self):
             origin = self.headers.get("Origin")
-            if origin and urlparse(origin).hostname not in ("localhost", "127.0.0.1", "::1"):
+            if studio.token:   # a write must come from the very page the Studio served (same site as the Host it was reached on)
+                host = (self.headers.get("Host") or "").rsplit(":", 1)[0].strip("[]")
+                if origin and (urlparse(origin).hostname or "") != host:
+                    return False
+            elif origin and urlparse(origin).hostname not in ("localhost", "127.0.0.1", "::1"):
                 return False
             return self.headers.get("X-Postcrew") == "1"
+
+        def authorised(self, u):
+            """(ok, redirect cookie header). Without a token (localhost only) everything is allowed."""
+            if not studio.token:
+                return True, None
+            given = [self.headers.get("Authorization", "")[7:] if self.headers.get("Authorization", "").startswith("Bearer ") else ""]
+            given += [c.split("=", 1)[1] for c in (self.headers.get("Cookie") or "").replace(" ", "").split(";") if c.startswith("postcrew_token=")]
+            if any(g and pysecrets.compare_digest(g, studio.token) for g in given):
+                return True, None
+            link = parse_qs(u.query).get("token", [""])[0]
+            if self.command == "GET" and link and pysecrets.compare_digest(link, studio.token):
+                return True, f"postcrew_token={studio.token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=31536000"
+            return False, None
 
         def body(self):
             n = int(self.headers.get("Content-Length") or 0)
@@ -690,6 +630,14 @@ def make_handler(studio):
         def route(self, method):
             if not self.host_ok():
                 return self.send(403, {"error": "Studio only answers on localhost"})
+            ok, cookie = self.authorised(urlparse(self.path))
+            if not ok:
+                page = (b"<!doctype html><meta charset=utf-8><title>Postcrew Studio</title><body style='font:16px system-ui;max-width:34rem;margin:15vh auto;padding:0 1rem'>"
+                        b"<h2>Postcrew Studio is locked</h2><p>Open the link the server printed when it started: it ends with <code>/?token=...</code>. "
+                        b"It also sits in <code>studio-token</code> in the workspace folder.</p>")
+                return self.send(401, ctype="text/html; charset=utf-8", body=page)
+            if cookie:   # the link with the token: keep it in a cookie, then show the Studio without the token in the address bar
+                return self.send(302, {}, headers={"Set-Cookie": cookie, "Location": urlparse(self.path).path or "/"})
             if method != "GET" and not self.mutation_ok():
                 return self.send(403, {"error": "missing X-Postcrew header or foreign origin"})
             u = urlparse(self.path)
@@ -748,21 +696,18 @@ def make_handler(studio):
                 m = re.match(r"^/api/team/(fire|hire|lesson-remove)$", p)
                 if m and method == "POST":
                     return self.send(200, studio.team_action(m.group(1), self.body()))
-                m = re.match(r"^/api/plan/(\d{4}-\d{2}-\d{2})(?:/(suggest))?$", p)
-                if m and method in ("PUT", "POST"):
-                    fn = studio.plan_suggest if m.group(2) else studio.plan_edit
-                    return self.send(200, fn(m.group(1), self.body()))
                 m = re.match(r"^/api/queue/([^/]+)/(approve|veto|restore|publish_now|edit|delete)$", p)
                 if method == "POST" and m:
                     return self.send(200, studio.queue_action(m.group(1), m.group(2), self.body()))
                 routes = {
                     ("GET", "/api/overview"): lambda: studio.overview(q.get("platform")),
-                    ("GET", "/api/plan"): lambda: studio.plan(q.get("platform")),
+                    ("GET", "/api/plan"): lambda: studio.plan(q.get("platform"), q.get("month")),
                     ("GET", "/api/team"): lambda: studio.team(),
                     ("GET", "/api/memory"): lambda: studio.memory(),
                     ("POST", "/api/memory/forget"): lambda: studio.memory_forget(self.body()),
-                    ("PUT", "/api/plan"): lambda: studio.plan_save(self.body()),
-                    ("POST", "/api/plan/fill"): lambda: studio.plan_fill(self.body()),
+                    ("POST", "/api/plan/generate"): lambda: studio.plan_generate(self.body()),
+                    ("POST", "/api/plan/assign"): lambda: studio.plan_assign(self.body()),
+                    ("POST", "/api/plan/unassign"): lambda: studio.plan_unassign(self.body()),
                     ("GET", "/api/agents"): lambda: studio.agents(),
                     ("GET", "/api/runs"): lambda: {"runs": crew.list_runs(ws)},
                     ("POST", "/api/runs"): lambda: studio.start_run(self.body()),
@@ -821,13 +766,55 @@ def make_handler(studio):
     return Handler
 
 
-def serve(ws, port=8765, scheduler=True):
+def lan_addresses():
+    """This computer's address(es) on the local network, for the link the server prints."""
+    import socket
+    found = []
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("10.255.255.255", 1))   # no packet is sent: it only picks the interface a LAN address would leave by
+        found.append(s.getsockname()[0])
+        s.close()
+    except OSError:
+        pass
+    try:
+        found += [i[4][0] for i in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET)]
+    except OSError:
+        pass
+    return [a for a in dict.fromkeys(found) if not a.startswith("127.")]
+
+
+def access_token(ws, given=None):
+    """The token that unlocks a Studio opened to the network: --token / $POSTCREW_TOKEN, else one made once and kept in the workspace."""
+    import os
+    token = given or os.environ.get("POSTCREW_TOKEN")
+    if token:
+        return token
+    path = ws.root / "studio-token"
+    saved = path.read_text().strip() if path.exists() else ""
+    if saved:
+        return saved
+    token = pysecrets.token_urlsafe(18)
+    path.write_text(token + "\n")
+    path.chmod(0o600)
+    return token
+
+
+def serve(ws, port=8765, scheduler=True, host="127.0.0.1", token=None):
     from ..scheduler import Scheduler
-    studio = Studio(ws, port)
-    httpd = ThreadingHTTPServer(("127.0.0.1", port), make_handler(studio))
+    local = host in ("127.0.0.1", "localhost", "::1")
+    token = None if local else access_token(ws, token)
+    studio = Studio(ws, port, token)
+    httpd = ThreadingHTTPServer((host, port), make_handler(studio))
     if scheduler:
         Scheduler(ws).start()
     print(f"Postcrew Studio {__version__}: http://localhost:{port}  (workspace: {ws.root})", flush=True)
+    if token:
+        shown = lan_addresses() if host in ("0.0.0.0", "") else [host]
+        print("Open to the network. Anyone with the link below can run the crew and publish, so share it only with people you trust:", flush=True)
+        for a in shown or ["<this computer's address>"]:
+            print(f"  http://{a}:{port}/?token={token}", flush=True)
+        print("(LinkedIn and YouTube sign-in redirects to localhost: connect those accounts on this computer, or through an SSH tunnel.)", flush=True)
     if scheduler:
         print("Scheduler is on: it writes, reviews and publishes on the times in Settings.", flush=True)
     try:

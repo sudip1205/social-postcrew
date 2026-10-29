@@ -18,6 +18,14 @@ What the viewer must get (this is the whole point):
   explainroo draws best: icons, hand-drawn arrows, code that changes step by step, charts, spring-in arrivals, a pointer.
 - Big, readable text; keep things in the same place from scene to scene so one picture grows; nothing cut off, nothing overlapping,
   no half-empty frame (fill the frame with the picture and use the camera).
+- SPACE AND SPACING (the most common faults): the picture must fill the FREE AREA you are given, not huddle at the top.
+  * Spread the scene's parts over the whole free height: the first part near the top of it, the last near the bottom, with even gaps
+    of at least 48 px between parts (use s.col(n) or s.grid). Never stack things touching; keep at least 32 px between any two texts,
+    shapes or labels, and 24 px inside a card between its lines.
+  * Make things big: main text 64 px or more, labels 44 px or more, array cells at least 150 x 150 px, icons 120 px or more; cards
+    at least 80% of the free width. If there is room left, make things bigger, not closer.
+  * Put each pointer, label or note in its OWN row below or above the thing it points at, never on top of text.
+  * One idea per scene: 3 to 5 big parts at most, not many small ones. Remove a part before you crowd it.
 - Vertical (shorts) videos: everything inside the safe area `s.safe` (use s.col / s.grid / s.row, stack things, never side by side), text
   large (at least 4% of the frame height), and USE that area: one big picture per scene (the array cells big, the pointers
   clear, the arithmetic large under it), not a few small things in a corner. Put an icon BESIDE its label, never on top of it; give

@@ -188,7 +188,10 @@ class SchedulerTests(unittest.TestCase):
             self.assertEqual(calls, [])
             scheduler.tick(ws, datetime(2026, 10, 12, 9, 5, tzinfo=tz), **kw)    # after post_time + check time
             self.assertEqual(calls, [("check",), ("publish",)])
-            scheduler.tick(ws, datetime(2026, 10, 12, 10, 1, tzinfo=tz), **kw)   # Monday 10:00: plan the week
+            cfg = ws.config()
+            cfg["topics"] = ["Circuit breaker pattern"]
+            ws.save_config(cfg)
+            scheduler.tick(ws, datetime(2026, 10, 12, 10, 1, tzinfo=tz), **kw)   # the month has topics now: plan the month once
             self.assertIn(("plan", "2026-10-12"), calls)
             scheduler.tick(ws, datetime(2026, 10, 12, 19, 1, tzinfo=tz), **kw)   # generate Tuesday's post
             self.assertIn(("run", "2026-10-13"), calls)
@@ -310,44 +313,35 @@ class StudioTests(unittest.TestCase):
         code, d = self.req("PUT", "/api/credentials", {"linkedin_access_token": "x"})
         self.assertEqual(code, 400)
 
-    def test_plan_edit_suggest_and_clear(self):
+    def test_the_monthly_plan_is_generated_assigned_and_unassigned_through_the_api(self):
         from helpers import ScriptedLLM
         from postcrew.agents import planner
-        code, d = self.req("GET", "/api/plan")
-        self.assertEqual(code, 200)
-        self.assertEqual(len(d["days"]), 7)                                  # Monday-Sunday of this week only
+        from postcrew.crew import local_now
         cfg = self.ws.config()
-        cfg["schedule"]["days"] = {k: "dev-tip" for k in cfg["schedule"]["days"]}   # every day open for edits
+        cfg["topics"] = ["Circuit breaker pattern"]
         self.ws.save_config(cfg)
-        d = self.req("GET", "/api/plan")[1]
-        open_days = [r["date"] for r in d["days"] if not r["past"]]
-        if len(open_days) < 2:
-            self.skipTest("run on Saturday or Sunday: too few days left this week")
-        day, day2 = open_days[:2]
-        code, d = self.req("PUT", "/api/plan", {"days": {day: {"topic": "Python walrus operator"},
-                                                         day2: {"topic": "Git stash in 2 minutes"}}})
-        self.assertEqual(code, 200)
-        self.assertEqual(planner.load_plan(self.ws)[day2]["topic"], "Git stash in 2 minutes")
-        code, _ = self.req("PUT", "/api/plan", {"days": {day: {"topic": "Docker tips"}, day2: {"topic": "x"}}})
-        self.assertEqual(code, 400)                                           # one bad day: nothing saved
-        self.assertEqual(planner.load_plan(self.ws)[day]["topic"], "Python walrus operator")
-        past = next((r["date"] for r in d["days"] if r["past"]), None)
-        if past:
-            self.assertEqual(self.req("PUT", "/api/plan", {"days": {past: {"topic": "Too late topic"}}})[0], 400)
-        code, d = self.req("PUT", f"/api/plan/{day}", {"topic": "Python walrus operator", "angle": "when := helps"})
-        e = next(r for r in d["days"] if r["date"] == day)["entry"]
-        self.assertEqual((e["topic"], e["source"]), ("Python walrus operator", "manual"))
-        self.assertEqual(self.req("PUT", f"/api/plan/{day}", {"topic": "x"})[0], 400)
-        llm = ScriptedLLM({"planner": [{"days": [{"date": day, "topic": "Git bisect in five minutes", "angle": "find "
-                                                  "the bad commit", "search_queries": []}]}]})
+        code, d = self.req("GET", "/api/plan")
+        self.assertEqual((code, d["items"], d["topics"]), (200, [], ["Circuit breaker pattern"]))
+        self.assertEqual(self.req("POST", "/api/plan/generate", {"month": "2020-01"})[0], 400)       # a month that is over
+        titles = ["Breaker states", "Retries vs breakers", "Bulkheads", "Timeouts", "Fallbacks", "Half-open probes",
+                  "Breaker metrics", "Breakers and rate limits", "Testing failures", "Breakers in meshes"]
+        plans = [{"title": t, "angle": f"what to know about {t}", "context": "why", "example": "a service", "takeaway": "do it",
+                  "search_queries": ["q"]} for t in titles]
+        llm = ScriptedLLM({"planner": [{"plans": plans}]})
         with mock.patch("postcrew.llm.make_backend", return_value=llm):
-            code, d = self.req("POST", f"/api/plan/{day}/suggest", {"hint": "something about git"})
-        e = next(r for r in d["days"] if r["date"] == day)["entry"]
-        self.assertEqual((e["topic"], e["rejected"]), ("Git bisect in five minutes", ["Python walrus operator"]))
-        self.assertIn("something about git", llm.calls[0]["prompt"])
-        self.req("PUT", f"/api/plan/{day}", {"topic": ""})
-        self.assertNotIn(day, planner.load_plan(self.ws))
-        self.assertEqual(self.req("PUT", "/api/plan/2020-01-01", {"topic": "Old day topic"})[0], 400)
+            code, d = self.req("POST", "/api/plan/generate", {})
+        self.assertEqual((code, d["added"], d["counts"]["unassigned"], d["days"]), (200, 10, 10, {}))
+        self.assertEqual(planner.load_plan(self.ws), {})                      # generating never fills a day
+        month, today = d["month"], local_now(self.ws.config()).date()
+        day = (today.replace(day=1) + __import__("datetime").timedelta(days=62)).isoformat()   # a later month: always in the future
+        code, d = self.req("POST", "/api/plan/assign", {"id": d["items"][0]["id"], "date": day})
+        self.assertEqual(code, 200, d)
+        self.assertEqual(planner.load_plan(self.ws)[day]["topic"], "Breaker states")
+        self.assertEqual(self.req("POST", "/api/plan/assign", {"id": "nope", "date": day})[0], 400)
+        pid = planner.load_plan(self.ws)[day]["plan_id"]
+        code, d = self.req("POST", "/api/plan/unassign", {"id": pid, "month": month})
+        self.assertEqual((code, planner.load_plan(self.ws)), (200, {}))
+        self.assertEqual(self.req("GET", "/api/plan?month=2026-13")[0], 400)
 
     def test_published_list_add_and_remove(self):
         from postcrew.checks import repeat_problem
@@ -444,3 +438,65 @@ class StudioTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class NetworkAccessTests(unittest.TestCase):
+    """A Studio opened to the network needs its access token; one on localhost is unchanged."""
+
+    def setUp(self):
+        import http.client
+        from http.server import ThreadingHTTPServer
+        from postcrew.studio.server import Studio, make_handler
+        self.http = http.client
+        self.tmp = TempWorkspace()
+        self.ws = self.tmp.__enter__()
+        self.httpd = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(Studio(self.ws, 0, token="s3cret-token")))
+        self.port = self.httpd.server_address[1]
+        threading.Thread(target=self.httpd.serve_forever, daemon=True).start()
+
+    def tearDown(self):
+        self.httpd.shutdown()
+        self.httpd.server_close()
+        self.tmp.__exit__(None, None, None)
+
+    def req(self, method, path, headers=None, body=None, host="192.168.1.50:8765"):
+        c = self.http.HTTPConnection("127.0.0.1", self.port)
+        c.request(method, path, body=body, headers={"Host": host, **(headers or {})})
+        r = c.getresponse()
+        data = r.read()
+        return r.status, data, r
+
+    def test_it_is_locked_without_the_token(self):
+        for path in ("/", "/api/overview", "/static/ui.js"):
+            self.assertEqual(self.req("GET", path)[0], 401, path)
+        self.assertEqual(self.req("GET", "/?token=wrong")[0], 401)
+        self.assertEqual(self.req("PUT", "/api/config", {"X-Postcrew": "1"}, "{}")[0], 401)
+
+    def test_the_link_sets_a_cookie_and_then_the_studio_opens(self):
+        status, _, r = self.req("GET", "/?token=s3cret-token")
+        self.assertEqual(status, 302)
+        cookie = r.getheader("Set-Cookie")
+        self.assertIn("HttpOnly", cookie)
+        self.assertIn("SameSite=Strict", cookie)
+        self.assertEqual(r.getheader("Location"), "/")
+        auth = {"Cookie": cookie.split(";")[0]}
+        self.assertEqual(self.req("GET", "/", auth)[0], 200)
+        self.assertEqual(self.req("GET", "/api/overview", auth)[0], 200)
+        self.assertEqual(self.req("GET", "/api/overview", {"Authorization": "Bearer s3cret-token"})[0], 200)
+
+    def test_a_write_must_come_from_the_page_it_was_reached_on(self):
+        auth = {"Cookie": "postcrew_token=s3cret-token", "X-Postcrew": "1", "Content-Type": "application/json"}
+        self.assertEqual(self.req("POST", "/api/notifications/test", {**auth, "Origin": "http://192.168.1.50:8765"}, "{}")[0], 200)
+        self.assertEqual(self.req("POST", "/api/notifications/test", {**auth, "Origin": "http://evil.example"}, "{}")[0], 403)
+        self.assertEqual(self.req("POST", "/api/notifications/test", {"Cookie": auth["Cookie"]}, "{}")[0], 403)   # no X-Postcrew header
+
+    def test_a_studio_on_localhost_keeps_its_old_rules(self):
+        from postcrew.studio.server import Studio
+        self.assertIsNone(Studio(self.ws, 0).token)
+
+    def test_the_token_is_made_once_and_kept(self):
+        from postcrew.studio.server import access_token
+        a = access_token(self.ws)
+        self.assertEqual(a, access_token(self.ws))
+        self.assertEqual(access_token(self.ws, "given"), "given")
+        self.assertEqual((self.ws.root / "studio-token").stat().st_mode & 0o777, 0o600)

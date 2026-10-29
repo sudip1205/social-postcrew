@@ -62,7 +62,7 @@ class VideoAgent(Agent):
         return {"kind": "video", "path": str(out_path), "thumbnail_path": str(thumb), "seconds": round(info["seconds"], 1),
                 "width": info["width"], "height": info["height"], "source": "crew", "renderer": renderer,
                 "voice": "own" if own.get("voice") else voice.get("mode", "none"), "shown_text": "",
-                "timeline": info.get("timeline")}
+                "timeline": info.get("timeline"), **(info.get("extra") or {})}
 
     def thumbnail(self, script, kicker, handle, path):
         return make_thumbnail(script, kicker, handle, path)

@@ -6,12 +6,13 @@ supervisor can send the work back to the right step.
 """
 import json
 
+from .. import speech
 from .base import Agent, AgentError
 
 CRITERIA = ["accuracy", "clarity", "hook", "value", "tone", "format"]
 RED_FLAGS = ["unsupported_claim", "factual_error", "code_error", "placeholder", "misleading_headline",
              "too_promotional", "political_or_offensive", "confidential_or_employer_reference",
-             "invented_experience", "poster_text_mismatch", "other"]
+             "invented_experience", "poster_text_mismatch", "unpronounceable", "other"]
 OWNERS = ["writer", "media", "research", "topic"]
 SCHEMA = {
     "type": "object",
@@ -48,6 +49,11 @@ def script_material(ctx, w):
                      + (f" | items: {'; '.join(sc['items'])}" if sc.get("items") else "")
                      + (f"\n  code ({sc.get('language')}):\n  " + sc["code"].replace("\n", "\n  ") if sc.get("code") else ""))
         parts.append(f"  narration: {sc.get('narration', '')}")
+        said = speech.speakable(sc.get("narration", ""))
+        if said and said.lower() != " ".join(str(sc.get("narration", "")).split()).lower():
+            parts.append(f"  the voice is given (symbols, numbers and acronyms spelled out): {said}")
+        for msg in speech.problems(sc.get("narration", "")):
+            parts.append(f"  CANNOT BE SPOKEN: {msg}")
     parts.append("</draft>")
     return parts
 

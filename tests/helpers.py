@@ -160,10 +160,14 @@ class TempWorkspace:
         cfg["profile"]["handle"] = "example.com/test"
         cfg["team"].update(research=1, writer=1, pre_review=False)  # the crew tests use one of each
         cfg["llm"]["claude_path"] = "/nonexistent/claude"  # a test that forgets to fake the LLM fails, never calls Claude
+        # the crew tests run on the weekly schedule the app had before the monthly plan (days are now assigned by hand)
+        cfg["schedule"].update(frequency="weekly", days={"mon": "algorithm", "tue": "ai-news", "wed": "build-guide",
+                                                         "thu": "tool-spotlight", "fri": "security", "sat": "dev-tip", "sun": "week-recap"})
+        cfg["platforms"]["youtube"]["schedule"]["frequency"] = "weekly"
         yt = cfg["platforms"]["youtube"]   # YouTube starts with no topics; the tests use the four example topics
         yt["categories"] = copy.deepcopy(YOUTUBE_EXAMPLE_TOPICS)
         yt["schedule"]["days"] = {"tue": "explainer", "fri": "short-tip"}
-        yt["video"].update(renderer="ffmpeg", pace="normal", target_seconds=45)   # the tests' videos are short and plain
+        yt["video"].update(renderer="ffmpeg", pace="normal", target_seconds=45, outro="")   # the tests' videos are short and plain
         ws.save_config(cfg)
         self.ws = ws
         return ws

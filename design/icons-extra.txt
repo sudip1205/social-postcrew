@@ -56,3 +56,5 @@ menu_book
 visibility
 record_voice_over
 progress_activity
+assignment
+calendar_add_on

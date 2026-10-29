@@ -27,6 +27,8 @@ def enqueue_youtube(ws, cfg, run_id, day, category, outputs, review):
     thumb = media_dir / f"{pid}.png"
     shutil.copy2(video["thumbnail_path"], thumb)
     mode = cfg["publishing"]["approval"]
+    if (outputs.get("hooks") or {}).get("unresolved"):   # a fault the Hooks agent could not fix: a person decides, whatever the approval setting
+        mode = "manual"
     post = {
         "id": pid, "platform": platform, "run_id": run_id, "date": day.isoformat(), "category": category,
         "topic": script["title"], "text": script["description"], "first_comment": "",
@@ -48,6 +50,9 @@ def enqueue_youtube(ws, cfg, run_id, day, category, outputs, review):
             "video_id": None, "url": None,
         },
     }
+    gate = outputs.get("hooks")   # the Hooks agent's check of sound and frames (no AI)
+    if gate:
+        post["youtube"]["quality"] = {k: gate.get(k) for k in ("score", "repaired", "checked")}
     check = outputs.get("video_review")   # the Video Editor's verdict on the finished video (blackboard videos)
     if check:
         post["youtube"]["video_review"] = {k: check.get(k) for k in ("verdict", "score", "first_score", "redrawn", "summary", "measured")}

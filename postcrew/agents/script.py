@@ -133,7 +133,7 @@ class ScriptWriter(WriterAgent):
         topic, spec = ctx.outputs["topic"], ctx.video
         lo, hi = int(spec["max_words"] * 0.7), spec["max_words"]
         system = (self.prompt(ctx, format=spec["format"], target_seconds=spec["target_seconds"], min_words=lo, max_words=hi,
-                              format_rules=FORMAT_RULES[spec["format"]], wps=spec.get("wps", 2.5),
+                              format_rules=FORMAT_RULES[spec["format"]], wps=spec.get("wps", 2.5), outro=spec.get("outro") or "(none: end with one clear next step)",
                               shorts_rule="Do not write #Shorts yourself: the app adds it to Shorts.")
                   + team.persona_block(ctx.ws, member))
         notes = briefmod.cat_context(ctx.cat)

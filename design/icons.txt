@@ -6,6 +6,7 @@ apps
 arrow_forward
 arrow_right_alt
 aspect_ratio
+assignment
 auto_awesome
 auto_fix_high
 auto_schedule
@@ -13,6 +14,7 @@ autorenew
 bedtime
 bolt
 build
+calendar_add_on
 calendar_month
 calendar_today
 calendar_view_week
@@ -31,6 +33,7 @@ dashboard
 data_usage
 date_range
 delete
+deployed_code
 description
 difference
 do_not_disturb_on
@@ -48,6 +51,7 @@ event_busy
 event_note
 event_repeat
 event_upcoming
+expand_less
 expand_more
 fact_check
 feed
@@ -63,6 +67,7 @@ group_work
 groups
 groups_2
 help
+help_center
 help_outline
 history
 history_edu
@@ -89,6 +94,7 @@ monitoring
 more_vert
 movie
 movie_edit
+movie_filter
 music_video
 name
 nightlight
@@ -100,10 +106,8 @@ pause
 pause_circle
 payments
 pending
-pending_actions
 person_add
 photo_camera
-pie_chart
 play_arrow
 play_circle
 progress_activity
@@ -140,6 +144,7 @@ sync
 table_rows
 terminal
 timer
+travel_explore
 trending_up
 tune
 undo

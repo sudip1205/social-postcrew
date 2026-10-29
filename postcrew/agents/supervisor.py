@@ -26,6 +26,8 @@ from .script import ScriptWriter
 from .topic import TopicAgent
 from .blackboard import BlackboardAgent, ExplainerAgent
 from .explainroo import ExplainrooAgent
+from .frames import HyperFramesAgent, RemotionAgent, RemotionFramesAgent
+from .hooks import HooksAgent
 from .video import VideoAgent
 from .video_review import VideoReviewAgent
 from .voice import VoiceAgent
@@ -36,19 +38,22 @@ CREW = [CredentialsAgent(), TopicAgent(), ResearchAgent(), WriterAgent(), MediaA
 # The YouTube crew: the same supervisor, topic scout, researchers, writer team (as the Script Writer) and Editor. The Editor
 # reviews the SCRIPT, so the voice and the video are only made after it passes: nothing is spent on a script sent back.
 YOUTUBE_CREW = [CredentialsAgent(), TopicAgent(), ResearchAgent(), ScriptWriter(), EditorAgent(), VoiceAgent(), VideoAgent(),
-                VideoReviewAgent(), PublisherAgent()]
+                VideoReviewAgent(), HooksAgent(), PublisherAgent()]
 CREWS = {"linkedin": CREW, "youtube": YOUTUBE_CREW}
 ORDER = [a.id for a in CREW]
-FIXABLE = ["topic", "research", "writer", "voice", "media"]   # steps the supervisor may send work back to
+FIXABLE = ["topic", "research", "writer", "voice", "text_frames", "data_frames", "media"]   # steps the supervisor may send work back to
 
 
 def crew_for(platform, cfg=None, category=None):
     """The agents of one run. cfg: that app's view of the config (platforms.view); with the blackboard renderer the
     Blackboard Producer replaces the Video Producer."""
     crew = CREWS.get(platform) or CREW
-    drawn = {"blackboard": BlackboardAgent, "explainer": ExplainerAgent, "explainroo": ExplainrooAgent}.get(platforms.renderer_for(cfg, category)) if cfg else None
+    drawn = {"blackboard": BlackboardAgent, "explainer": ExplainerAgent, "explainroo": ExplainrooAgent, "remotion": RemotionAgent}.get(platforms.renderer_for(cfg, category)) if cfg else None
     if drawn:
-        crew = [drawn() if a.id == "media" else a for a in crew]
+        if drawn is RemotionAgent:   # three steps: the word scenes (HyperFrames), the data scenes (Remotion), then one joins them
+            crew = [x for a in crew for x in ((HyperFramesAgent(), RemotionFramesAgent(), RemotionAgent()) if a.id == "media" else (a,))]
+        else:
+            crew = [drawn() if a.id == "media" else a for a in crew]
     return crew
 
 SCHEMA = {
@@ -72,7 +77,7 @@ MEDIA_WORDS = ("media", "poster", "image", "video", "visual", "slide", "animatio
 def _about(problem, step):
     """Does an Editor point concern this step's work? (Editors label fixes 'Media: ...' or mention the poster.)"""
     p = problem.lower()
-    if step == "media":
+    if step in ("media", "text_frames", "data_frames"):
         return any(w in p for w in MEDIA_WORDS) or "red flag: poster_text_mismatch" in p
     return True
 
@@ -92,6 +97,8 @@ class Supervisor:
         self.crew = crew or CREW
         self.by_id = {a.id: a for a in self.crew}
         self.order = [a.id for a in self.crew]
+        # work sent back to "the visuals" is drawn again from the first drawing step, not only joined again
+        self.alias = {"media": "text_frames"} if "text_frames" in self.by_id else {}
 
     # ---------- the run ----------
     def run(self, ctx):
@@ -152,6 +159,8 @@ class Supervisor:
             if decision["action"] == "abort":
                 return self._fail(ctx, step, f"supervisor stopped the run: {decision['reason']}", problems)
             target = decision["target"]
+            if target != step:
+                target = self.alias.get(target, target)
             by = self._who(ctx, step, out)
             guidance[target] = self._feedback(ctx, target, decision["instructions"] or problems[:6], by, problems,
                                               attempts[step], exact=step == "editor")

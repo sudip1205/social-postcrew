@@ -13,7 +13,7 @@ Every agent has a name, a team colour and an icon in the Studio, so you can tell
 | Team | Agent | Job | Checked by code before it is accepted |
 |---|---|---|---|
 | Command | **Orion**, Supervisor | Watches every step. When one fails, decides to retry it with specific instructions, rewind to an earlier agent, or stop. | its decision must name a real step; hard limits on tries and cost always apply |
-| Planning | **Vega**, Week Planner | Drafts a topic for every open day of the week, using your ideas first. | no repeats of published, planned or rejected topics |
+| Planning | **Vega**, Planner | On the 1st of every month writes 10 plans for each of your topics (context, research topics, example, takeaway); you assign them to days. | no repeats of published, planned or rejected topics |
 | Planning | **Nova**, Topic Scout | Picks the day's topic for its category, or takes the planned one. Prefers things readers can use now over "coming soon" announcements. | length, similarity to the last 60 posts |
 | Research team | **Ada · Ravi** (by default) | Each chooses primary sources with web search. Postcrew downloads the pages itself, and each researcher quotes them word for word. Their verified work is combined. | every quote must be on the downloaded page; every fact needs a quote; sources must be recent enough |
 | Writing team | **Maya · Leo** (by default) | Each writes a full draft from verified facts only, in your voice and their own style. | length, hook, no markdown, no hype words, no placeholders, no invented experience, no unsourced numbers, no stray links, no blocked phrases |
@@ -146,3 +146,14 @@ prompt), Researchers, writer team and Editor. Two agents are different or new:
 
 The Editor reviews the script, not the pixels, so the voice and the video are only made after the script passes: a script that is
 sent back costs no voice characters and no render time. See [Videos, voice and your own files](video-and-voice.md).
+
+
+## Hooks (YouTube quality gate)
+
+Runs after the Video Producer and the Video Editor, before the Publisher. No AI, a few seconds. It checks the finished file for sound
+(missing sound in a scene, a long silence, loudness far from -14 LUFS, clipping), the voice (for an explainroo video: does it stop
+where the punctuation says, does it say the written words) and the frames (black frames, a picture frozen for ten seconds, an empty
+scene, something drawn at the very edge). The score and findings are kept with the queued video. For an explainroo video a fault is
+fixed once: a scene with missing sound is recorded again, a scene with an empty or edge-crowded picture is redrawn by the picture agent
+(only that scene), then the video is rendered again. A fault that cannot be fixed holds the video for your approval instead of failing
+the run, so no money is spent repeating it.

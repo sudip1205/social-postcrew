@@ -22,11 +22,11 @@ DEFAULT_CONFIG = {
         "post_time": "08:30",       # ... and it is published the next morning
         "lead_days": 1,
         "credential_check_time": "09:00",
-        "days": {"mon": "algorithm", "tue": "ai-news", "wed": "build-guide", "thu": "tool-spotlight",
-                 "fri": "security", "sat": "dev-tip", "sun": "week-recap"},
-        # How often to post: weekly (the days above), every_n_days (from start_date, cycling `rotation`) or dates
-        # (only the dates listed). `dates` adds one-off days in any mode; `day_times` gives a weekday its own time.
-        "frequency": "weekly",
+        "days": {},
+        # Posts go out on the dates you assign a plan to (Plan page); they are listed in `dates`. The older ways of scheduling still
+        # work when set by hand: weekly (the days above), every_n_days (from start_date, cycling `rotation`).
+        # `day_times` gives a weekday its own time.
+        "frequency": "dates",
         "every_n": 2,
         "start_date": "",
         "rotation": [],
@@ -34,10 +34,11 @@ DEFAULT_CONFIG = {
         "day_times": {},                 # {"sat": "10:30"}
     },
     "planning": {
-        # The Week Planner drafts the rest of this week's topics on this day, so you can review and change them.
+        # On the 1st of every month (at this time) the Planner writes 10 plans for each of your topics. They are not put on days:
+        # you assign them to dates in the Plan page.
         "enabled": True,
         "weekday": "mon",
-        "time": "10:00",
+        "time": "06:00",
         "focus": "",                     # optional direction for the whole plan, e.g. "Kubernetes week"
     },
     "publishing": {
@@ -56,10 +57,11 @@ DEFAULT_CONFIG = {
             "enabled": False,
             "schedule": {
                 "timezone": "America/Chicago", "generate_time": "19:00", "post_time": "17:00", "lead_days": 2,
-                "days": {}, "frequency": "weekly", "every_n": 3, "start_date": "", "rotation": [], "dates": [],
+                "days": {}, "frequency": "dates", "every_n": 3, "start_date": "", "rotation": [], "dates": [],
                 "day_times": {},
             },
-            "planning": {"enabled": True, "weekday": "mon", "time": "10:00", "focus": ""},
+            "planning": {"enabled": True, "weekday": "mon", "time": "06:00", "focus": ""},
+            "topics": [],                    # one line each (Settings > Topics); the monthly plan is written from them
             "publishing": {
                 "approval": "manual", "dry_run": True,
                 "visibility": "public",          # what the video is once it goes live: public | unlisted | private
@@ -70,13 +72,20 @@ DEFAULT_CONFIG = {
             # run may override format and target_seconds.
             "video": {
                 "format": "short", "target_seconds": 90,
+                # said at the end of every video (the Script Writer writes it into the last scene); empty = no closing line
+                "outro": "If you like this kind of content, please like, comment and subscribe. And if you don't like it, "
+                         "definitely tell me why in the comments, so I can make the next one better.",
                 "pace": "slow",                  # slow: a teacher's pace, longer pauses. normal: brisk
                 "voice": {"provider": "elevenlabs", "voice_id": "", "voice_name": "", "model": "eleven_multilingual_v2",
                           "speed": 1.0},
-                "renderer": "explainer",         # explainer: slow animated explanation to the voice. ffmpeg: plain slides. blackboard: chalk. mcp: an animation MCP server
+                "renderer": "remotion",          # remotion: React video drawn by Remotion (default). explainer: slow animated explanation to the voice. ffmpeg: plain slides. blackboard: chalk. mcp: an animation MCP server
                 "mcp": {"command": "", "args": [], "tool": "", "timeout_s": 600},
                 # renderer "explainroo": https://www.explainroo.com, installed in `path` (see docs/video-and-voice.md)
-                "explainroo": {"path": "", "theme": "midnight", "music": "calm", "watermark": False, "review": True},
+                "explainroo": {"path": "", "theme": "midnight", "music": "calm", "watermark": False, "review": True,
+                               # how far content stays from the edges and how low the subtitles sit (fractions of the frame height)
+                               "margin": 0.09, "top": 0.10, "caption_bottom": 0.88},
+                # renderer "remotion": the project shipped in postcrew/remotion; `path` points at your own copy of it
+                "remotion": {"path": ""},
                 "captions": True,
             },
             "categories": {},   # the topics you create in Settings > Topics (YOUTUBE_EXAMPLE_TOPICS has four to copy from)
@@ -149,6 +158,8 @@ DEFAULT_CONFIG = {
         "warn_days_before_expiry": 7,
         "studio_url": "http://localhost:8765",  # where links in emails point (your port, or your SSH tunnel)
     },
+    # Your topics for LinkedIn: one line each (Settings > Topics). The monthly plan is written from them.
+    "topics": [],
     "categories": {
         "algorithm": {
             "label": "Algorithm in Java (animation)", "media": "animation", "research": "off",

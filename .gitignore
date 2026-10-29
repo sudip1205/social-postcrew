@@ -2,6 +2,7 @@
 workspace/
 workspace-demo/
 secrets*.json
+studio-token
 .env
 *.tmp
 PAUSE

@@ -146,8 +146,8 @@ class SettingsTests(unittest.TestCase):
         self.assertEqual((slow["max_words"], normal["max_words"]), (180, 225))
         self.assertEqual(slow["wps"], 2.0)
         text = "One thing. Another thing."
-        self.assertIn('<break time="0.6s" />', voice.prepare(text, pace="slow"))
-        self.assertIn('<break time="0.35s" />', voice.prepare(text, pace="normal"))
+        self.assertIn('<break time="0.35s" />', voice.prepare(text, pace="slow"))
+        self.assertIn('<break time="0.2s" />', voice.prepare(text, pace="normal"))
 
     def test_shorts_may_run_three_minutes(self):
         self.assertEqual(platforms.video_spec({"video": {"format": "short", "target_seconds": 170}})["target_seconds"], 170)
@@ -165,7 +165,7 @@ class SettingsTests(unittest.TestCase):
 
     def test_explainer_is_a_renderer_and_the_default(self):
         from postcrew.defaults import DEFAULT_CONFIG
-        self.assertEqual(DEFAULT_CONFIG["platforms"]["youtube"]["video"]["renderer"], "explainer")
+        self.assertEqual(DEFAULT_CONFIG["platforms"]["youtube"]["video"]["renderer"], "remotion")
         self.assertEqual(DEFAULT_CONFIG["platforms"]["youtube"]["video"]["pace"], "slow")
         with TempWorkspace() as ws:
             cfg = platforms.view(ws.config(), "youtube")
@@ -257,3 +257,52 @@ class StrayLetterTests(unittest.TestCase):
         out = script_problems({"scenes": sc, "text": " ".join(s["narration"] for s in sc), "title": "t" * 20, "description": "d" * 50,
                                "tags": ["a", "b", "c"], "thumbnail_text": "ab"}, spec, {}, {})
         self.assertTrue(any("lone lowercase letter" in p for p in out), out)
+
+
+class ClosingLineTests(unittest.TestCase):
+    def check(self, last, outro):
+        from postcrew import platforms
+        from postcrew.checks import script_problems
+        spec = platforms.video_spec({"video": {"format": "short", "pace": "normal", "outro": outro}, "categories": {}}, {})
+        sc = [{"layout": "statement", "narration": "One two three four five.", "on_screen": "x", "items": [], "nodes": [], "edges": [],
+               "cells": [], "steps": []}] * 3 + [{"layout": "statement", "narration": last, "on_screen": "x", "items": [], "nodes": [],
+                                                  "edges": [], "cells": [], "steps": []}]
+        return script_problems({"scenes": sc, "text": " ".join(s["narration"] for s in sc), "title": "t" * 20, "description": "d" * 50,
+                                "tags": ["a", "b", "c"], "thumbnail_text": "ab"}, spec, {}, {})
+
+    def test_the_last_scene_must_carry_the_closing_line(self):
+        out = self.check("That is the idea.", "If you like it, like, comment and subscribe.")
+        self.assertTrue(any("closing line" in p for p in out), out)
+
+    def test_a_closing_line_in_the_writers_own_words_passes(self):
+        out = self.check("Enjoyed this? Like, comment and subscribe. And if not, tell me why in the comments.", "x")
+        self.assertFalse(any("closing line" in p for p in out), out)
+
+    def test_no_closing_line_when_it_is_switched_off(self):
+        self.assertFalse(any("closing line" in p for p in self.check("That is the idea.", "")))
+
+
+class ClosingLineReviewTests(unittest.TestCase):
+    """The Editor must not reject the closing call to action that the owner requires (two real runs failed on this)."""
+
+    def test_the_editor_and_the_writer_are_told_the_closing_line_is_required(self):
+        from datetime import date
+        from helpers import TempWorkspace
+        from postcrew import platforms
+        from postcrew.agents.base import RunContext
+        from postcrew.agents.editor import EditorAgent
+        from postcrew.agents.script import ScriptWriter
+        with TempWorkspace() as ws:
+            cfg = ws.config()
+            cfg["platforms"]["youtube"]["enabled"] = True
+            cfg["platforms"]["youtube"]["video"]["outro"] = "Please like, comment and subscribe, and say what you did not like."
+            ws.save_config(cfg)
+            view = platforms.view(ws.config(), "youtube")
+            ctx = RunContext(ws=ws, cfg=view, day=date(2026, 11, 3), category="short-tip", run=None, llm=None, platform="youtube")
+            editor = EditorAgent().prompt(ctx, "editor", red_flags="too_promotional")
+            writer = ScriptWriter().prompt(ctx, format="short", target_seconds=45, min_words=80, max_words=112, format_rules="x", wps=2.5)
+        for text in (editor, writer):
+            self.assertIn("Please like, comment and subscribe", text)
+        self.assertIn("never a reason to lower tone", editor)   # via the rubric
+        self.assertIn("NOT \"too_promotional\"", editor)
+        self.assertNotIn("{{outro}}", editor + writer)

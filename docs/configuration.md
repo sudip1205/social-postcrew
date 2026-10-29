@@ -61,7 +61,7 @@ Friday `security`, Saturday `dev-tip`, Sunday `week-recap`.
 **What the scheduler does each day** (while `postcrew serve` is running; it checks every 30 seconds):
 
 1. At `credential_check_time`: checks LinkedIn and Claude Code, and notifies you of any problem.
-2. On `planning.weekday` at `planning.time`: the Week Planner drafts the week's open days.
+2. On the 1st of the month, at `planning.time`: the Planner writes the month's plans for your topics (once per month).
 3. At `generate_time`: runs the crew for the date `lead_days` ahead, **unless that date already has a post**
    (queued, waiting for approval or published) or a run is already going. Vetoed and failed posts don't
    count. The scheduler runs once per date; to replace a post you vetoed after that, start a run by hand.
@@ -103,19 +103,22 @@ Same `schedule`, `planning`, `categories` and `publishing` keys as above, plus:
 
 A YouTube topic (category) takes the usual keys (`label`, `brief`, `research`, `fact_check`, `ideas`, `max_source_age_days`) with
 `"media": "video"`, and may set its own `format` and `target_seconds`. YouTube starts with no topics: create yours in Settings > Topics
-(each can set its own `format`, `target_seconds` and `renderer`), and only those appear in the weekly schedule. Secrets: `youtube_client_id`, `youtube_client_secret`, `youtube_refresh_token`, `elevenlabs_api_key`.
+(each can set its own `format`, `target_seconds` and `renderer`), (they are used when you assign a plan to a date). Secrets: `youtube_client_id`, `youtube_client_secret`, `youtube_refresh_token`, `elevenlabs_api_key`.
 See [Connect YouTube](youtube-setup.md) and [Videos, voice and your own files](video-and-voice.md).
 
 ## planning
 
-The Week Planner (Vega) drafts a topic for every remaining day of the week so you can review them in the
-**Plan** tab. Studio: **Settings > 2. Weekly schedule**.
+Your topics are one-line texts in `topics` (LinkedIn) and `platforms.youtube.topics`; Studio: **Settings > Topics**. On the 1st of
+every month the Planner (Vega) writes 10 plans for each topic (title, angle, context, research queries, a real-world example, a
+takeaway). They wait in the **Plan** tab; nothing is put on a day for you. When you assign a plan to a date (YouTube: Short or Long)
+the date is added to `schedule.dates` and the app posts on it; `schedule.frequency` is `"dates"`. A plan that was written or published
+is never planned again. Topics you change mid-month are used for the next month's plan, or press **Generate plan** in the Plan tab.
 
 | Key | Default | What it does |
 |---|---|---|
-| `enabled` | `true` | Plan automatically every week. You can always plan by hand from the Plan tab. |
-| `weekday` | `"mon"` | Which day it plans. |
-| `time` | `"10:00"` | At what time. |
+| `enabled` | `true` | Write the plan automatically on the 1st of every month. You can always press Generate plan. |
+| `time` | `"06:00"` | At what time on the 1st (or the first moment after it, if Postcrew was off). |
+| `focus` | `""` | An optional direction for every topic. |
 | `focus` | `""` | Optional direction for the whole plan, e.g. "This week is about Kubernetes; keep examples in Python". Max 600 characters. |
 
 Days you planned (or typed) are written about as planned. A day left open is picked by the Topic Scout the

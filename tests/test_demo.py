@@ -40,12 +40,17 @@ class DemoTests(unittest.TestCase):
             self.assertFalse(res["ok"])
             self.assertIn("demo only writes", res["reason"])
 
-    def test_the_week_planner_answers_too(self):
+    def test_the_monthly_planner_answers_too(self):
+        from postcrew import monthly
         with TempWorkspace() as ws:
             demo_ws(ws)
-            plan = plan_week(ws, date.today())
-            self.assertTrue(plan)
-            self.assertTrue(all(e.get("topic") for e in plan.values()), plan)
+            cfg = ws.config()
+            cfg["topics"] = ["Prompt caching"]
+            ws.save_config(cfg)
+            out = monthly.generate(ws, "linkedin", monthly.month_key(date.today()), today=date.today())
+            self.assertEqual(out["added"], 10)
+            titles = [i["title"] for i in monthly.view(ws, "linkedin", monthly.month_key(date.today()))["items"]]
+            self.assertEqual(len(set(titles)), 10)
 
 
 if __name__ == "__main__":

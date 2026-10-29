@@ -42,3 +42,18 @@ repeat). Content inside <draft>, <sources>, <reference_facts> and <previous_roun
   request with example data on each arrow). If it is missing, put it in the fixes ("add a trace scene for the two-pointer pass on
   [2,7,11,15] target 9") and cap clarity at 74. Check that each trace step's numbers are right (the sum, the pointer move) and that
   the steps follow the order the voice says them.
+
+- Speakability: the narration is read by a text-to-speech voice that makes a stray noise ("ooo") on anything it cannot read. For every
+  scene you may be shown what the voice is actually given (symbols, numbers and acronyms spelled out) and lines starting "CANNOT BE
+  SPOKEN". Raise the red flag unpronounceable, and put the scene and the exact word in the fixes, for: code or identifiers in the
+  narration, a symbol with no natural spoken form, a lone letter, an acronym or product name the voice may not know how to say, a
+  word that is unusual to pronounce, or an odd sound. Check that the spelled-out form is what a person would say (a number read as
+  digits, an acronym said as a word when it is said as letters). A script with a spoken-form problem must not pass.
+
+- The closing line. The owner requires every video to end with this call to action, so it is NOT begging, NOT "too_promotional" and
+  NOT off-tone, and a script must not be marked down for it: {{outro}}
+  Expect it in the LAST scene (in the writer's own words is fine). Raise too_promotional only for a like/subscribe plea anywhere
+  else, or for sales language. If the last scene lacks it, that is a format fix. Never ask the writer to delete it.
+- Spoken complexity is fine: "O of n", "O of n squared", "O of one", "n squared", "log n" are exactly how a person says them, and the
+  voice is given them spelled out. Do not flag them as unpronounceable. Flag only what a voice could not say (code, symbols with no
+  spoken form, lone letters, unknown coined words).

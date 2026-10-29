@@ -184,19 +184,29 @@ class YouTubeStudioTests(unittest.TestCase):
 
     # ---------- plan, run options, queue ----------
     def test_a_plan_day_can_carry_its_own_video_format(self):
-        yt = self.ws.config()["platforms"]["youtube"]
-        day = next(r for r in self.studio.plan("youtube")["days"] if r["category"] and not r["past"])["date"]
-        code, d, _ = self.req("PUT", "/api/plan", {"platform": "youtube", "days": {day: {
-            "topic": "Why hash maps are fast", "angle": "buckets", "format": "long", "target_seconds": 420}}})
+        import datetime
+        from postcrew.agents import planner
+        from postcrew.crew import local_now
+        from helpers import ScriptedLLM
+        from unittest import mock
+        cfg = self.ws.config()
+        cfg["platforms"]["youtube"]["topics"] = ["Hash maps"]
+        self.ws.save_config(cfg)
+        plans = [{"title": t, "angle": "buckets", "context": "c", "example": "e", "takeaway": "t",
+                  "search_queries": ["q"]} for t in ['Open addressing vs chaining', 'Resizing without pauses', 'Choosing a hash function', 'Collision attacks', 'Load factor tuning', 'Hash maps in databases', 'Iteration order surprises', 'Concurrent hash maps', 'Memory cost of buckets', 'Perfect hashing for fixed keys']]
+        with mock.patch("postcrew.llm.make_backend", return_value=ScriptedLLM({"planner": [{"plans": plans}]})):
+            code, d, _ = self.req("POST", "/api/plan/generate", {"platform": "youtube"})
+        self.assertEqual((code, d["added"]), (200, 10), d)
+        day = (local_now(self.ws.config()).date() + datetime.timedelta(days=1)).isoformat()
+        a, b = d["items"][:2]
+        code, d, _ = self.req("POST", "/api/plan/assign", {"platform": "youtube", "id": a["id"], "date": day, "format": "long"})
         self.assertEqual(code, 200, d)
-        row = next(r for r in d["days"] if r["date"] == day)
-        self.assertEqual((row["entry"]["format"], row["entry"]["target_seconds"]), ("long", 420))
-        self.assertEqual(self.req("PUT", "/api/plan", {"platform": "youtube", "days": {day: {
-            "topic": "Why hash maps are fast", "angle": "buckets", "format": "huge"}}})[0], 400)
-        code, d, _ = self.req("PUT", "/api/plan", {"platform": "youtube", "days": {day: {
-            "topic": "Why hash maps are fast", "angle": "buckets", "format": ""}}})      # empty = inherit again
-        self.assertNotIn("format", next(r for r in d["days"] if r["date"] == day)["entry"])
-        self.assertTrue(yt["enabled"])
+        self.assertEqual(d["days"][day]["format"], "long")
+        entry = planner.load_plan(self.ws, "youtube")[day]
+        self.assertEqual((entry["format"], entry["category"]), ("long", "assigned-long"))
+        self.assertEqual(self.req("POST", "/api/plan/assign", {"platform": "youtube", "id": b["id"], "date": day, "format": "huge"})[0], 400)
+        code, d, _ = self.req("POST", "/api/plan/assign", {"platform": "youtube", "id": a["id"], "date": day, "format": "short"})   # change it
+        self.assertEqual(d["days"][day]["format"], "short")
 
     def queue_video(self):
         media = self.ws.root / "media"

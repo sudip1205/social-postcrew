@@ -75,7 +75,7 @@ def _seconds_ok(fmt, v):
     return isinstance(v, int) and not isinstance(v, bool) and ((15 <= v <= 180) if fmt == "short" else (60 <= v <= 1800))
 
 
-RENDERERS = ("ffmpeg", "explainer", "explainroo", "blackboard", "mcp")
+RENDERERS = ("remotion", "ffmpeg", "explainer", "explainroo", "blackboard", "mcp")
 
 
 def _validate_video(v, pre):
@@ -120,6 +120,9 @@ def validate_platform(cfg, pre="", primary=True):
             errs.append(f"{pre}schedule.{key} must be HH:MM (24h)")
     if not isinstance(s.get("lead_days"), int) or not 0 <= s["lead_days"] <= 7:
         errs.append(f"{pre}schedule.lead_days must be a whole number 0-7")
+    topics = cfg.get("topics", [])
+    if not (isinstance(topics, list) and len(topics) <= 40 and all(isinstance(t, str) and len(t.strip()) <= 150 for t in topics)):
+        errs.append(f"{pre}topics: up to 40 topics, each a line of at most 150 characters")
     cats = cfg.get("categories", {})
     days = s.get("days", {})
     for d in WEEKDAYS:
@@ -161,8 +164,6 @@ def validate_platform(cfg, pre="", primary=True):
                 errs.append(f"{pre}schedule.dates {e['date']} uses unknown category {e['category']!r}")
             if e.get("time") and not TIME_RE.match(str(e["time"])):
                 errs.append(f"{pre}schedule.dates {e['date']}: time must be HH:MM (24h)")
-        if freq == "dates" and not ds:
-            errs.append(f"{pre}schedule.dates: add at least one date")
     for cid, c in cats.items():
         where = f"{pre}categories.{cid}"
         if not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,30}", cid):
@@ -177,8 +178,8 @@ def validate_platform(cfg, pre="", primary=True):
             errs.append(f"{where}.research must be one of {RESEARCH_MODES}")
         if not str(c.get("brief", "")).strip():
             errs.append(f"{where}.brief: describe what this kind of post should contain")
-        if c.get("renderer") not in (None, "ffmpeg", "explainer", "blackboard"):
-            errs.append(f"{where}.renderer must be ffmpeg, explainer or blackboard")
+        if c.get("renderer") not in (None, "ffmpeg", "explainer", "explainroo", "remotion", "blackboard"):
+            errs.append(f"{where}.renderer must be one of ffmpeg, explainer, explainroo, remotion or blackboard")
         if "format" in c and c["format"] not in VIDEO_FORMATS:
             errs.append(f"{where}.format must be one of {VIDEO_FORMATS}")
         elif "target_seconds" in c and not _seconds_ok(c.get("format") or (cfg.get("video") or {}).get("format"), c["target_seconds"]):
@@ -303,7 +304,14 @@ class Workspace:
 
     # ---------- config ----------
     def config(self):
-        return normalize_categories(deep_merge(DEFAULT_CONFIG, read_json(self.root / "config.json", {})))
+        raw = read_json(self.root / "config.json", {})
+        cfg = normalize_categories(deep_merge(DEFAULT_CONFIG, raw))
+        # a config from before the monthly plan: nothing posts on weekdays any more, only on the dates you assign a plan to
+        for pid, section, mine in (("linkedin", cfg, raw), *((p, o, (raw.get("platforms") or {}).get(p) or {})
+                                                            for p, o in (cfg.get("platforms") or {}).items() if p != "linkedin")):
+            if raw and mine and "topics" not in mine and mine.get("schedule", {}).get("frequency", "weekly") == "weekly":
+                section["schedule"]["frequency"] = "dates"
+        return cfg
 
     def save_config(self, cfg):
         errs = validate_config(cfg)

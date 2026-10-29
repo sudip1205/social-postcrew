@@ -238,14 +238,21 @@ words in `script.md` are checked against the approved script, so the picture age
 `theme` (paper, clean, chalk, blueprint, midnight, editorial), `music`, `watermark` (explainroo asks you to keep its small credit),
 `review`. The Video Editor step is skipped: explainroo does its own checks.
 
-### Going further: Remotion, Manim, After Effects
+### Remotion (the default renderer)
+
+Videos are drawn by [Remotion](https://www.remotion.dev) from the project in `postcrew/remotion` (set `video.remotion.path` to use your
+own copy). Python works out when each box, arrow, bullet and step is said (from the recorded voice) and writes a props file; the
+React scenes in `src/Video.tsx` only draw a frame for a given time; ffmpeg then lays the voice under the picture. The picture is three steps: the HyperFrames Producer (`text_frames`), the Remotion Producer (`data_frames`) and the Video Composer (`media`), each reporting its engine and progress to the Workflow view. No watermark or handle is drawn. The opening card and the big statements are drawn by [HyperFrames](https://hyperframes.heygen.com) (`postcrew/hyperframes`, HTML + GSAP, rendered by the `hyperframes` CLI) and joined with the Remotion clips; if HyperFrames cannot run, Remotion draws every scene. Run
+`npm run studio` in that folder to preview and restyle the scenes. Needs Node.js 18+. Remotion is free for individuals and small
+teams; a company above that size needs its licence.
+
+### Going further: Manim, After Effects
 
 I looked at what people use to make this kind of video. The built-in renderer is the practical, dependency-free choice. If you
 want richer motion graphics later:
 
 | Tool | Good for | Fit |
 |---|---|---|
-| **Remotion** (React, renders with Chromium) | Anything a web page can do; official agent skills teach Claude Code to write it; scales with cloud rendering | The best upgrade. Needs Node and Chromium; free for individuals and small teams, a company licence above that. Use it through the animation MCP renderer setting. |
 | **Manim** (Python) | Maths: equations, graphs, geometry | Good for algorithm and maths scenes; render a scene to a clip and use it as a clip. |
 | **Motion Canvas / Revideo** (TypeScript) | Hand-tuned narrated explainers | Great with a human at the keyboard; weaker for unattended runs. |
 | **After Effects + MCP** | Studio-quality motion graphics | Needs a paid Adobe licence and the app open with a bridge panel running; not suitable for an unattended pipeline. |

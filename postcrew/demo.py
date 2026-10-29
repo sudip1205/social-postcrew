@@ -35,6 +35,8 @@ HOOK_1 = "A new model came out this week, and the price is the interesting part.
 HOOK_2 = "Acme Model 2 costs $0.10 per million input tokens."
 HOOK_FIX = f"Replace the first line with: \"{HOOK_2}\" (lead with the number, not a teaser)"
 
+PLAN_ASPECTS = ["the basics", "the most common mistake", "a worked example", "how to test it", "when not to use it",
+                "what to measure", "a cheaper way", "how it fails", "how to explain it to a teammate", "a checklist before you ship"]
 PLAN_TOPICS = ["Acme Model 2 pricing", "Structured outputs in practice", "Routing requests to small models",
                "Evaluating a model on your own data", "Caching prompts to cut costs", "Tool use without surprises",
                "What a long context window is good for"]
@@ -102,6 +104,12 @@ class Demo:
                     "items": [{"head": "What launched", "body": "Model 2 for all developers"},
                               {"head": "Price", "body": "$0.10 in, $0.50 out per million tokens"},
                               {"head": "Try it", "body": "Automate one boring task first"}]}
+        if agent_id == "planner" and "plans" in props:   # the monthly plan: ten different plans for the owner's topic
+            topic = (re.search(r"THE OWNER'S TOPIC: (.+)", prompt) or [None, "Your topic"])[1].strip()
+            return {"plans": [{"title": f"{topic}: {aspect}"[:90], "angle": f"{aspect} for {topic}",
+                               "context": f"Why {aspect} matters for {topic}.", "example": f"A small team meets {aspect} while working on {topic}.",
+                               "takeaway": f"Check {aspect} the next time you work on {topic}.", "search_queries": [f"{topic} {aspect}"]}
+                              for aspect in PLAN_ASPECTS]}
         if agent_id == "planner":
             days = sorted(set(re.findall(r"\b\d{4}-\d{2}-\d{2}\b", prompt)))
             return {"days": [{"date": d, "topic": PLAN_TOPICS[i % len(PLAN_TOPICS)], "angle": "what to try this week",

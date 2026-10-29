@@ -14,6 +14,11 @@ const wfDur = info => { if (!info?.started_at) return ""; const a = new Date(inf
 const wfClock = ms => { const s = Math.max(0, Math.round(ms / 1000)); return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`; };
 const wfElapsed = st => st?.started_at ? wfClock((st.finished_at ? new Date(st.finished_at) : new Date()) - new Date(st.started_at)) : "00:00";
 const wfTok = t => (t?.in || 0) + (t?.cached || 0) + (t?.out || 0);
+/* a drawing step reports which engine is working and how far it is: a chip and a bar */
+const WF_ENGINE = { hyperframes: ["HyperFrames", "bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200"], remotion: ["Remotion", "bg-sky-50 text-sky-700 border-sky-200"] };
+const wfEngine = e => String(e || "").split(" + ").filter(Boolean).map(x => { const [n, cls] = WF_ENGINE[x] || [x, "bg-slate-50 text-slate-600 border-slate-200"];
+  return `<span class="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border font-semibold ${cls}">${icon("movie_filter", "text-[12px]")}${esc(n)}</span>`; }).join(" ");
+const wfBar = (info, h = "h-1.5") => info.progress == null ? "" : `<div class="w-full bg-slate-100 rounded-full ${h} overflow-hidden"><div class="${h} rounded-full bg-gradient-to-r from-violet-500 to-fuchsia-500 transition-all duration-500" style="width:${Math.max(0, Math.min(100, info.progress))}%"></div></div>`;
 const wfK = n => n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}k` : `${n || 0}`;
 
 /* node look per state: [box classes, chip classes, chip icon, spins, word, text colour] (design.md colour code) */
@@ -179,6 +184,7 @@ function nodeHtml(id, st) {
       <div class="text-[10px] font-semibold tracking-wide ${info.state === "running" ? "text-violet-700" : "text-slate-400"} uppercase flex items-center gap-1"><span>${esc(agentTitle(id))}</span>${sel ? `<span class="w-1.5 h-1.5 rounded-full bg-violet-600" title="Selected agent"></span>` : ""}</div>
       <h3 class="font-headline font-bold text-slate-900 text-xs mt-0.5">${esc(agentName(id))}</h3>
       <p class="text-[11px] ${tc} font-medium mt-1">${esc(line)}</p>
+      ${info.engine ? `<div class="mt-1.5 space-y-1">${wfEngine(info.engine)}${["running", "retrying"].includes(info.state) || info.state === "passed" ? wfBar(info) : ""}${info.detail && ["running", "retrying"].includes(info.state) ? `<div class="text-[10px] text-slate-500 truncate" title="${esc(info.detail)}">${esc(info.detail)} · ${info.progress ?? 0}%</div>` : ""}</div>` : ""}
     </div>
     <div class="mt-2 pt-2 border-t border-slate-100 text-[10px] text-slate-500 flex items-center justify-between"><span>${info.attempts > 1 ? `${info.attempts} tries` : "Tries"}</span><span class="font-semibold ${info.state === "passed" ? "text-emerald-600" : "text-slate-700"}">${info.cost_usd ? money(info.cost_usd) : info.attempts || 0}</span></div>
   </button>`;
@@ -187,7 +193,7 @@ function nodeHtml(id, st) {
 function drawGraph(force) {
   const st = S.run?.status, el = $("#wf-graph"); if (!st || !el) return;
   const rw = wfRewinds();
-  const key = JSON.stringify([st.state, st.interventions, Object.values(st.steps).map(x => [x.state, x.attempts, x.cost_usd]), S.selected, rw]);
+  const key = JSON.stringify([st.state, st.interventions, Object.values(st.steps).map(x => [x.state, x.attempts, x.cost_usd, x.progress, x.engine, x.detail]), S.selected, rw]);
   if (!force && key === WF.graphKey) return;
   WF.graphKey = key;
   const ids = Object.keys(st.steps);
@@ -307,6 +313,7 @@ async function drawDrawer() {
       <div class="flex items-center justify-between font-semibold text-violet-900"><span class="flex items-center gap-1">${icon("memory", "text-[15px] text-violet-600")}<span>Token usage breakdown</span></span><span class="font-mono text-[11px]">${wfK(wfTok(tk))} total</span></div>
       <div class="text-[11px] text-slate-600 flex items-center justify-between"><span>Fresh: <strong class="text-slate-800">${wfK(tk.in)}</strong></span><span>Cached: <strong class="text-slate-800">${wfK(tk.cached)}</strong></span><span>Output: <strong class="text-violet-700">${wfK(tk.out)}</strong></span></div>
     </div>`;
+  const engineRow = info.engine ? `<div class="p-3 rounded-lg bg-fuchsia-50/40 border border-fuchsia-100 text-xs space-y-2"><div class="flex items-center justify-between font-semibold text-slate-800"><span class="flex items-center gap-1">${icon("movie_filter", "text-[15px] text-fuchsia-600")}<span>Engine</span></span><span class="flex gap-1">${wfEngine(info.engine)}</span></div>${wfBar(info, "h-2")}<div class="flex items-center justify-between text-[11px] text-slate-600"><span>${esc(info.detail || "")}</span><span class="font-mono font-semibold text-slate-800">${info.progress ?? 0}%</span></div></div>` : "";
   const summary = info.summary ? `<p class="text-xs text-slate-700">${esc(info.summary)}</p>` : "";
   const errs = info.errors?.length ? `<div class="space-y-1.5"><h4 class="font-headline font-bold text-xs text-slate-900 uppercase tracking-wider flex items-center gap-1">${icon("error", "text-[16px] text-rose-600")}<span>Problems found by validation</span></h4>
     ${info.errors.map(x => `<div class="p-2.5 rounded-lg bg-rose-50/70 border border-rose-200 text-[11px] text-rose-900">${esc(x)}</div>`).join("")}</div>` : "";
@@ -321,7 +328,7 @@ async function drawDrawer() {
         <button disabled title="Coming soon" class="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-medium text-xs transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">${icon("difference", "text-[16px] text-slate-500")}<span>Inspect prompt diff</span></button>
         <button disabled title="Coming soon" class="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-medium text-xs transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">${icon("tune", "text-[16px] text-slate-500")}<span>Adjust threshold</span></button>
       </div></div>`;
-  const base = `${head}${summary}${errs}${fixHtml}`;
+  const base = `${head}${engineRow}${summary}${errs}${fixHtml}`;
   const artKey = `${S.runId}|${s}`;
   el.innerHTML = `${base}<div id="wf-art" class="space-y-3">${WF.art[artKey] || ""}</div>${buttons}`;   // the last pictures at once, refreshed below
   // artifacts of this step (output, rendered media, rejected attempts)

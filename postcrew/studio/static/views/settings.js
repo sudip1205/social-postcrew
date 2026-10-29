@@ -8,13 +8,6 @@ const settingsView = (() => {
   const SOON = [["instagram", "Instagram", "Reels, carousels & stories", "photo_camera", "bg-gradient-to-tr from-slate-400 to-slate-500"],
     ["tiktok", "TikTok", "Short-form viral vertical clips", "music_video", "bg-slate-400"]];
   const APP_INFO = { linkedin: ["Articles, text posts & polls", "calendar_today"], youtube: ["Shorts & long-form videos", "videocam"] };
-  const FREQ = ["weekly", "every_n_days", "dates"];
-  const TOPIC_COL = [
-    { sel: "border-amber-300 bg-amber-50 text-amber-900 focus:ring-amber-500", ic: "text-amber-700", leg: "text-amber-800 bg-amber-50 border-amber-200", dot: "bg-amber-500" },
-    { sel: "border-sky-300 bg-sky-50 text-sky-900 focus:ring-sky-500", ic: "text-sky-700", leg: "text-sky-800 bg-sky-50 border-sky-200", dot: "bg-sky-500" },
-    { sel: "border-emerald-300 bg-emerald-50 text-emerald-900 focus:ring-emerald-500", ic: "text-emerald-700", leg: "text-emerald-800 bg-emerald-50 border-emerald-200", dot: "bg-emerald-500" },
-    { sel: "border-violet-300 bg-violet-50 text-violet-900 focus:ring-violet-500", ic: "text-violet-700", leg: "text-violet-800 bg-violet-50 border-violet-200", dot: "bg-violet-500" },
-    { sel: "border-rose-300 bg-rose-50 text-rose-900 focus:ring-rose-500", ic: "text-rose-700", leg: "text-rose-800 bg-rose-50 border-rose-200", dot: "bg-rose-500" }];
   const TINT = { violet: "bg-violet-100 text-violet-700", sky: "bg-sky-100 text-sky-700", indigo: "bg-indigo-100 text-indigo-700",
     emerald: "bg-emerald-100 text-emerald-700", red: "bg-red-100 text-red-700", amber: "bg-amber-100 text-amber-700", slate: "bg-slate-100 text-slate-600" };
   const SW_BIG = "w-11 h-6", SW_SM = "w-9 h-5", SW_BIG_KNOB = "after:h-5 after:w-5", SW_SM_KNOB = "after:h-4 after:w-4", SHOWN = "", HIDDEN = "hidden";
@@ -44,24 +37,11 @@ const settingsView = (() => {
   const sw = (attrs, on, peer = "peer-checked:bg-violet-600", big = false) => `<label class="relative inline-flex items-center cursor-pointer shrink-0"><input ${on ? "checked" : ""} class="sr-only peer" type="checkbox" ${attrs}/>
     <div class="${big ? SW_BIG : SW_SM} bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full ${big ? SW_BIG_KNOB : SW_SM_KNOB} after:transition-all ${peer}"></div></label>`;
   const swRow = (path, on, title, help) => `<div class="flex items-start justify-between gap-4 py-2"><div><span class="text-sm font-semibold text-slate-800">${title}</span><p class="text-[11px] text-slate-400">${help}</p></div>${sw(`data-k="${path}"`, on)}</div>`;
-  const isFixedTopic = (id, k) => k.media === "animation" || id === "week-recap";
-
-  /* ---------- topics of an app: names from the editor cards (LinkedIn) or the config ---------- */
-  function topicNames(id) {
-    const out = {};
-    const boxes = document.querySelectorAll(`#topics-${id} [data-cat]`);
-    if (boxes.length) boxes.forEach(box => out[box.dataset.cat] = box.querySelector('[data-c="label"]').value.trim() || box.dataset.cat);
-    else Object.entries(catsOf(S.config, id)).forEach(([cid, k]) => out[cid] = k.label || cid);
-    return out;
-  }
-  const colOf = (names, cid) => TOPIC_COL[Math.max(0, Object.keys(names).indexOf(cid)) % TOPIC_COL.length];
 
   /* ---------- the left column ---------- */
   function appSummary(c, id) {
-    const o = own(id), s = o.schedule || {}, fr = s.frequency || "weekly";
-    const n = WEEKDAYS.filter(d => (s.days || {})[d]).length;
-    const when = fr === "weekly" ? `${n} day${n === 1 ? "" : "s"}/week` : fr === "every_n_days" ? `every ${s.every_n || 2} days` : `${(s.dates || []).length} chosen dates`;
-    return `${when} · ${s.post_time || ""}`;
+    const n = (own(id).topics || []).filter(t => String(t).trim()).length;
+    return `${n} ${n === 1 ? "topic" : "topics"} · plan on the 1st`;
   }
   function appCards(c) {
     return PLATFORM_IDS.map(id => {
@@ -90,27 +70,14 @@ const settingsView = (() => {
         <label class="relative inline-flex items-center cursor-not-allowed shrink-0 mt-1 opacity-50"><input class="sr-only" disabled type="checkbox"/><div class="w-9 h-5 bg-slate-300 rounded-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4"></div></label></div></div>`).join("");
   }
   function summaryCard() {
-    const ids = PLATFORM_IDS.filter(enabledOf), per = ids.reduce((a, id) => { const s = own(id).schedule || {};
-      return a + ((s.frequency || "weekly") === "weekly" ? WEEKDAYS.filter(d => (s.days || {})[d]).length : 0); }, 0);
+    const ids = PLATFORM_IDS.filter(enabledOf), n = ids.reduce((a, id) => a + (own(id).topics || []).filter(t => String(t).trim()).length, 0);
     return `<div class="bg-gradient-to-br from-violet-50 to-indigo-50/60 rounded-xl p-4 border border-violet-100 text-xs space-y-2 mt-4">
-      <div class="flex items-center gap-2 font-semibold text-violet-900">${icon("insights", "text-violet-700 text-base")}<span>Channel Throughput Summary</span></div>
-      <p class="text-slate-600 leading-relaxed">Your crew is set to write <strong class="text-slate-900 font-semibold">${per} weekly ${per === 1 ? "post" : "posts"}</strong> across ${ids.length} ${ids.length === 1 ? "app" : "apps"} (weekly-day schedules only; other cadences are counted in the Plan).</p>
+      <div class="flex items-center gap-2 font-semibold text-violet-900">${icon("insights", "text-violet-700 text-base")}<span>Monthly plan summary</span></div>
+      <p class="text-slate-600 leading-relaxed">You have <strong class="text-slate-900 font-semibold">${n} ${n === 1 ? "topic" : "topics"}</strong> across ${ids.length} ${ids.length === 1 ? "app" : "apps"}. On the 1st of every month the Planner writes 10 plans for each; you assign them to days in the <a class="font-semibold underline" href="#plan">Plan</a>.</p>
       <div class="pt-2 border-t border-violet-200/50 flex items-center justify-end text-[11px] text-violet-800"><a class="font-semibold underline hover:text-violet-950" href="#credentials">Manage Credentials</a></div></div>`;
   }
 
   /* ---------- option cards ---------- */
-  function freqCards(id, val) {
-    const items = [["weekly", "date_range", "Weekly days", "Publish repeatedly on selected days of the week (e.g. every Tuesday & Friday).", "Active selection", "Weekday schedule"],
-      ["every_n_days", "hourglass_top", "Every N days", "Run continuously with a rolling interval gap, such as every 3 or 4 days.", "Active selection", "Interval spacing"],
-      ["dates", "event_note", "Specific dates", "Manual editorial calendar: only create content on hand-picked milestone dates.", "Active selection", "Custom ad-hoc dates"]];
-    return items.map(([v, ic, t, d, onFoot, offFoot]) => v === val
-      ? `<div data-freq="${id}|${v}" class="border-2 border-violet-600 bg-violet-50/40 rounded-xl p-4 cursor-pointer relative shadow-sm transition-all"><div class="absolute top-3 right-3 text-violet-600">${icon("check_circle", "text-lg", true)}</div>
-          <div class="w-10 h-10 rounded-lg bg-violet-100 text-violet-700 flex items-center justify-center mb-3">${icon(ic, "text-xl")}</div><h4 class="font-bold text-sm text-slate-900">${t}</h4>
-          <p class="text-xs text-slate-600 mt-1 leading-relaxed">${d}</p><div class="mt-3 text-[11px] font-semibold text-violet-700 flex items-center gap-1"><span>${onFoot}</span></div></div>`
-      : `<div data-freq="${id}|${v}" class="border border-slate-200 bg-white hover:border-slate-300 rounded-xl p-4 cursor-pointer relative transition-all"><div class="absolute top-3 right-3 text-slate-300">${icon("radio_button_unchecked", "text-lg")}</div>
-          <div class="w-10 h-10 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center mb-3">${icon(ic, "text-xl")}</div><h4 class="font-bold text-sm text-slate-900">${t}</h4>
-          <p class="text-xs text-slate-600 mt-1 leading-relaxed">${d}</p><div class="mt-3 text-[11px] font-medium text-slate-600"><span>${offFoot}</span></div></div>`).join("");
-  }
   function approvalCards(id, val) {
     const items = [["auto_with_veto", "shield", "emerald", "Publish unless I veto", "Posts go out at the post time unless you veto them in the Queue first.", "verified", "Active policy", "Autonomous with a veto window",
         "border-emerald-500 bg-emerald-50/30 border-2 shadow-sm", "border-emerald-300 bg-emerald-50/20 hover:border-emerald-400 border", "text-emerald-900", "text-emerald-700"],
@@ -128,68 +95,39 @@ const settingsView = (() => {
   /* ---------- one app's sections ---------- */
   function appSection(c, id) {
     const o = own(id), li = id === "linkedin", s = o.schedule || {}, pn = o.planning || {}, pub = o.publishing || {}, b = brand(id), k = p => K(id, p);
-    const en = enabledOf(id), freq = FREQ.includes(s.frequency) ? s.frequency : "weekly", a = appOf(id);
-    const dates = (s.dates || []).map(e => [e.date, e.category || "", e.time || ""].join(" | ").replace(/( \| )+$/, "")).join("\n");
+    const en = enabledOf(id), a = appOf(id);
     const tile = li ? `<span class="font-headline font-black text-2xl tracking-tight">in</span>` : `<span class="text-2xl font-black">▶</span>`;
     return `<div data-appsec="${id}" class="space-y-6 ${T.app === id ? SHOWN : HIDDEN}">
       <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div class="flex items-center gap-3.5"><div class="w-12 h-12 rounded-xl ${b.bg} flex items-center justify-center text-white shadow-md shrink-0">${tile}</div>
           <div><div class="flex items-center gap-2"><h2 class="text-xl font-bold font-headline text-slate-900">${esc(a.label)} Configuration</h2>
             <span class="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full ${a.soft} border">${icon(APP_INFO[id][1], "text-xs")}<span>${li ? "Text channel" : "Video Channel"}</span></span></div>
-            <p class="text-xs text-slate-500 mt-0.5">Every setting here is this app's own: schedule, topics, planning and publishing.</p></div></div>
+            <p class="text-xs text-slate-500 mt-0.5">Every setting here is this app's own: topics, monthly plan, release time and publishing.</p></div></div>
         <div class="flex items-center gap-2">
           <button type="button" data-testapi="${id}" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">${icon("sync", "text-sm")}<span>Test API</span></button>
           <button type="button" data-pause="${id}" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 transition-colors">${icon(en ? "pause_circle" : "play_circle", "text-sm")}<span data-pause-label="${id}">${en ? "Pause App" : "Resume App"}</span></button></div></div>
 
-      <div class="${CARD}">${head("repeat", "violet", "How often", `How often ${esc(a.label)} gets a post. ${tip("Weekly days", "Posts go out on the weekdays you tick below, each with its own topic.")} is the usual choice.`,
-        `<span class="text-xs font-semibold text-violet-700 bg-violet-50 px-2.5 py-1 rounded-lg">Cadence Type</span>`)}
-        <input type="hidden" data-k="${k("schedule.frequency")}" value="${freq}">
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-3.5 pt-1" data-freqbox="${id}">${freqCards(id, freq)}</div>
-        <div data-everyn="${id}" class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1 ${freq === "every_n_days" ? SHOWN : HIDDEN}">
-          ${field("Every N days", "hourglass_top", inp(k("schedule.every_n"), s.every_n ?? 2, "number", 'min="1" max="60"'), "A whole number from 1 to 60.")}
-          ${field("Starting on", "event", inp(k("schedule.start_date"), s.start_date || "", "date"), "The first posting day; the count runs from here.")}
-          ${field("Topics to cycle through (topic ids, one per line)", "autorenew", area(`data-k="${k("schedule.rotation")}" data-list="1"`, (s.rotation || []).join("\n"), 2), "Blank = the topics chosen in the weekly days.", "md:col-span-2")}</div>
-        <p class="text-[11px] text-slate-500 pt-1">${tip("Weekly days", "Weekly recurrence repeats on the same weekdays every week.")} give steady audience retention. You can still add one-off dates below.</p></div>
+      <div class="${CARD} space-y-5" ${li ? 'id="ideas"' : ""}>${head("format_list_bulleted", "violet", "Topics", "One line per topic. On the 1st of every month Postcrew writes 10 related plans for each topic. Changes apply to next month's plan.",
+        `<span data-topic-count="${id}" class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-violet-50 text-violet-700 border border-violet-200"></span>`)}
+        <div class="space-y-2.5 pt-1" data-topiclist="${id}"></div>
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-slate-100">
+          <div class="flex items-center gap-2.5">${button("secondary", "add", "Add another topic", `data-addtopic="${id}"`)}${button("primary", "save", "Save topics", `data-savetopics="${id}"`)}</div>
+          <p class="text-[11px] text-slate-400">No details needed: context, research and examples are written for you.</p></div></div>
 
-      <div class="${CARD} space-y-5">${head("view_week", "sky", "Weekly cadence schedule", "Toggle active days, assign a topic and optionally a different time for each day.",
-        `<span data-daycount="${id}" class="text-xs font-semibold px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200"></span>`)}
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-7 gap-3" data-days="${id}"></div>
-        <div class="flex flex-wrap items-center justify-between gap-3 pt-2 text-xs border-t border-slate-100"><div class="flex flex-wrap items-center gap-4" data-legend="${id}"></div>
-          <span class="text-[11px] text-slate-500">Each day slot gets its own topic, planned and written by the ${tip("Writing team", "The crew agents that research and write the post for that day's topic.")}.</span></div></div>
-
-      <div class="${CARD}">${head("calendar_month", "red", "One-off special dates", "Click a date on the calendar to add or remove a standalone post outside the recurring days.",
-        `<div class="flex items-center gap-2"><span class="text-xs font-bold text-slate-800" data-calmonth="${id}"></span><div class="flex items-center bg-slate-100 rounded-lg p-0.5 border border-slate-200">
-          <button type="button" data-calnav="-1" class="w-6 h-6 flex items-center justify-center text-slate-600 hover:text-slate-900" title="Previous month">${icon("chevron_left", "text-sm")}</button>
-          <button type="button" data-calnav="1" class="w-6 h-6 flex items-center justify-center text-slate-600 hover:text-slate-900" title="Next month">${icon("chevron_right", "text-sm")}</button></div></div>`)}
-        <div class="border border-slate-200 rounded-xl overflow-hidden bg-slate-50/40"><div class="grid grid-cols-7 text-center bg-slate-100/70 border-b border-slate-200 text-[11px] font-semibold text-slate-500 py-2">
-          ${WEEKDAYS.map(d => `<span>${DAY_NAMES[d].slice(0, 3)}</span>`).join("")}</div><div class="grid grid-cols-7 text-xs divide-x divide-y divide-slate-200/60 bg-white" data-cal="${id}"></div></div>
-        <div class="flex items-center justify-between text-[11px] text-slate-500 pt-1"><span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full ${b.bg}"></span>
-          <span>Selected dates become ${tip("one-off posts", "A one-off date is written on top of the weekly schedule and uses the topic you name, or the planner's choice.")}. Click any unselected date to add.</span></span>
-          <span class="font-semibold text-slate-700" data-datecount="${id}"></span></div>
-        <details class="text-xs"><summary class="cursor-pointer font-semibold text-slate-600">Edit dates as text (topic and time are optional)</summary>
-          ${field("One per line: date | topic id | time", "edit_note", area(`data-dates="${k("schedule.dates")}"`, dates, 3), "For example 2026-11-03 | topic id | 21:00", "pt-2")}</details></div>
+      <div class="${CARD}">${head("event_available", "violet", "Monthly plan", `The Planner writes the plans on the 1st of every month. ${tip("Assign", "You put each plan on a day in the Plan page; only assigned days get a post.")} them to days there.`)}
+        ${swRow(k("planning.enabled"), pn.enabled, "Write the plan on the 1st of every month", "Nothing is put on a day for you; the plans wait in the Plan.")}
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          ${field("Write the plan at", "schedule", inp(k("planning.time"), pn.time || "", "time"), "Time of day, in the time zone below.")}
+          ${field("Focus for the plan (optional)", "center_focus_strong", `<input data-k="${k("planning.focus")}" value="${esc(pn.focus || "")}" maxlength="600" placeholder="e.g. keep examples in Python" class="${FIELD}">`, "A direction for every topic; blank lets the Planner choose.")}</div>
+        <div class="flex items-center gap-3 pt-1"><a class="inline-flex items-center gap-1 text-xs font-semibold text-violet-600 hover:underline" href="#plan">${icon("calendar_month", "text-sm")}<span>Open the Plan</span></a></div></div>
 
       <div class="${CARD}">${head("schedule", "indigo", "Time and timezone", "When posts are written and published, in your audience's time zone.")}
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
-          ${field("Default release time", "alarm", iconIn("schedule", `<input data-k="${k("schedule.post_time")}" type="time" value="${esc(s.post_time || "")}" class="${FIELD_I}">`), "Default hour for days without their own time.")}
+          ${field("Default release time", "alarm", iconIn("schedule", `<input data-k="${k("schedule.post_time")}" type="time" value="${esc(s.post_time || "")}" class="${FIELD_I}">`), "Default release time for posts assigned to a date.")}
           ${field("Target timezone", "public", iconIn("map", `<input data-k="${k("schedule.timezone")}" type="text" list="tzs" value="${esc(s.timezone || "")}" class="${FIELD_I}">`), "An IANA name such as America/Chicago; it follows daylight saving.")}
           ${field("Write it ahead at", "edit_calendar", iconIn("schedule", `<input data-k="${k("schedule.generate_time")}" type="time" value="${esc(s.generate_time || "")}" class="${FIELD_I}">`), "When the crew starts writing, on the lead day.")}
           ${field("Days ahead", "event_upcoming", inp(k("schedule.lead_days"), s.lead_days ?? 1, "number", 'min="0" max="7"'), "Write this many days before the post time (0 to 7).")}</div>
-        <div data-preview="${id}" class="bg-gradient-to-r from-red-50 via-slate-50 to-indigo-50 border border-red-100 rounded-xl p-3.5 flex items-center justify-between"></div></div>
-
-      <div class="${CARD}">${head("event_available", "violet", "Weekly planning", `The Week Planner picks each day's topic from your ideas. ${tip("Re-plan", "Replaces the planner's topics; topics you typed in the Plan are kept.")} replaces its choices.`)}
-        ${swRow(k("planning.enabled"), pn.enabled, "Plan this week's topics automatically", "The planner runs on the day and time below.")}
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          ${field("Plan every", "event_repeat", sel(k("planning.weekday"), pn.weekday, WEEKDAYS.map(d => [d, DAY_NAMES[d]])), "The weekday the plan is made.")}
-          ${field("Plan at", "schedule", inp(k("planning.time"), pn.time || "", "time"), "Time of day, in the time zone above.")}</div>
-        ${field("Focus for the next plan (optional)", "center_focus_strong", `<input data-k="${k("planning.focus")}" value="${esc(pn.focus || "")}" maxlength="600" placeholder="e.g. This week is about Kubernetes; keep examples in Python" class="${FIELD}">`, "A direction for the whole plan; blank lets the planner choose.")}
-        <div class="flex flex-wrap items-center gap-3 pt-1">${button("primary", "event_available", "Save and plan open days", `data-plan="${id}|0"`)}${button("secondary", "refresh", "Save and re-plan this week", `data-plan="${id}|1"`)}
-          <a class="text-xs font-semibold text-violet-600 hover:underline" href="#plan">Open the Plan</a><span class="text-[11px] text-slate-400" data-plan-state="${id}"></span></div></div>
-
-      <div class="${CARD}" ${li ? 'id="ideas"' : ""}>${head("lightbulb", "amber", "Topics", `The kinds of posts you want. List your own ideas under each (one per line); the Week Planner uses them before inventing its own.`)}
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4" id="topics-${id}" data-topics="${id}"></div>
-        <div class="flex items-center gap-2 pt-1"><input data-newtopic="${id}" placeholder="New topic, e.g. ${li ? "Career advice" : "Explain a concept"}" maxlength="60" class="${FIELD} max-w-xs">${button("secondary", "add", "Add topic", `data-addtopic="${id}"`)}</div>
-        <p class="text-[11px] text-slate-400">Each topic needs a name and a brief; ideas, context and planning notes are optional.</p></div>
+        </div>
 
       ${id === "youtube" ? youtubeCard() : ""}
 
@@ -244,11 +182,14 @@ const settingsView = (() => {
           <p class="text-[11px] text-slate-400 mt-1" id="yt-voice-msg">A short sample of the chosen ElevenLabs voice.</p></div>
         <div class="pt-2 border-t border-slate-100 space-y-4"><div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           ${field("Pace", "speed", sel(k("pace"), v.pace || "slow", [["slow", "Slow, like a teacher (recommended)"], ["normal", "Normal, brisk"]]), "Slow leaves room for longer pauses and for the picture to build up.")}
-          ${field("Video renderer", "movie", sel(k("renderer"), v.renderer || "ffmpeg", [["explainroo", "Explainroo: hand-drawn explainer with a moving camera (recommended)"], ["explainer", "Explainer: slow animation to the voice"], ["ffmpeg", "Plain slides + captions"], ["blackboard", "Blackboard: chalk to the voice"], ["mcp", "Animation MCP server"]]).replace("<select ", '<select id="yt-renderer" '), "How the picture is made.")}
+          <div class="md:col-span-2">${field("Closing line", "campaign", area(`data-k="${k("outro")}"`, v.outro || "", 3, "If you like this kind of content, please like, comment and subscribe..."), "Said at the end of every video. Leave empty to end without one.")}</div>
+          ${field("Video renderer", "movie", sel(k("renderer"), v.renderer || "remotion", [["remotion", "Remotion: React animation to the voice (recommended)"], ["explainroo", "Explainroo: hand-drawn explainer with a moving camera (recommended)"], ["explainer", "Explainer: slow animation to the voice"], ["ffmpeg", "Plain slides + captions"], ["blackboard", "Blackboard: chalk to the voice"], ["mcp", "Animation MCP server"]]).replace("<select ", '<select id="yt-renderer" '), "How the picture is made.")}
           <div class="flex items-end">${swRow(k("captions"), v.captions !== false, "Burn in captions", "Subtitles drawn on the video.").replace('class="flex items-start', 'class="w-full flex items-start')}</div></div>
           <div id="yt-explainroo" class="grid grid-cols-1 md:grid-cols-2 gap-4 ${v.renderer === "explainroo" ? SHOWN : HIDDEN}">
             ${field("Explainroo folder", "folder", inp(k("explainroo.path"), er.path || "", "text", 'placeholder="/path/to/explainroo"'), "Where explainroo is installed (git clone, npm install, doctor --fetch).")}
             ${field("Look", "palette", sel(k("explainroo.theme"), er.theme || "midnight", [["midnight", "Midnight: dark, glowing colours"], ["clean", "Clean: flat cards"], ["blueprint", "Blueprint: engineering"], ["chalk", "Chalk: teaching board"], ["paper", "Paper: hand drawn"], ["editorial", "Editorial: magazine"]]), "The look of every video.")}
+            ${field("Edge margin", "crop_free", sel(k("explainroo.margin"), String(er.margin ?? 0.09), [["0.06", "Small"], ["0.09", "Medium (default)"], ["0.13", "Large"]]), "How far the picture stays from the sides of the frame.")}
+            ${field("Subtitle position", "subtitles", sel(k("explainroo.caption_bottom"), String(er.caption_bottom ?? 0.88), [["0.78", "Higher"], ["0.84", "Low"], ["0.88", "Lowest (default)"], ["0.92", "Very low"]]), "Where the subtitles sit, from the top of a vertical video.")}
             ${field("Music", "music_note", sel(k("explainroo.music"), er.music || "calm", [["calm", "Calm"], ["tech", "Tech"], ["warm", "Warm"], ["upbeat", "Upbeat"], ["playful", "Playful"]]), "Quiet background music that dips under the voice.")}</div>
           <div id="yt-mcp" class="grid grid-cols-1 md:grid-cols-2 gap-4 ${v.renderer === "mcp" ? SHOWN : HIDDEN}">
             ${field("Command", "terminal", inp(k("mcp.command"), m.command || "", "text", 'placeholder="npx"'), "The program that starts the MCP server.")}
@@ -370,117 +311,16 @@ const settingsView = (() => {
   }
 
   /* ---------- live drawing ---------- */
-  function drawDays(id, override = {}) {
-    const box = $(`[data-days="${id}"]`); if (!box) return;
-    const names = topicNames(id), has = Object.keys(names).length > 0, s = own(id).schedule || {}, b = brand(id), k = p => K(id, p);
-    const cur = {}, times = {};
-    WEEKDAYS.forEach(d => { const e = $(`[data-k="${k(`schedule.days.${d}`)}"]`), t = $(`[data-k="${k(`schedule.day_times.${d}`)}"]`);
-      cur[d] = d in override ? override[d] : e ? e.value : (s.days || {})[d] || ""; times[d] = t ? t.value : (s.day_times || {})[d] || ""; });
-    let n = 0;
-    box.innerHTML = WEEKDAYS.map(d => {
-      const on = !!cur[d] && (!has || cur[d] in names); if (on) n++;
-      const col = colOf(names, cur[d]), nm = DAY_NAMES[d].slice(0, 3);
-      const selEl = has ? `<select data-k="${k(`schedule.days.${d}`)}" data-dayval="${d}" class="w-full text-[11px] font-semibold py-1 pl-2 pr-5 rounded-md ${col.sel} appearance-none"><option value="">No post</option>${opts(Object.entries(names), cur[d])}</select>` : "";
-      const timeEl = `<input data-k="${k(`schedule.day_times.${d}`)}" type="time" value="${esc(times[d])}" title="Different time on this day; blank = the default time" class="w-full text-[11px] font-medium border-0 p-0 text-slate-700 focus:ring-0">`;
-      const chk = `<input type="checkbox" data-daychk="${d}" ${on ? "checked" : ""} ${has ? "" : 'disabled title="Add a topic first"'} class="w-4 h-4 rounded ${b.text} focus:ring-red-400 border-slate-300">`;
-      return on ? `<div class="rounded-xl border-2 ${b.border} ${b.wash} p-3 flex flex-col justify-between shadow-sm"><div class="flex items-center justify-between"><span class="font-bold text-xs ${b.text} flex items-center gap-1"><span>${nm}</span><span class="w-1.5 h-1.5 rounded-full ${b.bg}"></span></span>${chk}</div>
-          <div class="my-2 space-y-1.5"><div class="relative">${selEl}${icon("expand_more", `text-xs ${col.ic} absolute right-1 top-1.5 pointer-events-none`)}</div>
-          <div class="flex items-center gap-1 bg-white border border-slate-200 rounded-md px-1.5 py-0.5">${icon("schedule", "text-slate-400 text-xs")}${timeEl}</div></div>
-          <div class="text-[10px] ${b.text} font-semibold border-t ${b.line} pt-1 flex items-center justify-between"><span>Post day</span>${appBadge(id)}</div></div>`
-        : `<div class="rounded-xl border border-slate-200 bg-slate-50/60 p-3 flex flex-col justify-between opacity-70 hover:opacity-100 transition-all"><div class="flex items-center justify-between"><span class="font-bold text-xs text-slate-600">${nm}</span>${chk}</div>
-          <div class="my-3 text-center"><span class="text-[11px] text-slate-600 font-medium italic">Off day</span></div><div class="hidden">${selEl}${timeEl}</div>
-          <div class="text-[10px] text-slate-600 border-t border-slate-200 pt-1.5 text-center">No post</div></div>`;
-    }).join("");
-    const cnt = $(`[data-daycount="${id}"]`); if (cnt) cnt.textContent = `${n} of 7 Days Active`;
-    const lg = $(`[data-legend="${id}"]`);
-    if (lg) lg.innerHTML = `<span class="text-slate-600 font-medium">Topic Color Tagging:</span>${has ? Object.entries(names).map(([cid, nm]) => { const c = colOf(names, cid);
-      return `<span class="inline-flex items-center gap-1.5 text-[11px] font-semibold ${c.leg} px-2 py-0.5 rounded border"><span class="w-2 h-2 rounded-full ${c.dot}"></span><span>${esc(nm)}</span></span>`; }).join("") : `<span class="text-[11px] text-slate-500">No topics yet.</span>`}`;
-    drawTopicDays(id);
+  const topicRow = (id, v = "") => `<div class="flex items-center gap-2" data-topicrow><div class="relative flex-1"><input data-topic-in="${id}" value="${esc(v)}" maxlength="150" placeholder="e.g. Circuit breaker pattern"
+      class="${FIELD} ${v ? "" : "border-dashed bg-slate-50/60"}"></div><button type="button" data-deltopic="${id}" title="Remove topic" class="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors shrink-0">${icon("close", "text-base")}</button></div>`;
+  const topicValues = id => [...document.querySelectorAll(`[data-topic-in="${id}"]`)].map(i => i.value.replace(/\s+/g, " ").trim()).filter(Boolean);
+  function drawTopics(id, values = (own(id).topics || []).map(String), blank = 1) {
+    const box = $(`[data-topiclist="${id}"]`); if (!box) return;
+    box.innerHTML = [...values, ...Array(Math.max(blank, values.length ? 0 : 1)).fill("")].map(v => topicRow(id, v)).join("");
+    countTopics(id);
   }
-  function drawTopicDays(app) {
-    document.querySelectorAll(`#topics-${app} [data-cat]`).forEach(box => {
-      const id = box.dataset.cat, days = WEEKDAYS.filter(d => ($(`[data-k="${K(app, `schedule.days.${d}`)}"]`)?.value ?? (own(app).schedule?.days || {})[d]) === id);
-      box.querySelector("[data-topic-days]").innerHTML = days.length ? `Posted on ${days.map(d => DAY_NAMES[d]).join(", ")}`
-        : `<span class="text-amber-700 font-medium">Not on the schedule yet. Pick it for a day in the weekly schedule.</span>`;
-    });
-  }
-  const parseDates = text => text.split("\n").map(l => l.trim()).filter(Boolean).map(l => { const [date, category, time] = l.split("|").map(x => x.trim()); return { date, category, time }; });
-  // what one app posts on a given day (iso date): { label, time } or null. Reads the live form so the preview follows unsaved edits.
-  function postOn(id, iso, wd, names) {
-    const s = own(id).schedule || {}, freq = dv(id, "schedule.frequency") || s.frequency || "weekly", base = dv(id, "schedule.post_time") || s.post_time || "";
-    const one = parseDates($(`[data-dates="${K(id, "schedule.dates")}"]`)?.value || "").find(e => e.date === iso);
-    if (one) return { one: true, label: one.category ? (names[one.category] || one.category) : "One-off special", time: one.time || base };
-    if (freq === "weekly") { const d = WEEKDAYS[wd], v = dv(id, `schedule.days.${d}`); return v ? { label: names[v] || v, time: dv(id, `schedule.day_times.${d}`) || base } : null; }
-    if (freq === "every_n_days") { const st = dv(id, "schedule.start_date"), n = parseInt(dv(id, "schedule.every_n"), 10);
-      if (!st || !n) return null; const diff = Math.round((Date.parse(iso) - Date.parse(st)) / 864e5); return diff >= 0 && diff % n === 0 ? { label: "Post", time: base } : null; }
-    return null;
-  }
-  function drawCal(id) {
-    const box = $(`[data-cal="${id}"]`); if (!box) return;
-    const now = new Date(), m = T.month || (T.month = { y: now.getFullYear(), m: now.getMonth() }), names = topicNames(id), b = brand(id);
-    const first = new Date(Date.UTC(m.y, m.m, 1)), lead = (first.getUTCDay() + 6) % 7, days = new Date(Date.UTC(m.y, m.m + 1, 0)).getUTCDate();
-    const cells = Math.ceil((lead + days) / 7) * 7; let html = "", ones = 0;
-    for (let i = 0; i < cells; i++) {
-      const dt = new Date(Date.UTC(m.y, m.m, 1 - lead + i)), iso = dt.toISOString().slice(0, 10), dn = dt.getUTCDate(), wd = (dt.getUTCDay() + 6) % 7;
-      if (dt.getUTCMonth() !== m.m) { html += `<div class="p-2 text-slate-300 min-h-[64px] bg-slate-50/30">${dn}</div>`; continue; }
-      const p = postOn(id, iso, wd, names);
-      if (p?.one) { ones++; html += `<div data-caldate="${iso}" class="p-2 font-medium min-h-[64px] ${b.bg} text-white rounded-lg shadow-sm m-0.5 relative group cursor-pointer ring-2 ${b.ring}"><div class="flex justify-between items-center"><span class="font-black text-sm">${dn}</span>${icon("grade", "text-xs")}</div>
-        <div class="mt-1 text-[10px] font-bold leading-tight truncate">${esc(p.label)}</div><span class="text-[9px] text-slate-100 block">${esc(p.time)} one-off</span></div>`; }
-      else if (p) { const borderL = b.border.replace("border-", "border-l-"); html += `<div class="p-2 font-medium text-slate-800 min-h-[64px] ${b.wash} border-l-2 ${borderL}"><div class="flex justify-between items-center"><span class="font-bold text-slate-900">${dn}</span><span class="text-[9px] ${b.text} font-bold">${DAY_NAMES[WEEKDAYS[wd]].slice(0, 3)}</span></div>
-        <div class="mt-1 text-[10px] text-slate-600 truncate bg-white px-1 py-0.5 rounded border border-slate-200">${esc(p.label)}</div></div>`; }
-      else html += `<div data-caldate="${iso}" class="p-2 font-medium text-slate-700 min-h-[64px] hover:bg-slate-50 cursor-pointer">${dn}</div>`;
-    }
-    box.innerHTML = html;
-    $(`[data-calmonth="${id}"]`).textContent = `${first.toLocaleString([], { month: "long", timeZone: "UTC" })} ${m.y}`;
-    $(`[data-datecount="${id}"]`).textContent = `${ones} one-off ${ones === 1 ? "post" : "posts"} this month`;
-  }
-  function drawPreview(id) {
-    const box = $(`[data-preview="${id}"]`); if (!box) return;
-    const tz = dv(id, "schedule.timezone") || "UTC", names = topicNames(id), b = brand(id);
-    let next = null, err = false;
-    try {
-      const p = new Intl.DateTimeFormat("en-CA", { timeZone: tz, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }).formatToParts(new Date());
-      const g = t => +p.find(x => x.type === t).value, base = Date.UTC(g("year"), g("month") - 1, g("day")), nowMin = g("hour") * 60 + g("minute");
-      for (let i = 0; i < 400 && !next; i++) {
-        const dt = new Date(base + i * 864e5), iso = dt.toISOString().slice(0, 10), q = postOn(id, iso, (dt.getUTCDay() + 6) % 7, names);
-        if (!q || !/^\d\d:\d\d$/.test(q.time)) continue;
-        const [h, mi] = q.time.split(":").map(Number); if (i === 0 && h * 60 + mi <= nowMin) continue;
-        next = `${DAY_NAMES[WEEKDAYS[(dt.getUTCDay() + 6) % 7]].slice(0, 3)} ${dt.getUTCDate()} ${MON[dt.getUTCMonth()]} at ${h % 12 || 12}:${String(mi).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
-      }
-    } catch (e) { err = true; }
-    box.innerHTML = `<div class="flex items-center gap-3"><div class="w-9 h-9 rounded-lg ${b.bg} text-white flex items-center justify-center shadow-sm">${icon("schedule")}</div>
-      <div><span class="text-[11px] font-semibold text-red-700 uppercase tracking-wider block">Live Delivery Forecast</span>
-        <div class="text-sm font-bold text-slate-900 mt-0.5">${err ? "Check the time zone" : next ? `Next post: <span class="${b.text}">${esc(next)}</span> (${esc(tz)})` : "No upcoming post on this schedule"}</div></div></div>
-      <div class="hidden sm:flex items-center gap-1.5 text-xs text-slate-500 bg-white/80 px-2.5 py-1 rounded-lg border border-slate-200">${icon(next ? "check_circle" : "warning", `${next ? "text-emerald-600" : "text-amber-600"} text-xs`)}<span>${next ? "Cadence validated" : "Nothing planned"}</span></div>`;
-  }
-  const drawAll = () => PLATFORM_IDS.forEach(id => { drawCal(id); drawPreview(id); });
-
-  function drawTopics(app = "linkedin") {
-    const c = S.config, yt = app === "youtube", cats = catsOf(c, app), ta = (f, label, v, rows, ph = "", help = "") => `<label class="block"><span class="text-xs font-semibold text-slate-700">${label}</span><textarea data-c="${f}" rows="${rows}" placeholder="${esc(ph)}" class="${FIELD} mt-1">${esc(v)}</textarea>${help ? `<span class="text-[11px] text-slate-400">${help}</span>` : ""}</label>`;
-    $(`#topics-${app}`).innerHTML = Object.entries(cats).map(([id, k]) => {
-      const fixed = isFixedTopic(id, k), used = (S.ideaUse?.[id] || []).filter(x => x.used_on);
-      return `<div class="rounded-xl border border-slate-200 bg-slate-50/60 p-4 space-y-3" data-cat="${esc(id)}" data-app="${app}">
-        <div class="flex items-center gap-2"><input data-c="label" value="${esc(k.label)}" maxlength="60" aria-label="Topic name" title="Click to rename" class="${FIELD} font-bold">
-          <button type="button" data-delcat="${esc(id)}" data-app="${app}" title="Remove this topic" class="inline-flex items-center gap-1 px-2.5 py-2 text-xs font-semibold rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition-colors shrink-0">${icon("delete", "text-sm")}<span>Remove</span></button></div>
-        <div class="text-[11px] text-slate-500" data-topic-days></div>
-        ${fixed ? `<div class="text-xs text-slate-500">${k.media === "animation" ? "Picks the next algorithm from the built-in library automatically." : "Sums up the week's posts automatically."}</div>`
-          : ta("ideas", "Your ideas (one per line)", (k.ideas || []).join("\n"), 4, "e.g. Circuit breaker :: closed, open, half-open; fail fast", "Add :: and a few words of context after the title; the planner and the writer use them.")}
-        ${used.length ? `<div class="text-[11px] text-slate-500">Already used: ${used.map(x => `${esc(x.idea)} (${esc(x.used_on)})`).join("; ")}</div>` : ""}
-        ${ta("context", "About this type of topic (context)", k.context || "", 3, "What this topic is about, who it is for, your angle and experience.", "Helps the writer keep your angle.")}
-        ${ta("plan_context", "How to plan it", k.plan_context || "", 3, "How the week planner should choose topics of this type.", "Guidance for the Week Planner.")}
-        ${ta("brief", yt ? "What this kind of video must contain" : "What this kind of post must contain", k.brief, 3, "", yt ? "The script, scenes and thumbnail come from each day's plan and brief." : "Research always runs. The picture and its label come from each day's plan and brief.")}
-        ${yt ? `<div class="grid grid-cols-2 gap-3"><label class="block"><span class="text-xs font-semibold text-slate-700">Format (optional)</span><select data-c="format" class="${FIELD} mt-1 appearance-none">${opts([["", "Inherit"], ["short", "Short"], ["long", "Long"]], k.format || "")}</select></label>
-          <label class="block"><span class="text-xs font-semibold text-slate-700">Length (seconds)</span><input data-c="target_seconds" type="number" min="15" max="1800" value="${esc(k.target_seconds ?? "")}" placeholder="Inherit" class="${FIELD} mt-1"></label>
-          <label class="block col-span-2"><span class="text-xs font-semibold text-slate-700">Video style (optional)</span><select data-c="renderer" class="${FIELD} mt-1 appearance-none">${opts([["", "Same as the app's video setting"], ["explainroo", "Explainroo: hand-drawn explainer with a moving camera"], ["explainer", "Explainer: slow animation to the voice"], ["ffmpeg", "Plain slides with captions"], ["blackboard", "Blackboard: chalk to the voice"]], k.renderer || "")}</select></label></div>` : ""}</div>`; }).join("");
-    document.querySelectorAll(`#topics-${app} [data-delcat]`).forEach(b => b.onclick = () => {
-      const id = b.dataset.delcat;
-      if (!confirm(`Remove the topic "${cats[id].label}"? Days that use it will have no post.`)) return;
-      collectSettings(); delete catsOf(S.config, app)[id];
-      const sc = own(app).schedule; WEEKDAYS.forEach(d => { if (sc.days[d] === id) sc.days[d] = ""; });
-      drawTopics(app); drawDays(app); drawAll(); dirty();
-    });
-    drawTopicDays(app);
-  }
+  const countTopics = id => { const el = $(`[data-topic-count="${id}"]`), n = topicValues(id).length; if (el) el.textContent = `${n} ${n === 1 ? "topic" : "topics"}`;
+    const sum = $(`[data-app-sum="${id}"]`); if (sum) sum.textContent = `${n} ${n === 1 ? "topic" : "topics"} · plan on the 1st`; };
 
   /* ---------- config <-> form (same payload as the old configurator) ---------- */
   function collectSettings() {
@@ -491,27 +331,8 @@ const settingsView = (() => {
       else if (el.type === "number" || el.type === "range") v = el.step && el.step.includes(".") ? parseFloat(v) : parseInt(v, 10);
       setPath(cfg, el.dataset.k, v);
     });
-    root.querySelectorAll("[data-dates]").forEach(el => {
-      setPath(cfg, el.dataset.dates, el.value.split("\n").map(l => l.trim()).filter(Boolean).map(l => {
-        const [date, category, time] = l.split("|").map(x => x.trim()); const e = { date };
-        if (category) e.category = category; if (time) e.time = time; return e; }));
-    });
-    [cfg, ...Object.values(cfg.platforms || {})].forEach(o => {   // a weekday left blank keeps the normal time
-      const dt = o.schedule?.day_times; if (dt) Object.keys(dt).forEach(d => { if (!dt[d]) delete dt[d]; });
-    });
-    root.querySelectorAll("[data-cat]").forEach(box => {
-      const k = catsOf(cfg, box.dataset.app || "linkedin")[box.dataset.cat]; if (!k) return;
-      box.querySelectorAll("[data-c]").forEach(el => {
-        const f = el.dataset.c; let v = el.type === "checkbox" ? el.checked : el.value;
-        if (f === "layouts") v = v.split(",").map(s => s.trim()).filter(Boolean);
-        if (f === "ideas") v = v.split("\n").map(s => s.trim()).filter(Boolean);
-        if (["min_chars", "max_chars"].includes(f)) v = parseInt(v, 10);
-        if (f === "format" || f === "renderer") { if (!v) delete k[f]; else k[f] = v; return; }
-        if (f === "target_seconds") { v = parseInt(v, 10); if (!v) delete k[f]; else k[f] = v; return; }
-        if (f === "max_source_age_days") { if (v === "") { delete k[f]; return; } v = parseInt(v, 10); }
-        k[f] = v;
-      });
-    });
+    PLATFORM_IDS.forEach(id => { const list = topicValues(id); if (document.querySelector(`[data-topiclist="${id}"]`)) { const seen = new Set();
+      own(id).topics = list.filter(t => !seen.has(t.toLowerCase()) && seen.add(t.toLowerCase())); } });
     return cfg;
   }
   function dirty() {
@@ -546,8 +367,8 @@ const settingsView = (() => {
 
   /* ---------- render ---------- */
   async function render() {
-    const [{ config }, { agents }, planInfo] = await Promise.all([api("/api/config"), api("/api/agents"), api("/api/plan")]);
-    S.config = config; S.ideaUse = planInfo.ideas; const c = config;
+    const [{ config }, { agents }] = await Promise.all([api("/api/config"), api("/api/agents")]);
+    S.config = config; const c = config;
     T.app = PLATFORM_IDS.includes(S.platform) ? S.platform : "linkedin"; T.tab = "apps"; T.voicesLoaded = false;
     const active = PLATFORM_IDS.filter(enabledOf).length;
     $("#view").innerHTML = `<div data-st class="pb-24"><div id="st-head"></div>
@@ -565,21 +386,16 @@ const settingsView = (() => {
         <div class="flex items-center gap-3 w-full sm:w-auto justify-end"><button class="px-4 py-2 text-xs font-semibold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors" type="button" id="reset">Discard changes</button>
           <button class="inline-flex items-center gap-2 px-5 py-2 text-xs font-semibold rounded-lg bg-violet-600 hover:bg-violet-700 text-white shadow-sm shadow-violet-200 transition-all active:scale-95" type="button" id="save">${icon("save", "text-sm")}<span>Save settings</span></button></div></div></aside></div>`;
     $("#st-head").innerHTML = headerHtml();
-    PLATFORM_IDS.forEach(id => drawTopics(id)); PLATFORM_IDS.forEach(id => drawDays(id)); drawAll(); showTab(); ytInit();
+    PLATFORM_IDS.forEach(id => drawTopics(id)); showTab(); ytInit();
 
     const view = $("#view"), mine = e => S.tab === "settings" && e.target.closest("[data-st]");
-    view.oninput = e => { if (!mine(e)) return; dirty(); if (e.target.id === "yt-secs") ytLabel(); if (e.target.dataset.c === "label") { PLATFORM_IDS.forEach(id => drawDays(id)); } drawAll(); };
+    view.oninput = e => { if (!mine(e)) return; dirty(); if (e.target.id === "yt-secs") ytLabel(); if (e.target.dataset.topicIn) countTopics(e.target.dataset.topicIn); };
     view.onchange = e => {
       if (!mine(e)) return; const t = e.target;
-      if (t.dataset.daychk) {   // a day chip on/off: the topic menu is the truth ("" = no post)
-        const id = t.closest("[data-days]").dataset.days, d = t.dataset.daychk, sl = $(`[data-k="${K(id, `schedule.days.${d}`)}"]`), names = Object.keys(topicNames(id));
-        if (!t.checked && sl?.value) T.prev[`${id}${d}`] = sl.value;
-        drawDays(id, { [d]: t.checked ? (T.prev[`${id}${d}`] in topicNames(id) ? T.prev[`${id}${d}`] : names[0] || "") : "" });
-      } else if (t.dataset.dayval) drawDays(t.closest("[data-days]").dataset.days);
       if (t.dataset.appon) syncApp(t.dataset.appon);
       if (t.id === "yt-voice") $("#yt-voice-name").value = t.value ? t.selectedOptions[0].text.replace(/ \([^)]*\)$/, "") : "";
       if (t.id === "yt-renderer") { $("#yt-mcp").classList.toggle("hidden", t.value !== "mcp"); $("#yt-explainroo").classList.toggle("hidden", t.value !== "explainroo"); }
-      dirty(); drawAll();
+      dirty();
     };
     view.onclick = async e => {
       if (!mine(e)) return; const t = e.target, hit = q => t.closest(q);
@@ -588,18 +404,10 @@ const settingsView = (() => {
       if ((x = hit("[data-stab]"))) { e.preventDefault(); T.tab = x.dataset.stab; showTab(); window.scrollTo({ top: 0 }); return; }
       if ((x = hit("[data-app-pick]"))) { T.app = x.dataset.appPick; redrawApps(); return; }
       if ((x = hit("[data-pause]"))) { const sw1 = $(`[data-appon="${x.dataset.pause}"]`); sw1.checked = !sw1.checked; syncApp(x.dataset.pause); dirty(); return; }
-      if ((x = hit("[data-freq]"))) { const [id, v] = x.dataset.freq.split("|"); $(`[data-k="${K(id, "schedule.frequency")}"]`).value = v; $(`[data-freqbox="${id}"]`).innerHTML = freqCards(id, v);
-        $(`[data-everyn="${id}"]`).classList.toggle("hidden", v !== "every_n_days"); dirty(); drawAll(); return; }
       if ((x = hit("[data-appr]"))) { const [id, v] = x.dataset.appr.split("|"); $(`[data-k="${K(id, "publishing.approval")}"]`).value = v; $(`[data-apprbox="${id}"]`).innerHTML = approvalCards(id, v); dirty(); return; }
-      if ((x = hit("[data-calnav]"))) { const m = T.month; const dt = new Date(Date.UTC(m.y, m.m + +x.dataset.calnav, 1)); T.month = { y: dt.getUTCFullYear(), m: dt.getUTCMonth() }; drawAll(); return; }
-      if ((x = hit("[data-caldate]"))) {
-        const id = x.closest("[data-cal]").dataset.cal, ta = $(`[data-dates="${K(id, "schedule.dates")}"]`), iso = x.dataset.caldate;
-        const lines = ta.value.split("\n").filter(l => l.trim()), i = lines.findIndex(l => l.split("|")[0].trim() === iso);
-        if (i >= 0) lines.splice(i, 1); else lines.push(iso);
-        ta.value = lines.join("\n"); dirty(); drawAll(); return;
-      }
-      if ((x = hit("[data-plan]"))) { const [id, rp] = x.dataset.plan.split("|"); await planFrom(id, rp === "1"); return; }
-      if ((x = hit("[data-addtopic]"))) return addTopic(x.dataset.addtopic);
+      if ((x = hit("[data-addtopic]"))) { const id = x.dataset.addtopic; drawTopics(id, topicValues(id), 1); document.querySelectorAll(`[data-topic-in="${id}"]`).forEach(i => i.value ? 0 : i.focus()); dirty(); return; }
+      if ((x = hit("[data-deltopic]"))) { const id = x.dataset.deltopic, row = x.closest("[data-topicrow]"); row.querySelector("input").value = ""; const keep = topicValues(id); drawTopics(id, keep, 1); dirty(); return; }
+      if ((x = hit("[data-savetopics]"))) { await saveSettings(); return; }
       if ((x = hit("[data-testapi]"))) return testApi(x.dataset.testapi, x);
       if ((x = hit("[data-vtype]"))) return ytType(x.dataset.vtype);
       if (hit("#yt-play")) return ytPlay();
@@ -607,7 +415,7 @@ const settingsView = (() => {
       if (hit("#reset")) { S.dirty = false; render(); return; }
       if (hit("#save")) await saveSettings();
     };
-    $("#view").onkeydown = e => { if (e.key === "Enter" && e.target.dataset.newtopic && mine(e)) { e.preventDefault(); addTopic(e.target.dataset.newtopic); } };
+    $("#view").onkeydown = e => { if (e.key === "Enter" && e.target.dataset.topicIn && mine(e)) { e.preventDefault(); const id = e.target.dataset.topicIn; drawTopics(id, topicValues(id), 1); document.querySelectorAll(`[data-topic-in="${id}"]`).forEach(i => i.value ? 0 : i.focus()); dirty(); } };
 
     function redrawApps() {   // only the card column and the visible section change
       const kept = {}; PLATFORM_IDS.forEach(id => kept[id] = $(`[data-appon="${id}"]`)?.checked);
@@ -615,24 +423,6 @@ const settingsView = (() => {
       document.querySelectorAll("[data-appsec]").forEach(p => p.classList.toggle("hidden", p.dataset.appsec !== T.app)); ytInit();
       // the cards were rebuilt: restore their switches from the form state kept in the config copy
       PLATFORM_IDS.forEach(id => { const el = $(`[data-appon="${id}"]`); if (el) el.checked = !!kept[id]; syncApp(id); });
-    }
-    async function planFrom(id, replan) {
-      if (!(await saveSettings())) return;
-      const btns = document.querySelectorAll("[data-plan]"), state = $(`[data-plan-state="${id}"]`);
-      btns.forEach(b => b.disabled = true); state.textContent = "The Week Planner is working (about a minute)…";
-      try { await post("/api/plan/fill", { replan, platform: id }); toast("Plan updated"); location.hash = "plan"; }
-      catch (e) { toast(e.message, true); btns.forEach(b => b.disabled = false); state.textContent = e.message; }
-    }
-    function addTopic(app = "linkedin") {
-      const inpEl = $(`[data-newtopic="${app}"]`), name = inpEl.value.trim(); if (!name) return inpEl.focus();
-      collectSettings();
-      let id = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 28) || "topic";
-      const cats = app === "linkedin" ? S.config.categories : (own(app).categories ??= {});
-      for (let n = 2; cats[id]; n++) id = id.replace(/-\d+$/, "") + "-" + n;
-      cats[id] = { label: name, media: app === "youtube" ? "video" : "auto", research: "optional", fact_check: false, ideas: [], context: "", plan_context: "",
-        brief: app === "youtube" ? `A useful video about ${name}: a hook, the key points a viewer can act on, and a closing question.` : `A useful post about ${name}: a hook, the key points a reader can act on, a question, and 3-4 hashtags.` };
-      inpEl.value = ""; drawTopics(app); drawDays(app); drawAll(); dirty();
-      $(`#topics-${app} [data-cat="${id}"] [data-c="ideas"]`)?.focus();
     }
   }
   return render;

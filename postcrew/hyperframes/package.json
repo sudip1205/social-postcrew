@@ -1,0 +1,7 @@
+{
+  "name": "postcrew-hyperframes",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Kinetic-text scenes for Postcrew's YouTube videos, rendered by HyperFrames (HTML to video)",
+  "dependencies": {"gsap": "3.12.5", "hyperframes": "0.8.216"}
+}

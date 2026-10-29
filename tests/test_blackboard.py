@@ -140,9 +140,7 @@ class WiringTests(unittest.TestCase):
         self.assertEqual((yt["categories"], yt["schedule"]["days"]), ({}, {}))
         cfg = json.loads(json.dumps(DEFAULT_CONFIG))
         cfg["platforms"]["youtube"]["enabled"] = True
-        errs = validate_config(cfg)   # switched on with no topics yet: it says what to do, nothing else is wrong
-        self.assertEqual(len(errs), 1)
-        self.assertIn("add a topic", errs[0])
+        self.assertEqual(validate_config(cfg), [])   # switched on with no topics yet: nothing is wrong, nothing is scheduled
 
     def test_config_accepts_the_blackboard_renderer_and_rejects_others(self):
         with TempWorkspace() as ws:

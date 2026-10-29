@@ -36,12 +36,22 @@ accuracy
   <70   any claim the sources do not support (also a red flag: unsupported_claim / factual_error).
 
 tone    an online teacher: calm, clear and encouraging, spoken, plain; contractions are fine; no hype words, no sales
-        pitch, no begging for likes.
+        pitch, no begging for likes anywhere in the video EXCEPT the owner's required closing line (below). That line is the
+        owner's standing instruction: it is never "too_promotional", never off-tone, and never a reason to lower tone or format.
+        Judge the tone of everything else.
         90+ sounds like a good instructor walking a learner through it, using the real technical names.
+speakable (part of format; also a red flag: unpronounceable)
+        90+ nothing in the narration needs guessing: no code, identifiers, addresses or odd symbols; numbers, maths and acronyms are in
+            forms the voice can say; no lone letters; no hard-to-pronounce coined words. Any such item caps format at 70.
 format  the right length for the video's target (the word count matches the seconds), the right number of scenes, a
         title of 40-70 characters that matches the content, a useful description, 5-12 tags, thumbnail text of 2-4
-        words, no markdown or web addresses in the narration, and the last scene ends with one clear next step.
+        words, no markdown or web addresses in the narration, and the last scene ends with the owner's closing line (required, see below) after one clear takeaway or question.
 
 A script that would score 85+ on every criterion is short and focused: one promise, the hook in 3 seconds, only what
 serves the promise, one clear ending. Every extra scene or aside is a chance to lose points on clarity and value - cut
 rather than add.
+
+THE OWNER'S REQUIRED CLOSING LINE (every video ends with it; it counts toward the word budget; the writer may phrase it in
+their own natural words if the meaning is kept: like, comment and subscribe if they enjoyed it, and tell me in the comments what
+they did not like):
+  {{outro}}

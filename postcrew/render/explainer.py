@@ -318,9 +318,9 @@ def _geom(fmt):
     w, h = FORMATS[fmt]
     short = h > w
     u = w if short else h
-    x0 = 64 if short else 110
+    x0 = 96 if short else 150
     return {"w": w, "h": h, "short": short, "u": u, "x0": x0, "x1": w - x0, "top": 150 if short else 112,
-            "cap_cy": h * (0.865 if short else 0.915), "bot": h * (0.775 if short else 0.80),
+            "cap_cy": h * (0.885 if short else 0.925), "bot": h * (0.775 if short else 0.80),
             "body": u * (0.040 if short else 0.052), "head": u * (0.082 if short else 0.088),
             "max_bw": 660 if short else 330, "max_bh": 150 if short else 190}   # how big a box may get (render/scenes.place_diagram)
 

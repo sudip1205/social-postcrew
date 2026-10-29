@@ -64,3 +64,25 @@ class ExplainrooToolTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PauseAuditTests(unittest.TestCase):
+    def words(self, spec):
+        out, t = [], 0.0
+        for text, gap in spec:
+            out.append({"text": text, "start": t, "end": t + 0.3})
+            t += 0.3 + gap
+        return out
+
+    def test_a_voice_that_stops_where_the_punctuation_says_is_clean(self):
+        from postcrew.agents.explainroo import pause_problems
+        self.assertEqual(pause_problems(self.words([("In", 0.05), ("Python,", 0.3), ("a", 0.05), ("list", 0.05), ("works.", 0.6), ("Done.", 0)])), [])
+
+    def test_wrong_stops_are_found(self):
+        from postcrew.agents.explainroo import pause_problems
+        found = pause_problems(self.words([("Brackets", 0.05), ("close", 0.6), ("last", 0.05), ("opened,", 0.0), ("then", 0.05),
+                                           ("go", 0.05), ("here,", 0.02), ("now", 0.02), ("done.", 0.1), ("Next.", 0)]))
+        kinds = " ".join(w + ":" + k for w, k in found)
+        self.assertIn("close:it stops in the middle of a phrase", kinds)
+        self.assertIn("here,:the comma was run on", kinds)
+        self.assertIn("done.:no stop after the sentence end", kinds)

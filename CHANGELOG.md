@@ -3,6 +3,40 @@
 ## 0.2.0: YouTube, per-app settings and a faster Studio
 
 ### New
+- **Open the Studio to your local network.** `python3 -m postcrew serve --lan` (or `--host <address>`) lets other computers on your network use the Studio, for example from a lab server. It stays on this computer only unless you ask. On the network it needs an access token: the server prints a link ending `/?token=...` that opens the Studio and keeps you signed in with a cookie; the token is made once and kept in `studio-token` in the workspace (or pass `--token` / `$POSTCREW_TOKEN`). Writes must come from the page the Studio served. LinkedIn and YouTube sign-in still return to localhost, so connect those accounts on the server itself or through an SSH tunnel.
+- **A monthly plan you assign by hand.** Settings > Topics is now a list of one-line topics per app (LinkedIn and YouTube): no details, add as many boxes as you like and save. On the 1st of every month Postcrew writes 10 related plans for each topic, with the context, research topics, a real-world example and the takeaway. They are not put on days: the Plan page is a month calendar plus the list of generated plans, and you assign each plan to a date (for YouTube also Short or Long). Only assigned days get a post. Published plans stay listed, struck through, and are never planned again; no plan repeats another or a published post. Topics changed in the middle of a month are used for the next month's plan (or press Generate plan). The weekly cadence, one-off dates and the weekly planner are gone from Settings; an existing weekly schedule is switched to assigned dates.
+- **Remotion is now the video renderer.** Every YouTube video is drawn by Remotion (React) by default: title, statement, points, code, diagram, flow and trace scenes, timed to the recorded voice, with captions that follow the words. Needs only Node.js 18+; the first run installs the project (`postcrew/remotion`) and Remotion fetches its own browser. The thumbnail is drawn by the same project. The picture is made by three steps you can watch in the Workflow view: **HyperFrames Producer** (HeyGen, HTML + GSAP: the opening card and big statements, with drifting colour, blur-in words and a highlighted key word), **Remotion Producer** (diagrams, flows, traces, code, lists) and **Video Composer** (joins the clips in scene order, lays the voice under them, makes the thumbnail). Each drawing step shows its engine and a live progress bar; if HyperFrames cannot run, Remotion draws every scene. No watermark, handle or brand text is drawn on the picture or thumbnail. The older renderers stay available per app or per topic in Settings.
+- **Hooks agent: a quality gate for every video.** A new step ("Hook") looks at the finished video before it is queued, with no AI, in
+  seconds: sound where the voice should speak (missing sound, long silences, wrong loudness, clipping), the voice against the
+  punctuation and the words, and the frames (black frames, a picture frozen for ages, an empty scene, things drawn at the edge).
+  For an explainroo video it fixes only what is wrong, once: a scene with missing sound is recorded again, a scene with an empty or
+  crowded picture gets one scoped round from the picture agent, then it renders again. A fault it cannot fix does not fail (and
+  re-run) the whole video: the video is held for your approval with the findings, whatever the approval setting.
+- **Cheaper production.** A retry of the video step keeps the pictures already drawn when the script is the same; fix rounds name the
+  scenes to change and leave the others alone; the picture agent's second look is off by default because the Hooks agent checks the
+  frames for free (turn it on in Settings if you want it).
+- **The voice stops where the punctuation says.** Measured on real ElevenLabs output: a comma could run on with no pause (0.0 s), and a
+  misplaced "..." stopped the voice in the middle of a phrase for 0.6 s. Now clause commas get a small break, list items keep the
+  voice's own breath, sentence ends and "..." beats keep theirs, and the writer is told to put "..." only after a complete sentence
+  (the checks send a script back for one in the middle of a phrase). After the voice is recorded the Explainroo Producer listens
+  (explainroo aligns every word): a scene whose stops are in the wrong places is recorded again with another seed, up to twice.
+- **Space and spacing in Explainroo videos.** The agent is told the free area in pixels and must use all of it; explainroo's check now
+  also reports texts closer than 28 px, content that stops short of the free area, text under 44 px on a phone and a scene that
+  fills too little of the height, and the agent fixes them before the render. Subtitles default to the very bottom (88%).
+- **Nothing is left for the voice to guess.** Before narration goes to ElevenLabs, every symbol, number and acronym is written out as the
+  words to be said (`postcrew/speech.py`): "O(n^2)" becomes "O of n squared", "9 - 7 = 2" becomes "nine minus seven equals two",
+  "95%" and "$4.50" and "20ms" become words, acronyms are said the way people say them (A P I, sequel, cube control for kubectl) and
+  unknown ones are spelled letter by letter. Following ElevenLabs' guidance that too many break tags cause artifacts and noises, at most
+  three pauses are added per request.
+- **Unspeakable text is caught.** The writer's automatic checks send a script back for code, identifiers, addresses, emoji, lone letters,
+  words with no vowels or mixed letters and digits; the Editor sees what the voice will actually be given and has a new red flag,
+  `unpronounceable`, for anything a voice could not say.
+- **Closing line in every video.** The writer ends each video with a call to action ("If you like this kind of content, please like,
+  comment and subscribe. And if you don't like it, definitely tell me why in the comments..."); the checks send a script back without
+  it. Edit or switch it off in Settings > YouTube > Closing line.
+- **More room at the edges, subtitles lower.** Pictures stay further from the sides of the frame and the subtitles sit near the bottom
+  (adjustable per Settings > YouTube > Explainroo). Explainroo has no such setting, so a small patch
+  (`postcrew/tools/explainroo-layout.patch`) is applied to your install automatically.
 - **Explainroo renderer.** Videos can be made by [explainroo](https://www.explainroo.com), an open-source tool that runs on your computer:
   hand-drawn lines, icons, charts, code, a camera that follows the narration, sound effects and quiet music. The approved ElevenLabs
   voice is used as its narration; an AI agent writes the pictures from the script's plan, explainroo's own layout checks are fed back

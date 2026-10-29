@@ -178,12 +178,23 @@ class StudioPerAppTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 st.overview("myspace")
 
-    def test_plan_edits_land_in_the_chosen_apps_plan(self):
+    def test_assigned_plans_land_in_the_chosen_apps_plan(self):
+        import datetime
+        from postcrew import monthly
         from postcrew.crew import local_now
+        from helpers import ScriptedLLM
         with TempWorkspace() as ws:
-            with_youtube(ws, frequency="every_n_days", every_n=1, start_date="2026-01-01", rotation=["dev-tip"])
+            cfg = with_youtube(ws)
+            cfg["platforms"]["youtube"]["topics"] = ["Hash maps"]
+            ws.save_config(cfg)
+            titles = ['Open addressing vs chaining', 'Resizing without pauses', 'Choosing a hash function', 'Collision attacks', 'Load factor tuning', 'Hash maps in databases', 'Iteration order surprises', 'Concurrent hash maps', 'Memory cost of buckets', 'Perfect hashing for fixed keys']
+            plans = [{"title": t, "angle": "buckets", "context": "c", "example": "e", "takeaway": "t", "search_queries": ["q"]} for t in titles]
             st = self.studio(ws)
-            day = next(r for r in st.plan("youtube")["days"] if not r["past"])["date"]
-            st.plan_save({"days": {day: {"topic": "Why hash maps are fast", "angle": "buckets"}}, "platform": "youtube"})
-            self.assertEqual(planner_mod.load_plan(ws, "youtube")[day]["topic"], "Why hash maps are fast")
-            self.assertEqual(planner_mod.load_plan(ws), {})
+            with mock.patch("postcrew.llm.make_backend", return_value=ScriptedLLM({"planner": [{"plans": plans}]})):
+                out = st.plan_generate({"platform": "youtube"})
+            self.assertEqual(out["counts"]["plans"], 10)
+            day = (local_now(ws.config()).date() + datetime.timedelta(days=1)).isoformat()
+            st.plan_assign({"platform": "youtube", "id": out["items"][0]["id"], "date": day, "format": "long"})
+            self.assertEqual(planner_mod.load_plan(ws, "youtube")[day]["topic"], titles[0])
+            self.assertEqual(planner_mod.load_plan(ws), {})            # LinkedIn's plan is untouched
+            self.assertEqual(monthly.view(ws, "linkedin")["items"], [])

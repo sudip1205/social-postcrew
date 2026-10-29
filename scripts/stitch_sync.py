@@ -18,6 +18,11 @@ from pathlib import Path
 
 PROJECT = "12643280043223938531"
 API = "https://stitch.googleapis.com/v1"
+# Screens Stitch made with "edit screens" are not always placed on the canvas, so they are not "visible": list them here to sync them.
+# SUPERSEDED screens are skipped (the old screen was replaced by the new one).
+PINNED = {"ea789ed29bc94bfe838a978ea6ce0d38"}   # Content Plan > Monthly Editorial Board (replaces the weekly board)
+SUPERSEDED = {"aae9f43f535e4625bfeb3cb4c2b2eabc",   # Plan > Weekly Editorial Board
+              "1fc154c1dcae4b868d90494649baa18b"}   # the first draft of the monthly plan (a second version was kept)
 OUT = Path(__file__).resolve().parent.parent / "design" / "stitch"
 
 
@@ -43,7 +48,7 @@ def file_bytes(ref, key):
     path = ref["downloadUrl"].split("/v1/", 1)[1]
     w = get(path, key)
     if "dataString" in w:
-        if ref.get("mimeType", "").startswith("image/"):
+        if ref.get("mimeType", "").startswith("image/") or w["dataString"].startswith("iVBOR"):   # a PNG, base64
             return base64.b64decode(w["dataString"])
         return w["dataString"].encode()
     for k in ("data", "bytes", "content"):
@@ -60,7 +65,7 @@ def main():
     check = "--check" in sys.argv
     key = api_key()
     project = get(f"projects/{PROJECT}", key)
-    visible = {s["id"] for s in project.get("screenInstances", []) if not s.get("hidden")}
+    visible = ({s["id"] for s in project.get("screenInstances", []) if not s.get("hidden")} | PINNED) - SUPERSEDED
     screens = [s for s in get(f"projects/{PROJECT}/screens", key).get("screens", [])
                if s["name"].rsplit("/", 1)[1] in visible]
     OUT.mkdir(parents=True, exist_ok=True)

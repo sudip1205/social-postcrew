@@ -1,0 +1,93 @@
+diff --git a/engine/layout.js b/engine/layout.js
+index 30c884c..08257bb 100644
+--- a/engine/layout.js
++++ b/engine/layout.js
+@@ -30,7 +30,7 @@ export function layoutAreas(config, W, H) {
+     app = { left, top: appTop, right, bottom: appBottom };
+     top = config.watermark ? appTop + wmBox + 16 : appTop;
+     bottom = appBottom;
+-    if (config.captions) captions = { cx: (left + right) / 2, bottom: appBottom - 10, maxWidth: right - left };
++    if (config.captions) captions = { cx: (left + right) / 2, bottom: config.captionBottom ? Math.round(H * config.captionBottom) : appBottom - 10, maxWidth: right - left };   // postcrew: captionBottom
+   } else {
+     left = m;
+     right = W - m;
+diff --git a/engine/runtime.js b/engine/runtime.js
+index bbd969a..c8ab883 100644
+--- a/engine/runtime.js
++++ b/engine/runtime.js
+@@ -550,6 +550,8 @@ export class Engine {
+     for (const sc of this.timeline.scenes) {
+       const entrances = [];
+       this.recorder = { push: (e) => entrances.push(e) };
++      let fillMax = 0; // postcrew: the most vertical room the scene's text uses at any moment
++      let reachMax = 0; // postcrew: how far down the free area the scene's text ever reaches
+       const n = Math.ceil(sc.dur / step);
+       for (let k = 0; k <= n; k++) {
+         const t = Math.min(sc.dur - 0.001, k * step);
+@@ -593,6 +595,36 @@ export class Engine {
+             add('warn', sc.id, t, `"${label}" has low contrast against its background (${contrast(tx.fg, bg).toFixed(1)}:1); use color: '${suggestion.color}' (${suggestion.ratio.toFixed(1)}:1)`);
+           });
+         }
++        // postcrew: `_layout` {minGap, minFill, minText} adds checks for crowding, unused space and small text
++        const PL = this.config._layout;
++        if (PL && this.safeArea) {
++          const inner = texts.filter((x) => !x.ui && !(this.captionBand && x.y0 >= this.captionBand.top - 2));
++          if (inner.length) {
++            const use = Math.max(...inner.map((x) => x.y1)) - Math.min(...inner.map((x) => x.y0));
++            fillMax = Math.max(fillMax, use);
++            reachMax = Math.max(reachMax, Math.max(...inner.map((x) => x.y1)) - this.safeArea.top);
++          }
++          const minText = PL.minText ?? (H > W ? 40 : 30);
++          for (const tx of inner) {
++            if (!tx.block && Math.round(tx.size) < minText) once(`ptext:${sc.id}:${tx.text}`, () => add('warn', sc.id, t, `"${tx.text.slice(0, 30)}" is ${Math.round(tx.size)}px: too small for a phone (use ${minText}px or more)`));
++          }
++          const gapMin = PL.minGap ?? 24;
++          const shown = inner.filter((x) => x.alpha > 0.95);
++          for (let a = 0; a < shown.length; a++) {
++            for (let b = a + 1; b < shown.length; b++) {
++              const A = shown[a];
++              const B = shown[b];
++              if (A.block && B.block) continue;
++              const ix = Math.min(A.x1, B.x1) - Math.max(A.x0, B.x0);
++              const iy = Math.min(A.y1, B.y1) - Math.max(A.y0, B.y0);
++              const dy = -iy; // gap between the boxes when they do not overlap vertically
++              const dx = -ix;
++              if ((ix > 0 && dy >= 0 && dy < gapMin) || (iy > 0 && dx >= 0 && dx < gapMin)) {
++                once(`pgap:${sc.id}:${A.text}:${B.text}`, () => add('warn', sc.id, t, `"${A.text.slice(0, 24)}" and "${B.text.slice(0, 24)}" are only ${Math.round(Math.min(dx >= 0 && iy > 0 ? dx : 1e9, dy >= 0 && ix > 0 ? dy : 1e9))}px apart: leave at least ${gapMin}px between texts`));
++              }
++            }
++          }
++        }
+         // Overlaps only count when both are fully shown, not mid-fade.
+         const solid = texts.filter((x) => x.alpha > 0.95);
+         for (let a = 0; a < solid.length; a++) {
+@@ -612,6 +644,12 @@ export class Engine {
+           }
+         }
+       }
++      if (this.config._layout && this.safeArea && fillMax > 0) {
++        const want = this.config._layout.minFill ?? 0.7;
++        const room = this.safeArea.bottom - this.safeArea.top;
++        if (reachMax < room * (this.config._layout.minReach ?? 0.9)) add('warn', sc.id, null, `the scene's content ends ${Math.round(reachMax / room * 100)}% of the way down the free area (y ${Math.round(this.safeArea.top)} to ${Math.round(this.safeArea.bottom)}), so the lower part of the screen is empty: make the picture bigger and spread the parts so the lowest one reaches about y ${Math.round(this.safeArea.bottom - room * 0.08)}`);
++        else if (fillMax < room * want) add('warn', sc.id, null, `the scene's text spans only ${Math.round(fillMax)}px of the ${Math.round(room)}px free height (${Math.round(fillMax / room * 100)}%): enlarge the picture and spread things out so it fills at least ${Math.round(want * 100)}% (free area y ${Math.round(this.safeArea.top)} to ${Math.round(this.safeArea.bottom)})`);
++      }
+       this.recorder = null;
+       this.textLog = null;
+       const times = [...new Set(entrances.map((e) => Math.round(e.at * 100) / 100))].sort((a, b) => a - b);
+diff --git a/src/project.js b/src/project.js
+index 3ef0c57..f2d76c7 100644
+--- a/src/project.js
++++ b/src/project.js
+@@ -276,6 +276,12 @@ export function normalizeConfig(raw, dir = '.') {
+   cfg.height = height;
+   cfg.format = FORMATS[cfg.size] ? cfg.size : null;
+   cfg.safe = safe || null;
++  // postcrew: `_layout` {top,left,right,bottom,captionBottom} (fractions of the frame) replaces the platform's safe area and moves the captions
++  if (cfg._layout) {
++    const L = cfg._layout;
++    cfg.safe = { top: L.top ?? 0.07, right: L.right ?? 0.07, bottom: L.bottom ?? 0.07, left: L.left ?? 0.07 };
++    cfg.captionBottom = L.captionBottom ?? null;
++  }
+   if (cfg.captions === 'auto') cfg.captions = height >= width;
+   return cfg;
+ }

@@ -10,6 +10,24 @@ The Studio is Postcrew's dashboard at **http://localhost:8765**. It opens when y
 
 ---
 
+## Open it from another computer
+
+By default the Studio answers only on the computer it runs on. To use it from other computers on your network (a lab server, for
+example), start it with `--lan`:
+
+```
+python3 -m postcrew serve --lan            # or --host 192.168.1.50, --port 8765, --token your-own-word
+```
+
+It prints a link such as `http://192.168.1.50:8765/?token=...`. Open it once in each browser; the Studio then remembers you with a
+cookie. Without the token every page answers "Postcrew Studio is locked". The token is made once and kept in `studio-token` in the
+workspace folder; delete the file to get a new one. Anyone with the link can run the crew and publish for you, so keep it to people
+you trust and to a network you trust (the link is plain http).
+
+LinkedIn and YouTube sign-in send you back to `localhost`, so connect those accounts on the server itself, or through an SSH tunnel
+(`ssh -L 8765:localhost:8765 lab`, then open `http://localhost:8765`, which needs no token). To keep `--lan` on after a restart,
+add it to `ExecStart` in `deploy/systemd/postcrew.service` or to the arguments in `deploy/launchd/com.postcrew.studio.plist`.
+
 ## Overview
 
 <img src="assets/screens/overview.png" alt="Overview tab" width="900">
@@ -40,14 +58,14 @@ Your home page.
 
 <img src="assets/screens/plan.png" alt="Plan tab" width="900">
 
-This week, Monday to Sunday.
+One month, with the plans on the right.
 
-- Each open day shows the **topic** and an optional **angle** (what the reader will learn). Type over any of
-  them; leave a day empty to let the Topic Scout choose the evening before.
-- **Suggest another** asks the Week Planner for a different topic for that day. Type a hint first ("something
-  about Postgres") if you have one.
-- **Plan open days** fills every empty day now. Days you typed are never changed.
-- **Save plan** saves all your edits together; **Discard changes** throws them away.
+- **Generated plans** (right) are written from your Topics in Settings: 10 for each topic, on the 1st of every month or when you
+  press **Generate plan**. Open **Details** to read the context, the research topics, the real-world example and the takeaway.
+- **Assign** puts a plan on a day: pick a date in the small calendar (for YouTube also **Short** or **Long**), then confirm. You can
+  also drag a plan onto a day, or click a day's **+ Assign**. Only days you assign get a post. **Unassign** moves it back.
+- A plan that was written or published stays listed (struck through when published) and is never planned again.
+- The arrows change the month. Topics you change in the middle of a month are used for the next month's plan.
 - Days that are already written show their status, such as **queued** (change those in the Queue).
 - The **From** column shows each day's state: who planned it (the planner or you), **open** if nobody has
   yet, or the status of a post already written.
@@ -125,13 +143,11 @@ comment was added. Every topic in this list counts as done, so the crew never re
 Three steps and two extra sections. Nothing is saved until you click **Save settings** (the bar at the
 bottom shows unsaved changes). If something is wrong, the page lists exactly what to fix and saves nothing.
 
-1. **Topics**: one card per kind of post. Rename it, list your ideas (one per line), see which ideas were
-   already used and when, or **Remove** it. **More options** sets its picture, research, poster style and
-   label, length, source age, whether to plan it ahead, whether every number needs a source, and the brief
-   ("What this kind of post must contain"). **Add topic** creates a new kind.
-2. **Weekly schedule**: a topic (or "No post") for each day, the publish time, the time the crew writes the
-   day before, the time zone, and the weekly planning day and time, with an optional **focus** for the next
-   plan. **Save and plan open days** / **Save and re-plan this week** save and run the planner at once.
+1. **Topics**: one line per topic, one text box each. **Add another topic** for more boxes, the cross removes one, **Save topics**
+   saves. No details are needed: the Planner writes the context, research and examples. This is also where the monthly plan is
+   switched on or off, with its time and an optional **focus**.
+2. **Time and timezone**: the default publish time, the time the crew writes the day before, and the time zone. Which days get a
+   post is decided in the Plan tab.
 3. **About you**: name, profile link for posters, audience, voice, and true facts about you.
 
 **Publishing and alerts**: the approval mode, **Practice mode**, and which notification channels to use

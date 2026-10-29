@@ -33,13 +33,14 @@ No Stitch screen exists for either view. Both are derived from the shell, design
 - Filter and Export CSV disabled ("Coming soon"). Sync Pipelines re-fetches data; Run now scrolls to the Run card.
 
 ### plan
-# Plan deviations
-- Day cards show real data only: app + topic-type label instead of "Short 45s" format chip (no format in /api/plan); no fake hook outline, "Locked by", render notes or agent captions.
-- Editable days use inline inputs for topic/angle/brief (legacy editing kept) instead of static h3/p.
-- Weekly Recap and Rest slots: generic text (no backend text). "Add slot anyway" disabled (Coming soon).
-- Date navigator arrows, Quick drop idea, Export CSV: disabled (Coming soon). Preview notes / Unassign / "Added Nd ago" dropped (ideas are plain strings from config).
-- Idea bank: filters by topic type; "Assign" and drag/drop fill the day's topic field (then Save plan). Assign picks the first day with an empty topic.
-- App toggle in sub-header has no "N scheduled" counts. "Re-plan this week" = POST /api/plan/fill {replan:true}.
+# Plan deviations (Content Plan > Monthly Editorial Board)
+- The screen is `content-plan-monthly-editorial-board`. Stitch made it as a new screen when asked to edit the weekly board, so `scripts/stitch_sync.py` lists it in PINNED and skips the old weekly board (SUPERSEDED); the two first drafts and the old screen stay in Stitch, not in `design/stitch/`.
+- Real data only: plans, topics, counts, "Plan generated" and "Next" dates come from /api/plan. No "10 min read research" line (no such data).
+- The Assign popover sits inside the plan card as in the design; its date picker only offers free days from today on. YouTube also asks Short or Long (LinkedIn has no length choice, so the segmented control is not shown).
+- Drag a plan onto a day also assigns it (the design lists drag states as a suggestion); for YouTube the drop opens the popover so the length is still chosen.
+- Day cards: the source-topic chip is shown with a left border in the app colour; a past empty day is plain, not "Rest" (there are no scheduled rest days any more).
+- Month navigator arrows work; "Generate plan" is disabled for a month that is over. Export CSV and the weekly "Re-plan" are gone (not in the new design).
+
 
 ### queue
 # Queue and Upload dialog: deviations from Stitch
@@ -62,10 +63,9 @@ No Stitch screen exists for either view. Both are derived from the shell, design
 - Disabled with title "Coming soon", no config keys: YouTube video type, duration slider, ElevenLabs voice and Play sample, Test API. Instagram and TikTok cards.
 - Invented Stitch sample data dropped: "@AgentDevStudio / Google OAuth", "OAuth Tokens Status: Valid", the Instagram/TikTok beta lines, "Long video / Shorts clip" day footers (now "Post day"), the "You modified ..." change list in the save bar (now Unsaved changes / Saved).
 - Timezone is a text input with a datalist (free entry), not a 4-option select. Times are native time inputs (HH:MM 24h, what the backend validates), not "02:00 PM" text.
-- Added beyond Stitch (old functionality kept): Weekly planning card with Save and plan / re-plan, Topics editor (ideas, context, brief), every-N-days fields, dates-as-text editor, planning focus, lead days, generate time.
+- Topics are one-line text boxes (Stitch edit of the screen: Topics card with add, remove and Save topics). The cadence cards (How often, weekly days, one-off dates) and the topic detail editor are gone: days are assigned in the Plan. A short "Monthly plan" card keeps the on/off switch, time and focus of the planner. Stitch applied this edit as a page patch that its API does not save into the screen file, so the markup was taken from the edit result (`design/stitch/settings-apps-schedules.html` still shows the old cards).
 - Practice mode and approval policy are per app (each app has its own). Weekly day chips for YouTube are disabled until it has topics.
 - Focus rings are violet; the Stitch screen uses red on its YouTube page.
-- Calendar shows recurring days for weekly and every-N-days cadences.
 
 ### workflow
 # Workflow deviations

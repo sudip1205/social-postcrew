@@ -15,7 +15,7 @@ from datetime import date, datetime
 
 LINKEDIN = "linkedin"
 PLATFORM_IDS = [LINKEDIN, "youtube"]
-SECTIONS = ("schedule", "planning", "categories", "publishing", "video")
+SECTIONS = ("schedule", "planning", "categories", "publishing", "video", "topics")
 FREQUENCIES = ["weekly", "every_n_days", "dates"]
 WEEKDAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
 LABELS = {LINKEDIN: "LinkedIn", "youtube": "YouTube"}
@@ -155,5 +155,6 @@ def video_spec(cfg, category=None, entry=None, options=None):
     spec["pace"] = base.get("pace") if base.get("pace") in PACE_WPS else "normal"
     spec["wps"] = PACE_WPS[spec["pace"]]
     spec["max_words"] = int(spec["target_seconds"] * spec["wps"])
+    spec["outro"] = str(base.get("outro") or "").strip()
     spec["renderer"] = renderer_for(cfg, None) if not category else (category.get("renderer") or renderer_for(cfg, None))
     return spec

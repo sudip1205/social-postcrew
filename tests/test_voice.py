@@ -134,8 +134,8 @@ class VoiceTests(unittest.TestCase):
     def test_pauses_are_added_for_the_voice_only(self):
         said = "A hash is a fingerprint. It never changes... Why does that matter? It lets you compare files."
         out = voice.prepare(said)
-        self.assertEqual(out.count('<break time="0.35s" />'), 2)       # after a sentence that is followed by another
-        self.assertEqual(out.count('<break time="0.8s" />'), 1)        # the deliberate beat
+        self.assertEqual(out.count('<break time="0.2s" />'), 2)       # after a sentence that is followed by another
+        self.assertEqual(out.count('<break time="0.7s" />'), 1)        # the deliberate beat
         self.assertEqual(voice.prepare(out), out)                       # never twice
         self.assertEqual(voice.prepare(said, "eleven_v3"), said)        # v3 has no break tags: it follows the punctuation
         self.assertNotIn("<break", said)
@@ -170,13 +170,29 @@ if __name__ == "__main__":
 
 
 class HumanVoiceTests(unittest.TestCase):
-    def test_capitalised_words_are_read_as_words_and_acronyms_as_letters(self):
-        out = voice.prepare("Move UP the list. The API is NOT slow, and TCP uses LOAD balancing.")
+    def test_nothing_is_left_for_the_voice_to_guess(self):
+        out = voice.prepare("Move UP the list. The API is NOT slow, and TCP uses LOAD balancing.", pace="normal")
         self.assertIn("Move up the list", out)
-        self.assertIn("is not slow", out)
-        self.assertIn("API", out)
-        self.assertIn("TCP", out)
+        self.assertIn("The A P I is not slow", out)
+        self.assertIn("T C P", out)
         self.assertIn("load balancing", out)
+
+    def test_symbols_and_numbers_are_spelled_out(self):
+        out = voice.prepare("At 9 - 7 = 2, O(n^2) is slow: 95% of $4.50 in 20ms.", model="eleven_v3")
+        self.assertEqual(out, "At nine minus seven equals two, O of n squared is slow: ninety five percent of four dollars and fifty "
+                              "cents in twenty milliseconds.")
+
+    def test_break_tags_are_capped_because_too_many_cause_artifacts(self):
+        out = voice.prepare("One here. Two here. Three here. Four here. Five here. Six here... Seven there.")
+        self.assertLessEqual(out.count("<break"), voice.MAX_BREAKS)
+        many = voice.prepare(" ".join("In Rome, we do this and that." for _ in range(40)))
+        self.assertLessEqual(many.count("<break"), voice.MAX_BREAKS)
+        self.assertIn('<break time="0.7s" />', out)   # the deliberate beat is kept first
+
+    def test_a_clause_ending_comma_stops_the_voice_but_list_items_do_not(self):
+        out = voice.prepare("In Python, a list works. Take curly, square, round, closing in reverse.")
+        self.assertIn('In Python, <break time="0.1s" /> a list works.', out)
+        self.assertIn("square, round, closing", out)   # list items keep the voice's own breath
 
     def test_the_voice_settings_stay_steady_so_it_does_not_invent_sounds(self):
         self.assertGreaterEqual(voice.HUMAN["stability"], 0.5)

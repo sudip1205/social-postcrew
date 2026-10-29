@@ -170,6 +170,8 @@ def text_problems(text, cat, profile, first_comment=""):
 
 
 YOUTUBE_TITLE_MAX, YOUTUBE_DESC_MAX, YOUTUBE_TAGS_MAX = 100, 5000, 500
+from . import speech  # noqa: E402
+
 SCENE_LAYOUTS = ("title", "statement", "points", "code", "diagram", "trace", "flow")
 
 
@@ -178,8 +180,8 @@ SENTENCE_MAX = 30
 
 def needed_visual(spec, cat):
     """The scene a video of this topic must contain so the viewer sees the example move: 'trace' for algorithms, 'flow' for system
-    design and architecture. Only for the explainer renderer, the one that draws them."""
-    if (spec or {}).get("renderer") != "explainer":
+    design and architecture. Only for the explainer and Remotion renderers, the ones that draw them."""
+    if (spec or {}).get("renderer") not in ("explainer", "remotion"):
         return ""
     kind = " ".join(str((cat or {}).get(k) or "") for k in ("id", "label", "kicker")).lower()
     if any(w in kind for w in ("leetcode", "algorithm")):
@@ -240,10 +242,12 @@ def script_problems(script, spec, cat, profile):
                     problems.append(f"scene {i}: arrow {bad[0]!r} must be 'Box > Other box' using the exact box labels")
         elif sc.get("layout") in ("title", "statement") and not (sc.get("on_screen") or "").strip():
             problems.append(f"scene {i}: write the on-screen text")
-    stray = re.findall(r"(?<![\w'])[b-hj-z](?![\w'])", text) + re.findall(r"(?<![\w'])a(?=\s*,\s*[A-Za-z]\b)|(?<=[.!?]\s)a\s*[.,]", text)
-    if stray:
-        problems.append("the narration has a lone lowercase letter (" + ", ".join(sorted(set(stray))[:4]) + "): the voice makes stray sounds "
-                        "on them. Write example letters as capitals (A, B, C), never 'a, b, c'")
+    for i, sc in enumerate(scenes, 1):   # what the voice would have to guess at (code, symbols with no spoken form, odd words, lone letters)
+        for msg in speech.problems(sc.get("narration") or ""):
+            problems.append(f"scene {i}: {msg}")
+    if spec.get("outro") and scenes and not all(w in (scenes[-1].get("narration") or "").lower() for w in ("subscribe", "comment")):
+        problems.append("the last scene must end with the closing line asking the viewer to like, comment and subscribe, and to say "
+                        f"in the comments what they did not like: {spec['outro']!r}")
     need = needed_visual(spec, cat)
     if need and len(scenes) >= 3 and not any(sc.get("layout") == need for sc in scenes):
         problems.append({"trace": "this is an algorithm video: add a 'trace' scene that walks the example array (cells) with moving "

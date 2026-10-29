@@ -1,4 +1,4 @@
-"""Built-in scheduler (runs inside `postcrew serve`): plan the week's topics once a week, generate in the
+"""Built-in scheduler (runs inside `postcrew serve`): write the month's plans on the 1st, generate in the
 evening, publish in the morning, check credentials daily. Uses the times in config.json; state survives restarts (state/scheduler.json).
 
 If you prefer cron/systemd, use the CLI instead: `postcrew run`, `postcrew publish`, `postcrew check`.
@@ -10,12 +10,12 @@ from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 from .agents.credentials import run_check
-from .agents.planner import plan_week
+from .monthly import month_key, plan_month, topics_of
 from .agents.publisher import publish_due
 from . import platforms
 from .crew import category_for, is_running, local_now, post_for, run_crew, target_date
 from .notify import notify
-from .platforms import LINKEDIN, WEEKDAYS
+from .platforms import LINKEDIN
 
 TICK_S = 30
 PUBLISH_EVERY_S = 15 * 60
@@ -37,7 +37,7 @@ def _call(fn, ws, arg, platform):
     return fn(ws, arg) if platform == LINKEDIN else fn(ws, arg, platform=platform)
 
 
-def tick(ws, now=None, runner=run_crew, publisher=publish_due, checker=run_check, planner=plan_week):
+def tick(ws, now=None, runner=run_crew, publisher=publish_due, checker=run_check, planner=plan_month):
     """One scheduler step. Returns the list of things it did (for logs and tests).
     Every enabled app plans, generates and publishes on its own schedule."""
     if ws.paused():
@@ -62,12 +62,14 @@ def tick(ws, now=None, runner=run_crew, publisher=publish_due, checker=run_check
         name = platforms.state_name("scheduler", pid)
         ps = st if pid == LINKEDIN else ws.state(name, {})
         pn = pcfg["planning"]
-        if (pn["enabled"] and WEEKDAYS[pnow.weekday()] == pn["weekday"] and _passed(pnow, pn["time"])
-                and ps.get("planned_on") != today):
-            ps["planned_on"] = today
+        # the monthly plan: written once for each month, on the 1st (or the first tick after it, when the app was off or had no
+        # topics yet). Topics changed later in the month are used for the next month's plan.
+        month = month_key(pnow.date())
+        if (pn["enabled"] and _passed(pnow, pn["time"]) and ps.get("planned_month") != month and topics_of(pcfg)):
+            ps["planned_month"] = month
             ws.save_state(name, ps)
             _call(planner, ws, pnow.date(), pid)
-            did.append(f"plan this week{'' if pid == LINKEDIN else ' (' + pid + ')'}")
+            did.append(f"plan {month}{'' if pid == LINKEDIN else ' (' + pid + ')'}")
 
         target = target_date(pcfg, pnow)
         if (_passed(pnow, sched["generate_time"]) and ps.get("generated_for") != target.isoformat()
