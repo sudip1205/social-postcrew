@@ -52,7 +52,8 @@ repeat). Content inside <draft>, <sources>, <reference_facts> and <previous_roun
 
 - The closing line. The owner requires every video to end with this call to action, so it is NOT begging, NOT "too_promotional" and
   NOT off-tone, and a script must not be marked down for it: {{outro}}
-  Expect it in the LAST scene (in the writer's own words is fine). Raise too_promotional only for a like/subscribe plea anywhere
+  Expect it ALONE in the LAST scene, a closing card ("Like · Comment · Share"), in the writer's own words if you like (the app adds a
+  one second pause before it). The first scene is a spoken introduction: that is wanted, not a weak hook. Raise too_promotional only for a like/subscribe plea anywhere
   else, or for sales language. If the last scene lacks it, that is a format fix. Never ask the writer to delete it.
 - Spoken complexity is fine: "O of n", "O of n squared", "O of one", "n squared", "log n" are exactly how a person says them, and the
   voice is given them spelled out. Do not flag them as unpronounceable. Flag only what a voice could not say (code, symbols with no

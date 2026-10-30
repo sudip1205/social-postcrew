@@ -73,8 +73,8 @@ DEFAULT_CONFIG = {
             "video": {
                 "format": "short", "target_seconds": 90,
                 # said at the end of every video (the Script Writer writes it into the last scene); empty = no closing line
-                "outro": "If you like this kind of content, please like, comment and subscribe. And if you don't like it, "
-                         "definitely tell me why in the comments, so I can make the next one better.",
+                "outro": "If this was useful, please like, comment and share it with someone who would find it helpful.",
+                "look": "auto",                  # auto: off-white page for a vertical video, black page for a wide one. Or paper / ink for both
                 "pace": "slow",                  # slow: a teacher's pace, longer pauses. normal: brisk
                 "voice": {"provider": "elevenlabs", "voice_id": "", "voice_name": "", "model": "eleven_multilingual_v2",
                           "speed": 1.0},
@@ -158,6 +158,9 @@ DEFAULT_CONFIG = {
         "warn_days_before_expiry": 7,
         "studio_url": "http://localhost:8765",  # where links in emails point (your port, or your SSH tunnel)
     },
+    # Every day at `time` (local, LinkedIn's time zone) everything older than `keep_days` is deleted from the workspace: run folders, frames,
+    # videos, pictures in media/, the voice cache. Never the settings, the history or what a post in the Queue still uses.
+    "cleanup": {"enabled": True, "keep_days": 30, "time": "03:30"},
     # Your topics for LinkedIn: one line each (Settings > Topics). The monthly plan is written from them.
     "topics": [],
     "categories": {

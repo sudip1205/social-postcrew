@@ -238,6 +238,13 @@ words in `script.md` are checked against the approved script, so the picture age
 `theme` (paper, clean, chalk, blueprint, midnight, editorial), `music`, `watermark` (explainroo asks you to keep its small credit),
 `review`. The Video Editor step is skipped: explainroo does its own checks.
 
+### The look of a video
+
+Videos are drawn on a flat page: white for a vertical video and black for a wide one (**Settings > YouTube > Video look**: Automatic, or
+force one). White uses `#424242` headings with blue, orange and green; black uses `#C7C7C7` headings with cyan and orange. The colours are defined in
+`postcrew/render/looks.py` and the rules for type, layout and motion in `postcrew/remotion/STYLE.md`; add a look by adding one entry to `LOOKS`.
+The first scene of every script is a spoken introduction and the last is a closing card ("Like · Comment · Share") that appears after one second of silence.
+
 ### Remotion (the default renderer)
 
 Videos are drawn by [Remotion](https://www.remotion.dev) from the project in `postcrew/remotion` (set `video.remotion.path` to use your

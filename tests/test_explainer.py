@@ -130,7 +130,7 @@ class RenderTests(unittest.TestCase):
                 clips.append(d / f"s{i}.wav")
             info = ex.render([S1, S2], d / "o.mp4", "short", d / "w", audio=clips, kicker="K", handle="h")
             self.assertEqual((info["width"], info["height"]), (1080, 1920))
-            self.assertAlmostEqual(info["seconds"], 8.7, delta=0.4)
+            self.assertAlmostEqual(info["seconds"], 9.2, delta=0.4)   # the voice plus a calm 0.6 s after each scene
             self.assertTrue(video_mod.probe(d / "o.mp4")["has_audio"])
             before = (d / "w" / "seg-00.mp4").stat().st_mtime_ns
             info = ex.render([S1, dict(S2, on_screen="Changed")], d / "o.mp4", "short", d / "w", audio=clips, redo={1})

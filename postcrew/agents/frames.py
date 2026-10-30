@@ -55,6 +55,7 @@ class FramesAgent(Agent):
 
     def run(self, ctx, guidance):
         scenes, audio, _own = self.inputs(ctx)
+        rm.mark_closing(scenes, ctx.video)   # the last scene is the closing line, after a one second pause
         fmt, w = ctx.video["format"], FORMATS[ctx.video["format"]]
         kicker = handle = ""
         mine = self.mine(ctx, scenes)
@@ -62,7 +63,7 @@ class FramesAgent(Agent):
         work.mkdir(parents=True, exist_ok=True)
         ctx.run.step(self.id, engine=self.engine, progress=0, detail="starting")
         try:
-            props, _lengths = rm.build_props(scenes, fmt, audio)
+            props, _lengths = rm.build_props(scenes, fmt, audio, ctx.video.get("look"))
             if not ctx.cfg["video"].get("captions", True):
                 for s in props["scenes"]:
                     s["captions"] = []
@@ -100,7 +101,7 @@ class HyperFramesAgent(FramesAgent):
         for k, i in enumerate(mine):
             self.progress(ctx, k, len(mine), f"scene {i + 1}: {props['scenes'][i]['layout']}")
             path = work / f"scene-{i:02d}.mp4"
-            hf.render_scene(props["scenes"][i], path, size[0], size[1], work / f"scene-{i:02d}")
+            hf.render_scene(props["scenes"][i], path, size[0], size[1], work / f"scene-{i:02d}", theme=props["theme"])
             out.append({"scenes": [i], "path": str(path)})
         self.progress(ctx, len(mine), len(mine), "done")
         return out
@@ -155,11 +156,12 @@ class RemotionAgent(VideoAgent):
 
     def run(self, ctx, guidance):
         self._cfg = {"remotion": ctx.cfg["video"]["remotion"]} if ctx.cfg["video"].get("remotion") else {}
+        self._look = ctx.video.get("look")
         return super().run(ctx, guidance)
 
     def thumbnail(self, script, kicker, handle, path):
         try:
-            return rm.thumbnail(script, path, self._cfg)
+            return rm.thumbnail(script, path, self._cfg, self._look)
         except video_mod.VideoError as e:
             raise AgentError(f"drawing the thumbnail failed: {e}")
 
@@ -175,7 +177,8 @@ class RemotionAgent(VideoAgent):
         ctx.run.step(self.id, engine=" + ".join(engines), progress=0, detail="joining the clips")
         ctx.run.event(self.id, "join", f"joining {len(clips)} clip(s) from {' and '.join(engines)}")
         try:
-            props, lengths = rm.build_props(scenes, ctx.video["format"], audio)
+            rm.mark_closing(scenes, ctx.video)
+            props, lengths = rm.build_props(scenes, ctx.video["format"], audio, ctx.video.get("look"))
             work.mkdir(parents=True, exist_ok=True)
             fitted = []
             for n, c in enumerate(clips):
@@ -183,10 +186,11 @@ class RemotionAgent(VideoAgent):
                 rm._fit(c["path"], f, ctx.video["format"])
                 fitted.append(f)
                 ctx.run.step(self.id, progress=round(80 * (n + 1) / len(clips)))
-            video_mod.assemble(fitted, lengths, audio, out_path)
+            video_mod.assemble(fitted, lengths, audio, out_path, leads=[float(s.get("lead_s") or 0) for s in scenes])
             info = video_mod.probe(out_path)
         except video_mod.VideoError as e:
             raise AgentError(f"joining the video failed: {e}")
         ctx.run.step(self.id, progress=100, detail="video ready")
         return ({"seconds": info["seconds"], "width": info["width"], "height": info["height"],
-                 "extra": {"engines": engines}}, self.renderer)
+                 "extra": {"engines": engines, "scene_seconds": [round(x, 2) for x in lengths],
+                           "closing": bool(scenes and scenes[-1].get("closing"))}}, self.renderer)

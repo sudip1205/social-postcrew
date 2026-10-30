@@ -177,5 +177,26 @@ class McpTests(unittest.TestCase):
             render_clips(cfg, SCENES, "short", self.tmp / "w")
 
 
+class LoudnessTests(unittest.TestCase):
+    """A voice recording on its own is quiet: the finished video is brought to YouTube's usual level, and a lead is silence."""
+
+    def test_the_finished_video_is_about_minus_fourteen_lufs_and_the_lead_is_silent(self):
+        import json
+        import re
+        from postcrew.render import qa
+        from postcrew.render.video import assemble
+        tmp = Path(tempfile.mkdtemp())
+        seg = tmp / "seg.mp4"
+        subprocess.run(["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i", "color=c=white:s=320x240:d=4:r=10", "-pix_fmt", "yuv420p", str(seg)], check=True)
+        voice = tmp / "v.mp3"   # a quiet tone (about -30 dB), like a raw voice recording
+        subprocess.run(["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i", "sine=frequency=220:duration=3", "-af", "volume=-26dB", str(voice)], check=True)
+        out = tmp / "out.mp4"
+        assemble([seg], [4.0], [str(voice)], out, leads=[1.0])
+        facts = qa.audio_facts(out)
+        self.assertTrue(-16 <= facts["lufs"] <= -12, facts)
+        self.assertLessEqual(facts["peak_db"], -0.5)
+        self.assertTrue(any(s_ < 0.2 and e_ >= 0.9 for s_, e_ in qa.silences(out, min_s=0.5)), qa.silences(out, min_s=0.5))   # the first second is silent
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -245,9 +245,12 @@ def script_problems(script, spec, cat, profile):
     for i, sc in enumerate(scenes, 1):   # what the voice would have to guess at (code, symbols with no spoken form, odd words, lone letters)
         for msg in speech.problems(sc.get("narration") or ""):
             problems.append(f"scene {i}: {msg}")
-    if spec.get("outro") and scenes and not all(w in (scenes[-1].get("narration") or "").lower() for w in ("subscribe", "comment")):
-        problems.append("the last scene must end with the closing line asking the viewer to like, comment and subscribe, and to say "
-                        f"in the comments what they did not like: {spec['outro']!r}")
+    last = (scenes[-1].get("narration") or "").lower() if scenes else ""
+    if spec.get("outro") and scenes and not (all(w in last for w in ("like", "comment")) and ("share" in last or "subscribe" in last)):
+        problems.append("the last scene must be the closing scene: only the closing line asking the viewer to like, comment and "
+                        f"share, said warmly in your own words if you keep its meaning: {spec['outro']!r}")
+    if spec.get("outro") and len(scenes) > 1 and any(w in (scenes[-2].get("narration") or "").lower() for w in ("like and subscribe", "like, comment")):
+        problems.append("the closing line belongs only in the last scene, on its own: take it out of the scene before")
     need = needed_visual(spec, cat)
     if need and len(scenes) >= 3 and not any(sc.get("layout") == need for sc in scenes):
         problems.append({"trace": "this is an algorithm video: add a 'trace' scene that walks the example array (cells) with moving "

@@ -5,7 +5,7 @@ import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .. import platforms
+from .. import platforms, seo
 from ..notify import notify
 from ..runlog import RunLog
 from ..youtube import YouTube, YouTubeError
@@ -42,8 +42,7 @@ def enqueue_youtube(ws, cfg, run_id, day, category, outputs, review):
             "format": video.get("format") or ("short" if video["height"] > video["width"] else "long"),
             "seconds": video["seconds"], "thumbnail_text": script.get("thumbnail_text", ""),
             "voice": voice.get("voice") or ("own" if video.get("voice") == "own" else "none"),
-            "scenes": [{"narration": s["narration"], "on_screen": s.get("on_screen", ""), "seconds": s.get("seconds", 0)}
-                       for s in script["scenes"]],
+            "scenes": _scenes(script["scenes"], video),
             "source": {"script": script.get("source", "crew"),
                        "voice": "own" if video.get("voice") == "own" else ("crew" if voice.get("mode") == "elevenlabs" else "none"),
                        "video": video.get("source", "crew")},
@@ -60,11 +59,27 @@ def enqueue_youtube(ws, cfg, run_id, day, category, outputs, review):
     return post
 
 
+def _scenes(scenes, video):
+    """The scenes as kept with the post. When the video says how long each scene really is, that is used (the script only estimated)."""
+    real = video.get("scene_seconds") or []
+    out = [{"narration": s["narration"], "on_screen": s.get("on_screen", ""),
+            "seconds": real[i] if i < len(real) else s.get("seconds", 0)} for i, s in enumerate(scenes)]
+    if video.get("closing") and out:
+        out[-1]["closing"] = True
+    return out
+
+
 def full_description(post):
-    """The description as uploaded: a Short gets #Shorts so YouTube files it under Shorts."""
-    desc = post["youtube"]["description"].rstrip()
-    if post["youtube"]["format"] == "short" and "#shorts" not in desc.lower():
-        desc += "\n\n#Shorts"
+    """The description as uploaded: what the Script Writer wrote, then (for a long video) real chapters from the scene lengths, then three
+    hashtags (the first three are shown above the title), and #Shorts for a Short so YouTube files it under Shorts."""
+    yt = post["youtube"]
+    desc = yt["description"].rstrip()
+    chaps = seo.chapters(yt.get("scenes") or [], yt["format"])
+    if chaps and "0:00" not in desc:
+        desc += "\n\nChapters\n" + chaps
+    desc = seo.with_hashtags(desc, yt.get("tags"), 2 if yt["format"] == "short" else 3)
+    if yt["format"] == "short" and "#shorts" not in desc.lower():
+        desc += " #Shorts" if desc.rstrip().splitlines()[-1].startswith("#") else "\n\n#Shorts"
     return desc
 
 
@@ -100,7 +115,7 @@ def publish_one(ws, post, client_factory=YouTube, log=print, check=check_youtube
     pub = cfg["publishing"]
     try:
         ev("upload", f"uploading {Path(post['media']).name}")
-        res = client.upload(ws.root / post["media"], yt["title"], full_description(post), yt["tags"],
+        res = client.upload(ws.root / post["media"], yt["title"], full_description(post), seo.normalize_tags(yt["tags"], yt["title"]),
                             category_id=pub.get("category_id", "28"), privacy=pub.get("visibility", "public"),
                             made_for_kids=bool(pub.get("made_for_kids", False)),
                             progress=lambda sent, total: ev("upload", f"{sent * 100 // max(total, 1)}% uploaded"))

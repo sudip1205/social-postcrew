@@ -13,6 +13,8 @@ schedule.day_times gives a weekday its own post time.
 """
 from datetime import date, datetime
 
+from .render import looks
+
 LINKEDIN = "linkedin"
 PLATFORM_IDS = [LINKEDIN, "youtube"]
 SECTIONS = ("schedule", "planning", "categories", "publishing", "video", "topics")
@@ -156,5 +158,6 @@ def video_spec(cfg, category=None, entry=None, options=None):
     spec["wps"] = PACE_WPS[spec["pace"]]
     spec["max_words"] = int(spec["target_seconds"] * spec["wps"])
     spec["outro"] = str(base.get("outro") or "").strip()
+    spec["look"] = looks.resolve(base.get("look"), spec["format"])   # auto: white for a vertical video, black for a wide one
     spec["renderer"] = renderer_for(cfg, None) if not category else (category.get("renderer") or renderer_for(cfg, None))
     return spec

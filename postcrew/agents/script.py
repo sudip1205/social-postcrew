@@ -66,8 +66,8 @@ SCHEMA = {
 }
 
 FORMAT_RULES = {
-    "short": "A vertical 9:16 Short (up to 3 minutes): one idea built up scene by scene, the hook inside the first 3 seconds.",
-    "long": "A 16:9 video: open with a 15-second cold open, then one idea per scene (about 4-12 scenes per ten minutes), "
+    "short": "A vertical 9:16 Short (up to 3 minutes): a short introduction that opens with the problem, then one idea built up scene by scene.",
+    "long": "A 16:9 video: open with a short introduction (about 15 seconds), then one idea per scene (about 4-12 scenes per ten minutes), "
             "and finish with one clear next step.",
 }
 

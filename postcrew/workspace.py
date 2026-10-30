@@ -86,6 +86,8 @@ def _validate_video(v, pre):
         errs.append(f"{pre}video.target_seconds must be {_SECONDS_HINT}")
     if v.get("pace", "normal") not in ("slow", "normal"):
         errs.append(f"{pre}video.pace must be slow or normal")
+    if v.get("look", "auto") not in ("auto", "paper", "ink"):
+        errs.append(f"{pre}video.look must be auto, paper (off-white) or ink (black)")
     if v.get("renderer") not in RENDERERS:
         errs.append(f"{pre}video.renderer must be one of {RENDERERS}")
     voice = v.get("voice") or {}
@@ -217,6 +219,11 @@ def validate_config(cfg):
             errs.append(f"platforms.{pid}: unknown platform (known: {PLATFORM_IDS})")
         elif own.get("enabled"):   # a platform that is switched off is not checked until you turn it on
             errs += validate_platform(view(cfg, pid), pre=f"platforms.{pid}.", primary=False)
+    cl = cfg.get("cleanup", {})
+    if not (isinstance(cl.get("keep_days"), int) and 1 <= cl["keep_days"] <= 365):
+        errs.append("cleanup.keep_days must be a whole number of days, 1-365")
+    if not TIME_RE.match(str(cl.get("time", ""))):
+        errs.append("cleanup.time must be HH:MM (24h)")
     tm = cfg.get("team", {})
     for k, lo, hi in (("research", 1, 4), ("writer", 1, 4), ("fire_window", 3, 20), ("polish_rounds", 0, 3)):
         if not (isinstance(tm.get(k), int) and lo <= tm[k] <= hi):

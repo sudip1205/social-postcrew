@@ -7,7 +7,9 @@ from pathlib import Path
 from .scenes import FORMATS, draw_frame, split_captions
 
 FPS = 30
-TAIL_S = 0.35
+TAIL_S = 0.6        # calm: a pause after every scene
+LOUDNESS = "loudnorm=I=-14:TP=-1.5:LRA=11,aresample=44100"   # YouTube's usual level: a voice recording alone is far quieter
+LEAD_S = 1.0        # the pause before the closing scene: one second of silence after the content ends
 WPS = 2.5
 ZOOM = 0.05
 ENC = ["-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "23", "-preset", "veryfast", "-r", str(FPS)]
@@ -57,7 +59,7 @@ def _scene_lengths(scenes, audio):
     if isinstance(audio, (list, tuple)):
         if len(audio) != len(scenes):
             raise VideoError(f"{len(audio)} audio files for {len(scenes)} scenes")
-        return [max(0.5, probe(a)["seconds"]) + TAIL_S for a in audio]
+        return [max(0.5, probe(a)["seconds"]) + TAIL_S + float(s.get("lead_s") or 0) for a, s in zip(audio, scenes)]
     if audio:
         total = probe(audio)["seconds"]
         wts = [max(1, _words(s)) for s in scenes]
@@ -65,7 +67,7 @@ def _scene_lengths(scenes, audio):
     out = []
     for s in scenes:
         sec = s.get("seconds")
-        out.append(float(sec) if sec else max(1.0, _words(s) / WPS))
+        out.append((float(sec) if sec else max(1.0, _words(s) / WPS)) + float(s.get("lead_s") or 0))
     return out
 
 
@@ -106,7 +108,7 @@ def _clip_segment(clip, length, fmt, out):
           "-vf", vf, "-an"] + ENC + [str(out)], "Fitting a clip")
 
 
-def assemble(segs, lengths, audio, out_path):
+def assemble(segs, lengths, audio, out_path, leads=None):
     """Join the scene videos and lay the voice under them: one audio file per scene, one for the whole video, or silence."""
     total = sum(lengths)
     vlist = Path(out_path).with_name(Path(out_path).stem + "-segments.txt")
@@ -115,13 +117,15 @@ def assemble(segs, lengths, audio, out_path):
     if isinstance(audio, (list, tuple)):
         for a in audio:
             cmd += ["-i", str(a)]
-        parts = [f"[{i + 1}:a]aformat=sample_rates=44100:channel_layouts=stereo,apad=whole_dur={ln:.3f},"
-                 f"atrim=0:{ln:.3f},asetpts=N/SR/TB[a{i}]" for i, ln in enumerate(lengths)]
-        parts.append("".join(f"[a{i}]" for i in range(len(lengths))) + f"concat=n={len(lengths)}:v=0:a=1[aout]")
+        leads = leads or [0] * len(lengths)   # a scene's voice can start after a silence (the closing line)
+        parts = [f"[{i + 1}:a]" + (f"adelay={int(lead * 1000)}:all=1," if lead else "") +
+                 f"aformat=sample_rates=44100:channel_layouts=stereo,apad=whole_dur={ln:.3f},"
+                 f"atrim=0:{ln:.3f},asetpts=N/SR/TB[a{i}]" for i, (ln, lead) in enumerate(zip(lengths, leads))]
+        parts.append("".join(f"[a{i}]" for i in range(len(lengths))) + f"concat=n={len(lengths)}:v=0:a=1,{LOUDNESS}[aout]")
         cmd += ["-filter_complex", ";".join(parts), "-map", "0:v", "-map", "[aout]"]
     elif audio:
         cmd += ["-i", str(audio), "-filter_complex",
-                f"[1:a]aformat=sample_rates=44100:channel_layouts=stereo,apad=whole_dur={total:.3f}[aout]",
+                f"[1:a]aformat=sample_rates=44100:channel_layouts=stereo,apad=whole_dur={total:.3f},{LOUDNESS}[aout]",
                 "-map", "0:v", "-map", "[aout]"]
     else:
         cmd += ["-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo", "-map", "0:v", "-map", "1:a"]

@@ -8,6 +8,7 @@
   python3 -m postcrew check                check LinkedIn + Claude credentials
   python3 -m postcrew doctor               check everything needed is installed and configured
   python3 -m postcrew status               queue and recent runs
+  python3 -m postcrew clean [--dry-run]    delete what is older than 30 days (also runs every day while the Studio is open)
   python3 -m postcrew plan                 write this month's plans for your topics now (assign them to days in the Studio)
   python3 -m postcrew import FILE          add posts you published elsewhere, so they are never repeated
 """
@@ -179,6 +180,10 @@ def main(argv=None):
     r.add_argument("--platform", default="linkedin", help="the app to write for (default: linkedin)")
     r.add_argument("--format", choices=["short", "long"], help="YouTube: make a short or a long video this time")
     r.add_argument("--seconds", type=int, help="YouTube: about how long the video should be")
+    cl = sub.add_parser("clean", help="delete what is older than the retention (default 30 days) from the workspace")
+    cl.add_argument("--days", type=int, help="delete what is older than this many days (default: settings, cleanup.keep_days)")
+    cl.add_argument("--dry-run", action="store_true", help="only show what would be deleted")
+    cl.add_argument("--videos", action="store_true", help="also delete every finished video, frames folder and voice recording, whatever its age")
     sub.add_parser("publish")
     sub.add_parser("check")
     sub.add_parser("doctor")
@@ -234,6 +239,14 @@ def main(argv=None):
         return 0 if res.get("ok") else 1
     if a.cmd == "import":
         return cmd_import(ws, a.file)
+    if a.cmd == "clean":
+        from .cleanup import clean
+        days = a.days or int(ws.config().get("cleanup", {}).get("keep_days", 30))
+        r = clean(ws, keep_days=days, dry_run=a.dry_run, videos=a.videos)
+        print(("Would delete" if a.dry_run else "Deleted") + f" {r['removed']} item(s), {r['freed_mb']} MB " + ", ".join(f"{k}: {v}" for k, v in r["areas"].items()))
+        for x in r.get("examples", []):
+            print("  ", x)
+        return 0
     if a.cmd == "plan-import":
         return cmd_plan_import(ws, a.file, a.apply_schedule)
     if a.cmd == "plan":

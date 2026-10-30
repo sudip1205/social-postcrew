@@ -2,10 +2,11 @@ import React from "react";
 import {Composition, Still} from "remotion";
 import {Video, totalFrames} from "./Video";
 import {Thumbnail} from "./Thumbnail";
+import {PAPER} from "./theme";
 import type {ThumbProps, VideoProps} from "./types";
 
 const demo: VideoProps = {
-  format: "short", width: 1080, height: 1920, fps: 30,
+  format: "short", width: 1080, height: 1920, fps: 30, theme: PAPER,
   scenes: [{layout: "title", title: "Preview", items: [], code: "", language: "", seconds: 3, captions: []}],
 };
 
@@ -16,6 +17,6 @@ export const Root: React.FC = () => (
       calculateMetadata={({props}) => ({durationInFrames: totalFrames(props), fps: props.fps, width: props.width, height: props.height})}
     />
     <Still id="Thumbnail" component={Thumbnail} width={1280} height={720}
-      defaultProps={{text: "Thumbnail text", title: "Video title"} as ThumbProps} />
+      defaultProps={{text: "Thumbnail text", title: "Video title", theme: PAPER} as ThumbProps} />
   </>
 );

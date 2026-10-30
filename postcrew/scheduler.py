@@ -10,6 +10,7 @@ from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 from .agents.credentials import run_check
+from .cleanup import run_cleanup
 from .monthly import month_key, plan_month, topics_of
 from .agents.publisher import publish_due
 from . import platforms
@@ -37,7 +38,7 @@ def _call(fn, ws, arg, platform):
     return fn(ws, arg) if platform == LINKEDIN else fn(ws, arg, platform=platform)
 
 
-def tick(ws, now=None, runner=run_crew, publisher=publish_due, checker=run_check, planner=plan_month):
+def tick(ws, now=None, runner=run_crew, publisher=publish_due, checker=run_check, planner=plan_month, cleaner=run_cleanup):
     """One scheduler step. Returns the list of things it did (for logs and tests).
     Every enabled app plans, generates and publishes on its own schedule."""
     if ws.paused():
@@ -53,6 +54,13 @@ def tick(ws, now=None, runner=run_crew, publisher=publish_due, checker=run_check
         ws.save_state("scheduler", st)
         checker(ws)
         did.append("credentials")
+
+    cl = cfg.get("cleanup") or {}
+    if cl.get("enabled", True) and _passed(now, cl.get("time", "03:30")) and st.get("cleaned_on") != today:   # the daily tidy-up
+        st["cleaned_on"] = today
+        ws.save_state("scheduler", st)
+        cleaner(ws)
+        did.append("clean up")
 
     gates = []
     for pid in platforms.enabled(cfg):

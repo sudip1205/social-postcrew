@@ -113,7 +113,7 @@ class MeasuredOnTheVoiceTests(unittest.TestCase):
             self.assertEqual((d / "w" / "seg-00.mp4").stat().st_mtime_ns, first)           # kept
             self.assertGreater((d / "w" / "seg-01.mp4").stat().st_mtime_ns, second_before)  # drawn again
             self.assertEqual(len(info["timeline"]), 2)
-            self.assertAlmostEqual(info["seconds"], 6.7, delta=0.3)
+            self.assertAlmostEqual(info["seconds"], 7.2, delta=0.3)   # the voice plus a calm 0.6 s after each scene
 
 
 @unittest.skipUnless(yc.HAVE_FFMPEG, "ffmpeg not installed")

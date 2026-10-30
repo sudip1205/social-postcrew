@@ -106,6 +106,21 @@ A YouTube topic (category) takes the usual keys (`label`, `brief`, `research`, `
 (each can set its own `format`, `target_seconds` and `renderer`), (they are used when you assign a plan to a date). Secrets: `youtube_client_id`, `youtube_client_secret`, `youtube_refresh_token`, `elevenlabs_api_key`.
 See [Connect YouTube](youtube-setup.md) and [Videos, voice and your own files](video-and-voice.md).
 
+## cleanup
+
+Every day at `cleanup.time` (in LinkedIn's time zone, while `postcrew serve` runs) everything older than `cleanup.keep_days` days is deleted from the
+workspace: run folders (logs, frames, videos), the planner's logs, the voice cache, day briefs, files in `media/` and old `config.backup-*.json`.
+Never deleted: `config.json`, `secrets.json`, `studio-token`, `history.json`, `queue.json`, `state/`, and anything a post still in the Queue uses.
+
+| Key | Default | What it does |
+|---|---|---|
+| `enabled` | `true` | Run the clean-up every day. |
+| `keep_days` | `30` | Delete what is older than this (1-365). |
+| `time` | `"03:30"` | When it runs. |
+
+By hand: `python3 -m postcrew clean --dry-run` lists what would go; `python3 -m postcrew clean` deletes it; `--videos` also clears every finished
+video, frames folder and voice recording at once, whatever its age.
+
 ## planning
 
 Your topics are one-line texts in `topics` (LinkedIn) and `platforms.youtube.topics`; Studio: **Settings > Topics**. On the 1st of

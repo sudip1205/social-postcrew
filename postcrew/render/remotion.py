@@ -5,16 +5,17 @@ spoken); the React project only draws a frame for a given time. Remotion renders
 is laid under it afterwards with the same ffmpeg step the other renderers use.
 """
 import json
+import re
 import shutil
 import subprocess
 from pathlib import Path
 
-from . import timeline, video
+from . import looks, timeline, video
 from .scenes import FORMATS, parse_edge, parse_pointer, split_node
 from .video import FPS, VideoError
 
 PROJECT = Path(__file__).resolve().parent.parent / "remotion"
-CAPTION_WORDS = 4
+CAPTION_WORDS = 6   # calm: fewer, longer captions
 TAIL_S = video.TAIL_S
 
 
@@ -47,8 +48,17 @@ def install(root, log=None):
 
 
 def _times(scene, length, audio):
-    words, _measured = timeline.voice_words(scene.get("narration", ""), length, audio)
-    return words
+    """Word times of a scene. A scene with a lead (the closing line) starts speaking only after that silence."""
+    lead = float(scene.get("lead_s") or 0)
+    words, _measured = timeline.voice_words(scene.get("narration", ""), length - lead, audio)
+    return [(w, s + lead, e + lead) for w, s, e in words]
+
+
+def mark_closing(scenes, spec):
+    """The last scene is the closing line (like, comment, share) when the app has one: it comes in after a pause."""
+    if spec.get("outro") and scenes:
+        scenes[-1]["closing"], scenes[-1]["lead_s"] = True, video.LEAD_S
+    return scenes
 
 
 def _when(label, words, after=0.0):
@@ -107,7 +117,7 @@ def _trace(scene, words):
     return {"cells": [str(c) for c in scene.get("cells") or []], "steps": steps}
 
 
-def build_props(scenes, fmt, audio):
+def build_props(scenes, fmt, audio, look=None):
     """The JSON the Remotion project is rendered from, and the length of each scene in seconds."""
     if fmt not in FORMATS:
         raise VideoError(f"unknown format '{fmt}'")
@@ -120,6 +130,9 @@ def build_props(scenes, fmt, audio):
         item = {"layout": layout, "title": str(sc.get("on_screen") or ""), "items": [str(x) for x in sc.get("items") or []],
                 "code": str(sc.get("code") or ""), "language": str(sc.get("language") or ""),
                 "seconds": round(ln, 3), "captions": _captions(words)}
+        if sc.get("closing"):   # "Like · Comment · Share": each part appears when the voice says it
+            parts = [p for p in re.split(r"\s*[·•|,/]\s*|\s+and\s+", item["title"]) if p] or [item["title"]]
+            item.update(closing=True, items=parts, cues=[_when(p, words, float(sc.get("lead_s") or 0)) for p in parts])
         if layout in ("diagram", "flow"):
             item.update(_diagram(sc, words, carry if layout == "diagram" else {"nodes": []}))
         else:
@@ -130,7 +143,7 @@ def build_props(scenes, fmt, audio):
             item["cues"] = [_when(x, words) for x in (item["items"] if layout == "points" else [])]
         out.append(item)
     w, h = FORMATS[fmt]
-    return {"format": fmt, "width": w, "height": h, "fps": FPS, "scenes": out}, lengths
+    return {"format": fmt, "width": w, "height": h, "fps": FPS, "theme": looks.theme(look, fmt), "scenes": out}, lengths
 
 
 def _run(cmd, root, what, timeout=3600):
@@ -150,15 +163,43 @@ def _fit(src, dst, fmt):
                + video.ENC + [str(dst)], "Fitting a clip")
 
 
-def thumbnail(script, out_path, cfg=None):
-    """A 1280x720 thumbnail drawn by the Remotion project's Thumbnail composition."""
+def illustration(script):
+    """The picture of a thumbnail, drawn from the video's own content (there is no image model involved): its first diagram or request
+    flow, else its first trace (the array and where the answer is), else its first code. None when it has none of these: the thumbnail is
+    then type only. In a diagram, the box whose name shares the most words with the title is the one in focus."""
+    scenes = script.get("scenes") or []
+    words = lambda s: set(re.findall(r"[a-z0-9]+", str(s).lower()))
+    title = words(f"{script.get('title', '')} {script.get('thumbnail_text', '')}")
+    for sc in scenes:
+        labels = [split_node(n)[0][:18] for n in sc.get("nodes") or [] if split_node(n)[0]]
+        if sc.get("layout") in ("diagram", "flow") and len(labels) >= 2:
+            labels = labels[:4]
+            mid = (len(labels) - 1) / 2
+            focus = max(range(len(labels)), key=lambda i: (len(title & words(labels[i])), -abs(i - mid)))
+            return {"kind": "diagram", "nodes": labels, "focus": focus}
+    for sc in scenes:
+        cells = [str(c)[:5] for c in sc.get("cells") or []]
+        if sc.get("layout") == "trace" and len(cells) >= 2:
+            found = sorted({i for st in sc.get("steps") or [] for i in st.get("found") or [] if 0 <= i < min(len(cells), 6)})
+            return {"kind": "trace", "cells": cells[:6], "found": found}
+    for sc in scenes:
+        lines = [l for l in str(sc.get("code") or "").splitlines() if l.strip()][:6]
+        if sc.get("layout") == "code" and lines:
+            return {"kind": "code", "lines": [l[:34] for l in lines]}
+    return None
+
+
+def thumbnail(script, out_path, cfg=None, look=None):
+    """A 1280x720 thumbnail drawn by the Remotion project's Thumbnail composition: the thumbnail text, the topic (the title before its colon,
+    so it does not repeat the headline) and a picture drawn from the video's own diagram, array or code."""
     bad = problems(cfg)
     if bad:
         raise VideoError("; ".join(bad))
     root = project_dir(cfg)
     install(root)
     props = Path(out_path).with_suffix(".props.json")
-    props.write_text(json.dumps({"text": script.get("thumbnail_text") or script["title"], "title": script["title"]}))
+    props.write_text(json.dumps({"text": script.get("thumbnail_text") or script["title"], "title": script["title"].split(":")[0].strip(), "theme": looks.theme(look),
+                                 "illustration": illustration(script)}))
     _run(["npx", "remotion", "still", "src/index.ts", "Thumbnail", str(out_path), f"--props={props}", "--log=error"],
          root, "Remotion thumbnail", timeout=600)
     props.unlink(missing_ok=True)

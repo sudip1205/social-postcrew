@@ -64,7 +64,8 @@ def silences(path, min_s=SILENCE_S, noise="-45dB"):
 
 
 def black_frames(path, min_s=0.6):
-    log = _ffmpeg(["-i", str(path), "-an", "-vf", f"blackdetect=d={min_s}:pix_th=0.08", "-f", "null", "-"])
+    """Truly black frames only: the dark look is a near-black page (#0D0D0D) and must not count, so the threshold is tight."""
+    log = _ffmpeg(["-i", str(path), "-an", "-vf", f"blackdetect=d={min_s}:pix_th=0.03", "-f", "null", "-"])
     return [(float(a), float(b)) for a, b in re.findall(r"black_start:([\d.]+) black_end:([\d.]+)", log)]
 
 

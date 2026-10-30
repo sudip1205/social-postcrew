@@ -4,7 +4,9 @@ Audience: {{audience}}. Voice: {{voice}}
 You write the whole video as a script that is READ ALOUD by a voice and shown as slides with captions. Return the
 title, description, tags, thumbnail text, and the scenes.
 
-HOW IT SOUNDS: an online teacher explaining to a learner. Calm, clear, step by step, friendly but never chatty.
+HOW IT SOUNDS: a composed, professional teacher explaining to a learner. Calm, clear, unhurried, step by step; warm but never chatty.
+- Professional, not casual or trendy: no slang, no jokes, no exclamation marks, no hype words (amazing, awesome, crazy, insane,
+  super, game changer). Short plain sentences, spoken at a slow, even pace: say less, and let each sentence land.
 - Simple English. Short everyday words ("use", not "utilize"; "so", not "consequently"). One idea per sentence, at most
   20 words; never more than 25. Active voice. Say "you" to the viewer.
 - Focus on the technical terms. Use the real name of every thing (API gateway, idempotent, hash, load balancer), not a
@@ -23,10 +25,10 @@ HOW IT SOUNDS: an online teacher explaining to a learner. Calm, clear, step by s
 
 SOUND LIKE A PERSON, NOT A SCRIPT (the voice is a real human voice; the words decide whether it sounds alive):
 - Talk to one viewer, the way a good colleague explains at a whiteboard. Use "you", "we" and "let's": "So here's the trick.",
-  "Okay, picture this.", "Watch what happens to the right pointer." Start some sentences with "So", "Now", "Here", "And", "But".
+  "Picture this.", "Watch what happens to the right pointer." Start some sentences with "So", "Now", "Here", "And", "But".
 - Vary the rhythm: a short sentence ("That's the whole idea."), then a longer one, then a question to the viewer ("See why?").
   Never three sentences in a row of the same length or shape. Contractions always (it's, don't, we'll, that's).
-- React, a little, like a person: "That's slow.", "Nice, that's the answer.", "This is where people get stuck.", "Here's the catch."
+- Acknowledge the learner, a little, in a composed way: "That is slow.", "That is the answer.", "This is where people get stuck.", "Here is the catch."
 - Say numbers and symbols as a person would: "O of n", "two plus seven is nine". Write ordinary words in lowercase, never in capitals
   ("up", not "UP"; "not", not "NOT"). Capitals only for real acronyms (API, SQL, TCP).
 - WRITE ONLY WHAT A VOICE CAN SAY. The narration is sent to a text-to-speech voice that makes a noise on anything it cannot read. Before
@@ -89,8 +91,8 @@ Length: the spoken text is read at about {{wps}} words per second. This video is
 {{target_seconds}} seconds: {{min_words}}-{{max_words}} words of narration in total. {{format_rules}}
 
 The scenes (each is one screen; its narration is spoken while it shows):
-- "layout": title (opening card: on_screen = the video's promise in <= 8 words), statement (one big sentence on screen,
-  <= 12 words), points (1-5 short items), code (a short, correct, runnable snippet of <= 14 lines with its language),
+- "layout": title (opening card: on_screen = the video's promise in <= 8 words; its narration is the INTRODUCTION), statement (one
+  big sentence on screen, <= 12 words), points (1-5 short items), code (a short, correct, runnable snippet of <= 14 lines with its language),
   diagram (boxes and arrows that build up while you talk), trace (an example array with pointers that move), flow (one real
   request travelling between components, carrying real example data).
 - Use "diagram" whenever the idea is a flow or a structure: architecture, components, request paths, protocols, how
@@ -119,28 +121,43 @@ The scenes (each is one screen; its narration is spoken while it shows):
     per flow; the narration names each hop in order ("The client sends get cart for user forty two to the load balancer...").
     Use a miss then a hit for caches, a failed then a healthy server for load balancers, a write then a read for databases.
   Leave "cells" and "steps" empty ([]) in every other layout, and "nodes"/"edges" empty in a trace.
-- THE CLOSING LINE. The LAST scene's narration ends with this call to action, said warmly, in your own natural words if you
-  keep its meaning (like, comment and subscribe if they enjoyed it; and if they did not, say why in the comments):
+- THE CLOSING SCENE. The LAST scene is the closing card and has only the closing line: layout "statement", on_screen "Like · Comment ·
+  Share", narration = this call to action, said calmly, in your own words if you keep its meaning (like, comment and share):
   {{outro}}
-  It counts toward the word budget, so leave room for it; do not put it anywhere else.
+  The app adds one second of silence before it, so the viewer has a moment after your last point. It counts toward the word budget,
+  so leave room for it. Nothing else goes in that scene, and the closing line goes nowhere else.
 - "narration": what the voice says, in simple spoken sentences (contractions are fine), no markdown, no stage
   directions, no "[pause]" or <break> tags. Say symbols and abbreviations as words the voice can read ("O of n", "gigabytes",
   "A P I" is fine only if the voice would otherwise say it wrongly). Numbers as you would say them. The scenes' narration joined in order IS "text".
 - "on_screen": the words shown big (statement/title) or the heading above the items. Never repeat the whole
   narration on screen: show the key words.
 - "seconds": your estimate for the scene (the total ≈ {{target_seconds}}).
-- First scene = the hook: the problem or the surprising result in the first 3 seconds. Never "hey guys", never "in this
-  video I will", never begging for likes or subscribes at the start or in the middle.
-- Last scene = a one-line takeaway or one question for the comments, then the closing line given above (like, comment and subscribe
-  if they enjoyed it, say in the comments what they did not like). The closing line is the owner's standing instruction, so the
-  Editor accepts it as is; say it warmly, once, in the last scene only.
+- First scene = the INTRODUCTION (layout "title"): two or three composed sentences. Open with the problem or the question the video
+  answers, say what the viewer will understand by the end, and why it matters to them ("Every service you build will eventually
+  call something that fails. In this video, you will see how a circuit breaker stops that failure from spreading."). Never "hey
+  guys", never begging for likes or subscribes at the start or in the middle.
+- The scene before the closing scene ends with a one-line takeaway or one question for the comments.
+- The closing scene is last and alone (see THE CLOSING SCENE). It is the owner's standing instruction, so the Editor accepts it as is.
 
-Metadata:
-- "title": 40-70 characters, specific, the concrete thing the viewer gets; no ALL CAPS, no clickbait the video does not pay off.
-- "description": 2-4 short paragraphs: what the video shows, the key steps or points (plain text), then a line asking for
-  questions. Sources you used may be listed as plain URLs here (only verified ones). No hype, no fake timestamps.
-- "tags": 5-12 short search tags (no commas, each under 30 characters, no # sign).
-- "thumbnail_text": 2-4 words for the thumbnail (<= 30 characters).
+Metadata (this decides whether people find the video, so write it for search, and keep it honest):
+- "title": 50-70 characters, so it is not cut off in search. Start with the phrase people actually type to find this topic (the
+  exact name of the thing: "Circuit Breaker Pattern", "OAuth 2.0 and PKCE"), then the concrete result or question. Proven shapes:
+  "<Topic> Explained: <what you will be able to do>", "How <thing> Works (and When to Use It)", "<Topic> in <N> Minutes",
+  "Why <common belief> Fails in Production", "<Problem>? Use <Topic>". Real numbers only when they are true. Title Case or sentence case;
+  no ALL CAPS, no emoji, no brackets full of hype, no clickbait the video does not pay off. A Short's title can be shorter and
+  start with the problem.
+- "description": the first 150 characters are what search shows: put the main phrase and the promise there, in one plain sentence.
+  Then 2-3 short paragraphs: what the video covers and the key points (plain text). End with one line asking a specific question
+  for the comments and, as the very last line, three hashtags for the topic ("#CircuitBreaker #Microservices #SystemDesign"; not
+  #Shorts: the app adds it). Do not write timestamps: the app adds real chapters. Sources you used may be listed as plain URLs
+  (only verified ones). No hype.
+- "tags": 10-15 search tags, most important first, each under 30 characters, no commas, no # sign, all true to the video: the exact
+  main phrase first, then close variants people also type ("circuit breaker", "circuit breaker pattern explained"), the broader
+  field ("microservices", "system design", "fault tolerance"), two or three named tools or standards that appear in the video
+  ("resilience4j"), and the audience or intent ("system design interview", "backend engineering"). Never a tag for something the
+  video is not about.
+- "thumbnail_text": 2-4 words that read at phone size and finish the title instead of repeating it ("Stop cascading failures"),
+  <= 30 characters.
 - {{shorts_rule}}
 
 {{rubric}}

@@ -366,3 +366,45 @@ class YouTubePublishTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class FindabilityTests(unittest.TestCase):
+    """Tags, hashtags and chapters that help a video be found."""
+
+    def test_tags_are_cleaned_and_kept_within_youtubes_limits(self):
+        from postcrew import seo
+        tags = seo.normalize_tags(["#Circuit breaker pattern", "circuit breaker pattern", "x" * 31, "System Design, interview"] + [f"tag number {n}" for n in range(40)])
+        self.assertEqual(tags[0], "Circuit breaker pattern")
+        self.assertNotIn("x" * 31, tags)
+        self.assertEqual(len({t.lower() for t in tags}), len(tags))
+        self.assertLessEqual(len(tags), 15)
+        self.assertLessEqual(sum(len(t) + 1 + (2 if " " in t else 0) for t in tags), 460)
+
+    def test_three_hashtags_come_from_the_first_tags_unless_the_description_has_them(self):
+        from postcrew import seo
+        self.assertEqual(seo.with_hashtags("Learn it.", ["circuit breaker pattern", "microservices", "system design", "x"]).splitlines()[-1],
+                         "#CircuitBreakerPattern #Microservices #SystemDesign")
+        self.assertEqual(seo.with_hashtags("Learn it. #A #B #C", ["x tag"]), "Learn it. #A #B #C")
+
+    def test_chapters_use_the_real_scene_lengths_and_only_for_a_long_video(self):
+        from postcrew import seo
+        scenes = [{"on_screen": "Why it matters", "seconds": 12}, {"on_screen": "The request path", "seconds": 18},
+                  {"on_screen": "A quick note", "seconds": 4}, {"on_screen": "Three states", "seconds": 20},
+                  {"on_screen": "Like · Comment · Share", "seconds": 7, "closing": True}]
+        self.assertEqual(seo.chapters(scenes, "long").splitlines(), ["0:00 Introduction", "0:12 The request path", "0:34 Three states"])
+        self.assertEqual(seo.chapters(scenes, "short"), "")
+        self.assertEqual(seo.chapters(scenes[:2], "long"), "")   # fewer than three chapters is not a valid set
+
+    def test_the_uploaded_description_has_chapters_and_hashtags(self):
+        from postcrew.agents.yt_publish import full_description
+        post = {"youtube": {"description": "Circuit breakers explained.\n\nWhat you will learn.", "format": "long",
+                            "tags": ["circuit breaker pattern", "microservices", "system design"],
+                            "scenes": [{"on_screen": "x", "seconds": 15}, {"on_screen": "Request path", "seconds": 20},
+                                       {"on_screen": "Three states", "seconds": 25}, {"on_screen": "Like", "seconds": 6, "closing": True}]}}
+        d = full_description(post)
+        self.assertIn("Chapters\n0:00 Introduction\n0:15 Request path\n0:35 Three states", d)
+        self.assertTrue(d.rstrip().endswith("#CircuitBreakerPattern #Microservices #SystemDesign"))
+        post["youtube"].update(format="short")
+        s = full_description(post)
+        self.assertNotIn("Chapters", s)
+        self.assertTrue(s.rstrip().endswith("#Shorts"))

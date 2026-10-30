@@ -147,3 +147,20 @@ class HooksAgentTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class BlackFrameTests(unittest.TestCase):
+    """The dark look is a near-black page: it is not a broken video. A frame that is really black still is."""
+
+    def clip(self, colour, name):
+        import subprocess
+        import tempfile
+        path = str(Path(tempfile.mkdtemp()) / name)
+        subprocess.run(["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i", f"color=c={colour}:s=320x240:d=2:r=10", "-pix_fmt", "yuv420p", path], check=True)
+        return path
+
+    def test_the_ink_page_is_not_black_but_black_is(self):
+        from postcrew.render import qa
+        self.assertEqual(qa.black_frames(self.clip("0x0D0D0D", "ink.mp4")), [])
+        self.assertTrue(qa.black_frames(self.clip("0x000000", "black.mp4")))
+        self.assertEqual(qa.black_frames(self.clip("0xF5F2EB", "paper.mp4")), [])
