@@ -165,6 +165,111 @@ class VoiceTests(unittest.TestCase):
         self.assertAlmostEqual(voice.audio_seconds(p), 2.0, delta=0.2)
 
 
+class PausesLikeAPersonTests(unittest.TestCase):
+    """The voice must stop where the punctuation says, and a scene whose pauses are wrong is recorded again."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+        old = voice.sleep
+        voice.sleep = lambda s: None
+        self.addCleanup(setattr, voice, "sleep", old)
+
+    @staticmethod
+    def alignment(words):
+        """ElevenLabs' answer for [(word, start, end)]: one entry per character (the word's characters share its times), spaces between."""
+        chars, starts, ends = [], [], []
+        for k, (w, a, b) in enumerate(words):
+            for j, c in enumerate(w + (" " if k < len(words) - 1 else "")):
+                chars.append(c)
+                starts.append(a + (b - a) * j / max(1, len(w)))
+                ends.append(a + (b - a) * (j + 1) / max(1, len(w)))
+        return {"characters": chars, "character_start_times_seconds": starts, "character_end_times_seconds": ends}
+
+    def answer(self, words):
+        import base64
+        return {"audio_base64": base64.b64encode(b"ID3fake").decode(), "alignment": self.alignment(words)}
+
+    def test_a_sentence_that_starts_with_an_acronym_or_a_number_still_gets_its_pause(self):
+        out = voice.prepare("Long context suits whole documents. RAG often wins on cost. 100 tokens cost twenty cents. Done.", pace="slow")
+        self.assertEqual(out.count("<break"), 3)                  # three sentence ends, each followed by a pause
+        self.assertIn('documents. <break time="0.35s" /> rag', out)
+        self.assertIn('cost. <break time="0.35s" /> one hundred', out)
+        e = voice.prepare("Use tools, e.g. a hash, vs. a list. Next one.")
+        self.assertNotIn("e.g. <break", e)
+        self.assertNotIn("vs. <break", e)
+
+    def test_the_slow_pace_stops_longer_at_a_comma_than_the_normal_pace(self):
+        self.assertIn('Long context, <break time="0.4s" /> pasting', voice.prepare("Long context, pasting whole documents in, suits it.", pace="slow"))
+        self.assertIn('Long context, <break time="0.1s" /> pasting', voice.prepare("Long context, pasting whole documents in, suits it.", pace="normal"))
+
+    def test_pause_problems_are_stricter_at_the_slow_pace(self):
+        def w(items):
+            t, out = 0.0, []
+            for text, gap in items:
+                out.append({"text": text, "start": t + gap, "end": t + gap + 0.3})
+                t += gap + 0.3
+            return out
+        # "documents in, suits": a stop inside the phrase and none after the comma
+        words = w([("pasting", 0), ("whole", 0.04), ("documents", 0.04), ("in,", 0.18), ("suits", 0.05), ("it.", 0.04), ("RAG", 0.2)])
+        found = [what for _, what in voice.pause_problems(words, "slow")]
+        self.assertEqual(len(found), 3, found)
+        self.assertTrue(any("middle of a phrase" in f for f in found) and any("comma was run on" in f for f in found)
+                        and any("sentence end" in f for f in found))
+        old = [what for _, what in voice.pause_problems(words)]       # the normal-pace rule misses the stop inside the phrase
+        self.assertEqual(len(old), 2)
+        self.assertFalse(any("middle of a phrase" in f for f in old))
+        ok = w([("pasting", 0), ("whole", 0.04), ("documents", 0.04), ("in,", 0.05), ("suits", 0.4), ("it.", 0.04), ("RAG", 0.6)])
+        self.assertEqual(voice.pause_problems(ok, "slow"), [])
+
+    def test_words_come_out_of_the_character_times_without_the_break_tags(self):
+        al = self.alignment([("Long", 0.0, 0.2), ("context,", 0.25, 0.7), ('<break time="0.4s" />', 1.0, 1.0), ("pasting", 1.1, 1.5)])
+        words = voice.words_from_alignment(al)
+        self.assertEqual([x["text"] for x in words], ["Long", "context,", "pasting"])
+        self.assertAlmostEqual(words[2]["start"], 1.1, places=2)
+
+    def test_a_scene_with_a_wrong_pause_is_recorded_again_and_the_better_take_is_kept(self):
+        bad = self.answer([("pasting", 0.0, 0.3), ("documents", 0.34, 0.6), ("in,", 0.64, 0.8), ("suits", 0.82, 1.1), ("it.", 1.15, 1.3)])      # no stop at the comma
+        good = self.answer([("pasting", 0.0, 0.3), ("documents", 0.34, 0.6), ("in,", 0.64, 0.8), ("suits", 1.3, 1.6), ("it.", 1.64, 1.8)])
+        http = FakeHTTP(bad, good)
+        cfg = {"voice_id": "v", "pace": "slow"}
+        r = voice.cached_synthesize(self.root, "Pasting documents in, suits it.", cfg, "K", http, align=True, before="Earlier sentence.", after="Later sentence.")
+        self.assertEqual((len(http.requests), r["takes"], r["problems"]), (2, 2, []))
+        self.assertGreater(r["spent"], r["characters"])               # the retake used more characters, and it is said
+        self.assertNotEqual(json.loads(http.requests[0]["data"]).get("seed"), json.loads(http.requests[1]["data"])["seed"])
+        body = json.loads(http.requests[0]["data"])
+        self.assertEqual((body["previous_text"], body["next_text"]), ("Earlier sentence.", "Later sentence."))   # intonation across the join
+        self.assertIn("/with-timestamps", http.requests[0]["url"])
+        again = voice.cached_synthesize(self.root, "Pasting documents in, suits it.", cfg, "K", http, align=True, before="Earlier sentence.", after="Later sentence.")
+        self.assertEqual((len(http.requests), again["spent"], again["takes"]), (2, 0, 2))                         # cached: free
+
+    def test_a_scene_that_cannot_be_fixed_keeps_its_best_take_and_says_what_is_left(self):
+        bad = self.answer([("pasting", 0.0, 0.3), ("documents", 0.34, 0.6), ("in,", 0.64, 0.8), ("suits", 0.82, 1.1), ("it.", 1.15, 1.3)])
+        http = FakeHTTP(bad)
+        r = voice.cached_synthesize(self.root, "Pasting documents in, suits it.", {"voice_id": "v", "pace": "slow"}, "K", http, align=True)
+        self.assertEqual((len(http.requests), r["takes"]), (3, 1))
+        self.assertTrue(r["problems"])
+
+    def test_another_voice_tool_with_an_openai_style_speech_endpoint_can_be_used(self):
+        http = FakeHTTP(b"ID3audio")
+        cfg = {"provider": "openai-compatible", "base_url": "http://localhost:8880/v1", "model": "kokoro", "voice_id": "af_bella", "speed": 0.95}
+        r = voice.cached_synthesize(self.root, "RAG costs 20 cents.", cfg, "", http, align=True)
+        q = http.requests[0]
+        self.assertEqual(q["url"], "http://localhost:8880/v1/audio/speech")
+        body = json.loads(q["data"])
+        self.assertEqual((body["model"], body["voice"], body["speed"], body["response_format"]), ("kokoro", "af_bella", 0.95, "mp3"))
+        self.assertIn("twenty cents", body["input"])               # numbers are still written as words
+        self.assertEqual((r["takes"], r["problems"]), (1, []))
+        voice.cached_synthesize(self.root, "RAG costs 20 cents.", cfg, "", http)
+        self.assertEqual(len(http.requests), 1)                    # cached
+        with self.assertRaises(VoiceError):
+            voice.cached_synthesize(self.root, "Hi there.", dict(cfg, base_url=""), "", http)
+        with self.assertRaises(VoiceError) as cm:
+            voice.cached_synthesize(self.root, "Hi again.", cfg, "", FakeHTTP(urllib.error.URLError("refused")))
+        self.assertEqual(cm.exception.kind, "network")
+
+
 if __name__ == "__main__":
     unittest.main()
 

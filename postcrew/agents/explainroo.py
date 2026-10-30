@@ -16,6 +16,7 @@ import subprocess
 from pathlib import Path
 
 from ..render import video as video_mod
+from ..voice import pause_problems  # noqa: F401  (defined with the voice; explainroo and the Hooks agent import it from here)
 from .base import AgentError
 from .video import VideoAgent
 
@@ -42,28 +43,6 @@ def narration_of(script_md):
             continue
         out += _words(line)
     return out
-
-
-def pause_problems(words):
-    """Where the recorded voice stops against where the punctuation says it should: [(word, what)] from explainroo's word times
-    ([{text, start, end}]). A sentence end with no stop, a clause comma that was run on, and a stop in the middle of a phrase."""
-    found = []
-    clause = 0
-    for a, b in zip(words, words[1:]):
-        gap = b["start"] - a["end"]
-        mark = re.search(r"[.?!,;:]$", a["text"])
-        clause += 1
-        if mark and mark.group(0) in ".?!":
-            if gap < 0.25:
-                found.append((a["text"], f"no stop after the sentence end ({gap:.2f}s)"))
-            clause = 0
-        elif mark:
-            if clause >= 3 and gap < 0.12:
-                found.append((a["text"], f"the comma was run on ({gap:.2f}s)"))
-            clause = 0
-        elif gap > 0.45:
-            found.append((a["text"], f"it stops in the middle of a phrase ({gap:.2f}s)"))
-    return found
 
 
 class ExplainrooAgent(VideoAgent):

@@ -44,7 +44,7 @@ def enqueue_youtube(ws, cfg, run_id, day, category, outputs, review):
             "voice": voice.get("voice") or ("own" if video.get("voice") == "own" else "none"),
             "scenes": _scenes(script["scenes"], video),
             "source": {"script": script.get("source", "crew"),
-                       "voice": "own" if video.get("voice") == "own" else ("crew" if voice.get("mode") == "elevenlabs" else "none"),
+                       "voice": "own" if video.get("voice") == "own" else ("crew" if voice.get("mode") in ("elevenlabs", "local") else "none"),
                        "video": video.get("source", "crew")},
             "video_id": None, "url": None,
         },

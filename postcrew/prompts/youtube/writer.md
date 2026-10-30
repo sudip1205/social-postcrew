@@ -22,6 +22,12 @@ HOW IT SOUNDS: a composed, professional teacher explaining to a learner. Calm, c
   one deliberate beat, only AFTER a complete sentence or question and before the key point ("A hash is a fingerprint... It never
   changes."), never in the middle of a phrase ("Brackets close... last opened" is wrong). At most one "..." per scene. Never write
   [pause], <break> or any markup.
+- Sentences a voice can say: keep each one straight (who does what), never an inserted phrase between two commas ("Long context,
+  pasting whole documents in, suits full-document understanding" cannot be paced). Say it as two sentences ("Long context means pasting whole
+  documents in. It suits full-document understanding.") or with "which": "Long context, which means pasting whole documents in, suits...".
+  Never a comma straight after "in", "on", "at", "to", "of", "for", "with", "by", "from", "the" or "a" ("documents in, suits"). Start a
+  sentence with a plain word, not a number or an acronym ("RAG often wins" becomes "Often, RAG wins on cost"); write numbers inside the
+  sentence.
 
 SOUND LIKE A PERSON, NOT A SCRIPT (the voice is a real human voice; the words decide whether it sounds alive):
 - Talk to one viewer, the way a good colleague explains at a whiteboard. Use "you", "we" and "let's": "So here's the trick.",

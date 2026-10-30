@@ -48,8 +48,12 @@ def cmd_doctor(ws):
         yt = cfg["platforms"]["youtube"]
         rows.append(("YouTube: ffmpeg (videos)", bool(shutil.which("ffmpeg")), "found" if shutil.which("ffmpeg") else
                      "brew install ffmpeg / sudo apt install ffmpeg"))
-        rows.append(("YouTube: ElevenLabs voice", bool(s.get("elevenlabs_api_key") and yt["video"]["voice"].get("voice_id")),
-                     yt["video"]["voice"].get("voice_name") or "add the API key in Credentials and choose a voice in Settings"))
+        vc = yt["video"]["voice"]
+        if vc.get("provider") == "openai-compatible":
+            rows.append(("YouTube: voice server", bool(vc.get("base_url")), vc.get("base_url") or "set the server address in Settings > YouTube video settings"))
+        else:
+            rows.append(("YouTube: ElevenLabs voice", bool(s.get("elevenlabs_api_key") and vc.get("voice_id")),
+                         vc.get("voice_name") or "add the API key in Credentials and choose a voice in Settings"))
         rows.append(("YouTube connected", bool(s.get("youtube_refresh_token")),
                      s.get("youtube_channel_title") or "click Connect YouTube in Studio > Credentials"))
         rows.append(("YouTube publishing", True, "DRY RUN (nothing is uploaded)" if yt["publishing"]["dry_run"] else

@@ -45,6 +45,41 @@ Credentials > ElevenLabs: paste your API key (it is write-only). Settings > YouT
 loaded from your account) and press **Play sample**. The free ElevenLabs plan has a monthly character allowance and its terms
 limit commercial use: check your plan. Characters are only spent on scripts that passed the Editor.
 
+### Pauses that sound like a person
+
+The voice is recorded one scene at a time, and each recording is checked against its punctuation using the voice's own word times: a sentence
+end must be followed by a stop (at least 0.4 s at the slow pace), a comma that ends a clause by a stop of at least 0.2 s, and no stop may fall
+inside a phrase. A scene that fails is recorded again (up to three takes) and the best take is kept; the run log says how many characters the
+re-takes used and, if a pause is still wrong in the best take, which one. Each scene is also told what comes before and after it, so the
+intonation carries across the join. The slow pace stops 0.4 s at a comma and 0.35 s after a sentence (the voice adds its own natural stop).
+A sentence that starts with an acronym or a number ("RAG often wins...") gets its pause like any other.
+
+### Another voice tool instead of ElevenLabs
+
+ElevenLabs is the default, but any server that speaks the OpenAI speech API (`POST /v1/audio/speech`) can be used, which is how most free local
+models are served. In `config.json`, under `platforms.youtube.video.voice`:
+
+```json
+"voice": {"provider": "openai-compatible", "base_url": "http://localhost:8880/v1", "model": "kokoro", "voice_id": "af_bella", "speed": 1.0}
+```
+
+Leave `provider` out (or `"elevenlabs"`) to go back. A key, if your server wants one, goes in `secrets.json` as `voice_api_key`. `python3 -m postcrew doctor`
+shows the server address. A local server decides for itself how punctuation sounds, so Postcrew cannot check the pauses or re-take a scene
+with it (it only writes numbers and symbols as words first); listen to a sample before you switch.
+
+Free models worth trying on a machine with a GPU (licences checked against each model card, but check again before you rely on one: some
+free models forbid commercial use, which includes a monetised channel):
+
+| Model | Size | Licence | Server that speaks the OpenAI API | Notes |
+|---|---|---|---|---|
+| Chatterbox (Resemble AI) | 0.5B | MIT | [Chatterbox-TTS-Server](https://github.com/devnen/Chatterbox-TTS-Server) | Clones a voice from about 5 s of audio; an "exaggeration" control for expression. The first to try for a human sound. |
+| Kokoro | 82M | Apache 2.0 | Kokoro-FastAPI (`ghcr.io/remsky/kokoro-fastapi-gpu`, port 8880) | Fast and light, runs on a CPU; English is its strength. A good, steady baseline. |
+| Orpheus 3B (Canopy Labs) | 3B | Apache 2.0 (the weights follow Llama terms: read them) | [Orpheus-FastAPI](https://github.com/Lex-au/Orpheus-FastAPI) | Emotion tags, 24 voices; heavier. |
+| Qwen3-TTS | 1.7B | Apache 2.0 | (check its repository) | Many languages, voice cloning. |
+
+Not for a monetised channel: XTTS v2 (non-commercial licence), F5-TTS weights, Fish Speech and Voxtral (CC BY-NC). VibeVoice (MIT code) is listed by Microsoft
+as research only.
+
 ## Use your own script, voice or video
 
 On a YouTube card in the Queue (or on a day in Plan): **Use my own ...**. Files are kept per date and used by the next crew run

@@ -59,7 +59,7 @@ def youtube_ws(ws, dry_run=False, approval="manual"):
     return ws
 
 
-def fake_tts(root, text, voice_cfg, api_key, opener=None):
+def fake_tts(root, text, voice_cfg, api_key, opener=None, **kw):   # kw: align, before, after (the voice step passes the neighbouring scenes)
     """An audio clip as long as the text would take to say (2.5 words a second), made with ffmpeg."""
     secs = max(0.6, len(text.split()) / 2.5 / 8)   # eight times faster than real speech: keeps the test quick
     out = Path(root) / "cache" / "voice" / f"fake-{abs(hash(text))}.mp3"
