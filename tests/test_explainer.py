@@ -59,7 +59,7 @@ class IconAndNodeTests(unittest.TestCase):
     def test_icons_are_checked_in_scripts(self):
         spec = {"format": "short", "target_seconds": 45, "max_words": 112}
         s = yc.script()
-        s["scenes"][1] = dict(s["scenes"][1], layout="diagram", nodes=["Client|client", "Server|banana"], edges=["Client > Server: x"],
+        s["scenes"][1] = dict(s["scenes"][1], narration="The client asks the server. " + s["scenes"][1]["narration"], layout="diagram", nodes=["Client|client", "Server|banana"], edges=["Client > Server: x"],
                               on_screen="Ask")
         problems = script_problems(yc.finish(s), spec, {"label": "x"}, {"blocklist": [], "about": []})
         self.assertTrue(any("icon after |" in p for p in problems), problems)
@@ -185,7 +185,7 @@ class ExplainerCrewTests(unittest.TestCase):
             cfg["platforms"]["youtube"]["video"]["renderer"] = "explainer"
             ws.save_config(cfg)
             script = yc.script()
-            script["scenes"][1] = dict(script["scenes"][1], layout="diagram", on_screen="Ask the server",
+            script["scenes"][1] = dict(script["scenes"][1], narration="The client asks the server. " + script["scenes"][1]["narration"], layout="diagram", on_screen="Ask the server",
                                        nodes=["Client|client", "Server|server"], edges=["Client > Server: ask"])
             llm = ScriptedLLM({"topic": [topic("Default arguments", ())], "writer": [yc.finish(script)], "editor": [review()],
                                "video_review": [{"verdict": "pass", "score": 95, "summary": "in step", "scenes": []}]})

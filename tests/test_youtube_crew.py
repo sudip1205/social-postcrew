@@ -34,8 +34,9 @@ def narration(n_words, start="Step"):
 
 
 def script(words_per_scene=20, scenes=5, **over):
-    sc = [{"layout": "title" if i == 0 else "statement", "narration": narration(words_per_scene, f"w{i}"),
-           "on_screen": f"Point number {i + 1}", "items": [], "code": "", "language": "", "seconds": 8}
+    sc = [{"layout": "title" if i == 0 else "points" if i % 2 else "statement", "narration": narration(words_per_scene, f"w{i}"),   # the picture changes: never two plain scenes alike in a row
+           "on_screen": f"Point number {i + 1}", "items": [narration(words_per_scene, f"w{i}").split()[0]] if i % 2 else [],
+           "code": "", "language": "", "seconds": 8}
           for i in range(scenes)]
     out = {"title": "Why your default arguments surprise you", "description": "A quick look at Python default arguments and "
            "the one-line fix that stops them leaking between calls.", "tags": ["python", "tips", "debugging"],
@@ -450,3 +451,29 @@ class EditorVideoRulesTests(unittest.TestCase):
         self.assertFalse(out["passed"])
         self.assertTrue(any("introduction" in r for r in out["rules"]) and any("'mistake'" in r for r in out["rules"]))
         self.assertTrue(ag.validate(Ctx, out))
+
+
+class StoryboardTests(unittest.TestCase):
+    SPEC = {"format": "long", "wps": 2.5, "target_seconds": 240, "max_words": 600}
+
+    def test_one_picture_for_forty_seconds_is_sent_back(self):
+        from postcrew.checks import storyboard_problems
+        long = [{"layout": "diagram", "part": "idea", "nodes": ["Client", "Server"], "narration": "The client calls the server. " + "word " * 120}]
+        self.assertTrue(any("split it" in p for p in storyboard_problems(long, self.SPEC)))
+
+    def test_every_box_and_point_must_be_said(self):
+        from postcrew.checks import storyboard_problems
+        ok = [{"layout": "diagram", "nodes": ["Client", "API Gateway|gateway"], "narration": "The client calls the gateway."}]
+        self.assertEqual(storyboard_problems(ok, self.SPEC), [])
+        bad = [{"layout": "diagram", "nodes": ["Redis Cache", "Message Queue"], "narration": "The client calls the server."}]
+        self.assertTrue(any("never says it" in p for p in storyboard_problems(bad, self.SPEC)))
+        pts = [{"layout": "points", "items": ["Ask the questions"], "narration": "Begin with requirements."}]
+        self.assertTrue(any("never says it" in p for p in storyboard_problems(pts, self.SPEC)))
+        grow = [{"layout": "diagram", "nodes": ["Client", "Server"], "narration": "The client calls the server."},
+                {"layout": "diagram", "nodes": ["Client", "Server", "Cache"], "narration": "Then it reaches the cache."}]
+        self.assertEqual(storyboard_problems(grow, self.SPEC), [])   # boxes already drawn need not be named again
+
+    def test_three_plain_scenes_in_a_row_are_sent_back(self):
+        from postcrew.checks import storyboard_problems
+        row = [{"layout": "statement", "narration": "One."}] * 3
+        self.assertTrue(any("in a row" in p for p in storyboard_problems(row, self.SPEC)))

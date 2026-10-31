@@ -73,7 +73,8 @@ HOW THE VIDEO IS BUILT (the best explainer channels do it this way; write for it
   drew. Do not redraw the world every scene.
 - Build it slowly: at most 3 new boxes or arrows per scene, each added at the moment the narration names it. Say the name of
   every new box in the sentence where it should appear ("Then the request reaches the load balancer."), and explain the arrows
-  in the order you list them. Give a scene 12-25 seconds of narration (30-60 words): time to say it and time to look.
+  in the order you list them. Give a scene 6-12 seconds of narration (15-30 words), never more than 16 seconds in a long video or 11 in a Short:
+  the picture changes every few seconds. One long scene with one picture while the voice talks for 40 seconds is the worst fault a video can have.
 - Every chapter has its own short title in "on_screen" (2-4 words, the name of the idea: "Hash function", "The problem",
   "Cache miss"). The title changes with the idea; it is not a sentence.
 - Make it concrete with ONE worked example (a login form, a web shop with three servers, a short command) that the whole
@@ -87,6 +88,20 @@ HOW THE VIDEO IS BUILT (the best explainer channels do it this way; write for it
   gateway, cloud, globe, lock, key, file, terminal. Pick the one that matches what the box is.
 - Pace: slow and clear, about 2 words per second. Never rush: one new idea per scene, a full stop after every sentence, a "..."
   before the key point. The viewer watches the picture grow while you speak; do not talk faster than it builds.
+
+STORYBOARD FIRST (the screen must show what the voice is saying, at the moment it says it). Before writing narration, plan the video as a
+storyboard: a list of shots, each one idea, each with its own picture. Then write 15-30 words for each shot, in the order of the shots.
+- A long video of four minutes has about 20 to 28 scenes; a Short has 6 to 10. If you are about to give one picture more than about 12
+  seconds of talking, split it into two shots with two pictures.
+- Whatever the narration describes, the screen shows it: a thing named is a box that appears (or a highlighted box) as it is named; a
+  step described is an arrow or a move on the data; a list of three reasons is three points that appear one by one as each is said; a
+  number or a status code is on screen as it is spoken; code that is explained is on screen, line by line, in its own short scene.
+  Never describe something the screen does not show, and never show a box the voice does not name.
+- Vary the pictures. Do not use more than two scenes in a row of the same plain layout (title, statement, points, code, trace). Between
+  them use a diagram that grows, a flow that carries real data, a trace, a code scene, a before-and-after as two short diagrams.
+- Keep ONE growing picture where it fits: the next diagram scene keeps the earlier boxes and adds one to three, so the story builds.
+- A shot that explains "what goes wrong" shows it going wrong (an arrow to a box marked as failed, a wrong value, a slow path); the
+  next shot shows the fix on the same picture.
 
 EVERY VIDEO FOLLOWS THIS ARC (checked by the app; a script that skips a part is sent back). Each scene has a "part":
 1. "intro": the FIRST scene (layout "title"). It states the PROBLEM the viewer has, in two or three sentences, and what they will be able to

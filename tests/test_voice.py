@@ -317,3 +317,19 @@ class HumanVoiceTests(unittest.TestCase):
     def test_the_voice_settings_stay_steady_so_it_does_not_invent_sounds(self):
         self.assertGreaterEqual(voice.HUMAN["stability"], 0.5)
         self.assertEqual(voice.HUMAN["style"], 0)
+
+
+class VoiceSettingsTests(unittest.TestCase):
+    def test_a_voice_server_of_your_own_is_a_valid_setting(self):
+        from postcrew import defaults
+        from postcrew.workspace import validate_config
+        import copy
+        c = copy.deepcopy(defaults.DEFAULT_CONFIG) if hasattr(defaults, "DEFAULT_CONFIG") else None
+        if c is None:
+            self.skipTest("no default config object")
+        c["platforms"]["youtube"]["enabled"] = True
+        v = c["platforms"]["youtube"]["video"]
+        v["voice"] = {"provider": "openai-compatible", "base_url": "http://localhost:8880/v1", "model": "kokoro", "voice_id": "af_heart", "speed": 0.95}
+        self.assertEqual([e for e in validate_config(c) if "voice" in e], [])
+        v["voice"]["base_url"] = ""
+        self.assertTrue(any("base_url" in e for e in validate_config(c)))

@@ -191,6 +191,49 @@ def needed_visual(spec, cat):
     return ""
 
 
+MAX_SCENE_S = {"short": 11, "long": 16}   # the longest a scene (one picture) may run, in seconds of narration
+PLAIN_LAYOUTS = ("title", "statement", "points", "code", "trace")
+
+
+def _says(narration, label):
+    """Does the narration name this label (any word of it, or its first letters, so 'gateways' names 'Gateway')?"""
+    text = (narration or "").lower()
+    words = [w for w in re.findall(r"[a-z]+", str(label).lower()) if len(w) >= 3 and w not in ("the", "and", "for", "can", "not")]   # numbers are said in words: not compared
+    return not words or any(w[:4] in text for w in words)
+
+
+def storyboard_problems(scenes, spec):
+    """The picture must follow the voice: a new picture every few seconds, each one showing what is being said at that moment."""
+    from .render.scenes import split_node
+    cap, problems, seen = MAX_SCENE_S[spec["format"]], [], set()
+    run, run_layout = 0, None
+    for i, sc in enumerate(scenes, 1):
+        words = len((sc.get("narration") or "").split())
+        secs = words / float(spec.get("wps") or 2.5)
+        if sc.get("part") != "closing" and secs > cap + 4:
+            problems.append(f"scene {i}: about {secs:.0f} seconds on one picture while the voice talks: split it into scenes of at most "
+                            f"{cap} seconds ({int(cap * float(spec.get('wps') or 2.5))} words), each showing the part being said")
+        layout = sc.get("layout")
+        run = run + 1 if layout == run_layout else 1
+        run_layout = layout
+        if layout in PLAIN_LAYOUTS and run > 2:
+            problems.append(f"scene {i}: {run} '{layout}' scenes in a row: change the picture (a diagram, a flow, code or a trace) so "
+                            f"the screen shows the idea, not only words")
+        if layout in ("diagram", "flow"):
+            names = [split_node(n)[0] for n in sc.get("nodes") or []]
+            new = [n for n in names if n.lower() not in seen]
+            unsaid = [n for n in new if not _says(sc.get("narration"), n)]
+            if unsaid and len(unsaid) * 2 > len(new):   # a box may be said as its role ("the visitor" for Client), but most new boxes must be named
+                problems.append(f"scene {i}: the box '{unsaid[0]}' appears but the voice never says it: name each new box in the narration "
+                                f"at the moment it is drawn")
+            seen.update(n.lower() for n in names)
+        elif layout == "points":
+            unsaid = [it for it in sc.get("items") or [] if not _says(sc.get("narration"), it)]
+            if unsaid and len(unsaid) * 2 > len(sc.get("items") or []):   # a point may be worded differently, but most must be said
+                problems.append(f"scene {i}: the point '{unsaid[0]}' is on screen but the voice never says it: say each point as it appears")
+    return problems
+
+
 PARTS = ("intro", "idea", "example", "mistake", "closing")
 PART_HELP = {"intro": "the problem the viewer has", "idea": "the solution, the idea", "example": "a worked example that shows it working",
              "mistake": "one common mistake to avoid"}
@@ -234,9 +277,12 @@ def script_problems(script, spec, cat, profile):
     elif words < lo:
         problems.append(f"the narration is only {words} words: about {words / wps:.0f} seconds, but this video should "
                         f"run about {target} seconds ({lo}-{hi} words)")
-    mn, mx = (3, 24) if spec["format"] == "short" else (4, 40)
+    mn, mx = (3, 24) if spec["format"] == "short" else (4 if script.get("source") == "own" else max(8, int(target / MAX_SCENE_S["long"])), 60)
     if not mn <= len(scenes) <= mx:
-        problems.append(f"{len(scenes)} scenes: a {spec['format']} video needs {mn}-{mx}")
+        problems.append(f"{len(scenes)} scenes: a {spec['format']} video of this length needs {mn}-{mx}, one new picture about every "
+                        f"{MAX_SCENE_S[spec['format']] - 4:.0f} seconds")
+    if script.get("source") != "own":   # the owner's own script is theirs: it is checked for rules, not re-storyboarded
+        problems += storyboard_problems(scenes, spec)
     problems += structure_problems(scenes)
     for i, sc in enumerate(scenes, 1):
         if sc.get("layout") not in SCENE_LAYOUTS:

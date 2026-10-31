@@ -3,6 +3,8 @@
 ## 0.2.0: YouTube, per-app settings and a faster Studio
 
 ### New
+- **Storyboards that follow the voice.** A script is sent back unless it has a new picture every few seconds: no scene may talk for more than 16 seconds in a long video (11 in a Short) on one picture, every box and point on screen must be said by the voice in that scene, and no more than two words-only scenes may follow each other. The writer is told to plan shots first (a four-minute video has 20 to 28), and the Editor checks the same list. The earlier video had 9 scenes of 30 to 46 seconds each.
+- **A voice of your own, ready to use: Kokoro.** `scripts/kokoro_server.py` runs Kokoro (free, Apache-2.0, runs on the CPU) as an OpenAI-style voice server. Set `video.voice.provider` to `openai-compatible` (the settings check now accepts it; it was refused before). See the header of the script.
 - **Every video follows one story.** Each scene now says which part it is, and a script is sent back to the writer unless it has, in order: an **introduction that states the problem**, the **idea (the solution)**, a **worked example**, **one common mistake to avoid**, then the closing card. A video can no longer start on a diagram or the solution. (Scripts you write yourself are not checked.)
 - **The Editor checks the story before approving.** Its checklist now has the introduction (problem), solution, working example, common mistake and closing card, plus a few voice-smoothness rules, and the app also checks the parts itself: a script missing one is sent back whatever the reviewer scores. The reviewer sees each scene's part.
 - **No abrupt start.** The first picture is on screen 0.7 s before the voice begins.

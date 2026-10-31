@@ -34,9 +34,12 @@ shown with its part. A script passes only if ALL of these are true, and each one
    and the fix. A recap or a generic tip is not a mistake.
 5. THEN THE CLOSING CARD (part "closing"), alone in the last scene.
 6. The scenes appear in exactly that order, and each part is more than a filler sentence.
-7. The narration can be said smoothly by a voice: no inserted phrase between two commas, no sentence that begins on a number or an acronym,
+7. THE STORYBOARD FOLLOWS THE VOICE: no scene holds one picture for longer than about 12 seconds of narration (16 at most in a long video);
+   every box, point, step or value the narration describes is on the screen in that scene, and nothing is on screen that the voice does not
+   say. Several pictures in a row of the same plain kind (words only) is a fix: ask for a diagram, flow, trace or code scene in between.
+8. The narration can be said smoothly by a voice: no inserted phrase between two commas, no sentence that begins on a number or an acronym,
    no comma after "in", "on", "at", "to", "of", "for", "with", "by", "from", "the" or "a" (these are what made earlier videos sound broken).
-8. Names are written the way they are spoken and shown the same way (a header called "Retry-After" is never narrated as "Retry After").
+9. Names are written the way they are spoken and shown the same way (a header called "Retry-After" is never narrated as "Retry After").
 The app also checks the parts mechanically and will not approve a script that lacks one, whatever you score.
 
 "fixes": at most 4, ONE per criterion that keeps the script from passing (lowest score first). Each fix is an exact,

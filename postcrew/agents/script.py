@@ -61,7 +61,7 @@ SCHEMA = {
         "title": {"type": "string"}, "description": {"type": "string"},
         "tags": {"type": "array", "items": {"type": "string"}, "maxItems": 15},
         "thumbnail_text": {"type": "string"},
-        "scenes": {"type": "array", "items": SCENE, "maxItems": 40},
+        "scenes": {"type": "array", "items": SCENE, "maxItems": 60},
     },
     "required": ["title", "description", "tags", "thumbnail_text", "scenes"],
     "additionalProperties": False,

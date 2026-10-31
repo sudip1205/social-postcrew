@@ -91,8 +91,10 @@ def _validate_video(v, pre):
     if v.get("renderer") not in RENDERERS:
         errs.append(f"{pre}video.renderer must be one of {RENDERERS}")
     voice = v.get("voice") or {}
-    if voice.get("provider", "elevenlabs") != "elevenlabs":
-        errs.append(f"{pre}video.voice.provider must be elevenlabs")
+    if voice.get("provider", "elevenlabs") not in ("elevenlabs", "openai-compatible"):
+        errs.append(f"{pre}video.voice.provider must be elevenlabs or openai-compatible (a voice server of your own)")
+    elif voice.get("provider") == "openai-compatible" and not str(voice.get("base_url") or "").startswith(("http://", "https://")):
+        errs.append(f"{pre}video.voice.base_url must be the address of your voice server, e.g. http://localhost:8880/v1")
     if not (isinstance(voice.get("speed", 1.0), (int, float)) and 0.7 <= voice.get("speed", 1.0) <= 1.2):
         errs.append(f"{pre}video.voice.speed must be between 0.7 and 1.2")
     mcp = v.get("mcp") or {}

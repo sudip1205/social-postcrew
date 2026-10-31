@@ -128,7 +128,7 @@ class VideoEditorCrewTests(unittest.TestCase):
 
     def script(self):
         s = yc.script()
-        s["scenes"][1] = dict(s["scenes"][1], layout="diagram", nodes=["Client", "Server"], edges=["Client > Server: ask"],
+        s["scenes"][1] = dict(s["scenes"][1], narration="The client asks the server. " + s["scenes"][1]["narration"], layout="diagram", nodes=["Client", "Server"], edges=["Client > Server: ask"],
                               on_screen="Ask")
         return yc.finish(s)
 
