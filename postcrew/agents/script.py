@@ -133,7 +133,7 @@ class ScriptWriter(WriterAgent):
     # ---------- the crew's draft ----------
     def _draft(self, ctx, guidance, member, prev=None):
         topic, spec = ctx.outputs["topic"], ctx.video
-        lo, hi = int(spec["max_words"] * 0.7), spec["max_words"]
+        lo, hi = spec.get("min_words", int(spec["max_words"] * 0.7)), spec["max_words"]
         system = (self.prompt(ctx, format=spec["format"], target_seconds=spec["target_seconds"], min_words=lo, max_words=hi,
                               format_rules=FORMAT_RULES[spec["format"]], wps=spec.get("wps", 2.5), outro=spec.get("outro") or "(none: end with one clear next step)",
                               shorts_rule="Do not write #Shorts yourself: the app adds it to Shorts.")
@@ -157,7 +157,7 @@ class ScriptWriter(WriterAgent):
         spec = ctx.video
         if out.get("source") == "own":   # the owner's own length is what it is; a Short still has to fit in a minute
             words = len(out["text"].split())
-            spec = dict(spec, target_seconds=max(15, round(words / platforms.WORDS_PER_SECOND)), max_words=max(words, 1))
+            spec = dict(spec, target_seconds=max(15, round(words / platforms.WORDS_PER_SECOND)), max_words=max(words, 1), min_words=0)
             problems = script_problems(out, spec, ctx.cat, ctx.profile)
             if spec["format"] == "short" and words / platforms.WORDS_PER_SECOND > platforms.SHORT_MAX_S + 3:
                 problems.append(f"your script runs about {words / platforms.WORDS_PER_SECOND:.0f} seconds: too long for a "

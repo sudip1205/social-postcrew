@@ -30,10 +30,11 @@ WORDS = "apple river cloud stone bridge garden window candle forest anchor baske
 
 def narration(n_words, start="Step"):
     shift = sum(map(ord, start))
-    return " ".join(WORDS[(shift + i * 5 + i // 12) % len(WORDS)] for i in range(n_words)) + "."
+    words = [WORDS[(shift + i * 5 + i // 12) % len(WORDS)] for i in range(n_words)]
+    return " ".join(w + ("." if (i + 1) % 12 == 0 and i + 1 < n_words else "") for i, w in enumerate(words)) + "."   # short sentences: a voice can say them
 
 
-def script(words_per_scene=20, scenes=5, **over):
+def script(words_per_scene=32, scenes=5, **over):
     sc = [{"layout": "title" if i == 0 else "points" if i % 2 else "statement", "narration": narration(words_per_scene, f"w{i}"),   # the picture changes: never two plain scenes alike in a row
            "on_screen": f"Point number {i + 1}", "items": [narration(words_per_scene, f"w{i}").split()[0]] if i % 2 else [],
            "code": "", "language": "", "seconds": 8}
@@ -92,7 +93,7 @@ class FakeYouTube:
 
 
 class ScriptCheckTests(unittest.TestCase):
-    spec = {"format": "short", "target_seconds": 45, "max_words": 112}
+    spec = {"format": "short", "target_seconds": 75, "max_words": 187, "min_words": 131}
     profile = {"blocklist": ["my employer"], "about": []}
     cat = {"label": "x"}
 
@@ -100,7 +101,7 @@ class ScriptCheckTests(unittest.TestCase):
         self.assertEqual(script_problems(script(), self.spec, self.cat, self.profile), [])
 
     def test_length_scenes_and_metadata_are_checked(self):
-        long = script(words_per_scene=40)          # 200 words for a 45 s Short
+        long = script(words_per_scene=48)          # 240 words for a 75 s Short
         self.assertTrue(any("Cut" in p for p in script_problems(long, self.spec, self.cat, self.profile)))
         short = script(words_per_scene=5)
         self.assertTrue(any("only" in p for p in script_problems(short, self.spec, self.cat, self.profile)))
@@ -141,10 +142,12 @@ class ScriptCheckTests(unittest.TestCase):
 
 class VideoSpecTests(unittest.TestCase):
     def test_later_settings_win_and_lengths_are_clamped(self):
-        cfg = {"video": {"format": "short", "target_seconds": 45}}
-        self.assertEqual(platforms.video_spec(cfg)["max_words"], 112)
+        cfg = {"video": {"format": "short", "target_seconds": 75}}
+        self.assertEqual(platforms.video_spec(cfg)["max_words"], 187)
+        self.assertEqual(platforms.video_spec({"video": {"format": "short", "target_seconds": 45}})["target_seconds"], 50)   # never shorter than 50 s
+        self.assertEqual(platforms.video_spec(cfg, {"format": "long", "target_seconds": 120})["target_seconds"], 300)       # a long video: 5 minutes at least
         self.assertEqual(platforms.video_spec(cfg, {"format": "long", "target_seconds": 600})["target_seconds"], 600)
-        self.assertEqual(platforms.video_spec(cfg, {"target_seconds": 600})["target_seconds"], 180)   # a Short stays a Short (3 min)
+        self.assertEqual(platforms.video_spec(cfg, {"target_seconds": 600})["target_seconds"], 100)   # a Short stays a Short (100 s at most)
         self.assertEqual(platforms.video_spec(cfg, {}, {"format": "long"}, {"target_seconds": 300})["target_seconds"], 300)
 
     def test_config_validation_covers_the_video_settings(self):
@@ -229,7 +232,7 @@ class YouTubeCrewTests(unittest.TestCase):
             youtube_ws(ws)
             llm = self.llm(editor=[review(60, owner="writer", fixes=["Scene 1: shorten the hook"]), review()],
                            supervisor=[{"action": "rewind", "target": "writer", "instructions": ["fix"], "reason": "weak"}],
-                           writer=[script(), script(words_per_scene=19)])
+                           writer=[script(), script(words_per_scene=30)])
             res = self.run_short(ws, llm)
             self.assertTrue(res["ok"], res)
             self.assertEqual(llm.agents_called().count("writer"), 2)
@@ -246,7 +249,7 @@ class YouTubeCrewTests(unittest.TestCase):
     def test_a_script_that_breaks_the_rules_is_sent_back_before_any_review(self, _tts, _claude):
         with TempWorkspace() as ws:
             youtube_ws(ws)
-            bad = script(words_per_scene=60)          # 300 words for a 45 s Short
+            bad = script(words_per_scene=60)          # 300 words for a 75 s Short
             llm = self.llm(writer=[bad, script()])
             res = self.run_short(ws, llm)
             self.assertTrue(res["ok"], res)

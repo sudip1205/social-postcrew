@@ -57,7 +57,7 @@ class IconAndNodeTests(unittest.TestCase):
         self.assertEqual(ex.guess_icon("Thing", "lock"), "lock")
 
     def test_icons_are_checked_in_scripts(self):
-        spec = {"format": "short", "target_seconds": 45, "max_words": 112}
+        spec = {"format": "short", "target_seconds": 75, "max_words": 187, "min_words": 131}
         s = yc.script()
         s["scenes"][1] = dict(s["scenes"][1], narration="The client asks the server. " + s["scenes"][1]["narration"], layout="diagram", nodes=["Client|client", "Server|banana"], edges=["Client > Server: x"],
                               on_screen="Ask")
@@ -149,14 +149,14 @@ class SettingsTests(unittest.TestCase):
         self.assertIn('<break time="0.35s" />', voice.prepare(text, pace="slow"))
         self.assertIn('<break time="0.2s" />', voice.prepare(text, pace="normal"))
 
-    def test_shorts_may_run_three_minutes(self):
-        self.assertEqual(platforms.video_spec({"video": {"format": "short", "target_seconds": 170}})["target_seconds"], 170)
-        self.assertEqual(platforms.video_spec({"video": {"format": "short", "target_seconds": 500}})["target_seconds"], 180)
+    def test_shorts_run_fifty_to_a_hundred_seconds(self):
+        self.assertEqual(platforms.video_spec({"video": {"format": "short", "target_seconds": 95}})["target_seconds"], 95)
+        self.assertEqual(platforms.video_spec({"video": {"format": "short", "target_seconds": 500}})["target_seconds"], 100)
         with TempWorkspace() as ws:
             cfg = ws.config()
             yt = cfg["platforms"]["youtube"]
             yt["enabled"] = True
-            yt["video"].update(format="short", target_seconds=150)
+            yt["video"].update(format="short", target_seconds=95)
             self.assertEqual(validate_config(cfg), [])
             yt["video"]["target_seconds"] = 200
             self.assertTrue(any("target_seconds" in e for e in validate_config(cfg)))

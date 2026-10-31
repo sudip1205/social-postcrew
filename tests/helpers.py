@@ -167,7 +167,7 @@ class TempWorkspace:
         yt = cfg["platforms"]["youtube"]   # YouTube starts with no topics; the tests use the four example topics
         yt["categories"] = copy.deepcopy(YOUTUBE_EXAMPLE_TOPICS)
         yt["schedule"]["days"] = {"tue": "explainer", "fri": "short-tip"}
-        yt["video"].update(renderer="ffmpeg", pace="normal", target_seconds=45, outro="")   # the tests' videos are short and plain
+        yt["video"].update(renderer="ffmpeg", pace="normal", target_seconds=75, outro="")   # the tests' videos are short and plain
         ws.save_config(cfg)
         self.ws = ws
         return ws

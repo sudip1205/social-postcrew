@@ -253,7 +253,7 @@ SECRET_KEYS = ["linkedin_client_id", "linkedin_client_secret", "linkedin_access_
 YOUTUBE_EXAMPLE_TOPICS = {
                 "short-tip": {
                     "label": "Short: one quick tip", "media": "video", "research": "off", "fact_check": False,
-                    "format": "short", "target_seconds": 40, "kicker": "QUICK TIP",
+                    "format": "short", "target_seconds": 75, "kicker": "QUICK TIP",
                     "brief": "A vertical Short with ONE practical tip. Hook in the first 3 seconds (the problem or a "
                              "surprising result, never 'hi guys'), the tip in 2-4 steps, what the viewer will see when it "
                              "works, then one line asking them to try it. Short sentences, spoken words, no filler.",
@@ -274,7 +274,7 @@ YOUTUBE_EXAMPLE_TOPICS = {
                 },
                 "news-brief": {
                     "label": "Short: this week's news, sourced", "media": "video", "research": "required", "fact_check": True,
-                    "format": "short", "target_seconds": 55, "kicker": "NEWS", "max_source_age_days": 10,
+                    "format": "short", "target_seconds": 75, "kicker": "NEWS", "max_source_age_days": 10,
                     "brief": "A vertical Short on the most useful development of the last 7 days: the sourced fact first, what "
                              "happened in the sources' own tense and qualifiers, what it means (labelled as opinion), one "
                              "thing to try. Every number must come from a verified source.",

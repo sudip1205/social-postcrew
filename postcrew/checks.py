@@ -273,7 +273,7 @@ def script_problems(script, spec, cat, profile):
     text = script.get("text") or ""
     words = len(text.split())
     target, hi = spec["target_seconds"], spec["max_words"]
-    lo = int(hi * 0.7)
+    lo = spec.get("min_words", int(hi * 0.7))
     wps = spec.get("wps", 2.5)
     if words > int(hi * 1.1):
         problems.append(f"the narration is {words} words: about {words / wps:.0f} seconds, but this {spec['format']} video "
@@ -281,7 +281,7 @@ def script_problems(script, spec, cat, profile):
     elif words < lo:
         problems.append(f"the narration is only {words} words: about {words / wps:.0f} seconds, but this video should "
                         f"run about {target} seconds ({lo}-{hi} words)")
-    mn, mx = (3, 24) if spec["format"] == "short" else (4 if script.get("source") == "own" else max(8, int(target / MAX_SCENE_S["long"])), 60)
+    mn, mx = (max(3, int(target / 14)), 24) if spec["format"] == "short" else (4 if script.get("source") == "own" else max(8, int(target / MAX_SCENE_S["long"])), 60)
     if not mn <= len(scenes) <= mx:
         problems.append(f"{len(scenes)} scenes: a {spec['format']} video of this length needs {mn}-{mx}, one new picture about every "
                         f"{MAX_SCENE_S[spec['format']] - 4:.0f} seconds")

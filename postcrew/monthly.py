@@ -256,6 +256,10 @@ def _item(pool, item_id):
     raise ValueError("that plan no longer exists")
 
 
+def short_fmt(fmt):
+    return fmt == "short"
+
+
 def category_for_item(ws, platform, fmt):
     """The topic type the crew writes an assigned plan as: LinkedIn uses the deep-dive type, YouTube a Short or a Long video."""
     cfg = ws.config()
@@ -267,12 +271,18 @@ def category_for_item(ws, platform, fmt):
     if cid not in cats:
         short = fmt == "short"
         cats[cid] = {"label": "Short video" if short else "Long video", "media": "video", "research": "optional", "fact_check": False,
-                     "format": fmt, "target_seconds": 45 if short else 480, "kicker": "SHORT" if short else "EXPLAINED",
+                     "format": fmt, "target_seconds": platforms.SHORT_DEFAULT_S if short else platforms.LONG_DEFAULT_S, "kicker": "SHORT" if short else "EXPLAINED",
                      "brief": ("A vertical Short on this plan: a hook in the first 3 seconds, the idea in 2-4 steps, one line "
                                "asking the viewer to try it. Short sentences, spoken words." if short else
                                "A 16:9 explainer on this plan: a cold open with the problem, why it matters, the idea built up "
                                "in 3-5 scenes with one concrete example, the common mistake, what to do next.")}
         ws.save_config(cfg)
+    else:   # a category made earlier with a length that is no longer allowed (a Short of 45 seconds)
+        c = cats[cid]
+        lo, hi = (platforms.SHORT_MIN_S, platforms.SHORT_TOP_S) if short_fmt(fmt) else (platforms.LONG_MIN_S, 1800)
+        if not lo <= int(c.get("target_seconds") or 0) <= hi:
+            c["target_seconds"] = platforms.SHORT_DEFAULT_S if short_fmt(fmt) else platforms.LONG_DEFAULT_S
+            ws.save_config(cfg)
     return cid
 
 

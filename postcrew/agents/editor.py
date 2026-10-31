@@ -39,7 +39,7 @@ def script_material(ctx, w):
     spec = ctx.video
     words = len(w["text"].split())
     parts = [f"CATEGORY: {ctx.cat['label']}", f"WHAT THIS CATEGORY NEEDS: {ctx.cat['brief']}",
-             f"VIDEO: {spec['format']}, target about {spec['target_seconds']} seconds ({int(spec['max_words'] * 0.7)}-"
+             f"VIDEO: {spec['format']} (a Short runs 50 to 100 seconds, a long video at least 5 minutes), target about {spec['target_seconds']} seconds ({spec.get('min_words', int(spec['max_words'] * 0.7))}-"
              f"{spec['max_words']} words). This script: {words} words, about {words / 2.5:.0f} seconds, {len(w['scenes'])} scenes."
              + (" (The owner wrote this script: judge it, do not rewrite it from scratch.)" if w.get("source") == "own" else ""),
              "", "<draft>", f"TITLE: {w.get('title', '')}", f"THUMBNAIL TEXT: {w.get('thumbnail_text', '')}",

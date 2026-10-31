@@ -131,6 +131,8 @@ def parse_day(value):
 WORDS_PER_SECOND = 2.5   # how fast a voice-over is read: the script's word budget and every scene's timing
 PACE_WPS = {"normal": 2.5, "slow": 2.0}   # a teacher's pace leaves room for pauses and for the picture to build up
 SHORT_MAX_S = 180        # YouTube allows Shorts of up to three minutes
+SHORT_MIN_S, SHORT_TOP_S, LONG_MIN_S = 50, 100, 300   # the owner's lengths: a Short runs 50 to 100 seconds, a long video at least 5 minutes
+SHORT_DEFAULT_S, LONG_DEFAULT_S = 75, 480
 
 
 def renderer_for(cfg, category=None):
@@ -142,21 +144,23 @@ def video_spec(cfg, category=None, entry=None, options=None):
     """The kind of video to make: {"format", "target_seconds", "max_words"}. Later wins: the platform's default video
     settings, the topic's own, the plan day's, then a one-off override from the run."""
     base = (cfg.get("video") or {})
-    spec = {"format": base.get("format", "short"), "target_seconds": base.get("target_seconds", 45)}
+    spec = {"format": base.get("format", "short"), "target_seconds": base.get("target_seconds", SHORT_DEFAULT_S)}
     for src in (category or {}, entry or {}, options or {}):
         if src.get("format"):
             if src["format"] != spec["format"] and not src.get("target_seconds"):
-                spec["target_seconds"] = 45 if src["format"] == "short" else 480   # a new kind without a length of its own
+                spec["target_seconds"] = SHORT_DEFAULT_S if src["format"] == "short" else LONG_DEFAULT_S   # a new kind without a length of its own
             spec["format"] = src["format"]
         if src.get("target_seconds"):
             spec["target_seconds"] = int(src["target_seconds"])
     if spec["format"] == "short":
-        spec["target_seconds"] = max(15, min(SHORT_MAX_S, spec["target_seconds"]))
+        spec["target_seconds"] = max(SHORT_MIN_S, min(SHORT_TOP_S, spec["target_seconds"]))
     else:
-        spec["target_seconds"] = max(60, min(1800, spec["target_seconds"]))
+        spec["target_seconds"] = max(LONG_MIN_S, min(1800, spec["target_seconds"]))
     spec["pace"] = base.get("pace") if base.get("pace") in PACE_WPS else "normal"
     spec["wps"] = PACE_WPS[spec["pace"]]
     spec["max_words"] = int(spec["target_seconds"] * spec["wps"])
+    floor = (SHORT_MIN_S if spec["format"] == "short" else LONG_MIN_S) * 0.9   # the narration alone must come close to the shortest allowed video
+    spec["min_words"] = min(int(spec["max_words"] * 0.92), int(max(0.7 * spec["target_seconds"], floor) * spec["wps"]))
     spec["outro"] = str(base.get("outro") or "").strip()
     spec["look"] = looks.resolve(base.get("look"), spec["format"])   # auto: white for a vertical video, black for a wide one
     spec["renderer"] = renderer_for(cfg, None) if not category else (category.get("renderer") or renderer_for(cfg, None))

@@ -68,11 +68,11 @@ def deep_merge(base, override):
 
 
 VIDEO_FORMATS = ["short", "long"]
-_SECONDS_HINT = "15-180 for a short, 60-1800 for a long video"
+_SECONDS_HINT = "50-100 for a short, 300-1800 (5 to 30 minutes) for a long video"
 
 
 def _seconds_ok(fmt, v):
-    return isinstance(v, int) and not isinstance(v, bool) and ((15 <= v <= 180) if fmt == "short" else (60 <= v <= 1800))
+    return isinstance(v, int) and not isinstance(v, bool) and ((50 <= v <= 100) if fmt == "short" else (300 <= v <= 1800))
 
 
 RENDERERS = ("remotion", "ffmpeg", "explainer", "explainroo", "blackboard", "mcp")

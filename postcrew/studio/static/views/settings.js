@@ -146,12 +146,12 @@ const settingsView = (() => {
   }
   // YouTube-only settings: video format, length, ElevenLabs voice, renderer. Fields carry data-k so collectSettings() saves them.
   const DOCS = "https://github.com/sudip1205/social-postcrew/blob/main/docs/";
-  const VRANGE = { short: { min: 15, max: 180, step: 5, def: 90, ticks: ["15s", "1 min", "2 min", "3 min"] },
-    long: { min: 60, max: 1800, step: 30, def: 480, ticks: ["1 min", "10 min", "20 min", "30 min"] } };
+  const VRANGE = { short: { min: 50, max: 100, step: 5, def: 75, ticks: ["50s", "65s", "80s", "100s"] },
+    long: { min: 300, max: 1800, step: 30, def: 480, ticks: ["5 min", "10 min", "20 min", "30 min"] } };
   const secsLabel = (f, n) => f === "long" ? `${n % 60 ? (n / 60).toFixed(1) : n / 60} min` : `${n} seconds`;
   const SPIN = "inline-flex items-center justify-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-lg bg-slate-900 text-white shadow-sm shrink-0 disabled:opacity-50 disabled:cursor-not-allowed";
   function typeCards(f) {
-    const items = [["short", "stay_current_portrait", "Short", "Vertical (9:16), up to 3 minutes"], ["long", "laptop_chromebook", "Long", "Horizontal (16:9), chapters & b-roll"]];
+    const items = [["short", "stay_current_portrait", "Short", "Vertical (9:16), 50 to 100 seconds"], ["long", "laptop_chromebook", "Long", "Horizontal (16:9), chapters & b-roll"]];
     return items.map(([v, ic, t, d]) => `<div data-vtype="${v}" class="${v === f ? "border-2 border-red-500 bg-red-50/40" : "border border-slate-200 bg-white hover:border-slate-300"} rounded-xl p-3.5 flex items-center justify-between cursor-pointer transition-all">
       <div class="flex items-center gap-3"><div class="w-9 h-9 rounded-lg ${v === f ? "bg-red-500 text-white" : "bg-slate-100 text-slate-600"} flex items-center justify-center">${icon(ic, "text-xl")}</div>
         <div><span class="text-sm font-bold text-slate-900 block">${t}</span><span class="text-xs text-slate-500">${esc(d)}</span></div></div>
