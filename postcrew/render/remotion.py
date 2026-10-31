@@ -10,7 +10,7 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from . import looks, timeline, video
+from . import iconlib, looks, timeline, video
 from .scenes import FORMATS, parse_edge, parse_pointer, split_node
 from .video import FPS, VideoError
 
@@ -87,7 +87,8 @@ def _diagram(scene, words, carry):
         if label.lower() not in [n[0].lower() for n in nodes]:
             nodes.append((label, icon))
     names = [n[0] for n in nodes]
-    boxes = [{"label": n[0][:18], "icon": n[1], "t": 0.0 if (n[0], n[1]) in carry["nodes"] else None} for n in nodes]
+    boxes = [{"label": n[0][:18], "icon": n[1], "t": 0.0 if (n[0], n[1]) in carry["nodes"] else None,
+              "svg": iconlib.svg(n[1]) or iconlib.svg(iconlib.auto(n[0]))} for n in nodes]   # the icon the script names, else the best match for the label
     edges, said = [], 0.0
     for e in scene.get("edges") or []:
         p = parse_edge(e, names)
@@ -148,6 +149,8 @@ def build_props(scenes, fmt, audio, look=None):
         if sc.get("closing"):   # "Like · Comment · Share": each part appears when the voice says it
             parts = [p for p in re.split(r"\s*[·•|,/]\s*|\s+and\s+", item["title"]) if p] or [item["title"]]
             item.update(closing=True, items=parts, cues=[_when(p, words, float(sc.get("lead_s") or 0)) for p in parts])
+        if sc.get("clip") and iconlib.svg(sc["clip"]):   # a clipart beside a words scene
+            item["clip"] = iconlib.svg(sc["clip"])
         if layout in ("diagram", "flow"):
             item.update(_diagram(sc, words, carry if layout == "diagram" else {"nodes": []}))
         else:

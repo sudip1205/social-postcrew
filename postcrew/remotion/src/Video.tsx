@@ -2,7 +2,7 @@ import React from "react";
 import {AbsoluteFill, Sequence, interpolate} from "remotion";
 import {FONT, MONO, ThemeContext, ease, keyWord, useProgress, useT, useTheme} from "./theme";
 import {useFonts} from "./fonts";
-import type {Box, Caption, Edge, Scene, Step, VideoProps} from "./types";
+import type {Box, Caption, Edge, Scene, Step, Svg, VideoProps} from "./types";
 
 /*
  * The scenes follow postcrew/remotion/STYLE.md: a flat page, one accent colour, thin rules, slow eased reveals (never a bounce), the
@@ -63,13 +63,37 @@ const Shell: React.FC<{p: VideoProps; s: Scene}> = ({p, s}) => {
   );
 };
 
+/** A clipart: an icon or colour picture drawn from its SVG markup (render/iconlib.py). Line icons take the page's colour. */
+const Glyph: React.FC<{svg?: Svg | null; size: number; color?: string}> = ({svg, size, color}) => {
+  const th = useTheme();
+  if (!svg) return null;
+  return <svg width={size} height={(size * svg.h) / svg.w} viewBox={`0 0 ${svg.w} ${svg.h}`} style={{color: color ?? th.text, flexShrink: 0}}
+    dangerouslySetInnerHTML={{__html: svg.body}} />;
+};
+
+/** The picture beside a words scene: a big clipart on a soft disc, beside the text in a wide video and above it in a vertical one. */
+const WithClip: React.FC<{clip?: Svg; short: boolean; children: React.ReactNode}> = ({clip, short, children}) => {
+  const th = useTheme(), p = useProgress(0.35, 1.0);
+  if (!clip) return <>{children}</>;
+  const d = short ? 360 : 420;
+  const disc = (
+    <div style={{width: d, height: d, borderRadius: d, background: th.accentSoft, display: "flex", alignItems: "center", justifyContent: "center",
+      opacity: p, transform: `scale(${0.9 + 0.1 * p})`, flexShrink: 0}}>
+      <Glyph svg={clip} size={d * 0.56} color={th.accent} />
+    </div>
+  );
+  return short
+    ? <div style={{flex: 1, display: "flex", flexDirection: "column", gap: 40}}><div style={{display: "flex", justifyContent: "flex-start"}}>{disc}</div>{children}</div>
+    : <div style={{flex: 1, display: "flex", alignItems: "center", gap: 90}}><div style={{flex: 1, display: "flex", flexDirection: "column", alignSelf: "stretch"}}>{children}</div>{disc}</div>;
+};
+
 const Body: React.FC<{p: VideoProps; s: Scene}> = ({p, s}) => {
   const short = p.format === "short";
   if (s.closing) return <Closing s={s} short={short} />;
   switch (s.layout) {
-    case "title": return <Statement text={s.title} short={short} big keyAt={s.key} />;
-    case "statement": return <Statement text={s.title} short={short} keyAt={s.key} />;
-    case "points": return <Points s={s} short={short} />;
+    case "title": return <WithClip clip={s.clip} short={short}><Statement text={s.title} short={short} big keyAt={s.key} /></WithClip>;
+    case "statement": return <WithClip clip={s.clip} short={short}><Statement text={s.title} short={short} keyAt={s.key} /></WithClip>;
+    case "points": return <WithClip clip={s.clip} short={short}><Points s={s} short={short} /></WithClip>;
     case "code": return <Code s={s} short={short} />;
     case "diagram":
     case "flow": return <Diagram s={s} short={short} flow={s.layout === "flow"} />;
@@ -156,8 +180,8 @@ const Code: React.FC<{s: Scene; short: boolean}> = ({s, short}) => {
 type P = {x: number; y: number};
 const Diagram: React.FC<{s: Scene; short: boolean; flow: boolean}> = ({s, short, flow}) => {
   const nodes = s.nodes ?? [], edges = s.edges ?? [];
-  const W = short ? 888 : 1620, H = short ? 1060 : 640;
-  const bw = short ? 640 : Math.min(340, (W - 64 * (nodes.length - 1)) / Math.max(1, nodes.length)), bh = short ? 150 : 150;   // a wide video: big boxes, labels on two lines
+  const W = short ? 888 : 1620, H = short ? 1060 : 680;
+  const bw = short ? 640 : Math.min(340, (W - 64 * (nodes.length - 1)) / Math.max(1, nodes.length)), bh = short ? 150 : (nodes.some((n) => n.svg) ? 190 : 150);   // a wide video: big boxes, an icon above the label
   const pos: P[] = nodes.map((_, i) => short
     ? {x: W / 2, y: bh / 2 + (i * (H - bh)) / Math.max(1, nodes.length - 1 || 1)}
     : {x: bw / 2 + (i * (W - bw)) / Math.max(1, nodes.length - 1 || 1), y: H / 2});
@@ -187,12 +211,20 @@ const NodeView: React.FC<{n: Box; at: P; bw: number; bh: number; short: boolean;
   // a long label in a wide video goes on two lines so it can be big; the size fits the longest line to the box
   const words = n.label.split(" "), half = Math.ceil(words.length / 2);
   const lines = !short && n.label.length > 9 && words.length > 1 ? [words.slice(0, half).join(" "), words.slice(half).join(" ")] : [n.label];
-  const fs = short ? 52 : Math.max(26, Math.min(48, (bw - 40) / (Math.max(...lines.map((l) => l.length)) * 0.58)));
+  const icon = n.svg ?? null, isz = short ? 84 : 58;   // an icon sits above the label in a wide box and to the left of it in a vertical one
+  const room = icon && short ? bw - isz - 90 : bw - 40;
+  const fs = short ? 52 : Math.max(26, Math.min(icon ? 40 : 48, room / (Math.max(...lines.map((l) => l.length)) * 0.58)));
+  const lx = icon && short ? (isz + 24) / 2 : 0, ly0 = icon && !short ? 34 : 0;
+  const col = active ? th.accent : th.text;
   return (
     <g transform={`translate(${at.x} ${at.y + (1 - p) * 16})`} opacity={p}>
       <rect x={-bw / 2} y={-bh / 2} width={bw} height={bh} rx={12} fill={active ? th.accentSoft : th.surface} stroke={active ? th.accent : th.text} strokeWidth={active ? 4 : 2.5} />
+      {icon && (
+        <svg x={short ? -bw / 2 + 36 : -isz / 2} y={short ? -isz / 2 : -bh / 2 + 16} width={isz} height={(isz * icon.h) / icon.w} viewBox={`0 0 ${icon.w} ${icon.h}`}
+          style={{color: col, overflow: "visible"}}><g dangerouslySetInnerHTML={{__html: icon.body}} /></svg>
+      )}
       {lines.map((ln, k) => (
-        <text key={k} x={0} y={(k - (lines.length - 1) / 2) * fs * 1.12} textAnchor="middle" dominantBaseline="central" fill={th.text} fontSize={fs} fontWeight={600} fontFamily={FONT} letterSpacing={-0.8}>{ln}</text>
+        <text key={k} x={lx} y={ly0 + (k - (lines.length - 1) / 2) * fs * 1.12} textAnchor="middle" dominantBaseline="central" fill={th.text} fontSize={fs} fontWeight={600} fontFamily={FONT} letterSpacing={-0.8}>{ln}</text>
       ))}
     </g>
   );

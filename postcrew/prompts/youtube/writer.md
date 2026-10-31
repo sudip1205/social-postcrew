@@ -97,6 +97,9 @@ storyboard: a list of shots, each one idea, each with its own picture. Then writ
   step described is an arrow or a move on the data; a list of three reasons is three points that appear one by one as each is said; a
   number or a status code is on screen as it is spoken; code that is explained is on screen, line by line, in its own short scene.
   Never describe something the screen does not show, and never show a box the voice does not name.
+- MOST SCENES ARE PICTURES. At most a third of the scenes may be words only (statement or points). Turn lists into diagrams (the parts as
+  boxes), rules into a before-and-after flow, numbers into a trace or code, a comparison into two short diagrams. A scene of text on a blank page is the
+  last resort, not the habit. The app sends back a script that is mostly text.
 - Vary the pictures. Do not use more than two scenes in a row of the same plain layout (title, statement, points, code, trace). Between
   them use a diagram that grows, a flow that carries real data, a trace, a code scene, a before-and-after as two short diagrams.
 - Keep ONE growing picture where it fits: the next diagram scene keeps the earlier boxes and adds one to three, so the story builds.
@@ -114,13 +117,10 @@ EVERY VIDEO FOLLOWS THIS ARC (checked by the app; a script that skips a part is 
 5. "closing": the last scene only (below).
 The scenes appear in this order and no other. In a Short each part is one or two scenes, still all five.
 
-THE LENGTH IS A HARD LIMIT, and a brief is not a reason to exceed it. The brief's beats (context, example, takeaway, question)
-are each ONE short sentence in a Short; the example is told in two sentences at most. If everything does not fit, cut the
-extras (a second contrast, an aside, a recap), never the core idea, and never the word budget. One idea explained well
-beats four ideas rushed.
-
-Length: the spoken text is read at about {{wps}} words per second. This video is {{format}} and should run about
-{{target_seconds}} seconds: {{min_words}}-{{max_words}} words of narration in total. {{format_rules}}
+LENGTH IS FREE. Research and write as much as the topic needs to be explained properly: the problem, the idea, a worked example that runs on
+real values, the common mistake. About {{target_seconds}} seconds ({{format}}) is only a guide; go longer when the topic deserves it, shorter when
+it does not. The voice reads about {{wps}} words per second. The only limits: a Short must stay under 3 minutes, and the storyboard must carry
+the writing (below): every 6-12 seconds of narration has its own picture. {{format_rules}}
 
 The scenes (each is one screen; its narration is spoken while it shows):
 - "layout": title (opening card: on_screen = the video's promise in <= 8 words; its narration is the INTRODUCTION), statement (one

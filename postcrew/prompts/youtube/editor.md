@@ -12,10 +12,9 @@ problems): {{red_flags}}. Personal experience not listed in <about_the_owner> is
 {{brief_rules}}
 For a video the brief is a guide, not a checklist to be satisfied at any cost:
 - Its beats (context, example, takeaway, question) may be one short sentence each. A beat that is present in short form is
-  present. Do not ask for a beat to be expanded, and never ask for words that would push the narration over the budget:
-  to make room, ask for something ELSE to be cut.
-- The length: the automatic check already enforces the word budget (it allows 10% over). Do not lower a score for being a
-  few words over; only for a script that is clearly too long or too short for its video.
+  present. Do not ask for a beat to be expanded, and there is no word budget.
+- The length is free: the writer takes the time the topic needs. Never lower a score, or ask for cuts, because of how long the video is
+  (only a Short over 3 minutes is a problem). Judge instead whether there are enough scenes, each with a picture, to carry the writing.
 - Scene layouts (diagram, flow, trace, points, statement, code, title) are the writer's choice, with one exception below. A statement or points scene in an
   otherwise diagram-heavy video is fine. Judge the words and the order of ideas, not the layout.
 - Accuracy is judged against the sources AND well-established general knowledge. A standard concept explained correctly and
@@ -36,7 +35,7 @@ shown with its part. A script passes only if ALL of these are true, and each one
 6. The scenes appear in exactly that order, and each part is more than a filler sentence.
 7. THE STORYBOARD FOLLOWS THE VOICE: no scene holds one picture for longer than about 12 seconds of narration (16 at most in a long video);
    every box, point, step or value the narration describes is on the screen in that scene, and nothing is on screen that the voice does not
-   say. Several pictures in a row of the same plain kind (words only) is a fix: ask for a diagram, flow, trace or code scene in between.
+   say. At most a third of the scenes may be words only (statement or points): more is a fix, ask for diagrams, flows, code or traces. Several pictures in a row of the same plain kind (words only) is a fix: ask for a diagram, flow, trace or code scene in between.
 8. The narration can be said smoothly by a voice: no inserted phrase between two commas, no sentence that begins on a number or an acronym,
    no comma after "in", "on", "at", "to", "of", "for", "with", "by", "from", "the" or "a" (these are what made earlier videos sound broken).
 9. Names are written the way they are spoken and shown the same way (a header called "Retry-After" is never narrated as "Retry After").
@@ -47,7 +46,7 @@ minimal edit the writer can apply as written: name the scene and quote the words
 wording ("Scene 1, replace the narration with: '...'", "Delete scene 4"). Rules for fixes:
 - Only use facts that are in <sources> or <reference_facts>. Never ask the writer to add a fact that is not there; to fix
   clutter or jargon, prefer cutting.
-- A fix must raise a score without lowering another, and must keep the total narration within the word budget.
+- A fix must raise a score without lowering another, and must not ask for the video to be made shorter.
 - If <previous_rounds> is given: you asked for those fixes and the writer was told to apply them. Check each one. Do not
   ask for the opposite of a fix that was applied, do not re-word one that was applied, and do not lower a criterion whose
   fix was applied unless the new script is actually worse. Raise a new issue only if it alone keeps the script from passing.

@@ -153,9 +153,9 @@ def video_spec(cfg, category=None, entry=None, options=None):
         if src.get("target_seconds"):
             spec["target_seconds"] = int(src["target_seconds"])
     if spec["format"] == "short":
-        spec["target_seconds"] = max(SHORT_MIN_S, min(SHORT_TOP_S, spec["target_seconds"]))
+        spec["target_seconds"] = max(15, min(SHORT_MAX_S, spec["target_seconds"]))   # a guide only: the writer takes the time the topic needs
     else:
-        spec["target_seconds"] = max(LONG_MIN_S, min(1800, spec["target_seconds"]))
+        spec["target_seconds"] = max(60, min(1800, spec["target_seconds"]))
     spec["pace"] = base.get("pace") if base.get("pace") in PACE_WPS else "normal"
     spec["wps"] = PACE_WPS[spec["pace"]]
     spec["max_words"] = int(spec["target_seconds"] * spec["wps"])

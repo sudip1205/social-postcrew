@@ -4,7 +4,7 @@ Everything here can be changed in the Studio (Settings tab) or by editing config
 Secrets (LinkedIn app, tokens, Telegram) never live here; they go to workspace/secrets.json.
 """
 
-AGENT_IDS = ["planner", "topic", "research", "writer", "reviewer", "media", "editor", "formatter", "publisher", "supervisor", "credentials", "video_review", "explainroo"]
+AGENT_IDS = ["planner", "topic", "research", "writer", "reviewer", "media", "editor", "formatter", "publisher", "supervisor", "credentials", "video_review", "explainroo", "graphics"]
 
 DEFAULT_CONFIG = {
     "version": 1,
@@ -71,7 +71,7 @@ DEFAULT_CONFIG = {
             # The default kind of video: "short" (vertical, up to 3 minutes) or "long" (16:9). A topic, a plan day or a single
             # run may override format and target_seconds.
             "video": {
-                "format": "short", "target_seconds": 90,
+                "format": "short", "target_seconds": 90, "graphics": True,   # the Storyboard Artist draws icons and cliparts (Remotion videos)
                 # said at the end of every video (the Script Writer writes it into the last scene); empty = no closing line
                 "outro": "If this was useful, please like, comment and share it with someone who would find it helpful.",
                 "look": "auto",                  # auto: off-white page for a vertical video, black page for a wide one. Or paper / ink for both
@@ -128,6 +128,7 @@ DEFAULT_CONFIG = {
             "reviewer": {"model": "sonnet", "timeout_s": 300, "max_budget_usd": 0.4},
             "media": {"model": "haiku", "timeout_s": 300, "max_budget_usd": 0.3},
             "editor": {"model": "sonnet", "timeout_s": 300, "max_budget_usd": 0.4},
+            "graphics": {"model": "sonnet", "timeout_s": 600, "max_budget_usd": 0.8},   # the Storyboard Artist: icons and cliparts for every scene
             "video_review": {"model": "sonnet", "timeout_s": 300, "max_budget_usd": 0.4},   # the Video Editor, after the video is drawn
             "explainroo": {"model": "sonnet", "timeout_s": 900, "max_budget_usd": 2.0},   # writes the pictures of an explainroo video
             "supervisor": {"model": "haiku", "timeout_s": 180, "max_budget_usd": 0.2},

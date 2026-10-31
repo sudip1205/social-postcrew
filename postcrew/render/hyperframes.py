@@ -21,7 +21,7 @@ LAYOUTS = ("title", "statement")   # the scenes HyperFrames draws
 
 def engine_for(scene):
     """Which engine draws a scene: 'hyperframes' for words on their own, 'remotion' for everything with data."""
-    return "hyperframes" if scene.get("layout") in LAYOUTS else "remotion"
+    return "hyperframes" if scene.get("layout") in LAYOUTS and not scene.get("clip") else "remotion"   # a scene with a clipart is drawn by Remotion
 
 
 def available():

@@ -31,6 +31,7 @@ from ..agents.blackboard import BlackboardAgent, ExplainerAgent
 from ..agents.explainroo import ExplainrooAgent
 from ..agents.frames import HyperFramesAgent, RemotionAgent, RemotionFramesAgent
 from ..agents.hooks import HooksAgent
+from ..agents.graphics import GraphicsAgent
 from ..agents.video_review import VideoReviewAgent
 from ..agents.voice import VoiceAgent
 from ..llm import LLMError, agent_settings, make_backend
@@ -94,7 +95,7 @@ class Studio:
         cfg = self.ws.config()
         rows = []
         roster = team_mod.load(self.ws)["members"]
-        for a in [monthly.MonthPlanner()] + CREW + [VoiceAgent(), BlackboardAgent(), ExplainerAgent(), ExplainrooAgent(), HyperFramesAgent(), RemotionFramesAgent(), RemotionAgent(), VideoReviewAgent(), HooksAgent(), Supervisor()]:
+        for a in [monthly.MonthPlanner()] + CREW + [VoiceAgent(), BlackboardAgent(), ExplainerAgent(), ExplainrooAgent(), HyperFramesAgent(), RemotionFramesAgent(), RemotionAgent(), GraphicsAgent(), VideoReviewAgent(), HooksAgent(), Supervisor()]:
             role = {"research": "research", "writer": "writer"}.get(a.id)
             members = [m["name"] for m in roster if m["role"] == role][:cfg["team"][role]] if role else []
             rows.append({"id": a.id, "title": a.title, "name": a.name, "role": a.role, "members": members,

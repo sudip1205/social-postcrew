@@ -145,7 +145,7 @@ class ScriptWriter(WriterAgent):
                       "explain the arrows in the order they are listed; keep on_screen titles and labels to a few words.")
         prompt = (f"Category: {ctx.cat['label']}\nWhat this category needs: {ctx.cat['brief']}\n"
                   + (notes + "\n" if notes else "")
-                  + f"Video: {spec['format']}, about {spec['target_seconds']} seconds ({lo}-{hi} words of narration)\n"
+                  + f"Video: {spec['format']}, guide length about {spec['target_seconds']} seconds (a guide only: take the time the topic needs)\n"
                   f"Topic: {topic['topic']}\nAngle: {topic['angle']}\n\n"
                   + research_block(ctx.outputs.get("research"))
                   + f"\n\nRecent videos (do not repeat their hook or structure):\n{recent_block(ctx, 6)}"

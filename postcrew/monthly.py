@@ -279,7 +279,7 @@ def category_for_item(ws, platform, fmt):
         ws.save_config(cfg)
     else:   # a category made earlier with a length that is no longer allowed (a Short of 45 seconds)
         c = cats[cid]
-        lo, hi = (platforms.SHORT_MIN_S, platforms.SHORT_TOP_S) if short_fmt(fmt) else (platforms.LONG_MIN_S, 1800)
+        lo, hi = (15, platforms.SHORT_MAX_S) if short_fmt(fmt) else (60, 1800)
         if not lo <= int(c.get("target_seconds") or 0) <= hi:
             c["target_seconds"] = platforms.SHORT_DEFAULT_S if short_fmt(fmt) else platforms.LONG_DEFAULT_S
             ws.save_config(cfg)

@@ -26,6 +26,7 @@ from .script import ScriptWriter
 from .topic import TopicAgent
 from .blackboard import BlackboardAgent, ExplainerAgent
 from .explainroo import ExplainrooAgent
+from .graphics import GraphicsAgent
 from .frames import HyperFramesAgent, RemotionAgent, RemotionFramesAgent
 from .hooks import HooksAgent
 from .video import VideoAgent
@@ -37,7 +38,7 @@ CREW = [CredentialsAgent(), TopicAgent(), ResearchAgent(), WriterAgent(), MediaA
         FormatterAgent(), PublisherAgent()]
 # The YouTube crew: the same supervisor, topic scout, researchers, writer team (as the Script Writer) and Editor. The Editor
 # reviews the SCRIPT, so the voice and the video are only made after it passes: nothing is spent on a script sent back.
-YOUTUBE_CREW = [CredentialsAgent(), TopicAgent(), ResearchAgent(), ScriptWriter(), EditorAgent(), VoiceAgent(), VideoAgent(),
+YOUTUBE_CREW = [CredentialsAgent(), TopicAgent(), ResearchAgent(), ScriptWriter(), EditorAgent(), GraphicsAgent(), VoiceAgent(), VideoAgent(),
                 VideoReviewAgent(), HooksAgent(), PublisherAgent()]
 CREWS = {"linkedin": CREW, "youtube": YOUTUBE_CREW}
 ORDER = [a.id for a in CREW]

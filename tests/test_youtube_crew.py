@@ -34,11 +34,19 @@ def narration(n_words, start="Step"):
     return " ".join(w + ("." if (i + 1) % 12 == 0 and i + 1 < n_words else "") for i, w in enumerate(words)) + "."   # short sentences: a voice can say them
 
 
+def _scene(i, words_per_scene, scenes):
+    text = narration(words_per_scene, f"w{i}")
+    a, b = (w.strip(".") for w in text.split()[:2])
+    if i == 0:
+        return {"layout": "title", "narration": text, "on_screen": "Point number 1", "items": [], "code": "", "language": "", "seconds": 8}
+    if i == scenes - 1 and scenes > 3:   # a words-only scene now and then is fine; most scenes are pictures
+        return {"layout": "statement", "narration": text, "on_screen": f"Point number {i + 1}", "items": [], "code": "", "language": "", "seconds": 8}
+    return {"layout": "diagram", "narration": text, "on_screen": f"Point number {i + 1}", "items": [], "code": "", "language": "", "seconds": 8,
+            "nodes": [a.capitalize(), b.capitalize()], "edges": [f"{a.capitalize()} > {b.capitalize()}: go"]}
+
+
 def script(words_per_scene=32, scenes=5, **over):
-    sc = [{"layout": "title" if i == 0 else "points" if i % 2 else "statement", "narration": narration(words_per_scene, f"w{i}"),   # the picture changes: never two plain scenes alike in a row
-           "on_screen": f"Point number {i + 1}", "items": [narration(words_per_scene, f"w{i}").split()[0]] if i % 2 else [],
-           "code": "", "language": "", "seconds": 8}
-          for i in range(scenes)]
+    sc = [_scene(i, words_per_scene, scenes) for i in range(scenes)]
     out = {"title": "Why your default arguments surprise you", "description": "A quick look at Python default arguments and "
            "the one-line fix that stops them leaking between calls.", "tags": ["python", "tips", "debugging"],
            "thumbnail_text": "Default args", "scenes": sc}
@@ -101,8 +109,10 @@ class ScriptCheckTests(unittest.TestCase):
         self.assertEqual(script_problems(script(), self.spec, self.cat, self.profile), [])
 
     def test_length_scenes_and_metadata_are_checked(self):
-        long = script(words_per_scene=48)          # 240 words for a 75 s Short
-        self.assertTrue(any("Cut" in p for p in script_problems(long, self.spec, self.cat, self.profile)))
+        long = script(words_per_scene=48)          # longer than the guide: the length is free, so no complaint about the length
+        self.assertFalse(any("Cut" in p or "should run" in p for p in script_problems(long, self.spec, self.cat, self.profile)))
+        over = script(words_per_scene=80, scenes=8)  # a Short over three minutes cannot be a Short
+        self.assertTrue(any("3 minutes" in p for p in script_problems(over, self.spec, self.cat, self.profile)))
         short = script(words_per_scene=5)
         self.assertTrue(any("only" in p for p in script_problems(short, self.spec, self.cat, self.profile)))
         two = script(scenes=2, words_per_scene=45)
@@ -144,10 +154,9 @@ class VideoSpecTests(unittest.TestCase):
     def test_later_settings_win_and_lengths_are_clamped(self):
         cfg = {"video": {"format": "short", "target_seconds": 75}}
         self.assertEqual(platforms.video_spec(cfg)["max_words"], 187)
-        self.assertEqual(platforms.video_spec({"video": {"format": "short", "target_seconds": 45}})["target_seconds"], 50)   # never shorter than 50 s
-        self.assertEqual(platforms.video_spec(cfg, {"format": "long", "target_seconds": 120})["target_seconds"], 300)       # a long video: 5 minutes at least
+        self.assertEqual(platforms.video_spec({"video": {"format": "short", "target_seconds": 45}})["target_seconds"], 45)   # the length is a guide
         self.assertEqual(platforms.video_spec(cfg, {"format": "long", "target_seconds": 600})["target_seconds"], 600)
-        self.assertEqual(platforms.video_spec(cfg, {"target_seconds": 600})["target_seconds"], 100)   # a Short stays a Short (100 s at most)
+        self.assertEqual(platforms.video_spec(cfg, {"target_seconds": 600})["target_seconds"], 180)   # a Short stays a Short (3 min is YouTube's limit)
         self.assertEqual(platforms.video_spec(cfg, {}, {"format": "long"}, {"target_seconds": 300})["target_seconds"], 300)
 
     def test_config_validation_covers_the_video_settings(self):
@@ -214,7 +223,7 @@ class YouTubeCrewTests(unittest.TestCase):
             steps = json.loads((ws.runs_dir / res["run_id"] / "status.json").read_text())["steps"]
             self.assertEqual({k: v["state"] for k, v in steps.items()},
                              {**{s: "passed" for s in ("credentials", "topic", "research", "writer", "editor", "voice", "media",
-                                                      "hooks", "publisher")}, "video_review": "skipped"})   # slides videos: no second review
+                                                      "hooks", "publisher")}, "video_review": "skipped", "graphics": "skipped"})   # slides videos: no second review, no icons
             self.assertEqual(llm.agents_called().count("editor"), 3)      # reviewed like any post
             post = ws.queue()[0]
             self.assertEqual((post["platform"], post["status"], post["id"]), ("youtube", "awaiting_approval",
@@ -459,6 +468,14 @@ class EditorVideoRulesTests(unittest.TestCase):
 
 
 class StoryboardTests(unittest.TestCase):
+    def test_most_scenes_must_be_pictures(self):
+        from postcrew.checks import storyboard_problems
+        wordy = [{"layout": "diagram", "part": "intro", "nodes": ["A", "B"], "narration": "a b"}] + \
+                [{"layout": "points" if i % 2 else "statement", "part": "idea", "items": [], "narration": "words"} for i in range(6)]
+        self.assertTrue(any("only words" in p for p in storyboard_problems(wordy, self.SPEC)))
+        mixed = wordy[:1] + [{"layout": "diagram", "part": "idea", "nodes": ["A", "B"], "narration": "a b"}] * 3 + [wordy[1]]
+        self.assertFalse(any("only words" in p for p in storyboard_problems(mixed, self.SPEC)))
+
     SPEC = {"format": "long", "wps": 2.5, "target_seconds": 240, "max_words": 600}
 
     def test_one_picture_for_forty_seconds_is_sent_back(self):

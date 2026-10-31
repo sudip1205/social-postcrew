@@ -65,7 +65,7 @@ const AGENTS = { supervisor: ["Orion", "command", "hub"], planner: ["Vega", "pla
   research: ["Research team", "research", "search"], writer: ["Writing team", "writing", "edit_note"], reviewer: ["Iris", "writing", "visibility"],
   media: ["Pixel", "design", "image"], editor: ["Quinn", "quality", "fact_check"], formatter: ["Kai", "quality", "format_align_left"],
   credentials: ["Aegis", "ops", "shield"], publisher: ["Echo", "ops", "send"], voice: ["Echo Voice", "design", "mic"], video: ["Reel", "design", "movie"],
-  video_review: ["Cut", "quality", "movie"], hooks: ["Hook", "quality", "verified"],
+  video_review: ["Cut", "quality", "movie"], graphics: ["Sketch", "design", "draw"], hooks: ["Hook", "quality", "verified"],
   text_frames: ["Glyph", "design", "text_fields"], data_frames: ["Plot", "design", "bar_chart"] };
 const teamOf = id => TEAMS[AGENTS[id]?.[1]] || TEAMS.ops;
 const avatar = (id, size = "w-9 h-9") => { const [team, h1, h2] = teamOf(id);

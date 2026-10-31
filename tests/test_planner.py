@@ -67,7 +67,7 @@ class PlannerTests(unittest.TestCase):
             prompt = llm.calls[0]["prompt"]
             self.assertIn("Length: a short video of about 80 seconds", prompt)
             self.assertIn("Plan ONE main idea", prompt)                      # one idea per 25 s, not four subtopics
-            self.assertIn("FIT THE LENGTH", llm.calls[0]["system"])
+            self.assertIn("KEEP ONE MAIN IDEA", llm.calls[0]["system"])
         with TempWorkspace() as ws:                                          # LinkedIn has no video length
             llm = ScriptedLLM({"planner": [{"days": [day_answer("2026-10-16", "Git worktrees")]}]})
             planner.PlannerAgent().plan(ws, [date(2026, 10, 16)], llm=llm, force=True)

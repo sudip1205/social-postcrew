@@ -257,18 +257,13 @@ if __name__ == "__main__":
 
 
 class AssignedLengthTests(unittest.TestCase):
-    def test_an_assigned_short_is_never_shorter_than_fifty_seconds_and_old_ones_are_fixed(self):
+    def test_an_assigned_video_starts_from_a_guide_length(self):
         from postcrew import monthly
         with TempWorkspace() as ws:
             cfg = ws.config()
             cfg["platforms"]["youtube"]["enabled"] = True
             ws.save_config(cfg)
             cid = monthly.category_for_item(ws, "youtube", "short")
-            self.assertEqual(ws.config()["platforms"]["youtube"]["categories"][cid]["target_seconds"], 75)
-            cfg = ws.config()
-            cfg["platforms"]["youtube"]["categories"][cid]["target_seconds"] = 45       # made by an earlier version
-            ws.root.joinpath("config.json").write_text(__import__("json").dumps(cfg))
-            monthly.category_for_item(ws, "youtube", "short")
             self.assertEqual(ws.config()["platforms"]["youtube"]["categories"][cid]["target_seconds"], 75)
             self.assertEqual(monthly.category_for_item(ws, "youtube", "long"), "assigned-long")
             self.assertEqual(ws.config()["platforms"]["youtube"]["categories"]["assigned-long"]["target_seconds"], 480)

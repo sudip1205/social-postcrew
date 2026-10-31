@@ -191,6 +191,8 @@ def needed_visual(spec, cat):
     return ""
 
 
+SHORT_LIMIT_S = 175   # YouTube: a Short is 3 minutes at most (a little margin)
+MAX_PLAIN = 0.34      # at most about a third of the scenes may be words only; the rest are diagrams, flows, code or traces
 MAX_SCENE_S = {"short": 11, "long": 16}   # the longest a scene (one picture) may run, in seconds of narration
 PLAIN_LAYOUTS = ("title", "statement", "points", "code", "trace")
 
@@ -231,7 +233,16 @@ def storyboard_problems(scenes, spec):
             unsaid = [it for it in sc.get("items") or [] if not _says(sc.get("narration"), it)]
             if unsaid and len(unsaid) * 2 > len(sc.get("items") or []):   # a point may be worded differently, but most must be said
                 problems.append(f"scene {i}: the point '{unsaid[0]}' is on screen but the voice never says it: say each point as it appears")
+    body = [(i, sc) for i, sc in enumerate(scenes, 1) if sc.get("part") not in ("intro", "closing") and not (i == 1 and not sc.get("part"))]
+    plain = [i for i, sc in body if sc.get("layout") in ("statement", "points", "title")]
+    if len(body) >= 4 and len(plain) > MAX_PLAIN * len(body) + 0.5:
+        problems.append(f"{len(plain)} of {len(body)} scenes are only words (scenes {', '.join(map(str, plain[:6]))}): draw them instead. A "
+                        f"list of reasons is a diagram of the parts; a rule is a before-and-after flow; numbers are a trace or code. "
+                        f"At most a third of the scenes may be words only")
     return problems
+
+
+STOP_WORDS = set("that this with from have they them then than what when where which while your will would there their about into more some such only also very just like been being were because these those each other over under again further here being does done make made makes know take".split())
 
 
 PARTS = ("intro", "idea", "example", "mistake", "closing")
@@ -272,19 +283,16 @@ def script_problems(script, spec, cat, profile):
     scenes = script.get("scenes") or []
     text = script.get("text") or ""
     words = len(text.split())
-    target, hi = spec["target_seconds"], spec["max_words"]
-    lo = spec.get("min_words", int(hi * 0.7))
     wps = spec.get("wps", 2.5)
-    if words > int(hi * 1.1):
-        problems.append(f"the narration is {words} words: about {words / wps:.0f} seconds, but this {spec['format']} video "
-                        f"should run about {target} seconds ({hi} words at most). Cut {words - hi} words")
-    elif words < lo:
-        problems.append(f"the narration is only {words} words: about {words / wps:.0f} seconds, but this video should "
-                        f"run about {target} seconds ({lo}-{hi} words)")
-    mn, mx = (max(3, int(target / 14)), 24) if spec["format"] == "short" else (4 if script.get("source") == "own" else max(8, int(target / MAX_SCENE_S["long"])), 60)
+    # No limit on how long the writer takes: the topic decides. Only what cannot work: too little to teach, and a Short over YouTube's 3 minutes.
+    if words < 40:
+        problems.append(f"the narration is only {words} words: too little to teach anything. Explain the idea properly")
+    if spec["format"] == "short" and words / wps > SHORT_LIMIT_S:
+        problems.append(f"the narration runs about {words / wps:.0f} seconds: YouTube allows a Short of 3 minutes at most. Cut the least "
+                        f"important points, or make this a long video")
+    mn, mx = (3 if spec["format"] == "short" else 4), 80
     if not mn <= len(scenes) <= mx:
-        problems.append(f"{len(scenes)} scenes: a {spec['format']} video of this length needs {mn}-{mx}, one new picture about every "
-                        f"{MAX_SCENE_S[spec['format']] - 4:.0f} seconds")
+        problems.append(f"{len(scenes)} scenes: a {spec['format']} video needs {mn}-{mx}, a new picture every few seconds")
     if script.get("source") != "own":   # the owner's own script is theirs: it is checked for rules, not re-storyboarded
         problems += storyboard_problems(scenes, spec)
     problems += structure_problems(scenes)
@@ -305,14 +313,16 @@ def script_problems(script, spec, cat, profile):
             if bad:
                 problems.append(f"scene {i}: {bad}")
         elif sc.get("layout") in ("diagram", "flow"):
+            from .render import iconlib
             from .render.scenes import ICONS, parse_edge, split_node
             nodes = [n for n in sc.get("nodes") or [] if split_node(n)[0]]
             edges = sc.get("edges") or []
             labels = [split_node(n)[0] for n in nodes]
             if not 2 <= len(nodes) <= 6 or len(set(n.lower() for n in labels)) != len(nodes) or any(len(n) > 18 for n in labels):
                 problems.append(f"scene {i}: a diagram needs 2-6 different boxes with labels of at most 18 characters")
-            elif any(split_node(n)[1] and split_node(n)[1] not in ICONS for n in nodes):
-                problems.append(f"scene {i}: an icon after | must be one of {', '.join(ICONS)}")
+            elif any(split_node(n)[1] and split_node(n)[1] not in ICONS and not iconlib.exists(split_node(n)[1]) for n in nodes):
+                problems.append(f"scene {i}: an icon after | must be one that exists: {', '.join(ICONS)}, or 'set:name' from the icon catalog "
+                                f"(lucide:database, logos:redis, fluent-emoji-flat:locked)")
             elif not 1 <= len(edges) <= 8:
                 problems.append(f"scene {i}: a diagram needs 1-8 arrows")
             else:

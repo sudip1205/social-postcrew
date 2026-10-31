@@ -149,9 +149,9 @@ class SettingsTests(unittest.TestCase):
         self.assertIn('<break time="0.35s" />', voice.prepare(text, pace="slow"))
         self.assertIn('<break time="0.2s" />', voice.prepare(text, pace="normal"))
 
-    def test_shorts_run_fifty_to_a_hundred_seconds(self):
-        self.assertEqual(platforms.video_spec({"video": {"format": "short", "target_seconds": 95}})["target_seconds"], 95)
-        self.assertEqual(platforms.video_spec({"video": {"format": "short", "target_seconds": 500}})["target_seconds"], 100)
+    def test_shorts_may_run_three_minutes(self):
+        self.assertEqual(platforms.video_spec({"video": {"format": "short", "target_seconds": 170}})["target_seconds"], 170)
+        self.assertEqual(platforms.video_spec({"video": {"format": "short", "target_seconds": 500}})["target_seconds"], 180)
         with TempWorkspace() as ws:
             cfg = ws.config()
             yt = cfg["platforms"]["youtube"]
