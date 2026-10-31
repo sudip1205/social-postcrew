@@ -181,7 +181,7 @@ type P = {x: number; y: number};
 const Diagram: React.FC<{s: Scene; short: boolean; flow: boolean}> = ({s, short, flow}) => {
   const nodes = s.nodes ?? [], edges = s.edges ?? [];
   const W = short ? 888 : 1620, H = short ? 1060 : 680;
-  const bw = short ? 640 : Math.min(340, (W - 64 * (nodes.length - 1)) / Math.max(1, nodes.length)), bh = short ? 150 : (nodes.some((n) => n.svg) ? 190 : 150);   // a wide video: big boxes, an icon above the label
+  const bw = short ? 640 : Math.max(190, Math.min(340, (W - 112 * (nodes.length - 1)) / Math.max(1, nodes.length))), bh = short ? 150 : (nodes.some((n) => n.svg) ? 190 : 150);   // a wide video: big boxes, an icon above the label
   const pos: P[] = nodes.map((_, i) => short
     ? {x: W / 2, y: bh / 2 + (i * (H - bh)) / Math.max(1, nodes.length - 1 || 1)}
     : {x: bw / 2 + (i * (W - bw)) / Math.max(1, nodes.length - 1 || 1), y: H / 2});
