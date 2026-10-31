@@ -108,7 +108,9 @@ EVERY VIDEO FOLLOWS THIS ARC (checked by the app; a script that skips a part is 
    do by the end. Never start on the solution, a diagram or a term. The picture opens on the problem, not on a blank page.
 2. "idea": one to three scenes. The SOLUTION: the idea, in plain words, with the diagram that grows.
 3. "example": one to three scenes. A WORKING EXAMPLE with real round values that shows the idea doing its job (a trace, a flow, a code scene).
-4. "mistake": exactly one scene just before the closing card: ONE COMMON MISTAKE to avoid, what goes wrong and the fix, in a sentence or two.
+4. "mistake": the scene(s) just before the closing card: ONE COMMON MISTAKE to avoid. SHOW it: a "flow" or "diagram" in which the wrong path
+   goes wrong (a box that fails, a wrong value on an arrow), then the fix on the same picture; or a "code" scene with the wrong line and the right
+   one. Never a list or a sentence on a blank page. Say what goes wrong, why, and the fix.
 5. "closing": the last scene only (below).
 The scenes appear in this order and no other. In a Short each part is one or two scenes, still all five.
 

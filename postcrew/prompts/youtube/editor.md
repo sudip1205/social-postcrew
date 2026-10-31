@@ -31,7 +31,7 @@ shown with its part. A script passes only if ALL of these are true, and each one
 3. THEN A WORKING EXAMPLE (part "example"): concrete round values (a real request, array, command or snippet) walked through so the viewer
    sees the idea do its job. Not a second explanation of the idea: it must run on specific data.
 4. THEN ONE COMMON MISTAKE TO AVOID (part "mistake", the scene just before the closing card): what people get wrong, why it goes wrong,
-   and the fix. A recap or a generic tip is not a mistake.
+   and the fix, SHOWN as a picture (flow, diagram, code or trace), not a list of words. A recap or a generic tip is not a mistake.
 5. THEN THE CLOSING CARD (part "closing"), alone in the last scene.
 6. The scenes appear in exactly that order, and each part is more than a filler sentence.
 7. THE STORYBOARD FOLLOWS THE VOICE: no scene holds one picture for longer than about 12 seconds of narration (16 at most in a long video);

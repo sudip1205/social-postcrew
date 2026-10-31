@@ -255,6 +255,10 @@ def structure_problems(scenes):
     idx = [parts.index(p) for p in order if p in parts]
     if idx != sorted(idx):
         problems.append("the parts are out of order: intro (problem), idea (solution), example (worked example), mistake (common mistake), closing")
+    for sc in scenes:   # the mistake is shown, not listed: a picture of what goes wrong and the fix
+        if sc.get("part") == "mistake" and (sc.get("layout") not in ("diagram", "flow", "code", "trace")):
+            problems.append("the common mistake scene must be a picture, not words: a 'flow' or 'diagram' showing the wrong path and then "
+                            "the fix, or a 'code' scene with the wrong line and the right one (layout diagram, flow, code or trace)")
     if parts[-1] != "closing" or parts.count("closing") != 1:
         problems.append("the last scene, and only it, has part 'closing'")
     elif "mistake" in parts and parts[-2:-1] != ["mistake"]:

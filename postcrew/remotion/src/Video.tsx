@@ -156,8 +156,8 @@ const Code: React.FC<{s: Scene; short: boolean}> = ({s, short}) => {
 type P = {x: number; y: number};
 const Diagram: React.FC<{s: Scene; short: boolean; flow: boolean}> = ({s, short, flow}) => {
   const nodes = s.nodes ?? [], edges = s.edges ?? [];
-  const W = short ? 888 : 1620, H = short ? 1060 : 600;
-  const bw = short ? 640 : Math.min(290, (W - 70 * nodes.length) / Math.max(1, nodes.length)), bh = short ? 150 : 104;
+  const W = short ? 888 : 1620, H = short ? 1060 : 640;
+  const bw = short ? 640 : Math.min(340, (W - 64 * (nodes.length - 1)) / Math.max(1, nodes.length)), bh = short ? 150 : 150;   // a wide video: big boxes, labels on two lines
   const pos: P[] = nodes.map((_, i) => short
     ? {x: W / 2, y: bh / 2 + (i * (H - bh)) / Math.max(1, nodes.length - 1 || 1)}
     : {x: bw / 2 + (i * (W - bw)) / Math.max(1, nodes.length - 1 || 1), y: H / 2});
@@ -165,7 +165,7 @@ const Diagram: React.FC<{s: Scene; short: boolean; flow: boolean}> = ({s, short,
   const th = useTheme(), {t} = useT();
   // in a wide video the labels sit on the arrows; when a label is wider than the gap between two boxes they go above and below the row instead
   const gap = short || nodes.length < 2 ? 0 : (W - bw * nodes.length) / (nodes.length - 1);
-  const tight = !short && edges.some((e) => e.label.length * 14 + 70 > gap - 16);
+  const tight = !short && edges.some((e) => e.label.length * 16 + 70 > gap - 16);
   return (
     <>
       <Heading text={s.title} short={short} />
@@ -184,10 +184,16 @@ const Diagram: React.FC<{s: Scene; short: boolean; flow: boolean}> = ({s, short,
 
 const NodeView: React.FC<{n: Box; at: P; bw: number; bh: number; short: boolean; active: boolean}> = ({n, at, bw, bh, short, active}) => {
   const th = useTheme(), p = useProgress(n.t, 0.9);
+  // a long label in a wide video goes on two lines so it can be big; the size fits the longest line to the box
+  const words = n.label.split(" "), half = Math.ceil(words.length / 2);
+  const lines = !short && n.label.length > 9 && words.length > 1 ? [words.slice(0, half).join(" "), words.slice(half).join(" ")] : [n.label];
+  const fs = short ? 52 : Math.max(26, Math.min(48, (bw - 40) / (Math.max(...lines.map((l) => l.length)) * 0.58)));
   return (
     <g transform={`translate(${at.x} ${at.y + (1 - p) * 16})`} opacity={p}>
       <rect x={-bw / 2} y={-bh / 2} width={bw} height={bh} rx={12} fill={active ? th.accentSoft : th.surface} stroke={active ? th.accent : th.text} strokeWidth={active ? 4 : 2.5} />
-      <text textAnchor="middle" dominantBaseline="central" fill={th.text} fontSize={short ? 52 : 34} fontWeight={600} fontFamily={FONT} letterSpacing={-0.8}>{n.label}</text>
+      {lines.map((ln, k) => (
+        <text key={k} x={0} y={(k - (lines.length - 1) / 2) * fs * 1.12} textAnchor="middle" dominantBaseline="central" fill={th.text} fontSize={fs} fontWeight={600} fontFamily={FONT} letterSpacing={-0.8}>{ln}</text>
+      ))}
     </g>
   );
 };
@@ -210,7 +216,7 @@ const EdgeView: React.FC<{n: number; e: Edge; pos: P[]; bw: number; bh: number; 
   const lt = lane && short ? 0.32 : 0.5;
   const mx = x1 + (x2 - x1) * lt, my = y1 + (y2 - y1) * lt;
   const pack = flow ? interpolate(t, [e.t + 0.5, e.t + 1.8], [0, 1], {extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: ease}) : -1;
-  const lab = e.label ? e.label.length * (short ? 17 : 14) + 70 : 0;
+  const lab = e.label ? e.label.length * (short ? 17 : 16) + 70 : 0;
   return (
     <g>
       <line x1={x1} y1={y1} x2={px} y2={py} stroke={th.accent} strokeWidth={4} strokeLinecap="round" strokeDasharray={e.from > e.to ? "3 12" : undefined}
@@ -220,7 +226,7 @@ const EdgeView: React.FC<{n: number; e: Edge; pos: P[]; bw: number; bh: number; 
           <rect x={-lab / 2} y={-26} width={lab || 52} height={52} rx={26} fill={th.bg} stroke={th.rule} strokeWidth={2} />
           <circle cx={lab ? -lab / 2 + 26 : 0} cy={0} r={15} fill={th.accent} />
           <text x={lab ? -lab / 2 + 26 : 0} y={1} textAnchor="middle" dominantBaseline="central" fill={th.bg} fontSize={19} fontWeight={700} fontFamily={MONO}>{n}</text>
-          {e.label && <text x={14} y={1} textAnchor="middle" dominantBaseline="central" fill={th.text} fontSize={short ? 27 : 23} fontFamily={MONO}>{e.label}</text>}
+          {e.label && <text x={14} y={1} textAnchor="middle" dominantBaseline="central" fill={th.text} fontSize={short ? 27 : 26} fontFamily={MONO}>{e.label}</text>}
         </g>
       )}
       {pack >= 0 && pack <= 1 && <circle cx={x1 + (x2 - x1) * pack} cy={y1 + (y2 - y1) * pack} r={13} fill={th.accent} />}

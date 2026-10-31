@@ -416,8 +416,10 @@ class VideoArcTests(unittest.TestCase):
 
     def test_the_arc_is_checked(self):
         from postcrew.checks import structure_problems
-        ok = [{"part": p} for p in ("intro", "idea", "idea", "example", "mistake", "closing")]
+        ok = [{"part": p, "layout": "flow" if p == "mistake" else "statement"} for p in ("intro", "idea", "idea", "example", "mistake", "closing")]
         self.assertEqual(structure_problems(ok), [])
+        words = [dict(sc, layout="points") if sc["part"] == "mistake" else sc for sc in ok]
+        self.assertTrue(any("must be a picture" in m for m in structure_problems(words)))   # the mistake is shown, not listed
         self.assertEqual(structure_problems([{}, {}]), [])                       # an owner's own script says no parts: not checked
         abrupt = [{"part": p} for p in ("idea", "example", "mistake", "closing")]
         self.assertTrue(any("introduction" in m for m in structure_problems(abrupt)))
