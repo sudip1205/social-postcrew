@@ -408,3 +408,45 @@ class FindabilityTests(unittest.TestCase):
         s = full_description(post)
         self.assertNotIn("Chapters", s)
         self.assertTrue(s.rstrip().endswith("#Shorts"))
+
+
+class VideoArcTests(unittest.TestCase):
+    """Every video: intro (the problem), idea (the solution), example, a common mistake, then the closing card."""
+
+    def test_the_arc_is_checked(self):
+        from postcrew.checks import structure_problems
+        ok = [{"part": p} for p in ("intro", "idea", "idea", "example", "mistake", "closing")]
+        self.assertEqual(structure_problems(ok), [])
+        self.assertEqual(structure_problems([{}, {}]), [])                       # an owner's own script says no parts: not checked
+        abrupt = [{"part": p} for p in ("idea", "example", "mistake", "closing")]
+        self.assertTrue(any("introduction" in m for m in structure_problems(abrupt)))
+        no_mistake = [{"part": p} for p in ("intro", "idea", "example", "closing")]
+        self.assertTrue(any("'mistake'" in m for m in structure_problems(no_mistake)))
+        swapped = [{"part": p} for p in ("intro", "example", "idea", "mistake", "closing")]
+        self.assertTrue(any("out of order" in m for m in structure_problems(swapped)))
+        no_end = [{"part": p} for p in ("intro", "idea", "example", "mistake")]
+        self.assertTrue(any("closing" in m for m in structure_problems(no_end)))
+
+
+class EditorVideoRulesTests(unittest.TestCase):
+    def test_the_editor_does_not_approve_a_script_without_the_story_even_when_the_reviewer_is_happy(self):
+        from postcrew.agents import editor
+        scenes = [{"part": p, "layout": "statement", "narration": "x"} for p in ("idea", "example", "closing")]
+        seen = []
+
+        class Ctx:
+            platform = "youtube"
+            outputs = {"writer": {"scenes": scenes, "text": "x"}}
+            reviews = []
+            cfg = {"pipeline": {"review_runs": 1, "min_overall": 70, "min_subscore": 60}}
+
+        ag = editor.EditorAgent.__new__(editor.EditorAgent)
+        ag.prompt = lambda ctx, **k: "system"
+        ag.ask = lambda ctx, system, material, schema: seen.append(material) or {
+            "overall": 95, "scores": {k: 95 for k in editor.CRITERIA}, "red_flags": [], "fixes": [], "fix_owner": "writer", "reasons": ""}
+        from unittest import mock
+        with mock.patch.object(editor, "review_material", lambda ctx, draft=None: "material"):
+            out = ag.run(Ctx, None)
+        self.assertFalse(out["passed"])
+        self.assertTrue(any("introduction" in r for r in out["rules"]) and any("'mistake'" in r for r in out["rules"]))
+        self.assertTrue(ag.validate(Ctx, out))

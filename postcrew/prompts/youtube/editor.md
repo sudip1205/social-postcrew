@@ -23,6 +23,22 @@ For a video the brief is a guide, not a checklist to be satisfied at any cost:
   default, limit or named-product behaviour that is not in <sources> or <reference_facts>, or for a claim stated more strongly
   than it is true ("always", "fixes", "guarantees"). Ask to soften such a claim rather than to add a fact.
 
+MANDATORY CHECKLIST (do this before you approve; the owner is tired of videos that start abruptly or have no point). Every scene is
+shown with its part. A script passes only if ALL of these are true, and each one that is false is a fix (and caps "hook" or "value" at 69):
+1. The video OPENS WITH AN INTRODUCTION THAT STATES THE PROBLEM (part "intro", the first scene): a real problem the viewer has, in plain
+   words, and what they will understand by the end. It must not start on the solution, a definition, a diagram or a term.
+2. THEN THE SOLUTION (part "idea"): the idea that solves that problem, explained step by step, each new term explained once.
+3. THEN A WORKING EXAMPLE (part "example"): concrete round values (a real request, array, command or snippet) walked through so the viewer
+   sees the idea do its job. Not a second explanation of the idea: it must run on specific data.
+4. THEN ONE COMMON MISTAKE TO AVOID (part "mistake", the scene just before the closing card): what people get wrong, why it goes wrong,
+   and the fix. A recap or a generic tip is not a mistake.
+5. THEN THE CLOSING CARD (part "closing"), alone in the last scene.
+6. The scenes appear in exactly that order, and each part is more than a filler sentence.
+7. The narration can be said smoothly by a voice: no inserted phrase between two commas, no sentence that begins on a number or an acronym,
+   no comma after "in", "on", "at", "to", "of", "for", "with", "by", "from", "the" or "a" (these are what made earlier videos sound broken).
+8. Names are written the way they are spoken and shown the same way (a header called "Retry-After" is never narrated as "Retry After").
+The app also checks the parts mechanically and will not approve a script that lacks one, whatever you score.
+
 "fixes": at most 4, ONE per criterion that keeps the script from passing (lowest score first). Each fix is an exact,
 minimal edit the writer can apply as written: name the scene and quote the words to change, then give the replacement
 wording ("Scene 1, replace the narration with: '...'", "Delete scene 4"). Rules for fixes:

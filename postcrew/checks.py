@@ -191,6 +191,34 @@ def needed_visual(spec, cat):
     return ""
 
 
+PARTS = ("intro", "idea", "example", "mistake", "closing")
+PART_HELP = {"intro": "the problem the viewer has", "idea": "the solution, the idea", "example": "a worked example that shows it working",
+             "mistake": "one common mistake to avoid"}
+
+
+def structure_problems(scenes):
+    """Every video follows one arc: intro (the problem), idea (the solution), example (worked example), mistake (a common mistake to
+    avoid), then the closing card. Scripts that do not say their parts (the owner's own) are not checked."""
+    parts = [sc.get("part") for sc in scenes]
+    if not any(parts):
+        return []
+    problems, order = [], [p for p in PARTS if p != "closing"]
+    if parts[0] != "intro":
+        problems.append("the video must open with an introduction that states the problem (first scene, part 'intro'): it must not start "
+                        "on the solution or a diagram")
+    for part in order:
+        if part not in parts:
+            problems.append(f"no scene has part '{part}': every video needs {PART_HELP[part]} (intro, idea, example, mistake, then the closing card)")
+    idx = [parts.index(p) for p in order if p in parts]
+    if idx != sorted(idx):
+        problems.append("the parts are out of order: intro (problem), idea (solution), example (worked example), mistake (common mistake), closing")
+    if parts[-1] != "closing" or parts.count("closing") != 1:
+        problems.append("the last scene, and only it, has part 'closing'")
+    elif "mistake" in parts and parts[-2:-1] != ["mistake"]:
+        problems.append("the scene just before the closing card must be the common mistake to avoid")
+    return problems
+
+
 def script_problems(script, spec, cat, profile):
     """The automatic checks on a YouTube script before any reviewer sees it. spec: platforms.video_spec(...)."""
     problems = []
@@ -209,6 +237,7 @@ def script_problems(script, spec, cat, profile):
     mn, mx = (3, 24) if spec["format"] == "short" else (4, 40)
     if not mn <= len(scenes) <= mx:
         problems.append(f"{len(scenes)} scenes: a {spec['format']} video needs {mn}-{mx}")
+    problems += structure_problems(scenes)
     for i, sc in enumerate(scenes, 1):
         if sc.get("layout") not in SCENE_LAYOUTS:
             problems.append(f"scene {i}: layout must be one of {SCENE_LAYOUTS}")

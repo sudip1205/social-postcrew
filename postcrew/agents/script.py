@@ -11,7 +11,7 @@ like any other.
 from .. import assets as assets_mod
 from .. import brief as briefmod
 from .. import platforms
-from ..checks import repeat_problem, script_problems
+from ..checks import PARTS, repeat_problem, script_problems
 from . import team
 from .base import AgentError, guidance_block, recent_block
 from .writer import WriterAgent, research_block, revision_block
@@ -36,6 +36,8 @@ SCENE = {
     "type": "object",
     "properties": {
         "layout": {"type": "string", "enum": ["title", "statement", "points", "code", "diagram", "trace", "flow"]},
+        "part": {"type": "string", "enum": list(PARTS),
+                 "description": "which part of the video this scene is: intro (the problem), idea (the solution), example (worked example), mistake (a common mistake to avoid), closing (the like, comment, share card)"},
         "narration": {"type": "string", "description": "what the voice says; spoken sentences, no markdown"},
         "on_screen": {"type": "string", "description": "the key words shown big (or the heading above the points)"},
         "items": {"type": "array", "items": {"type": "string"}, "maxItems": 5},
@@ -50,7 +52,7 @@ SCENE = {
                   "description": "trace: what happens to the data, one entry per move, in the order the voice says it"},
         "seconds": {"type": "number"},
     },
-    "required": ["layout", "narration", "on_screen", "items", "code", "language", "nodes", "edges", "cells", "steps", "seconds"],
+    "required": ["layout", "part", "narration", "on_screen", "items", "code", "language", "nodes", "edges", "cells", "steps", "seconds"],
     "additionalProperties": False,
 }
 SCHEMA = {

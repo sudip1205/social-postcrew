@@ -241,7 +241,7 @@ def synthesize_timed(text, voice_id, api_key, out_path, model=DEFAULT_MODEL, spe
             "words": words_from_alignment(d.get("alignment") or d.get("normalized_alignment") or {})}
 
 
-TAKE_SEEDS = (None, 17, 29)   # a scene is recorded up to three times when a pause is in the wrong place; the best take is kept
+TAKE_SEEDS = (None, 17, 29, 41, 53)   # a scene is recorded up to five times (a retry of the step carries on from the best take) when a pause is in the wrong place; the best take is kept
 
 
 def audio_seconds(path):
@@ -332,13 +332,21 @@ def _aligned(root, text, spoken, voice_id, model, speed, pace, settings, api_key
                                   + ([seed] if seed is not None else []), ensure_ascii=False).encode()).hexdigest()
     out = Path(root) / "cache" / "voice" / f"{key}.mp3"
     side = out.with_suffix(".json")
-    if out.exists() and side.exists():   # cached: nothing is spent
+    prior = None
+    if out.exists() and side.exists():   # cached: nothing is spent, unless a pause is still wrong and there are takes left (a retry of the step)
         d = json.loads(side.read_text())
-        return {"path": str(out), "seconds": audio_seconds(out), "characters": len(spoken), "problems": d["problems"], "takes": d["takes"],
-                "spent": 0, "words": d["words"]}
+        if not d["problems"] or d["takes"] >= len(TAKE_SEEDS):
+            return {"path": str(out), "seconds": audio_seconds(out), "characters": len(spoken), "problems": d["problems"], "takes": d["takes"],
+                    "spent": 0, "words": d["words"]}
+        prior = d
+        keep = out.with_name(f"{key}.take-prior.mp3")
+        out.replace(keep)
     out.parent.mkdir(parents=True, exist_ok=True)
     best, spent, made = None, 0, 0
-    for n, take_seed in enumerate((seed,) + TAKE_SEEDS[1:]):
+    if prior:
+        best = ({"path": str(keep), "words": prior["words"], "characters": len(spoken)}, prior["problems"], prior.get("best_take", prior["takes"]))
+        made = prior["takes"]
+    for n, take_seed in list(enumerate((seed,) + TAKE_SEEDS[1:]))[made:]:
         tmp = out.with_name(f"{key}.take{n}.mp3")
         r = synthesize_timed(spoken, voice_id, api_key, tmp, model, speed, opener, settings, take_seed, before, after)
         spent += r["characters"]

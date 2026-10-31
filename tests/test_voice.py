@@ -248,8 +248,23 @@ class PausesLikeAPersonTests(unittest.TestCase):
         bad = self.answer([("pasting", 0.0, 0.3), ("documents", 0.34, 0.6), ("in,", 0.64, 0.8), ("suits", 0.82, 1.1), ("it.", 1.15, 1.3)])
         http = FakeHTTP(bad)
         r = voice.cached_synthesize(self.root, "Pasting documents in, suits it.", {"voice_id": "v", "pace": "slow"}, "K", http, align=True)
-        self.assertEqual((len(http.requests), r["takes"]), (3, 3))     # three takes were made, and the count says so
+        self.assertEqual((len(http.requests), r["takes"]), (5, 5))     # five takes were made, and the count says so
         self.assertTrue(r["problems"])
+
+    def test_a_retry_carries_on_from_the_best_take_until_five_have_been_made(self):
+        bad = self.answer([("pasting", 0.0, 0.3), ("documents", 0.34, 0.6), ("in,", 0.64, 0.8), ("suits", 0.82, 1.1), ("it.", 1.15, 1.3)])
+        http = FakeHTTP(bad)
+        cfg = {"voice_id": "v", "pace": "slow"}
+        seeds = voice.TAKE_SEEDS
+        voice.TAKE_SEEDS = seeds[:3]
+        try:
+            first = voice.cached_synthesize(self.root, "Pasting documents in, suits it.", cfg, "K", http, align=True)
+            self.assertEqual((len(http.requests), first["takes"]), (3, 3))
+            voice.TAKE_SEEDS = seeds
+            again = voice.cached_synthesize(self.root, "Pasting documents in, suits it.", cfg, "K", http, align=True)
+        finally:
+            voice.TAKE_SEEDS = seeds
+        self.assertEqual((len(http.requests), again["takes"]), (5, 5))   # two more takes, not five new ones
 
     def test_another_voice_tool_with_an_openai_style_speech_endpoint_can_be_used(self):
         http = FakeHTTP(b"ID3audio")

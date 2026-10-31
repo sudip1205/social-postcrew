@@ -121,7 +121,8 @@ class RemotionTests(unittest.TestCase):
         self.assertTrue(scenes[-1]["closing"] and "closing" not in scenes[0])
         props, lengths = rm.build_props(scenes, "short", None)
         self.assertAlmostEqual(lengths[1] - plain_len[1], video.LEAD_S, places=2)      # the pause is part of the scene
-        self.assertEqual(lengths[0], plain_len[0])
+        self.assertAlmostEqual(lengths[0] - plain_len[0], video.OPEN_S, places=2)      # the opening picture is up before the voice
+        self.assertGreaterEqual(props["scenes"][0]["captions"][0]["start"], video.OPEN_S)
         last = props["scenes"][1]
         self.assertGreaterEqual(last["captions"][0]["start"], video.LEAD_S)             # nothing is said before it
         self.assertEqual(last["items"], ["Like", "Comment", "Share"])

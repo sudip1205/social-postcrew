@@ -9,6 +9,7 @@ from .scenes import FORMATS, draw_frame, split_captions
 FPS = 30
 TAIL_S = 0.6        # calm: a pause after every scene
 LOUDNESS = "loudnorm=I=-14:TP=-1.5:LRA=11,aresample=44100"   # YouTube's usual level: a voice recording alone is far quieter
+OPEN_S = 0.7        # the first scene's picture is on screen this long before the voice starts: the video never opens on a talking blank page
 LEAD_S = 1.0        # the pause before the closing scene: one second of silence after the content ends
 WPS = 2.5
 ZOOM = 0.05

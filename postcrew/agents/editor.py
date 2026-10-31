@@ -45,7 +45,7 @@ def script_material(ctx, w):
              "", "<draft>", f"TITLE: {w.get('title', '')}", f"THUMBNAIL TEXT: {w.get('thumbnail_text', '')}",
              f"TAGS: {', '.join(w.get('tags', []))}", "DESCRIPTION:", w.get("description", ""), "", "SCENES:"]
     for i, sc in enumerate(w["scenes"], 1):
-        parts.append(f"Scene {i} [{sc.get('layout')}, ~{sc.get('seconds', 0):.0f}s] on screen: {sc.get('on_screen') or '-'}"
+        parts.append(f"Scene {i} [{sc.get('part') or 'no part'} / {sc.get('layout')}, ~{sc.get('seconds', 0):.0f}s] on screen: {sc.get('on_screen') or '-'}"
                      + (f" | items: {'; '.join(sc['items'])}" if sc.get("items") else "")
                      + (f"\n  code ({sc.get('language')}):\n  " + sc["code"].replace("\n", "\n  ") if sc.get("code") else ""))
         parts.append(f"  narration: {sc.get('narration', '')}")
@@ -154,12 +154,16 @@ class EditorAgent(Agent):
         worst = min(runs, key=lambda r: r["overall"])
         scores = {k: min(r["scores"].get(k, 0) for r in runs) for k in CRITERIA}
         flags = sorted({f for r in runs for f in r.get("red_flags", [])})
-        passed = worst["overall"] >= pl["min_overall"] and min(scores.values()) >= pl["min_subscore"] and not flags
-        fixes = [] if passed else pick_fixes(runs, scores, pl)
+        rules = []
+        if getattr(ctx, "platform", "linkedin") == "youtube":   # the story rules are checked here too, whatever the reviewer scored
+            from ..checks import structure_problems
+            rules = structure_problems(ctx.outputs["writer"].get("scenes") or [])
+        passed = worst["overall"] >= pl["min_overall"] and min(scores.values()) >= pl["min_subscore"] and not flags and not rules
+        fixes = [] if passed else rules + pick_fixes(runs, scores, pl)
         ctx.reviews.append({"overall": worst["overall"], "scores": scores, "red_flags": flags, "fixes": fixes})
         owners = [r["fix_owner"] for r in runs if r["overall"] < pl["min_overall"] or r.get("red_flags")]
         return {"passed": passed, "overall": worst["overall"], "scores": scores, "red_flags": flags,
-                "reasons": worst.get("reasons", ""), "fixes": fixes, "runs": len(runs), "errors": errors,
+                "reasons": worst.get("reasons", ""), "fixes": fixes, "rules": rules, "runs": len(runs), "errors": errors,
                 "fix_owner": max(set(owners), key=owners.count) if owners else worst.get("fix_owner", "writer")}
 
     @staticmethod
@@ -171,7 +175,8 @@ class EditorAgent(Agent):
         if out["passed"]:
             return []
         pl = ctx.cfg["pipeline"]
-        problems = [f"reviewer overall score {out['overall']} (needs {pl['min_overall']})"]
+        problems = [f"reviewer overall score {out['overall']} (needs {pl['min_overall']})"] if (
+            out["overall"] < pl["min_overall"] or out["red_flags"] or not out.get("rules")) else ["the video rules are not met"]
         problems += [f"red flag: {f}" for f in out["red_flags"]]
         problems += [f"{k} scored {v} (needs {pl['min_subscore']})" for k, v in out["scores"].items()
                      if v < pl["min_subscore"]]

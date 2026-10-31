@@ -58,6 +58,8 @@ def mark_closing(scenes, spec):
     """The last scene is the closing line (like, comment, share) when the app has one: it comes in after a pause."""
     if spec.get("outro") and scenes:
         scenes[-1]["closing"], scenes[-1]["lead_s"] = True, video.LEAD_S
+    if len(scenes) > 1:
+        scenes[0]["lead_s"] = video.OPEN_S
     return scenes
 
 

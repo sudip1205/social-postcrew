@@ -41,7 +41,7 @@ class VoiceAgent(Agent):
             if not cfg.get("voice_id"):
                 raise AgentError("choose a voice in Settings > Apps & Schedules > YouTube video settings, or upload your own "
                                  "voice for this video", fatal=True)
-        files, seconds, chars, spent, left, retakes = [], [], 0, 0, [], 0
+        files, seconds, chars, spent, left, retakes, more = [], [], 0, 0, [], 0, 0
         for i, sc in enumerate(scenes, 1):
             before = scenes[i - 2]["narration"] if i > 1 else ""      # what comes before and after: the voice carries its intonation across the join
             after = scenes[i]["narration"] if i < len(scenes) else ""
@@ -55,6 +55,8 @@ class VoiceAgent(Agent):
             spent += r.get("spent", r["characters"])
             retakes += max(0, r.get("takes", 1) - 1)
             left += [(i, w, what) for w, what in r.get("problems") or []]
+            if r.get("problems") and r.get("takes", 1) < len(voice_mod.TAKE_SEEDS):
+                more += 1
         total = round(sum(seconds), 1)
         ctx.run.event(self.id, "voice", f"{len(files)} clips, {total}s, {chars} characters" + (f" ({spent} spent, {retakes} retake(s) to fix the pauses)" if retakes else ""),
                       {"characters": chars, "spent": spent, "retakes": retakes})
@@ -62,7 +64,7 @@ class VoiceAgent(Agent):
             ctx.run.event(self.id, "pauses", f"{len(left)} pause(s) still not where the punctuation says: "
                           + "; ".join(f"scene {i} after '{w}' ({what})" for i, w, what in left[:4]), {"left": left[:12]}, level="warning")
         return {"mode": "local" if local else "elevenlabs", "files": files, "seconds": seconds, "total_seconds": total, "characters": chars,
-                "spent": spent, "retakes": retakes, "pause_problems": len(left),
+                "spent": spent, "retakes": retakes, "pause_problems": len(left), "retryable": more,
                 "voice": cfg.get("voice_name") or cfg.get("voice_id") or cfg.get("model") or "voice server"}
 
     def validate(self, ctx, out):
@@ -70,6 +72,8 @@ class VoiceAgent(Agent):
         if out["mode"] == "rehearsal":
             return []
         problems = []
+        if out.get("retryable"):   # a pause is still wrong and the scene has takes left: record it again (the next attempt carries on from the best take)
+            problems.append(f"{out['retryable']} scene(s) still have a pause in the wrong place: record them again")
         if len(out["files"]) != len(scenes) or any(s <= 0 for s in out["seconds"]):
             problems.append("a scene came back without audio")
         if ctx.video["format"] == "short" and out["total_seconds"] > platforms.SHORT_MAX_S + 0.5:

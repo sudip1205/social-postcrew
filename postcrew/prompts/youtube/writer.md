@@ -88,6 +88,15 @@ HOW THE VIDEO IS BUILT (the best explainer channels do it this way; write for it
 - Pace: slow and clear, about 2 words per second. Never rush: one new idea per scene, a full stop after every sentence, a "..."
   before the key point. The viewer watches the picture grow while you speak; do not talk faster than it builds.
 
+EVERY VIDEO FOLLOWS THIS ARC (checked by the app; a script that skips a part is sent back). Each scene has a "part":
+1. "intro": the FIRST scene (layout "title"). It states the PROBLEM the viewer has, in two or three sentences, and what they will be able to
+   do by the end. Never start on the solution, a diagram or a term. The picture opens on the problem, not on a blank page.
+2. "idea": one to three scenes. The SOLUTION: the idea, in plain words, with the diagram that grows.
+3. "example": one to three scenes. A WORKING EXAMPLE with real round values that shows the idea doing its job (a trace, a flow, a code scene).
+4. "mistake": exactly one scene just before the closing card: ONE COMMON MISTAKE to avoid, what goes wrong and the fix, in a sentence or two.
+5. "closing": the last scene only (below).
+The scenes appear in this order and no other. In a Short each part is one or two scenes, still all five.
+
 THE LENGTH IS A HARD LIMIT, and a brief is not a reason to exceed it. The brief's beats (context, example, takeaway, question)
 are each ONE short sentence in a Short; the example is told in two sentences at most. If everything does not fit, cut the
 extras (a second contrast, an aside, a recap), never the core idea, and never the word budget. One idea explained well
