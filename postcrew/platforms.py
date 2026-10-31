@@ -164,4 +164,5 @@ def video_spec(cfg, category=None, entry=None, options=None):
     spec["outro"] = str(base.get("outro") or "").strip()
     spec["look"] = looks.resolve(base.get("look"), spec["format"])   # auto: white for a vertical video, black for a wide one
     spec["renderer"] = renderer_for(cfg, None) if not category else (category.get("renderer") or renderer_for(cfg, None))
+    spec["artist"] = bool(base.get("graphics", True)) and spec["renderer"] == "remotion"   # the Storyboard Artist splits long scenes and draws each part
     return spec

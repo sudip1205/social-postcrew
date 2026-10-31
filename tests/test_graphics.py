@@ -103,3 +103,28 @@ class StoryboardArtistTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SplitLongScenesTests(unittest.TestCase):
+    SPEC = {"format": "long", "wps": 2.5}
+
+    def test_a_long_scene_becomes_several_at_its_sentences(self):
+        from postcrew.checks import split_long_scenes
+        text = " ".join(f"Sentence number {i} says something useful about the design." for i in range(10))
+        out = split_long_scenes([{"layout": "diagram", "part": "idea", "narration": text, "nodes": ["A", "B"], "edges": ["A > B: x"], "on_screen": "X"}], self.SPEC)
+        self.assertGreater(len(out), 1)
+        self.assertEqual(" ".join(s["narration"] for s in out), text)                 # not a word lost or changed
+        self.assertTrue(all(len(s["narration"].split()) <= 40 for s in out))
+        self.assertEqual(out[0]["edges"], ["A > B: x"])
+        self.assertTrue(all(s["nodes"] == ["A", "B"] for s in out))                     # the boxes carry on; the artist draws what each part says
+
+    def test_short_scenes_and_the_closing_card_are_left_alone(self):
+        from postcrew.checks import split_long_scenes
+        sc = [{"layout": "statement", "part": "idea", "narration": "A short one."}, {"layout": "statement", "part": "closing", "narration": "Like. " * 30}]
+        self.assertEqual(split_long_scenes(sc, self.SPEC), sc)
+
+    def test_the_writer_is_not_rejected_for_a_long_scene_when_the_artist_will_split_it(self):
+        from postcrew.checks import storyboard_problems
+        long = [{"layout": "diagram", "part": "idea", "nodes": ["Client", "Server"], "narration": "The client calls the server. " + "word " * 120}]
+        self.assertTrue(any("split it" in p for p in storyboard_problems(long, dict(self.SPEC))))
+        self.assertFalse(any("split it" in p for p in storyboard_problems(long, dict(self.SPEC, artist=True))))

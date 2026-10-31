@@ -194,7 +194,7 @@ def needed_visual(spec, cat):
 SHORT_LIMIT_S = 175   # YouTube: a Short is 3 minutes at most (a little margin)
 MAX_PLAIN = 0.34      # at most about a third of the scenes may be words only; the rest are diagrams, flows, code or traces
 MAX_SCENE_S = {"short": 11, "long": 16}   # the longest a scene (one picture) may run, in seconds of narration
-PLAIN_LAYOUTS = ("title", "statement", "points", "code", "trace")
+PLAIN_LAYOUTS = ("title", "statement", "points")   # words only: a code walk-through or a trace may run several scenes
 
 
 def _says(narration, label):
@@ -202,6 +202,37 @@ def _says(narration, label):
     text = (narration or "").lower()
     words = [w for w in re.findall(r"[a-z]+", str(label).lower()) if len(w) >= 3 and w not in ("the", "and", "for", "can", "not")]   # numbers are said in words: not compared
     return not words or any(w[:4] in text for w in words)
+
+
+def split_long_scenes(scenes, spec):
+    """A scene that talks for much longer than a picture can hold is cut at its sentences into scenes of at most the cap: the first keeps the
+    picture, the others carry on the same idea (a diagram keeps its boxes) for the Storyboard Artist to draw."""
+    cap_words = int(MAX_SCENE_S[spec["format"]] * float(spec.get("wps") or 2.5))
+    out = []
+    for sc in scenes:
+        words = (sc.get("narration") or "").split()
+        if sc.get("part") == "closing" or len(words) <= cap_words + int(4 * float(spec.get("wps") or 2.5)):
+            out.append(sc)
+            continue
+        sentences = re.findall(r"[^.!?]+[.!?]+\s*|[^.!?]+$", sc["narration"])
+        chunks, cur = [], ""
+        for sent in sentences:
+            if cur and len((cur + sent).split()) > cap_words:
+                chunks.append(cur.strip())
+                cur = ""
+            cur += sent
+        if cur.strip():
+            chunks.append(cur.strip())
+        for i, text in enumerate(chunks):
+            part = dict(sc, narration=text)
+            if i:
+                part.update(steps=[], cells=[] if sc.get("layout") == "trace" else sc.get("cells", []))
+                if sc.get("layout") in ("diagram", "flow"):
+                    part["edges"] = []   # the boxes stay (the picture grows); the artist adds what this part says
+                elif sc.get("layout") in ("code", "trace"):
+                    part["layout"], part["code"], part["language"], part["cells"] = "statement", "", "", []
+            out.append(part)
+    return out
 
 
 def storyboard_problems(scenes, spec):
@@ -212,7 +243,7 @@ def storyboard_problems(scenes, spec):
     for i, sc in enumerate(scenes, 1):
         words = len((sc.get("narration") or "").split())
         secs = words / float(spec.get("wps") or 2.5)
-        if sc.get("part") != "closing" and secs > cap + 4:
+        if sc.get("part") != "closing" and secs > cap + 4 and not spec.get("artist"):   # with the Storyboard Artist a long scene is split for it
             problems.append(f"scene {i}: about {secs:.0f} seconds on one picture while the voice talks: split it into scenes of at most "
                             f"{cap} seconds ({int(cap * float(spec.get('wps') or 2.5))} words), each showing the part being said")
         layout = sc.get("layout")
@@ -266,8 +297,9 @@ def structure_problems(scenes):
     idx = [parts.index(p) for p in order if p in parts]
     if idx != sorted(idx):
         problems.append("the parts are out of order: intro (problem), idea (solution), example (worked example), mistake (common mistake), closing")
-    for sc in scenes:   # the mistake is shown, not listed: a picture of what goes wrong and the fix
-        if sc.get("part") == "mistake" and (sc.get("layout") not in ("diagram", "flow", "code", "trace")):
+    mistakes = [sc for sc in scenes if sc.get("part") == "mistake"]
+    if mistakes and not any(sc.get("layout") in ("diagram", "flow", "code", "trace") for sc in mistakes):   # the mistake is shown, not only said
+        if True:
             problems.append("the common mistake scene must be a picture, not words: a 'flow' or 'diagram' showing the wrong path and then "
                             "the fix, or a 'code' scene with the wrong line and the right one (layout diagram, flow, code or trace)")
     if parts[-1] != "closing" or parts.count("closing") != 1:

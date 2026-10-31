@@ -11,7 +11,7 @@ ends with a clipart, a replacement that breaks a script rule is left out, and no
 import re
 
 from .. import platforms
-from ..checks import STOP_WORDS, script_problems, storyboard_problems
+from ..checks import STOP_WORDS, script_problems, split_long_scenes, storyboard_problems
 from ..render import iconlib
 from ..render.scenes import split_node
 from .base import Agent, AgentError
@@ -148,7 +148,9 @@ class GraphicsAgent(Agent):
 
     def run(self, ctx, guidance):
         script = ctx.outputs["writer"]
-        scenes = [dict(sc) for sc in script["scenes"]]
+        scenes = split_long_scenes([dict(sc) for sc in script["scenes"]], ctx.video)   # a scene that talks too long becomes several: each gets its own picture
+        if len(scenes) != len(script["scenes"]):
+            ctx.run.event(self.id, "split", f"{len(scenes) - len(script['scenes'])} long scene(s) split so every picture matches its words")
         review = self.ask(ctx, self.prompt(ctx), self._report(scenes, ctx.video), SCHEMA)
         changed = self._apply(ctx, script, scenes, review.get("scenes") or [])
         boxes, clips = self._complete(scenes)
