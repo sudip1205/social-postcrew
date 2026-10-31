@@ -64,6 +64,8 @@ One month, with the plans on the right.
   press **Generate plan**. Open **Details** to read the context, the research topics, the real-world example and the takeaway.
 - **Assign** puts a plan on a day: pick a date in the small calendar (for YouTube also **Short** or **Long**), then confirm. You can
   also drag a plan onto a day, or click a day's **+ Assign**. Only days you assign get a post. **Unassign** moves it back.
+  A day can hold up to 5 plans (**+ Add one more**). The scheduled run makes one post a day from the day's current plan; **Create now**
+  on a plan makes the next one at once, one at a time. A published plan is struck out in the list and leaves the calendar.
 - A plan that was written or published stays listed (struck through when published) and is never planned again.
 - The arrows change the month. Topics you change in the middle of a month are used for the next month's plan.
 - Days that are already written show their status, such as **queued** (change those in the Queue).

@@ -9,6 +9,7 @@ from helpers import ScriptedLLM, TempWorkspace  # noqa: E402
 
 from postcrew import monthly  # noqa: E402
 from postcrew.agents import planner  # noqa: E402
+from postcrew import scheduler  # noqa: E402
 from postcrew.scheduler import tick  # noqa: E402
 
 TODAY = date(2026, 11, 3)
@@ -69,10 +70,8 @@ class MonthlyTests(unittest.TestCase):
             self.assertTrue(platforms.category_for(ws.config()["schedule"], "2026-11-10"))
             self.assertIsNone(platforms.category_for(ws.config()["schedule"], "2026-11-11"))   # only assigned days post
             v = monthly.view(ws, "linkedin", "2026-11", TODAY)
-            self.assertEqual(v["days"]["2026-11-10"]["title"], item["title"])
+            self.assertEqual([x["title"] for x in v["days"]["2026-11-10"]], [item["title"]])
             other = v["items"][1]
-            with self.assertRaises(ValueError):                                # one plan per day
-                monthly.assign(ws, "linkedin", other["id"], "2026-11-10", today=TODAY)
             with self.assertRaises(ValueError):                                # not in the past
                 monthly.assign(ws, "linkedin", other["id"], "2026-11-02", today=TODAY)
             monthly.assign(ws, "linkedin", item["id"], "2026-11-12", today=TODAY)   # moving frees the old day
@@ -142,6 +141,109 @@ class MonthlyTests(unittest.TestCase):
             [t.join() for t in threads]
             self.assertEqual(monthly.view(ws, "linkedin", "2026-11", TODAY)["counts"]["plans"], 10)
             self.assertEqual(len(llm.calls), 1)
+
+    def assigned(self, ws, n, day="2026-11-10", fmt=None):
+        monthly.generate(ws, "linkedin", "2026-11", llm=ScriptedLLM({"planner": [answer(TITLES[:10])]}), today=TODAY)
+        items = monthly.view(ws, "linkedin", "2026-11", TODAY)["items"][:n]
+        for it in items:
+            monthly.assign(ws, "linkedin", it["id"], day, today=TODAY)
+        return items
+
+    def test_a_day_holds_several_plans_and_the_first_is_the_one_made(self):
+        with TempWorkspace() as ws:
+            self.ws(ws)
+            a, b, c = self.assigned(ws, 3)
+            days = monthly.view(ws, "linkedin", "2026-11", TODAY)["days"]["2026-11-10"]
+            self.assertEqual([(x["id"], x["position"], x["of"]) for x in days], [(a["id"], 1, 3), (b["id"], 2, 3), (c["id"], 3, 3)])
+            self.assertEqual(planner.load_plan(ws)["2026-11-10"]["plan_id"], a["id"])             # the scheduled run takes this one
+            self.assertEqual(planner.plan_id_for(ws, "linkedin", "2026-11-10", ws.config()["schedule"]["dates"][0]["category"]), a["id"])
+            self.assertEqual(len(ws.config()["schedule"]["dates"]), 1)                              # still one entry for the day
+
+    def test_a_published_plan_leaves_the_calendar_stays_struck_in_the_list_and_the_next_one_is_current(self):
+        with TempWorkspace() as ws:
+            self.ws(ws)
+            a, b = self.assigned(ws, 2)
+            ws.add_history({"id": "p1", "date": "2026-11-10", "topic": "A title the Script Writer rewrote", "platform": "linkedin", "plan_id": a["id"]})
+            monthly.sync_all(ws, "linkedin")                                  # what a run, a scheduler tick and the Plan page do first
+            v = monthly.view(ws, "linkedin", "2026-11", TODAY)               # found by its plan id, not by its (rewritten) title
+            self.assertEqual([x["id"] for x in v["days"]["2026-11-10"]], [b["id"]])
+            self.assertEqual([i["status"] for i in v["items"][:2]], ["published", "assigned"])
+            self.assertEqual(planner.load_plan(ws)["2026-11-10"]["plan_id"], b["id"])               # the next one is what a run makes now
+            with self.assertRaises(ValueError):
+                monthly.assign(ws, "linkedin", a["id"], "2026-11-12", today=TODAY)                  # never planned again
+            c = v["items"][2]
+            monthly.assign(ws, "linkedin", c["id"], "2026-11-10", today=TODAY)                      # one more on the same day
+            self.assertEqual([x["id"] for x in monthly.view(ws, "linkedin", "2026-11", TODAY)["days"]["2026-11-10"]], [b["id"], c["id"]])
+
+    def test_when_every_plan_of_a_day_is_published_the_day_leaves_the_schedule(self):
+        with TempWorkspace() as ws:
+            self.ws(ws)
+            (a,) = self.assigned(ws, 1)
+            ws.add_history({"id": "p1", "date": "2026-11-10", "topic": a["title"], "platform": "linkedin", "plan_id": a["id"]})
+            monthly.sync_all(ws, "linkedin")
+            self.assertEqual((ws.config()["schedule"]["dates"], planner.load_plan(ws)), ([], {}))
+            self.assertEqual(monthly.view(ws, "linkedin", "2026-11", TODAY)["days"], {})
+
+    def test_the_scheduled_run_makes_one_post_a_day_and_a_manual_run_makes_the_next(self):
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+        with TempWorkspace() as ws:
+            self.ws(ws)
+            a, b = self.assigned(ws, 2, "2026-11-04")
+            calls = []
+            noop = lambda *x, **k: None
+            tz = ZoneInfo(ws.config()["schedule"]["timezone"])
+            # the evening before: the scheduler makes the day's post, once
+            for hour in (19, 20):
+                scheduler.tick(ws, datetime(2026, 11, 3, hour, 5, tzinfo=tz), runner=lambda w, d: calls.append((d.isoformat(), planner.load_plan(w)[d.isoformat()]["plan_id"])),
+                               publisher=noop, checker=noop, planner=noop, cleaner=noop)
+            self.assertEqual(calls, [("2026-11-04", a["id"])])
+            # that post is published; the scheduler does not start a second one for the day
+            ws.add_history({"id": "p1", "date": "2026-11-04", "topic": a["title"], "platform": "linkedin", "plan_id": a["id"], "published_at": "x"})
+            scheduler.tick(ws, datetime(2026, 11, 3, 21, 0, tzinfo=tz), runner=lambda w, d: calls.append("again"), publisher=noop, checker=noop, planner=noop, cleaner=noop)
+            self.assertEqual(len(calls), 1)
+            # a manual run (run_crew) now takes the next plan
+            from postcrew import crew
+            seen = []
+            from unittest import mock
+            with mock.patch("postcrew.crew.Supervisor") as sup:
+                sup.return_value.run.side_effect = lambda ctx: seen.append(planner.planned_for(ws, ctx.day, ctx.category)["plan_id"]) or {"ok": True}
+                crew.run_crew(ws, date(2026, 11, 4), llm=ScriptedLLM({}))
+            self.assertEqual(seen, [b["id"]])
+
+    def test_at_most_five_plans_wait_on_one_day_and_a_written_plan_cannot_be_unassigned(self):
+        with TempWorkspace() as ws:
+            self.ws(ws)
+            monthly.generate(ws, "linkedin", "2026-11", llm=ScriptedLLM({"planner": [answer(TITLES[:10])]}), today=TODAY)
+            items = monthly.view(ws, "linkedin", "2026-11", TODAY)["items"]
+            for it in items[:5]:
+                monthly.assign(ws, "linkedin", it["id"], "2026-11-10", today=TODAY)
+            with self.assertRaises(ValueError):
+                monthly.assign(ws, "linkedin", items[5]["id"], "2026-11-10", today=TODAY)
+            ws.save_queue([{"id": "q1", "platform": "linkedin", "date": "2026-11-10", "status": "awaiting_approval", "topic": "x", "plan_id": items[0]["id"]}])
+            with self.assertRaises(ValueError):
+                monthly.unassign(ws, "linkedin", items[0]["id"])
+            monthly.unassign(ws, "linkedin", items[1]["id"])                                         # a waiting one can go
+            self.assertEqual(len(monthly.view(ws, "linkedin", "2026-11", TODAY)["days"]["2026-11-10"]), 4)
+
+    def test_two_posts_of_one_day_keep_their_own_queue_entries(self):
+        from postcrew import platforms
+        from postcrew.agents import publisher
+        with TempWorkspace() as ws:
+            self.ws(ws)
+            a, b = self.assigned(ws, 2)
+            cfg = platforms.view(ws.config(), "linkedin")
+            cat = ws.config()["schedule"]["dates"][0]["category"]
+            final = lambda t: {"title": t, "text": "body text"}
+            publisher.enqueue(ws, cfg, "r1", date(2026, 11, 10), cat, final("First"), {})
+            ws.add_history({"id": "p1", "date": "2026-11-10", "topic": "First", "platform": "linkedin", "plan_id": a["id"]})   # published; B is current
+            monthly.sync_all(ws, "linkedin")
+            ws.save_queue([])
+            publisher.enqueue(ws, cfg, "r2", date(2026, 11, 10), cat, final("Second"), {})
+            q = ws.queue()
+            self.assertEqual(len(q), 1)
+            self.assertEqual(q[0]["plan_id"], b["id"])
+            self.assertTrue(q[0]["id"].endswith("-" + b["id"]))
 
     def test_no_topics_means_no_plan_and_a_clear_message(self):
         with TempWorkspace() as ws:

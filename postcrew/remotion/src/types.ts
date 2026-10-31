@@ -7,7 +7,7 @@ export type Step = {
 export type Scene = {
   layout: "title" | "statement" | "points" | "code" | "diagram" | "flow" | "trace";
   title: string; items: string[]; code: string; language: string; seconds: number; captions: Caption[];
-  nodes?: Box[]; edges?: Edge[]; cells?: string[]; steps?: Step[]; cues?: number[]; closing?: boolean;
+  nodes?: Box[]; edges?: Edge[]; cells?: string[]; steps?: Step[]; cues?: number[]; closing?: boolean; key?: number;
 };
 /** The colours of a look: defined in postcrew/render/looks.py and sent with every render. */
 export type Theme = {

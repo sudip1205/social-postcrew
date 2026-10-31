@@ -248,7 +248,7 @@ class PausesLikeAPersonTests(unittest.TestCase):
         bad = self.answer([("pasting", 0.0, 0.3), ("documents", 0.34, 0.6), ("in,", 0.64, 0.8), ("suits", 0.82, 1.1), ("it.", 1.15, 1.3)])
         http = FakeHTTP(bad)
         r = voice.cached_synthesize(self.root, "Pasting documents in, suits it.", {"voice_id": "v", "pace": "slow"}, "K", http, align=True)
-        self.assertEqual((len(http.requests), r["takes"]), (3, 1))
+        self.assertEqual((len(http.requests), r["takes"]), (3, 3))     # three takes were made, and the count says so
         self.assertTrue(r["problems"])
 
     def test_another_voice_tool_with_an_openai_style_speech_endpoint_can_be_used(self):

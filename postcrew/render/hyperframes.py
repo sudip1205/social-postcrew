@@ -60,7 +60,7 @@ def scene_html(scene, width, height, theme=None):
     card, closing = scene.get("layout") == "title", bool(scene.get("closing"))
     title = scene.get("title") or ""
     words = title.split()
-    key = _key_word(words)
+    key = scene["key"] if scene.get("key") is not None else _key_word(words)
     size = (132 if card else 98) if short else (112 if card else 86)
     mask = lambda w, cls="": f'<span class="m{cls}"><span class="w">{html.escape(w)}</span></span>'
     if closing:

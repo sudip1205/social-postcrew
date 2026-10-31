@@ -2,6 +2,8 @@ import React from "react";
 import {Composition, Still} from "remotion";
 import {Video, totalFrames} from "./Video";
 import {Thumbnail} from "./Thumbnail";
+import {ChannelArt} from "./ChannelArt";
+import type {ChannelArtProps} from "./ChannelArt";
 import {PAPER} from "./theme";
 import type {ThumbProps, VideoProps} from "./types";
 
@@ -18,5 +20,7 @@ export const Root: React.FC = () => (
     />
     <Still id="Thumbnail" component={Thumbnail} width={1280} height={720}
       defaultProps={{text: "Thumbnail text", title: "Video title", theme: PAPER} as ThumbProps} />
+    <Still id="ChannelArt" component={ChannelArt} width={2560} height={1440}
+      defaultProps={{name: "Channel name", tagline: "What the channel is about", topics: ["Topic one", "Topic two"], theme: PAPER} as ChannelArtProps} />
   </>
 );

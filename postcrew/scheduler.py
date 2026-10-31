@@ -11,6 +11,7 @@ from zoneinfo import ZoneInfo
 
 from .agents.credentials import run_check
 from .cleanup import run_cleanup
+from . import monthly
 from .monthly import month_key, plan_month, topics_of
 from .agents.publisher import publish_due
 from . import platforms
@@ -43,6 +44,8 @@ def tick(ws, now=None, runner=run_crew, publisher=publish_due, checker=run_check
     Every enabled app plans, generates and publishes on its own schedule."""
     if ws.paused():
         return ["paused"]
+    for pid in platforms.enabled(ws.config()):   # a day with several plans works on the first one still to make
+        monthly.sync_all(ws, pid)
     cfg = ws.config()
     now = now or local_now(cfg)
     st = ws.state("scheduler", {})

@@ -146,6 +146,17 @@ class RemotionTests(unittest.TestCase):
         self.assertIsNone(rm.illustration({"title": "T", "scenes": [{"layout": "statement"}, {"layout": "points", "items": ["a"]}]}))
         self.assertEqual(rm.illustration({"title": "Plain", "scenes": [{"layout": "diagram", "nodes": ["A", "B", "C"]}]})["focus"], 1)   # no match: the middle
 
+    def test_the_highlighted_word_can_be_chosen_with_asterisks(self):
+        from postcrew.render import hyperframes as hf
+        self.assertEqual(rm._marked("Welcome to Dip to *Dive*"), ("Welcome to Dip to Dive", 4))
+        self.assertEqual(rm._marked("No marker here"), ("No marker here", None))
+        props, _ = rm.build_props([{"layout": "title", "on_screen": "Welcome to Dip to *Dive*", "narration": "Hi."}], "long", None)
+        sc = props["scenes"][0]
+        self.assertEqual((sc["title"], sc["key"]), ("Welcome to Dip to Dive", 4))
+        page = hf.scene_html(sc, 1920, 1080, props["theme"])
+        self.assertEqual(page.count(' key"'), 1)
+        self.assertIn('<span class="m key"><span class="w">Dive</span>', page)          # Dive, not the longest word (Welcome)
+
 
 if __name__ == "__main__":
     unittest.main()

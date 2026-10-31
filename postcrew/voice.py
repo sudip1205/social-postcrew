@@ -337,11 +337,12 @@ def _aligned(root, text, spoken, voice_id, model, speed, pace, settings, api_key
         return {"path": str(out), "seconds": audio_seconds(out), "characters": len(spoken), "problems": d["problems"], "takes": d["takes"],
                 "spent": 0, "words": d["words"]}
     out.parent.mkdir(parents=True, exist_ok=True)
-    best, spent = None, 0
+    best, spent, made = None, 0, 0
     for n, take_seed in enumerate((seed,) + TAKE_SEEDS[1:]):
         tmp = out.with_name(f"{key}.take{n}.mp3")
         r = synthesize_timed(spoken, voice_id, api_key, tmp, model, speed, opener, settings, take_seed, before, after)
         spent += r["characters"]
+        made += 1
         problems = pause_problems(r["words"], pace)
         if best is None or len(problems) < len(best[1]):
             if best:
@@ -351,10 +352,10 @@ def _aligned(root, text, spoken, voice_id, model, speed, pace, settings, api_key
             tmp.unlink(missing_ok=True)
         if not problems:
             break
-    r, problems, takes = best
+    r, problems, best_take = best
     Path(r["path"]).replace(out)
-    side.write_text(json.dumps({"words": r["words"], "problems": problems, "takes": takes}))
-    return {"path": str(out), "seconds": audio_seconds(out), "characters": len(spoken), "problems": problems, "takes": takes, "spent": spent,
+    side.write_text(json.dumps({"words": r["words"], "problems": problems, "takes": made, "best_take": best_take}))
+    return {"path": str(out), "seconds": audio_seconds(out), "characters": len(spoken), "problems": problems, "takes": made, "spent": spent,
             "words": r["words"]}
 
 

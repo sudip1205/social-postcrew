@@ -201,12 +201,12 @@ class YouTubeStudioTests(unittest.TestCase):
         a, b = d["items"][:2]
         code, d, _ = self.req("POST", "/api/plan/assign", {"platform": "youtube", "id": a["id"], "date": day, "format": "long"})
         self.assertEqual(code, 200, d)
-        self.assertEqual(d["days"][day]["format"], "long")
+        self.assertEqual(d["days"][day][0]["format"], "long")
         entry = planner.load_plan(self.ws, "youtube")[day]
         self.assertEqual((entry["format"], entry["category"]), ("long", "assigned-long"))
         self.assertEqual(self.req("POST", "/api/plan/assign", {"platform": "youtube", "id": b["id"], "date": day, "format": "huge"})[0], 400)
         code, d, _ = self.req("POST", "/api/plan/assign", {"platform": "youtube", "id": a["id"], "date": day, "format": "short"})   # change it
-        self.assertEqual(d["days"][day]["format"], "short")
+        self.assertEqual(d["days"][day][0]["format"], "short")
 
     def queue_video(self):
         media = self.ws.root / "media"

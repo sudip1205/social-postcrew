@@ -118,6 +118,7 @@ class Studio:
     def start_run(self, body):
         if crew.is_running():
             raise ValueError("a crew run is already in progress")
+        monthly.sync_all(self.ws, self._view(body.get("platform"))[0])   # the day's current plan (several can wait on one day)
         platform, cfg = self._view(body.get("platform"))
         errs = validate_config(self.ws.config())
         if errs:
@@ -170,6 +171,7 @@ class Studio:
     def plan(self, platform=None, month=None):
         """One month of the plan: the generated plans, the days they are assigned to, and the topics they came from."""
         platform, cfg = self._view(platform)
+        monthly.sync_all(self.ws, platform)   # plans published since the page was last opened leave the calendar
         today = crew.local_now(cfg).date()
         month = month or monthly.month_key(today)
         if not re.fullmatch(r"\d{4}-(0[1-9]|1[0-2])", month):

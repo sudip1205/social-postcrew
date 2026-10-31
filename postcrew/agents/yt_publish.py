@@ -10,6 +10,7 @@ from ..notify import notify
 from ..runlog import RunLog
 from ..youtube import YouTube, YouTubeError
 from .credentials import GOOD, check_youtube
+from .planner import plan_id_for
 from .publisher import post_details, scheduled_at
 
 LABEL = "YouTube"
@@ -20,6 +21,9 @@ def enqueue_youtube(ws, cfg, run_id, day, category, outputs, review):
     script, video, voice = outputs["writer"], outputs["media"], outputs.get("voice") or {}
     platform = cfg.get("platform", "youtube")
     pid = f"{day.isoformat()}-{platform}-{category}"
+    plan_id = plan_id_for(ws, platform, day, category)   # a day can hold several plans, made one at a time: each post is its own
+    if plan_id:
+        pid += f"-{plan_id}"
     media_dir = ws.root / "media"
     media_dir.mkdir(exist_ok=True)
     dest = media_dir / f"{pid}.mp4"
@@ -37,6 +41,7 @@ def enqueue_youtube(ws, cfg, run_id, day, category, outputs, review):
         "scheduled_at": scheduled_at(cfg, day) if mode != "immediate" else datetime.now(timezone.utc).isoformat(),
         "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "review": {k: review.get(k) for k in ("overall", "scores")},
+        **({"plan_id": plan_id} if plan_id else {}),
         "youtube": {
             "title": script["title"], "description": script["description"], "tags": script["tags"],
             "format": video.get("format") or ("short" if video["height"] > video["width"] else "long"),
@@ -145,7 +150,7 @@ def publish_one(ws, post, client_factory=YouTube, log=print, check=check_youtube
     if run:
         run.step("publisher", "passed", summary=f"uploaded {res['url']}")
     ws.add_history({k: post.get(k) for k in ("id", "platform", "date", "category", "topic", "text", "media", "published_at",
-                                             "run_id", "youtube")})
+                                             "run_id", "youtube", "plan_id")})
     notify(ws, "Uploaded to YouTube", f"{yt['title']} is on your channel.", level="success",
            action={"label": "Open Queue", "tab": "queue"},
            details=post_details(ws, post, ("Video on YouTube", res["url"])))

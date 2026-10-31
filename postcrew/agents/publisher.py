@@ -17,6 +17,7 @@ from ..notify import notify
 from ..runlog import RunLog
 from .base import Agent, AgentError
 from .credentials import GOOD, run_check
+from .planner import plan_id_for
 
 DUE = ("queued", "approved")
 COMMENT_WAITS_S = (5, 20)        # LinkedIn may not accept a comment the moment a post is created
@@ -33,6 +34,9 @@ def scheduled_at(cfg, day):
 def enqueue(ws, cfg, run_id, day, category, final, review):
     platform = cfg.get("platform", platforms.LINKEDIN)
     pid = f"{day.isoformat()}-{category}" if platform == platforms.LINKEDIN else f"{day.isoformat()}-{platform}-{category}"
+    plan_id = plan_id_for(ws, platform, day, category)   # a day can hold several plans, made one at a time: each post is its own
+    if plan_id:
+        pid += f"-{plan_id}"
     media = None
     if final.get("media_path"):
         dest = ws.root / "media" / f"{pid}{'.mp4' if final['media_kind'] == 'video' else '.png'}"
@@ -52,6 +56,8 @@ def enqueue(ws, cfg, run_id, day, category, final, review):
             "scheduled_at": scheduled_at(cfg, day) if mode != "immediate" else datetime.now(timezone.utc).isoformat(),
             "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "review": {k: review.get(k) for k in ("overall", "scores")}}
+    if plan_id:
+        post["plan_id"] = plan_id
     queue = [p for p in ws.queue() if p["id"] != pid]
     ws.save_queue(queue + [post])
     return post
@@ -204,7 +210,7 @@ def publish_one(ws, post, client_factory=LinkedIn, log=print, sleep=time.sleep):
         run.step("publisher", "passed", summary=f"published {urn}")
     ws.add_history({k: post.get(k) for k in ("id", "date", "category", "topic", "text", "first_comment", "media",
                                              "urn", "published_at", "run_id", "comment_status", "comment_error",
-                                             "comment_tries")})
+                                             "comment_tries", "plan_id")})
     comment = {"added": "added", "failed": "failed, will retry"}.get(post.get("comment_status"), "none")
     notify(ws, "Posted to LinkedIn", f"{post['topic']} is live on your profile.", level="success",
            action={"label": "Open Queue", "tab": "queue"},

@@ -62,6 +62,13 @@ def planned_for(ws, day, category, platform=LINKEDIN):
     return e if e and e.get("category") == category and e.get("topic") else None
 
 
+def plan_id_for(ws, platform, day, category):
+    """The id of the generated plan (monthly.py) the crew is making for this day, or None for a post that did not come from one."""
+    iso = day.isoformat() if hasattr(day, "isoformat") else day
+    e = load_plan(ws, platform).get(iso)
+    return e.get("plan_id") if e and e.get("category") == category and e.get("plan_id") else None
+
+
 def this_week(today):
     """Monday-Sunday of the week `today` is in."""
     start = today - timedelta(days=today.weekday())

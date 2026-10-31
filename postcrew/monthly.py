@@ -12,6 +12,7 @@ and the scheduler already read, so nothing else changes in how a post is made.
 """
 import re
 import threading
+import time
 import uuid
 from datetime import date, datetime, timezone
 
@@ -25,6 +26,7 @@ from .runlog import RunLog
 
 PER_TOPIC = 10
 FORMATS = ("short", "long")
+MAX_PER_DAY = 5   # plans waiting on one day
 _lock = threading.Lock()
 _generating = {}   # one generation at a time per app: the scheduler and the Generate plan button must not both write the same plans
 
@@ -77,19 +79,25 @@ def _mine(platform):
 
 
 def posted_titles(ws, platform=LINKEDIN):
-    """What was published or written on this app: {normalised topic: "published"|"written"} (vetoed and failed posts do not count)."""
+    """What was published or written on this app, by the plan's id (when the post came from a plan) and by normalised topic:
+    {"id:<plan id>" | topic: "published" | "written"}. Vetoed and failed posts do not count."""
     mine, out = _mine(platform), {}
+
+    def note(p, state):
+        for key in ("id:" + p["plan_id"] if p.get("plan_id") else None, norm(p["topic"]) if p.get("topic") else None):
+            if key:
+                out[key] = state
     for p in ws.queue():
-        if mine(p) and p.get("status") not in ("vetoed", "failed") and p.get("topic"):
-            out[norm(p["topic"])] = "written"
+        if mine(p) and p.get("status") not in ("vetoed", "failed"):
+            note(p, "written")
     for p in ws.history():
-        if mine(p) and p.get("topic"):
-            out[norm(p["topic"])] = "published"
+        if mine(p):
+            note(p, "published")
     return out
 
 
 def status_of(item, posted):
-    s = posted.get(norm(item["title"]))
+    s = posted.get("id:" + item["id"]) or posted.get(norm(item["title"]))
     if s:
         return s
     return "assigned" if item.get("assigned") else "unassigned"
@@ -107,12 +115,17 @@ def view(ws, platform=LINKEDIN, month=None, today=None):
     items = []
     for i in pool["months"].get(month, {}).get("items", []):
         items.append(dict(i, status=status_of(i, posted)))
-    # an item assigned in another month's pool can still sit on a day of this month
+    # the calendar: every plan still to make on each day of this month, in the order they are made. A published plan is no longer on the
+    # calendar (it stays struck through in the list). A plan assigned in another month's pool can still sit on a day of this month.
     days = {}
-    for i in _all_items(pool):
-        a = i.get("assigned")
-        if a and a["date"].startswith(month):
-            days[a["date"]] = dict(a, id=i["id"], title=i["title"], topic=i["topic"], status=status_of(i, posted))
+    for i in _live_items(pool, posted):
+        iso = i["assigned"]["date"]
+        if iso.startswith(month):
+            days.setdefault(iso, []).append({"id": i["id"], "title": i["title"], "topic": i["topic"], "status": status_of(i, posted),
+                                             "format": i["assigned"].get("format")})
+    for iso, rows in days.items():
+        for n, r in enumerate(rows, 1):
+            r["position"], r["of"] = n, len(rows)
     first = date.fromisoformat(month + "-01")
     nxt = date(first.year + (first.month == 12), first.month % 12 + 1, 1)
     meta = pool["months"].get(month) or {}
@@ -122,7 +135,7 @@ def view(ws, platform=LINKEDIN, month=None, today=None):
             "next_plan": nxt.isoformat(), "per_topic": PER_TOPIC,
             "counts": {"plans": len(items), "assigned": count("assigned") + count("written"), "unassigned": count("unassigned"),
                        "published": count("published")},
-            "formats": platform != LINKEDIN, "default_format": (cfg.get("video") or {}).get("format", "short")}
+            "max_per_day": MAX_PER_DAY, "formats": platform != LINKEDIN, "default_format": (cfg.get("video") or {}).get("format", "short")}
 
 
 # ---------- generating ----------
@@ -264,9 +277,12 @@ def category_for_item(ws, platform, fmt):
 
 
 def _set_date(ws, platform, day, category):
-    """Put (category) or take (None) a date in the app's schedule."""
+    """Put (category) or take (None) a date in the app's schedule. Does nothing (no write) when it is already so."""
     cfg = ws.config()
     sched = cfg["schedule"] if platform == LINKEDIN else cfg["platforms"][platform]["schedule"]
+    have = next((e.get("category") for e in sched.get("dates") or [] if isinstance(e, dict) and e.get("date") == day), None)
+    if have == category:
+        return
     dates = [e for e in sched.get("dates") or [] if not (isinstance(e, dict) and e.get("date") == day)]
     if category:
         dates.append({"date": day, "category": category})
@@ -274,9 +290,64 @@ def _set_date(ws, platform, day, category):
     ws.save_config(cfg)
 
 
+def _live_items(pool, posted, iso=None):
+    """The plans still to make or waiting in the Queue, in the order they are made: the one already written first, then the others in
+    the order they were assigned. All days, or just `iso`."""
+    live = [i for i in _all_items(pool) if i.get("assigned") and (iso is None or i["assigned"]["date"] == iso)
+            and status_of(i, posted) in ("assigned", "written")]
+    return sorted(live, key=lambda i: (i["assigned"]["date"], status_of(i, posted) != "written", i["assigned"].get("seq", 0)))
+
+
+def _entry(item, cat, fmt, platform):
+    brief = {}
+    try:
+        brief = briefmod.normalize({"context": item["context"], "example": item["example"], "takeaway": item["takeaway"],
+                                    "example_kind": "scenario", "generated": ["context", "example", "takeaway"]})
+    except briefmod.BriefError:
+        pass
+    entry = {"category": cat, "topic": item["title"], "angle": item["angle"], "search_queries": item["search_queries"],
+             "source": "manual", "plan_id": item["id"], "rejected": []}
+    if brief:
+        entry["brief"] = brief
+    if platform != LINKEDIN:
+        entry["format"] = fmt
+    return entry
+
+
+def _sync_day(ws, platform, pool, posted, iso):
+    """Make a day's schedule and plan say what is made next there: the first plan still to make. After one is published the next one becomes
+    that plan; with none left the day is taken out of the schedule. The scheduled run makes ONE post a day (the plan that is current when
+    it runs); the others are made by hand, one at a time."""
+    live = _live_items(pool, posted, iso)
+    entry = load_plan(ws, platform).get(iso)
+    if not live:
+        if entry and entry.get("plan_id"):
+            set_entry(ws, iso, None, platform)
+        _set_date(ws, platform, iso, None)
+        return
+    cur = live[0]
+    fmt = cur["assigned"].get("format")
+    cat = category_for_item(ws, platform, fmt)
+    if not entry or entry.get("plan_id") != cur["id"] or entry.get("category") != cat:
+        set_entry(ws, iso, _entry(cur, cat, fmt, platform), platform)
+    _set_date(ws, platform, iso, cat)
+
+
+def sync_all(ws, platform=LINKEDIN):
+    """Bring every day that has assigned plans up to date (cheap; run before each scheduled and each manual run, and when the page opens)."""
+    with _lock:
+        pool = load(ws, platform)
+        dates = sorted({i["assigned"]["date"] for i in _all_items(pool) if i.get("assigned")})
+        if not dates:
+            return
+        posted = posted_titles(ws, platform)
+        for iso in dates:
+            _sync_day(ws, platform, pool, posted, iso)
+
+
 def assign(ws, platform, item_id, day, fmt=None, today=None):
-    """Put a plan on a date. For YouTube `fmt` is "short" or "long". Moves the plan if it was on another date."""
-    from .crew import post_for
+    """Put a plan on a date; a date can hold several, made one at a time. For YouTube `fmt` is "short" or "long". Moves the plan if it
+    was on another date. A plan is on one date only."""
     day = date.fromisoformat(day)
     if day < (today or date.today()):
         raise ValueError("that date has passed: pick today or a later day")
@@ -289,53 +360,36 @@ def assign(ws, platform, item_id, day, fmt=None, today=None):
     with _lock:
         pool = load(ws, platform)
         item = _item(pool, item_id)
-        if status_of(item, posted_titles(ws, platform)) in ("published", "written"):
+        posted = posted_titles(ws, platform)
+        if status_of(item, posted) in ("published", "written"):
             raise ValueError("this plan was already written or published: it is never planned again")
-        taken = next((i for i in _all_items(pool) if i["id"] != item_id and (i.get("assigned") or {}).get("date") == iso), None)
-        if taken:
-            raise ValueError(f"{iso} already has a plan ('{taken['title']}'): unassign it first")
-        if post_for(ws, day, platform):
-            raise ValueError(f"a post is already made for {iso}")
-        cat = category_for_item(ws, platform, fmt)
-        if not cat:
+        waiting = [i for i in _live_items(pool, posted, iso) if i["id"] != item_id]
+        if len(waiting) >= MAX_PER_DAY:
+            raise ValueError(f"{iso} already has {MAX_PER_DAY} plans waiting: make or unassign one first")
+        if not category_for_item(ws, platform, fmt):
             raise ValueError("no post type is available for this app")
         old = (item.get("assigned") or {}).get("date")
-        if old and old != iso:
-            _set_date(ws, platform, old, None)
-            set_entry(ws, old, None, platform)
-        _set_date(ws, platform, iso, cat)
-        brief = {}
-        try:
-            brief = briefmod.normalize({"context": item["context"], "example": item["example"], "takeaway": item["takeaway"],
-                                        "example_kind": "scenario", "generated": ["context", "example", "takeaway"]})
-        except briefmod.BriefError:
-            pass
-        entry = {"category": cat, "topic": item["title"], "angle": item["angle"], "search_queries": item["search_queries"],
-                 "source": "manual", "plan_id": item["id"], "rejected": []}
-        if brief:
-            entry["brief"] = brief
-        if platform != LINKEDIN:
-            entry["format"] = fmt
-        set_entry(ws, iso, entry, platform)
-        item["assigned"] = {"date": iso, **({"format": fmt} if platform != LINKEDIN else {})}
+        item["assigned"] = {"date": iso, "seq": int(time.time() * 1000), **({"format": fmt} if platform != LINKEDIN else {})}
         ws.save_state(_name(platform), pool)
+        if old and old != iso:
+            _sync_day(ws, platform, pool, posted, old)
+        _sync_day(ws, platform, pool, posted, iso)
     return item
 
 
 def unassign(ws, platform, item_id):
-    from .crew import post_for
     with _lock:
         pool = load(ws, platform)
         item = _item(pool, item_id)
         a = item.get("assigned")
         if not a:
             return item
-        if post_for(ws, a["date"], platform):
-            raise ValueError("the post for that date is already written: veto or delete it in the Queue first")
-        _set_date(ws, platform, a["date"], None)
-        set_entry(ws, a["date"], None, platform)
+        posted = posted_titles(ws, platform)
+        if status_of(item, posted) == "written":
+            raise ValueError("this plan is already written: veto or delete its post in the Queue first")
         item["assigned"] = None
         ws.save_state(_name(platform), pool)
+        _sync_day(ws, platform, pool, posted, a["date"])
     return item
 
 

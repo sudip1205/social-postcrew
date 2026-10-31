@@ -22,10 +22,10 @@ const MaskWord: React.FC<{word: string; at: number; color: string; dur?: number}
   );
 };
 
-const Headline: React.FC<{text: string; size: number; at?: number; step?: number; align?: "left" | "center"; accentKey?: boolean}> =
-  ({text, size, at = 0.2, step = 0.14, align = "left", accentKey = true}) => {
+const Headline: React.FC<{text: string; size: number; at?: number; step?: number; align?: "left" | "center"; accentKey?: boolean; keyAt?: number}> =
+  ({text, size, at = 0.2, step = 0.14, align = "left", accentKey = true, keyAt}) => {
     const th = useTheme();
-    const words = text.split(/\s+/).filter(Boolean), key = accentKey ? keyWord(words) : -1;
+    const words = text.split(/\s+/).filter(Boolean), key = accentKey ? (keyAt ?? keyWord(words)) : -1;
     return (
       <div style={{fontSize: size, fontWeight: 700, lineHeight: 1.1, letterSpacing: -size * 0.028, textAlign: align}}>
         {words.map((w, i) => <MaskWord key={i} word={w} at={at + i * step} color={i === key ? th.highlight : th.text} />)}
@@ -67,8 +67,8 @@ const Body: React.FC<{p: VideoProps; s: Scene}> = ({p, s}) => {
   const short = p.format === "short";
   if (s.closing) return <Closing s={s} short={short} />;
   switch (s.layout) {
-    case "title": return <Statement text={s.title} short={short} big />;
-    case "statement": return <Statement text={s.title} short={short} />;
+    case "title": return <Statement text={s.title} short={short} big keyAt={s.key} />;
+    case "statement": return <Statement text={s.title} short={short} keyAt={s.key} />;
     case "points": return <Points s={s} short={short} />;
     case "code": return <Code s={s} short={short} />;
     case "diagram":
@@ -78,10 +78,10 @@ const Body: React.FC<{p: VideoProps; s: Scene}> = ({p, s}) => {
   return null;
 };
 
-const Statement: React.FC<{text: string; short: boolean; big?: boolean}> = ({text, short, big}) => (
+const Statement: React.FC<{text: string; short: boolean; big?: boolean; keyAt?: number}> = ({text, short, big, keyAt}) => (
   <div style={{flex: 1, display: "flex", flexDirection: "column", justifyContent: "center"}}>
     <div style={{marginBottom: 44}}><Rule at={0.1} width={big ? 150 : 110} thick={big ? 9 : 6} /></div>
-    <Headline text={text} size={short ? (big ? 132 : 98) : (big ? 112 : 86)} at={0.35} />
+    <Headline text={text} size={short ? (big ? 132 : 98) : (big ? 112 : 86)} at={0.35} keyAt={keyAt} />
   </div>
 );
 
@@ -163,6 +163,9 @@ const Diagram: React.FC<{s: Scene; short: boolean; flow: boolean}> = ({s, short,
     : {x: bw / 2 + (i * (W - bw)) / Math.max(1, nodes.length - 1 || 1), y: H / 2});
   if (nodes.length === 1) pos[0] = {x: W / 2, y: H / 2};
   const th = useTheme(), {t} = useT();
+  // in a wide video the labels sit on the arrows; when a label is wider than the gap between two boxes they go above and below the row instead
+  const gap = short || nodes.length < 2 ? 0 : (W - bw * nodes.length) / (nodes.length - 1);
+  const tight = !short && edges.some((e) => e.label.length * 14 + 70 > gap - 16);
   return (
     <>
       <Heading text={s.title} short={short} />
@@ -170,7 +173,7 @@ const Diagram: React.FC<{s: Scene; short: boolean; flow: boolean}> = ({s, short,
         <defs>
           <marker id="ah" markerWidth="12" markerHeight="12" refX="9" refY="6" orient="auto"><path d="M0,0 L12,6 L0,12 z" fill={th.accent} /></marker>
         </defs>
-        {edges.map((e, i) => <EdgeView key={i} n={i + 1} e={e} pos={pos} bw={bw} bh={bh} short={short} flow={flow} t={t}
+        {edges.map((e, i) => <EdgeView key={i} n={i + 1} e={e} pos={pos} bw={bw} bh={bh} short={short} flow={flow} t={t} tight={tight}
           lane={edges.some((o) => o.from === e.to && o.to === e.from) ? 1 : 0} />)}
         {nodes.map((n, i) => <NodeView key={i} n={n} at={pos[i]} bw={bw} bh={bh} short={short}
           active={flow && edges.some((e) => (e.from === i || e.to === i) && t >= e.t && t < e.t + 1.6)} />)}
@@ -189,7 +192,7 @@ const NodeView: React.FC<{n: Box; at: P; bw: number; bh: number; short: boolean;
   );
 };
 
-const EdgeView: React.FC<{n: number; e: Edge; pos: P[]; bw: number; bh: number; short: boolean; flow: boolean; t: number; lane: number}> = ({n, e, pos, bw, bh, short, flow, t, lane}) => {
+const EdgeView: React.FC<{n: number; e: Edge; pos: P[]; bw: number; bh: number; short: boolean; flow: boolean; t: number; lane: number; tight?: boolean}> = ({n, e, pos, bw, bh, short, flow, t, lane, tight}) => {
   const th = useTheme();
   const a = pos[e.from], b = pos[e.to];
   const dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy) || 1;
@@ -213,7 +216,7 @@ const EdgeView: React.FC<{n: number; e: Edge; pos: P[]; bw: number; bh: number; 
       <line x1={x1} y1={y1} x2={px} y2={py} stroke={th.accent} strokeWidth={4} strokeLinecap="round" strokeDasharray={e.from > e.to ? "3 12" : undefined}
         markerEnd={grow > 0.98 ? "url(#ah)" : undefined} />
       {grow > 0.55 && (
-        <g transform={`translate(${mx} ${my + (short ? 0 : lane ? (e.from < e.to ? 50 : -50) : -38)})`} opacity={Math.min(1, (grow - 0.55) * 2.2)}>
+        <g transform={`translate(${mx} ${my + (short ? 0 : tight ? (lane && e.from < e.to ? bh / 2 + 40 : -(bh / 2 + 40)) : lane ? (e.from < e.to ? 50 : -50) : -38)})`} opacity={Math.min(1, (grow - 0.55) * 2.2)}>
           <rect x={-lab / 2} y={-26} width={lab || 52} height={52} rx={26} fill={th.bg} stroke={th.rule} strokeWidth={2} />
           <circle cx={lab ? -lab / 2 + 26 : 0} cy={0} r={15} fill={th.accent} />
           <text x={lab ? -lab / 2 + 26 : 0} y={1} textAnchor="middle" dominantBaseline="central" fill={th.bg} fontSize={19} fontWeight={700} fontFamily={MONO}>{n}</text>

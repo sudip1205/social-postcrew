@@ -39,6 +39,8 @@ def run_crew(ws, day=None, category=None, llm=None, fetch=fetch_text, dry_run=Fa
              platform=LINKEDIN, options=None):
     """Run the whole crew for one post on one platform. Returns the supervisor result plus run_id. One run at a time.
     options: one-off overrides for this run (a YouTube video's "format" and "target_seconds")."""
+    from . import monthly
+    monthly.sync_all(ws, platform)   # a day with several plans: this run makes the first one still to make
     full = ws.config()
     try:
         cfg = platforms.view(full, platform)

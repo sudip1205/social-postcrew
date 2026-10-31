@@ -117,6 +117,16 @@ def _trace(scene, words):
     return {"cells": [str(c) for c in scene.get("cells") or []], "steps": steps}
 
 
+def _marked(text):
+    """On-screen text with the word to highlight chosen by hand: "Welcome to *Dive*" -> ("Welcome to Dive", 2). Without a marker the
+    longest word is highlighted (key is None)."""
+    m = re.search(r"\*([^*]+)\*", text)
+    if not m:
+        return text, None
+    clean = (text[:m.start()] + m.group(1) + text[m.end():]).strip()
+    return clean, len(text[:m.start()].split())
+
+
 def build_props(scenes, fmt, audio, look=None):
     """The JSON the Remotion project is rendered from, and the length of each scene in seconds."""
     if fmt not in FORMATS:
@@ -127,9 +137,12 @@ def build_props(scenes, fmt, audio, look=None):
         a = audio[i] if isinstance(audio, (list, tuple)) else None
         words = _times(sc, ln, a)
         layout = sc.get("layout") or "statement"
-        item = {"layout": layout, "title": str(sc.get("on_screen") or ""), "items": [str(x) for x in sc.get("items") or []],
+        title, key = _marked(str(sc.get("on_screen") or ""))
+        item = {"layout": layout, "title": title, "items": [str(x) for x in sc.get("items") or []],
                 "code": str(sc.get("code") or ""), "language": str(sc.get("language") or ""),
                 "seconds": round(ln, 3), "captions": _captions(words)}
+        if key is not None:
+            item["key"] = key
         if sc.get("closing"):   # "Like · Comment · Share": each part appears when the voice says it
             parts = [p for p in re.split(r"\s*[·•|,/]\s*|\s+and\s+", item["title"]) if p] or [item["title"]]
             item.update(closing=True, items=parts, cues=[_when(p, words, float(sc.get("lead_s") or 0)) for p in parts])
@@ -202,5 +215,20 @@ def thumbnail(script, out_path, cfg=None, look=None):
                                  "illustration": illustration(script)}))
     _run(["npx", "remotion", "still", "src/index.ts", "Thumbnail", str(out_path), f"--props={props}", "--log=error"],
          root, "Remotion thumbnail", timeout=600)
+    props.unlink(missing_ok=True)
+    return out_path
+
+
+def channel_art(out_path, name, tagline, topics, look="ink", guides=False, cfg=None):
+    """The channel cover (2560x1440): the name, a line on what the channel is, the topics. The text sits in the centre that a phone shows
+    (1546x423); a quiet diagram motif fills the wide area. guides=True draws the safe areas on it, for checking only."""
+    bad = problems(cfg)
+    if bad:
+        raise VideoError("; ".join(bad))
+    root = project_dir(cfg)
+    install(root)
+    props = Path(out_path).with_suffix(".props.json")
+    props.write_text(json.dumps({"name": name, "tagline": tagline, "topics": list(topics), "theme": looks.theme(look), "guides": bool(guides)}))
+    _run(["npx", "remotion", "still", "src/index.ts", "ChannelArt", str(out_path), f"--props={props}", "--log=error"], root, "Remotion channel art", timeout=600)
     props.unlink(missing_ok=True)
     return out_path
