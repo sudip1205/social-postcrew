@@ -300,3 +300,13 @@ want richer motion graphics later:
 | **After Effects + MCP** | Studio-quality motion graphics | Needs a paid Adobe licence and the app open with a bridge panel running; not suitable for an unattended pipeline. |
 
 Sources: the Remotion, Manim and Motion Canvas comparisons and the After Effects MCP repositories listed in the pull request notes.
+
+
+## Moving pictures (Remotion videos)
+
+- **Box states and counts**: a diagram box is `Label|icon|third`, where the third part is `down`, `busy` or a number (a count tile).
+- **Packets**: an arrow label ending in `x4` sends four packets; ending in `!` the packet is dropped at the far box.
+- **Fan-out**: when one box sends to several, the layout puts the sender above the receivers automatically.
+- **Code scenes** are editor windows; the file name is the scene's on-screen title, and up to five output lines in `items` print in a terminal panel.
+- **Stat scenes** (`layout: stat`): `items = ["600 PB", "caption"]`, optional `cells = ["7", "10"]` and a `clip` icon.
+- **Closing card**: `Like · Comment · Share · Subscribe` is drawn as four buttons pressed as the voice says them.

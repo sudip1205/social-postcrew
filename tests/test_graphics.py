@@ -128,3 +128,47 @@ class SplitLongScenesTests(unittest.TestCase):
         long = [{"layout": "diagram", "part": "idea", "nodes": ["Client", "Server"], "narration": "The client calls the server. " + "word " * 120}]
         self.assertTrue(any("split it" in p for p in storyboard_problems(long, dict(self.SPEC))))
         self.assertFalse(any("split it" in p for p in storyboard_problems(long, dict(self.SPEC, artist=True))))
+
+
+class MovingPicturesTests(unittest.TestCase):
+    def test_a_box_can_be_down_busy_or_carry_a_count(self):
+        from postcrew.render.scenes import node_extra, split_node
+        self.assertEqual(split_node("Server 3|lucide:server|down"), ("Server 3", "lucide:server"))        # the icon is still the second part
+        self.assertEqual(node_extra("Server 3|lucide:server|down"), ("down", None))
+        self.assertEqual(node_extra("Server 2|lucide:server|busy"), ("busy", None))
+        self.assertEqual(node_extra("Server A|lucide:server|4"), ("", 4))
+        self.assertEqual(node_extra("Server B|lucide:server"), ("", None))
+        self.assertEqual(node_extra("Server C|lucide:server|nonsense"), ("", None))
+
+    def test_arrow_labels_can_send_several_packets_or_drop_one(self):
+        from postcrew.render.scenes import edge_marks
+        self.assertEqual(edge_marks("requests x4"), ("requests", 4, False))
+        self.assertEqual(edge_marks("GET /a !"), ("GET /a", 1, True))
+        self.assertEqual(edge_marks("plain"), ("plain", 1, False))
+
+    def test_props_carry_states_counts_packets_and_the_closing_buttons(self):
+        base = {"items": [], "nodes": [], "edges": [], "code": "", "language": "", "cells": [], "steps": []}
+        scenes = [dict(base, layout="flow", on_screen="Down", narration="The load balancer sends requests to server three, which is down.",
+                       nodes=["Load Balancer|lucide:network", "Server 3|lucide:server|down", "Server 1|lucide:server|3"],
+                       edges=["Load Balancer > Server 3: GET /a x2 !", "Load Balancer > Server 1: ok"]),
+                  dict(base, layout="statement", closing=True, on_screen="Like · Comment · Share · Subscribe",
+                       narration="Please like, comment, share and subscribe.")]
+        props, _ = rm.build_props(scenes, "long", None)
+        nodes = props["scenes"][0]["nodes"]
+        self.assertEqual((nodes[1]["state"], nodes[2]["count"]), ("down", 3))
+        e = props["scenes"][0]["edges"][0]
+        self.assertEqual((e["label"], e["n"], e["drop"]), ("GET /a", 2, True))
+        buttons = props["scenes"][1]["buttons"]
+        self.assertEqual([b["kind"] for b in buttons], ["like", "comment", "share", "subscribe"])
+        self.assertTrue(all(b["svg"] and b["svg"]["body"] for b in buttons))
+        self.assertEqual(len(props["scenes"][1]["cues"]), 4)
+
+    def test_a_stat_scene_needs_a_number_and_only_remotion_draws_it(self):
+        from postcrew.checks import script_problems
+        spec = {"format": "long", "wps": 2.5, "target_seconds": 300, "max_words": 750, "renderer": "remotion"}
+        sc = {"layout": "stat", "on_screen": "of traffic", "items": ["600 PB"], "narration": "Six hundred petabytes every day.", "part": "idea"}
+        ok = [p for p in script_problems({"scenes": [sc], "text": sc["narration"]}, spec, {"label": "x"}, {"blocklist": [], "about": []}) if "'stat' scene" in p]
+        self.assertEqual(ok, [])
+        bad = dict(sc, items=["lots"])
+        self.assertTrue(any("needs the number first" in p for p in script_problems({"scenes": [bad], "text": "x"}, spec, {"label": "x"}, {"blocklist": [], "about": []})))
+        self.assertTrue(any("only by the Remotion" in p for p in script_problems({"scenes": [sc], "text": "x"}, dict(spec, renderer="ffmpeg"), {"label": "x"}, {"blocklist": [], "about": []})))

@@ -1,14 +1,14 @@
 export type Caption = {text: string; start: number; end: number};
 export type Svg = {body: string; w: number; h: number; color: boolean};   // an icon or clipart: the inner markup of an SVG (render/iconlib.py)
-export type Box = {label: string; icon: string; t: number; svg?: Svg | null};
-export type Edge = {from: number; to: number; label: string; t: number};
+export type Box = {label: string; icon: string; t: number; svg?: Svg | null; state?: "" | "ok" | "busy" | "down"; count?: number | null};
+export type Edge = {from: number; to: number; label: string; t: number; n?: number; drop?: boolean};
 export type Step = {
   t: number; pointers: {name: string; at: number}[]; active: number[]; out: number[]; found: number[]; note: string; memo: string[];
 };
 export type Scene = {
-  layout: "title" | "statement" | "points" | "code" | "diagram" | "flow" | "trace";
+  layout: "title" | "statement" | "points" | "code" | "diagram" | "flow" | "trace" | "stat";
   title: string; items: string[]; code: string; language: string; seconds: number; captions: Caption[];
-  nodes?: Box[]; edges?: Edge[]; cells?: string[]; steps?: Step[]; cues?: number[]; closing?: boolean; key?: number; clip?: Svg;
+  nodes?: Box[]; edges?: Edge[]; cells?: string[]; steps?: Step[]; cues?: number[]; closing?: boolean; key?: number; clip?: Svg; buttons?: {label: string; kind: string; svg?: Svg | null}[];
 };
 /** The colours of a look: defined in postcrew/render/looks.py and sent with every render. */
 export type Theme = {

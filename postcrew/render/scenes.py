@@ -161,9 +161,31 @@ ICONS = ("client", "phone", "server", "database", "cache", "queue", "gateway", "
 
 
 def split_node(n):
-    """A diagram box as written: 'API Gateway' or 'API Gateway|gateway' -> (label, icon hint or '')."""
-    label, _, icon = str(n or "").partition("|")
-    return label.strip(), icon.strip().lower()
+    """A diagram box as written: 'API Gateway', 'API Gateway|gateway' or 'Server 3|lucide:server|down' -> (label, icon hint or '')."""
+    label, _, rest = str(n or "").partition("|")
+    return label.strip(), rest.partition("|")[0].strip().lower()
+
+
+NODE_STATES = ("ok", "busy", "down")
+
+
+def node_extra(n):
+    """The third part of a box: 'Server 3|lucide:server|down' -> ("down", None); 'Server A|lucide:server|4' -> ("", 4) (a count shown on the box);
+    'Server B|lucide:server|busy' -> ("busy", None). Anything else -> ("", None)."""
+    extra = str(n or "").partition("|")[2].partition("|")[2].strip().lower()
+    if extra in NODE_STATES:
+        return extra, None
+    return ("", int(extra)) if re.fullmatch(r"\d{1,4}", extra) else ("", None)
+
+
+def edge_marks(label):
+    """The marks on an arrow's label: 'GET /a x4' = four packets, 'GET /a !' = the packet is dropped. -> (clean label, packets, dropped)."""
+    text = str(label or "")
+    m = re.search(r"\bx([2-9])\b", text)
+    n = int(m.group(1)) if m else 1
+    drop = bool(re.search(r"\s*!\s*$", text))
+    clean = re.sub(r"\s*!\s*$", "", re.sub(r"\s*\bx[2-9]\b", "", text)).strip()
+    return clean, n, drop
 
 
 def parse_edge(edge, nodes):

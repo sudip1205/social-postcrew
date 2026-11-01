@@ -98,6 +98,7 @@ const Body: React.FC<{p: VideoProps; s: Scene}> = ({p, s}) => {
     case "diagram":
     case "flow": return <Diagram s={s} short={short} flow={s.layout === "flow"} />;
     case "trace": return <Trace s={s} short={short} />;
+    case "stat": return <Stat s={s} short={short} />;
   }
   return null;
 };
@@ -109,23 +110,40 @@ const Statement: React.FC<{text: string; short: boolean; big?: boolean; keyAt?: 
   </div>
 );
 
-/** The closing line: "Like · Comment · Share", each part appears when the voice says it, after a quiet beat. */
-const Closing: React.FC<{s: Scene; short: boolean}> = ({s, short}) => {
-  const th = useTheme();
+/** The closing card: real-looking buttons (Like, Comment, Share, Subscribe). Each appears, and is pressed when the voice says its word: it dips, ripples
+ *  and changes state (a filled thumb with a +1, a ringing bell that turns "Subscribed"). */
+const PressButton: React.FC<{b: {label: string; kind: string; svg?: Svg | null}; at: number; short: boolean; index: number}> = ({b, at, short, index}) => {
+  const th = useTheme(), {t} = useT();
+  const enter = useProgress(Math.max(0, at - 0.9 + index * 0.05), 0.7);
+  const dt = t - at, press = 0.16;
+  const down = dt < 0 ? 0 : dt < press ? dt / press : dt < press + 0.4 ? 1 - (dt - press) / 0.4 : 0;
+  const pressed = dt >= press;
+  const scale = (0.9 + 0.1 * enter) * (1 - 0.08 * down) * (pressed && dt < press + 0.5 ? 1 + 0.04 * Math.sin(((dt - press) / 0.5) * Math.PI) : 1);
+  const hot = b.kind === "subscribe" ? th.highlight : th.accent;
+  const ring = dt >= press && dt < press + 1.1 ? (dt - press) / 1.1 : -1;
+  const wiggle = b.kind === "subscribe" && pressed && dt < press + 1.2 ? Math.sin((dt - press) * 26) * 22 * (1 - (dt - press) / 1.2) : 0;
+  const pop = b.kind === "like" && pressed && dt < press + 0.9 ? (dt - press) / 0.9 : -1;
+  const h = short ? 132 : 104, isz = short ? 60 : 46, fs = short ? 54 : 42;
+  const label = b.kind === "subscribe" && pressed ? "Subscribed" : b.label;
   return (
-    <div style={{flex: 1, display: "flex", flexDirection: "column", justifyContent: "center"}}>
-      <div style={{marginBottom: 56}}><Rule at={0.15} width={short ? 150 : 130} thick={7} dur={1.4} /></div>
-      {s.items.map((part, i) => {
-        const at = s.cues?.[i] ?? 0.8 + i * 0.8;
-        return (
-          <div key={i}>
-            <Rule at={at - 0.1} width="100%" thick={2} color={th.rule} dur={1.0} />
-            <div style={{padding: short ? "30px 0" : "20px 0", fontSize: short ? 124 : 96, fontWeight: 700, letterSpacing: -4, lineHeight: 1.05}}>
-              <MaskWord word={part} at={at} color={i === s.items.length - 1 ? th.highlight : th.text} dur={1.1} />
-            </div>
-          </div>
-        );
-      })}
+    <div style={{position: "relative", opacity: enter, transform: `translateY(${(1 - enter) * 30}px) scale(${scale})`}}>
+      {ring >= 0 && <div style={{position: "absolute", inset: 0, borderRadius: h, border: `4px solid ${hot}`, opacity: 0.6 * (1 - ring), transform: `scale(${1 + ring * 0.35})`}} />}
+      <div style={{height: h, padding: `0 ${short ? 56 : 44}px`, borderRadius: h, display: "flex", alignItems: "center", justifyContent: "center", gap: 22,
+        background: pressed ? hot : th.surface, border: `3px solid ${pressed ? hot : th.text}`, color: pressed ? th.bg : th.text, boxShadow: pressed ? "none" : `0 6px 0 ${th.rule}`,
+        fontWeight: 700, fontSize: fs, letterSpacing: -1, whiteSpace: "nowrap"}}>
+        <svg width={isz} height={(isz * (b.svg?.h ?? 24)) / (b.svg?.w ?? 24)} viewBox={`0 0 ${b.svg?.w ?? 24} ${b.svg?.h ?? 24}`} style={{color: "inherit", transform: `rotate(${wiggle}deg)`, transformOrigin: "50% 15%"}}
+          fill={pressed && b.kind === "like" ? "currentColor" : "none"} dangerouslySetInnerHTML={{__html: b.svg?.body ?? ""}} />
+        <span>{label}</span>
+      </div>
+      {pop >= 0 && <div style={{position: "absolute", right: 28, top: -10 - pop * 60, opacity: 1 - pop, fontFamily: MONO, fontWeight: 700, fontSize: short ? 44 : 34, color: hot}}>+1</div>}
+    </div>
+  );
+};
+const Closing: React.FC<{s: Scene; short: boolean}> = ({s, short}) => {
+  const buttons = s.buttons ?? s.items.map((x) => ({label: x, kind: x.toLowerCase(), svg: null}));
+  return (
+    <div style={{flex: 1, display: "flex", flexDirection: short ? "column" : "row", flexWrap: "wrap", alignItems: "center", justifyContent: "center", gap: short ? 44 : 40}}>
+      {buttons.map((bt, i) => <PressButton key={i} b={bt} at={s.cues?.[i] ?? 0.8 + i * 0.8} short={short} index={i} />)}
     </div>
   );
 };
@@ -152,44 +170,139 @@ const PointRow: React.FC<{n: number; text: string; at: number; short: boolean}> 
   );
 };
 
-const KEYWORDS = /\b(def|return|if|else|elif|for|while|in|not|and|or|import|from|class|const|let|var|function|new|true|false|True|False|None|null|async|await|break|continue)\b/g;
+const KEYWORDS = /\b(def|return|if|else|elif|for|while|in|not|and|or|import|from|class|const|let|var|function|new|true|false|True|False|None|null|async|await|break|continue|try|except|catch|finally|raise|throw|with|as|yield|switch|case|default|select|where|insert|into|values|create|table|upstream|server|location|proxy_pass|listen)\b/;
+const TOKEN = new RegExp(`(#.*$|//.*$|--.*$)|("[^"]*"|'[^']*')|\\b(\\d+(?:\\.\\d+)?)\\b|${KEYWORDS.source}`, "g");
+const EXT: Record<string, string> = {python: "py", javascript: "js", typescript: "ts", java: "java", go: "go", sql: "sql", bash: "sh", shell: "sh", nginx: "conf", yaml: "yml", json: "json", rust: "rs", c: "c", cpp: "cpp"};
+/** One line of code with its colours: comments muted, strings in the positive colour, numbers highlighted, keywords in the accent. */
+const Colored: React.FC<{line: string}> = ({line}) => {
+  const th = useTheme(), out: React.ReactNode[] = [];
+  let last = 0, m: RegExpExecArray | null;
+  TOKEN.lastIndex = 0;
+  while ((m = TOKEN.exec(line))) {
+    if (m.index > last) out.push(line.slice(last, m.index));
+    const col = m[1] ? th.muted : m[2] ? th.positive : m[3] ? th.highlight : th.accent;
+    out.push(<span key={m.index} style={{color: col, fontWeight: m[1] || m[2] || m[3] ? 400 : 700, fontStyle: m[1] ? "italic" : "normal"}}>{m[0]}</span>);
+    last = m.index + m[0].length;
+    if (m[0].length === 0) TOKEN.lastIndex++;
+  }
+  if (last < line.length) out.push(line.slice(last));
+  return <>{out}</>;
+};
+/** A code scene drawn as an editor window: title bar, a file tab, line numbers, the line being typed highlighted with a blinking caret, and, when the
+ *  scene has output lines in "items", a terminal panel that prints them once the code is typed. */
 const Code: React.FC<{s: Scene; short: boolean}> = ({s, short}) => {
   const th = useTheme(), {t} = useT();
   const lines = s.code.replace(/\s+$/, "").split("\n");
-  const shown = interpolate(t, [0.5, Math.max(1.2, s.seconds * 0.8)], [0, lines.length], {extrapolateLeft: "clamp", extrapolateRight: "clamp"});
-  const size = Math.min(short ? 50 : 36, ((short ? 800 : 1500) / Math.max(12, ...lines.map((l) => l.length))) * 1.65);
+  const typeEnd = Math.max(1.2, s.seconds * (s.items?.length ? 0.55 : 0.8));
+  const shown = interpolate(t, [0.5, typeEnd], [0, lines.length], {extrapolateLeft: "clamp", extrapolateRight: "clamp"});
+  const size = Math.min(short ? 46 : 34, ((short ? 780 : 1380) / Math.max(12, ...lines.map((l) => l.length))) * 1.65);
+  const file = /\.\w{1,5}$/.test(s.title) ? s.title : `main.${EXT[(s.language || "").toLowerCase()] ?? "txt"}`;
+  const cur = Math.min(lines.length - 1, Math.floor(shown)), done = shown >= lines.length, caret = Math.floor(t * 2.4) % 2 === 0;
+  const out = s.items ?? [], termStart = typeEnd + 0.4;
   return (
     <>
       <Heading text={s.title} short={short} />
-      <div style={{background: th.surface, border: `2px solid ${th.rule}`, borderRadius: 14, padding: short ? "36px 40px" : "28px 36px", fontFamily: MONO, fontSize: size, lineHeight: 1.6}}>
-        <div style={{color: th.muted, fontSize: 22, letterSpacing: 2, textTransform: "uppercase", marginBottom: 18}}>{s.language}</div>
-        {lines.map((l, i) => {
-          const a = Math.max(0, Math.min(1, shown - i));
-          return (
-            <div key={i} style={{display: "flex", gap: 28, whiteSpace: "pre", opacity: ease(a), transform: `translateY(${(1 - ease(a)) * 10}px)`}}>
-              <span style={{color: th.muted, minWidth: 34, textAlign: "right"}}>{i + 1}</span>
-              <span>{l.split(KEYWORDS).map((part, j) => (j % 2 ? <span key={j} style={{color: th.accent, fontWeight: 700}}>{part}</span> : part))}</span>
-            </div>
-          );
-        })}
+      <div style={{border: `2px solid ${th.rule}`, borderRadius: 16, overflow: "hidden", background: th.surface}}>
+        <div style={{height: 52, display: "flex", alignItems: "center", gap: 10, padding: "0 20px", background: th.accentSoft, borderBottom: `2px solid ${th.rule}`}}>
+          {[0, 1, 2].map((i) => <span key={i} style={{width: 14, height: 14, borderRadius: 14, background: th.muted, opacity: 0.6}} />)}
+          <span style={{marginLeft: 18, fontFamily: MONO, fontSize: 20, color: th.muted}}>{file}</span>
+          <span style={{marginLeft: "auto", fontFamily: MONO, fontSize: 18, color: th.muted, letterSpacing: 2, textTransform: "uppercase"}}>{s.language}</span>
+        </div>
+        <div style={{padding: short ? "28px 36px" : "22px 30px", fontFamily: MONO, fontSize: size, lineHeight: 1.6}}>
+          {lines.map((l, i) => {
+            const a = Math.max(0, Math.min(1, shown - i)), active = i === cur && !done;
+            return (
+              <div key={i} style={{display: "flex", gap: 26, whiteSpace: "pre", opacity: ease(a), background: active ? th.accentSoft : "transparent", margin: "0 -14px", padding: "0 14px", borderRadius: 6,
+                transform: `translateY(${(1 - ease(a)) * 10}px)`}}>
+                <span style={{color: th.muted, minWidth: 34, textAlign: "right", opacity: 0.8}}>{i + 1}</span>
+                <span><Colored line={l} />{active && caret && <span style={{display: "inline-block", width: size * 0.5, height: size * 1.05, background: th.accent, marginLeft: 3, verticalAlign: "text-bottom"}} />}</span>
+              </div>
+            );
+          })}
+        </div>
+        {out.length > 0 && (
+          <div style={{borderTop: `2px solid ${th.rule}`, padding: short ? "20px 36px 26px" : "16px 30px 22px", fontFamily: MONO, fontSize: size * 0.82, lineHeight: 1.55, opacity: ease(Math.min(1, Math.max(0, (t - termStart + 0.3) / 0.5)))}}>
+            <div style={{color: th.muted, fontSize: 17, letterSpacing: 3, textTransform: "uppercase", marginBottom: 10}}>Terminal</div>
+            {out.map((o, i) => {
+              const at = termStart + i * 0.55, a = Math.max(0, Math.min(1, (t - at) / 0.3));
+              return <div key={i} style={{display: "flex", gap: 14, whiteSpace: "pre", opacity: ease(a), color: i === 0 ? th.text : th.muted}}><span style={{color: th.accent}}>{i === 0 ? "$" : ">"}</span><span>{o}</span></div>;
+            })}
+          </div>
+        )}
+      </div>
+    </>
+  );
+};
+
+/** A big number that counts up, with an optional row of icons showing "a of b" (for example 7 of 10 highlighted). */
+const Stat: React.FC<{s: Scene; short: boolean}> = ({s, short}) => {
+  const th = useTheme(), {t} = useT();
+  const value = s.items[0] ?? "", caption = s.items[1] ?? "";
+  const m = value.match(/^([^\d]*)([\d,]*\.?\d+)(.*)$/);
+  const start = s.cues?.[0] ?? 0.4, p = ease(Math.max(0, Math.min(1, (t - start) / 1.6)));
+  const target = m ? parseFloat(m[2].replace(/,/g, "")) : 0, decimals = m && m[2].includes(".") ? m[2].split(".")[1].length : 0;
+  const shownNum = m ? (target * p).toLocaleString("en-US", {minimumFractionDigits: decimals, maximumFractionDigits: decimals}) : "";
+  const [a, b] = [parseInt(s.cells?.[0] ?? "0", 10) || 0, parseInt(s.cells?.[1] ?? "0", 10) || 0], n = Math.min(b, 20);
+  const lit = Math.round((a / Math.max(1, b)) * n);
+  return (
+    <>
+      <Heading text={s.title} short={short} />
+      <div style={{flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", gap: short ? 40 : 26}}>
+        <div style={{fontWeight: 800, letterSpacing: -6, lineHeight: 1, color: th.highlight, fontSize: short ? 250 : 230, opacity: ease(Math.min(1, t / 0.5))}}>
+          {m ? <>{m[1]}{shownNum}{m[3]}</> : value}
+        </div>
+        {caption && <div style={{fontSize: short ? 56 : 44, fontWeight: 600, color: th.text, opacity: ease(Math.max(0, Math.min(1, (t - start - 0.6) / 0.6)))}}>{caption}</div>}
+        {n > 0 && (
+          <div style={{display: "flex", flexWrap: "wrap", gap: short ? 22 : 18}}>
+            {Array.from({length: n}).map((_, i) => {
+              const on = i < lit, at = start + 0.8 + i * 0.07, ap = ease(Math.max(0, Math.min(1, (t - at) / 0.4)));
+              return (
+                <div key={i} style={{opacity: ap, transform: `scale(${0.6 + 0.4 * ap})`, color: on ? th.highlight : th.muted}}>
+                  {s.clip ? <Glyph svg={s.clip} size={short ? 76 : 62} color={on ? th.highlight : th.muted} /> : <div style={{width: short ? 60 : 48, height: short ? 60 : 48, borderRadius: 12, background: on ? th.highlight : th.rule}} />}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </>
   );
 };
 
 type P = {x: number; y: number};
+/** Where each box goes. A plain chain (each box passes to one next box) keeps the single row (wide) or column (vertical). Anything else, like a load balancer
+ *  handing requests to several servers, is laid out in layers: who sends is above, who receives is below, so no arrow crosses a box. */
+function layout(nodes: Box[], edges: Edge[], short: boolean, W: number, H: number) {
+  const n = nodes.length, pairs = new Set(edges.map((e) => `${e.from}>${e.to}`));
+  const fwd = edges.filter((e) => !(e.from > e.to && pairs.has(`${e.to}>${e.from}`)));   // a reply goes back along its request: it is not a new step
+  const out: number[] = Array(n).fill(0), inn: number[] = Array(n).fill(0);
+  new Set(fwd.map((e) => `${e.from}>${e.to}`)).forEach((k) => { const [f, t] = k.split(">").map(Number); out[f]++; inn[t]++; });
+  const chain = n < 3 || (out.every((x) => x <= 1) && inn.every((x) => x <= 1));
+  const hasIcon = nodes.some((x) => x.svg);
+  if (chain) {
+    const bw = short ? 640 : Math.max(190, Math.min(340, (W - 112 * (n - 1)) / Math.max(1, n))), bh = short ? 150 : (hasIcon ? 190 : 150);
+    const pos: P[] = nodes.map((_, i) => short ? {x: W / 2, y: bh / 2 + (i * (H - bh)) / Math.max(1, n - 1 || 1)} : {x: bw / 2 + (i * (W - bw)) / Math.max(1, n - 1 || 1), y: H / 2});
+    if (n === 1) pos[0] = {x: W / 2, y: H / 2};
+    return {pos, bw, bh, layered: false};
+  }
+  const depth: number[] = Array(n).fill(0);
+  for (let it = 0; it < n; it++) fwd.forEach((e) => { if (depth[e.to] < depth[e.from] + 1) depth[e.to] = depth[e.from] + 1; });
+  const rows = Math.max(...depth) + 1, perRow = Array.from({length: rows}, (_, r) => nodes.map((_, i) => i).filter((i) => depth[i] === r)), widest = Math.max(...perRow.map((r) => r.length));
+  const bw = short ? Math.min(640, W / widest - 28) : Math.max(180, Math.min(340, W / widest - 70));
+  const bh = Math.min(short ? 150 : (hasIcon ? 190 : 150), (H - (rows - 1) * (short ? 100 : 112)) / rows);
+  const pos: P[] = Array(n).fill(null).map(() => ({x: 0, y: 0}));
+  perRow.forEach((row, r) => row.forEach((i, j) => { pos[i] = {x: ((j + 0.5) * W) / row.length, y: rows === 1 ? H / 2 : bh / 2 + (r * (H - bh)) / (rows - 1)}; }));
+  return {pos, bw, bh, layered: true};
+}
+
 const Diagram: React.FC<{s: Scene; short: boolean; flow: boolean}> = ({s, short, flow}) => {
   const nodes = s.nodes ?? [], edges = s.edges ?? [];
   const W = short ? 888 : 1620, H = short ? 1060 : 680;
-  const bw = short ? 640 : Math.max(190, Math.min(340, (W - 112 * (nodes.length - 1)) / Math.max(1, nodes.length))), bh = short ? 150 : (nodes.some((n) => n.svg) ? 190 : 150);   // a wide video: big boxes, an icon above the label
-  const pos: P[] = nodes.map((_, i) => short
-    ? {x: W / 2, y: bh / 2 + (i * (H - bh)) / Math.max(1, nodes.length - 1 || 1)}
-    : {x: bw / 2 + (i * (W - bw)) / Math.max(1, nodes.length - 1 || 1), y: H / 2});
-  if (nodes.length === 1) pos[0] = {x: W / 2, y: H / 2};
+  const {pos, bw, bh, layered} = layout(nodes, edges, short, W, H);
   const th = useTheme(), {t} = useT();
-  // in a wide video the labels sit on the arrows; when a label is wider than the gap between two boxes they go above and below the row instead
-  const gap = short || nodes.length < 2 ? 0 : (W - bw * nodes.length) / (nodes.length - 1);
-  const tight = !short && edges.some((e) => e.label.length * 16 + 70 > gap - 16);
+  // in a wide chain the labels sit on the arrows; when a label is wider than the gap between two boxes they go above and below the row instead
+  const gap = short || nodes.length < 2 || layered ? 0 : (W - bw * nodes.length) / (nodes.length - 1);
+  const tight = !short && !layered && edges.some((e) => e.label.length * 16 + 70 > gap - 16);
   return (
     <>
       <Heading text={s.title} short={short} />
@@ -197,7 +310,7 @@ const Diagram: React.FC<{s: Scene; short: boolean; flow: boolean}> = ({s, short,
         <defs>
           <marker id="ah" markerWidth="12" markerHeight="12" refX="9" refY="6" orient="auto"><path d="M0,0 L12,6 L0,12 z" fill={th.accent} /></marker>
         </defs>
-        {edges.map((e, i) => <EdgeView key={i} n={i + 1} e={e} pos={pos} bw={bw} bh={bh} short={short} flow={flow} t={t} tight={tight}
+        {edges.map((e, i) => <EdgeView key={i} n={i + 1} e={e} pos={pos} bw={bw} bh={bh} short={short} flow={flow} t={t} tight={tight} layered={layered}
           lane={edges.some((o) => o.from === e.to && o.to === e.from) ? 1 : 0} />)}
         {nodes.map((n, i) => <NodeView key={i} n={n} at={pos[i]} bw={bw} bh={bh} short={short}
           active={flow && edges.some((e) => (e.from === i || e.to === i) && t >= e.t && t < e.t + 1.6)} />)}
@@ -210,17 +323,32 @@ const NodeView: React.FC<{n: Box; at: P; bw: number; bh: number; short: boolean;
   const th = useTheme(), p = useProgress(n.t, 0.9);
   // a long label in a wide video goes on two lines so it can be big; the size fits the longest line to the box
   const words = n.label.split(" "), half = Math.ceil(words.length / 2);
-  const lines = !short && n.label.length > 9 && words.length > 1 ? [words.slice(0, half).join(" "), words.slice(half).join(" ")] : [n.label];
-  const icon = n.svg ?? null, isz = short ? 84 : 58;   // an icon sits above the label in a wide box and to the left of it in a vertical one
-  const room = icon && short ? bw - isz - 90 : bw - 40;
-  const fs = short ? 52 : Math.max(26, Math.min(icon ? 40 : 48, room / (Math.max(...lines.map((l) => l.length)) * 0.58)));
-  const lx = icon && short ? (isz + 24) / 2 : 0, ly0 = icon && !short ? 34 : 0;
-  const col = active ? th.accent : th.text;
+  const lines = (!short || bw < 420) && n.label.length > 9 && words.length > 1 ? [words.slice(0, half).join(" "), words.slice(half).join(" ")] : [n.label];
+  const narrow = bw < 420, icon = n.svg ?? null, isz = short && !narrow ? 84 : bh < 170 ? 46 : 58;   // an icon sits above the label in a wide box and to the left of it in a vertical one
+  const room = icon && short && !narrow ? bw - isz - 90 : bw - 40;
+  const fs = short && !narrow ? 52 : Math.max(24, Math.min(icon ? (bh < 170 ? 31 : 40) : 48, room / (Math.max(...lines.map((l) => l.length)) * 0.58)));
+  const lx = icon && short && !narrow ? (isz + 24) / 2 : 0, ly0 = icon && (!short || narrow) ? (bh < 170 && lines.length > 1 ? 24 : 34) : 0;
+  const down = n.state === "down", busy = n.state === "busy", {t} = useT();
+  const col = down ? th.muted : busy ? th.highlight : active ? th.accent : th.text;
+  const pulse = busy ? 0.5 + 0.5 * Math.sin(t * 6) : 0;
   return (
-    <g transform={`translate(${at.x} ${at.y + (1 - p) * 16})`} opacity={p}>
-      <rect x={-bw / 2} y={-bh / 2} width={bw} height={bh} rx={12} fill={active ? th.accentSoft : th.surface} stroke={active ? th.accent : th.text} strokeWidth={active ? 4 : 2.5} />
+    <g transform={`translate(${at.x} ${at.y + (1 - p) * 16})`} opacity={p * (down ? 0.72 : 1)}>
+      {busy && <rect x={-bw / 2 - 6 - pulse * 4} y={-bh / 2 - 6 - pulse * 4} width={bw + 12 + pulse * 8} height={bh + 12 + pulse * 8} rx={16} fill="none" stroke={th.highlight} strokeWidth={3} opacity={0.35 + 0.3 * pulse} />}
+      <rect x={-bw / 2} y={-bh / 2} width={bw} height={bh} rx={12} fill={active ? th.accentSoft : th.surface} stroke={down || busy ? col : active ? th.accent : th.text} strokeWidth={active || busy ? 4 : 2.5} strokeDasharray={down ? "10 8" : undefined} />
+      {n.count != null && (
+        <g transform={`translate(${bw / 2 - 34} ${-bh / 2 + 6})`}>
+          <rect x={-8} y={0} width={56} height={44} rx={10} fill={th.bg} stroke={busy ? th.highlight : th.accent} strokeWidth={2.5} />
+          <text x={20} y={23} textAnchor="middle" dominantBaseline="central" fill={th.text} fontSize={28} fontWeight={700} fontFamily={MONO}>{n.count}</text>
+        </g>
+      )}
+      {down && (
+        <g transform={`translate(${-bw / 2 + 16} ${-bh / 2 + 14})`}>
+          <circle cx={20} cy={20} r={20} fill={th.highlight} />
+          <path d="M12 12 L28 28 M28 12 L12 28" stroke={th.bg} strokeWidth={5} strokeLinecap="round" />
+        </g>
+      )}
       {icon && (
-        <svg x={short ? -bw / 2 + 36 : -isz / 2} y={short ? -isz / 2 : -bh / 2 + 16} width={isz} height={(isz * icon.h) / icon.w} viewBox={`0 0 ${icon.w} ${icon.h}`}
+        <svg x={short && !narrow ? -bw / 2 + 36 : -isz / 2} y={short && !narrow ? -isz / 2 : -bh / 2 + 16} width={isz} height={(isz * icon.h) / icon.w} viewBox={`0 0 ${icon.w} ${icon.h}`}
           style={{color: col, overflow: "visible"}}><g dangerouslySetInnerHTML={{__html: icon.body}} /></svg>
       )}
       {lines.map((ln, k) => (
@@ -230,7 +358,7 @@ const NodeView: React.FC<{n: Box; at: P; bw: number; bh: number; short: boolean;
   );
 };
 
-const EdgeView: React.FC<{n: number; e: Edge; pos: P[]; bw: number; bh: number; short: boolean; flow: boolean; t: number; lane: number; tight?: boolean}> = ({n, e, pos, bw, bh, short, flow, t, lane, tight}) => {
+const EdgeView: React.FC<{n: number; e: Edge; pos: P[]; bw: number; bh: number; short: boolean; flow: boolean; t: number; lane: number; tight?: boolean; layered?: boolean}> = ({n, e, pos, bw, bh, short, flow, t, lane, tight, layered}) => {
   const th = useTheme();
   const a = pos[e.from], b = pos[e.to];
   const dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy) || 1;
@@ -247,21 +375,34 @@ const EdgeView: React.FC<{n: number; e: Edge; pos: P[]; bw: number; bh: number; 
   // is below its line and the reply's label above its own
   const lt = lane && short ? 0.32 : 0.5;
   const mx = x1 + (x2 - x1) * lt, my = y1 + (y2 - y1) * lt;
-  const pack = flow ? interpolate(t, [e.t + 0.5, e.t + 1.8], [0, 1], {extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: ease}) : -1;
+  const count = e.n ?? 1, dropped = !!e.drop;   // a flow always sends one packet; a diagram sends them only when the script says so (x4, or ! for a drop)
+  const sends = flow || count > 1 || dropped;
   const lab = e.label ? e.label.length * (short ? 17 : 16) + 70 : 0;
   return (
     <g>
-      <line x1={x1} y1={y1} x2={px} y2={py} stroke={th.accent} strokeWidth={4} strokeLinecap="round" strokeDasharray={e.from > e.to ? "3 12" : undefined}
+      <line x1={x1} y1={y1} x2={px} y2={py} stroke={e.drop ? th.highlight : th.accent} strokeWidth={4} strokeLinecap="round" strokeDasharray={e.drop ? "10 9" : e.from > e.to ? "3 12" : undefined}
         markerEnd={grow > 0.98 ? "url(#ah)" : undefined} />
       {grow > 0.55 && (
-        <g transform={`translate(${mx} ${my + (short ? 0 : tight ? (lane && e.from < e.to ? bh / 2 + 40 : -(bh / 2 + 40)) : lane ? (e.from < e.to ? 50 : -50) : -38)})`} opacity={Math.min(1, (grow - 0.55) * 2.2)}>
+        <g transform={`translate(${layered ? mx + (dx < 0 ? -(lab / 2 + 14) : lab / 2 + 14) : mx} ${layered ? my : my + (short ? 0 : tight ? (lane && e.from < e.to ? bh / 2 + 40 : -(bh / 2 + 40)) : lane ? (e.from < e.to ? 50 : -50) : -38)})`} opacity={Math.min(1, (grow - 0.55) * 2.2)}>
           <rect x={-lab / 2} y={-26} width={lab || 52} height={52} rx={26} fill={th.bg} stroke={th.rule} strokeWidth={2} />
           <circle cx={lab ? -lab / 2 + 26 : 0} cy={0} r={15} fill={th.accent} />
           <text x={lab ? -lab / 2 + 26 : 0} y={1} textAnchor="middle" dominantBaseline="central" fill={th.bg} fontSize={19} fontWeight={700} fontFamily={MONO}>{n}</text>
           {e.label && <text x={14} y={1} textAnchor="middle" dominantBaseline="central" fill={th.text} fontSize={short ? 27 : 26} fontFamily={MONO}>{e.label}</text>}
         </g>
       )}
-      {pack >= 0 && pack <= 1 && <circle cx={x1 + (x2 - x1) * pack} cy={y1 + (y2 - y1) * pack} r={13} fill={th.accent} />}
+      {sends && Array.from({length: count}).map((_, k) => {
+        const t0 = e.t + 0.5 + k * 0.3, reach = dropped ? 0.86 : 1;
+        const pk = interpolate(t, [t0, t0 + 1.2], [0, reach], {extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: ease});
+        const fall = dropped ? interpolate(t, [t0 + 1.2, t0 + 1.9], [0, 1], {extrapolateLeft: "clamp", extrapolateRight: "clamp"}) : 0;
+        if (t < t0 || (!dropped && pk >= 1 && k < count - 1 && t > t0 + 1.4) || fall >= 1) return null;
+        const cx = x1 + (x2 - x1) * pk, cy = y1 + (y2 - y1) * pk + fall * 90;
+        return (
+          <g key={k} transform={`translate(${cx} ${cy}) rotate(${fall * 40})`} opacity={1 - fall}>
+            <rect x={-13} y={-13} width={26} height={26} rx={6} fill={dropped && fall > 0 ? th.highlight : th.accent} />
+            {dropped && fall > 0 && <path d="M-7 -7 L7 7 M7 -7 L-7 7" stroke={th.bg} strokeWidth={4} strokeLinecap="round" />}
+          </g>
+        );
+      })}
     </g>
   );
 };

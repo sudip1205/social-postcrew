@@ -14,7 +14,7 @@ from ..render import video as video_mod
 from .base import Agent, AgentError
 from .script import STEP, finish
 
-LAYOUTS = ["title", "statement", "points", "code", "diagram", "trace", "flow"]
+LAYOUTS = ["title", "statement", "points", "code", "diagram", "trace", "flow", "stat"]
 VISUAL_KEYS = ("layout", "on_screen", "items", "nodes", "edges", "code", "language", "cells", "steps")
 FIX = {
     "type": "object",

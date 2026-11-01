@@ -11,7 +11,7 @@ import subprocess
 from pathlib import Path
 
 from . import iconlib, looks, timeline, video
-from .scenes import FORMATS, parse_edge, parse_pointer, split_node
+from .scenes import FORMATS, edge_marks, node_extra, parse_edge, parse_pointer, split_node
 from .video import FPS, VideoError
 
 PROJECT = Path(__file__).resolve().parent.parent / "remotion"
@@ -63,6 +63,17 @@ def mark_closing(scenes, spec):
     return scenes
 
 
+BUTTONS = {"like": ("lucide:thumbs-up", "Like"), "comment": ("lucide:message-circle", "Comment"), "share": ("lucide:share-2", "Share"),
+           "subscribe": ("lucide:bell", "Subscribe"), "follow": ("lucide:bell", "Follow"), "save": ("lucide:bookmark", "Save")}
+
+
+def _button(part):
+    """A closing-card button: its words and its icon (like -> thumb, comment -> bubble, share -> arrow, subscribe -> bell)."""
+    key = re.sub(r"[^a-z]", "", str(part).lower())
+    icon_id, label = BUTTONS.get(key, ("lucide:sparkles", str(part)))
+    return {"label": label, "kind": key, "svg": iconlib.svg(icon_id)}
+
+
 def _when(label, words, after=0.0):
     t = timeline.cue_time(label, words, after)
     return round(t if t is not None else after, 3)
@@ -82,22 +93,26 @@ def _captions(words):
 
 def _diagram(scene, words, carry):
     """Boxes and arrows with the time each is said; what earlier consecutive diagram scenes drew is kept (from time 0)."""
-    nodes = [split_node(n) for n in scene.get("nodes") or [] if split_node(n)[0]]
+    raw = [n for n in scene.get("nodes") or [] if split_node(n)[0]]
+    extras = {split_node(n)[0].lower(): node_extra(n) for n in raw}
+    nodes = [split_node(n) for n in raw]
     for label, icon in carry["nodes"]:
         if label.lower() not in [n[0].lower() for n in nodes]:
             nodes.append((label, icon))
     names = [n[0] for n in nodes]
     boxes = [{"label": n[0][:18], "icon": n[1], "t": 0.0 if (n[0], n[1]) in carry["nodes"] else None,
-              "svg": iconlib.svg(n[1]) or iconlib.svg(iconlib.auto(n[0]))} for n in nodes]   # the icon the script names, else the best match for the label
+              "svg": iconlib.svg(n[1]) or iconlib.svg(iconlib.auto(n[0])),
+              "state": extras.get(n[0].lower(), ("", None))[0], "count": extras.get(n[0].lower(), ("", None))[1]} for n in nodes]   # the icon the script names, else the best match for the label
     edges, said = [], 0.0
     for e in scene.get("edges") or []:
         p = parse_edge(e, names)
         if not p:
             continue
         a, b, label = p
+        label, packets, drop = edge_marks(label)   # the marks (x4, !) are not words the voice says
         t = max(_when(label, words, said) if label else said, _when(names[b], words, said))
         said = t
-        edges.append({"from": a, "to": b, "label": label, "t": t})
+        edges.append({"from": a, "to": b, "label": label, "t": t, "n": packets, "drop": drop})
         for i in (a, b):
             if boxes[i]["t"] is None:
                 boxes[i]["t"] = min(_when(names[i], words), t)
@@ -146,9 +161,12 @@ def build_props(scenes, fmt, audio, look=None):
                 "seconds": round(ln, 3), "captions": _captions(words)}
         if key is not None:
             item["key"] = key
-        if sc.get("closing"):   # "Like · Comment · Share": each part appears when the voice says it
+        if sc.get("closing"):   # "Like · Comment · Share · Subscribe": a button for each, pressed when the voice says it
             parts = [p for p in re.split(r"\s*[·•|,/]\s*|\s+and\s+", item["title"]) if p] or [item["title"]]
-            item.update(closing=True, items=parts, cues=[_when(p, words, float(sc.get("lead_s") or 0)) for p in parts])
+            item.update(closing=True, items=parts, cues=[_when(p, words, float(sc.get("lead_s") or 0)) for p in parts],
+                        buttons=[_button(p) for p in parts])
+        if layout == "stat":
+            item["cues"] = [_when(sc.get("on_screen"), words)]
         if sc.get("clip") and iconlib.svg(sc["clip"]):   # a clipart beside a words scene
             item["clip"] = iconlib.svg(sc["clip"])
         if layout in ("diagram", "flow"):

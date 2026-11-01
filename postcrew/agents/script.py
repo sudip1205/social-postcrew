@@ -38,7 +38,7 @@ STEP = {
 SCENE = {
     "type": "object",
     "properties": {
-        "layout": {"type": "string", "enum": ["title", "statement", "points", "code", "diagram", "trace", "flow"]},
+        "layout": {"type": "string", "enum": ["title", "statement", "points", "code", "diagram", "trace", "flow", "stat"]},
         "part": {"type": "string", "enum": list(PARTS),
                  "description": "which part of the video this scene is: intro (the problem), idea (the solution), example (worked example), mistake (a common mistake to avoid), closing (the like, comment, share card)"},
         "narration": {"type": "string", "description": "what the voice says; spoken sentences, no markdown"},

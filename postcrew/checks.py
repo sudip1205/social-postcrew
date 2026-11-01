@@ -172,7 +172,7 @@ def text_problems(text, cat, profile, first_comment=""):
 YOUTUBE_TITLE_MAX, YOUTUBE_DESC_MAX, YOUTUBE_TAGS_MAX = 100, 5000, 500
 from . import speech  # noqa: E402
 
-SCENE_LAYOUTS = ("title", "statement", "points", "code", "diagram", "trace", "flow")
+SCENE_LAYOUTS = ("title", "statement", "points", "code", "diagram", "trace", "flow", "stat")
 
 
 SENTENCE_MAX = 30
@@ -370,6 +370,8 @@ def script_problems(script, spec, cat, profile):
             code_problem = check_code(sc.get("code") or "", sc.get("language") or "")
             if code_problem:
                 problems.append(f"scene {i}: {code_problem}")
+        elif sc.get("layout") == "stat" and not (1 <= len(sc.get("items") or []) <= 2 and re.search(r"\d", str((sc.get("items") or [""])[0]))):
+            problems.append(f"scene {i}: a 'stat' scene needs the number first in items (for example '600 PB', '70%', '3x'), then optionally a caption")
         elif sc.get("layout") == "points" and not 1 <= len(sc.get("items") or []) <= 5:
             problems.append(f"scene {i}: 'points' needs 1-5 items")
         elif sc.get("layout") == "trace":
@@ -400,6 +402,8 @@ def script_problems(script, spec, cat, profile):
         for msg in speech.problems(sc.get("narration") or ""):
             problems.append(f"scene {i}: {msg}")
     last = (scenes[-1].get("narration") or "").lower() if scenes else ""
+    if spec.get("renderer") not in (None, "remotion") and any(sc.get("layout") == "stat" for sc in scenes):
+        problems.append("a 'stat' scene is drawn only by the Remotion renderer: use a statement or points scene here")
     if spec.get("outro") and scenes and not (all(w in last for w in ("like", "comment")) and ("share" in last or "subscribe" in last)):
         problems.append("the last scene must be the closing scene: only the closing line asking the viewer to like, comment and "
                         f"share, said warmly in your own words if you keep its meaning: {spec['outro']!r}")

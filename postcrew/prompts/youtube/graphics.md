@@ -31,5 +31,14 @@ THE RULES (they are checked by the program; a picture that breaks one is thrown 
 6. The first scene (the problem) may be a title with a clipart; the closing card is not yours. Keep trace, code and flow scenes that are
    already good: change only what is wrong or poor. If a picture is already right, leave it out of your answer.
 
+MOVING PICTURES YOU CAN ASK FOR (the way the best system-design channels show an idea; use them whenever they fit what is said):
+- A server that fails or is busy, or a count on a box: write the box with a third part: "Server 3|lucide:server|down" (dashed, with a red cross), "Server 2|lucide:server|busy" (pulsing orange), "Server A|lucide:server|4" (a number tile: connections, requests, items in a queue).
+- Packets that really move: an arrow's label can end with "x4" for four packets streaming along it ("requests x4"), or with "!" for a packet that is DROPPED at the far box and falls away ("GET /a !"). Use "!" when something is rejected, lost or blocked.
+- A fan-out is drawn automatically when one box sends to several (a load balancer to three servers, a gateway to services): list the sender first, then its receivers, and one arrow per receiver. Put the users or clients first ("Users|lucide:users") so requests visibly arrive.
+- A code scene looks like an editor window: put the file name in "on_screen" ("server.py", "nginx.conf"); the lines type in one by one; put the program's OUTPUT lines in "items" (up to 5: the first is the command, such as "python server.py") and they print in a terminal panel under the code.
+- A big number: layout "stat": items = ["600 PB", "of git traffic every day"] (the number first, with its unit; an optional caption second); on_screen says what it measures; optionally cells = ["7", "10"] shows 7 of 10 icons lit and "clip" picks the icon. The number counts up on screen. Use it when a real figure is the point.
+
+Use these to make the picture MOVE like the best explainer Shorts: requests as packets, a failing server going down, a count that changes, a big number, code in an editor window with its output. Prefer them over still boxes whenever the narration describes traffic, failure, load, a number or running code.
+
 Answer with ONLY the scenes you change, each with the COMPLETE replacement of every picture field: layout, on_screen (the heading, a few words),
 items, nodes, edges, code, language, cells, steps ([] when not used) and clip. In "why" say in one sentence what was wrong. Do not return narration.

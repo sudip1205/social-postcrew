@@ -159,6 +159,13 @@ storyboard: a list of shots, each one idea, each with its own picture. Then writ
 - A shot that explains "what goes wrong" shows it going wrong (an arrow to a box marked as failed, a wrong value, a slow path); the
   next shot shows the fix on the same picture.
 
+MOVING PICTURES YOU CAN ASK FOR (the way the best system-design channels show an idea; use them whenever they fit what is said):
+- A server that fails or is busy, or a count on a box: write the box with a third part: "Server 3|lucide:server|down" (dashed, with a red cross), "Server 2|lucide:server|busy" (pulsing orange), "Server A|lucide:server|4" (a number tile: connections, requests, items in a queue).
+- Packets that really move: an arrow's label can end with "x4" for four packets streaming along it ("requests x4"), or with "!" for a packet that is DROPPED at the far box and falls away ("GET /a !"). Use "!" when something is rejected, lost or blocked.
+- A fan-out is drawn automatically when one box sends to several (a load balancer to three servers, a gateway to services): list the sender first, then its receivers, and one arrow per receiver. Put the users or clients first ("Users|lucide:users") so requests visibly arrive.
+- A code scene looks like an editor window: put the file name in "on_screen" ("server.py", "nginx.conf"); the lines type in one by one; put the program's OUTPUT lines in "items" (up to 5: the first is the command, such as "python server.py") and they print in a terminal panel under the code.
+- A big number: layout "stat": items = ["600 PB", "of git traffic every day"] (the number first, with its unit; an optional caption second); on_screen says what it measures; optionally cells = ["7", "10"] shows 7 of 10 icons lit and "clip" picks the icon. The number counts up on screen. Use it when a real figure is the point.
+
 EVERY VIDEO FOLLOWS THIS ARC (checked by the app; a script that skips a part is sent back). Each scene has a "part":
 1. "intro": the FIRST scene (layout "title"). It states the PROBLEM the viewer has, in two or three sentences, and what they will be able to
    do by the end. Never start on the solution, a diagram or a term. The picture opens on the problem, not on a blank page.
@@ -206,8 +213,7 @@ The scenes (each is one screen; its narration is spoken while it shows):
     per flow; the narration names each hop in order ("The client sends get cart for user forty two to the load balancer...").
     Use a miss then a hit for caches, a failed then a healthy server for load balancers, a write then a read for databases.
   Leave "cells" and "steps" empty ([]) in every other layout, and "nodes"/"edges" empty in a trace.
-- THE CLOSING SCENE. The LAST scene is the closing card and has only the closing line: layout "statement", on_screen "Like · Comment ·
-  Share", narration = this call to action, said calmly, in your own words if you keep its meaning (like, comment and share):
+- THE CLOSING SCENE. The LAST scene is the closing card and has only the closing line: layout "statement", on_screen "Like · Comment · Share · Subscribe", narration = this call to action, said calmly, in your own words if you keep its meaning (like, comment and share):
   {{outro}}
   The app adds one second of silence before it, so the viewer has a moment after your last point. It counts toward the word budget,
   so leave room for it. Nothing else goes in that scene, and the closing line goes nowhere else.
