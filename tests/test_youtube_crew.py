@@ -31,7 +31,13 @@ WORDS = "apple river cloud stone bridge garden window candle forest anchor baske
 def narration(n_words, start="Step"):
     shift = sum(map(ord, start))
     words = [WORDS[(shift + i * 5 + i // 12) % len(WORDS)] for i in range(n_words)]
-    return " ".join(w + ("." if (i + 1) % 12 == 0 and i + 1 < n_words else "") for i, w in enumerate(words)) + "."   # short sentences: a voice can say them
+    for k, w in ((3, "you"), (9, "let's")):   # a teacher speaks to the student
+        if k < n_words and start != "Step":
+            words[k] = w
+    if start == "w0" and n_words > 12:
+        words[11] = "imagine"
+    text = " ".join(w + ("." if (i + 1) % 12 == 0 and i + 1 < n_words else "") for i, w in enumerate(words)) + "."   # short sentences: a voice can say them
+    return text[:-1] + "?" if start == "w1" else text   # one question to the class
 
 
 def _scene(i, words_per_scene, scenes):
@@ -499,3 +505,67 @@ class StoryboardTests(unittest.TestCase):
         from postcrew.checks import storyboard_problems
         row = [{"layout": "statement", "narration": "One."}] * 3
         self.assertTrue(any("in a row" in p for p in storyboard_problems(row, self.SPEC)))
+
+
+class TeachingVoiceTests(unittest.TestCase):
+    SPEC = {"format": "long", "wps": 2.5}
+
+    def sc(self, *texts):
+        return [{"narration": t, "part": "idea", "layout": "statement"} for t in texts]
+
+    def test_notes_read_aloud_are_sent_back(self):
+        from postcrew.checks import teaching_problems
+        notes = self.sc("Round robin takes turns.", "Use it when times vary.", "Least connections adapts.", "Health checks help.", "Layer 7 sees requests.", "Done.")
+        text = " ".join(teaching_problems(notes, self.SPEC))
+        self.assertIn("clipped fragments", text)
+        self.assertIn("never speaks to the student", text)
+        self.assertIn("add a question", text)
+        self.assertIn("no example", text)
+
+    def test_a_professor_passes(self):
+        from postcrew.checks import teaching_problems
+        prof = self.sc("Have you ever wondered how a busy website stays up when a million people open it at once?",
+                       "Imagine a pizza shop with three chefs, and one person at the counter who hands every order to a chef.",
+                       "Let's call that person the load balancer, and we will see why the choice of chef matters.",
+                       "So, in short, the counter person only decides who gets the next order. Does that make sense?")
+        self.assertEqual(teaching_problems(prof, self.SPEC), [])
+
+    def test_semicolons_and_colons_are_sent_back(self):
+        from postcrew.checks import teaching_problems
+        prof = self.sc("Have you ever wondered how a busy website stays up when a million people open it at once?",
+                       "Imagine a pizza shop with three chefs; one person hands every order to a chef.",
+                       "Let's call that person the load balancer and see why the choice matters to us.",
+                       "So, in short, there are two ways: turns, or the least busy chef. Does that make sense?")
+        text = " ".join(teaching_problems(prof, self.SPEC))
+        self.assertIn("scene 2: no semicolons", text)
+        self.assertIn("scene 4: no semicolons", text)
+
+
+@mock.patch.object(cred_mod, "check_claude", return_value=CLAUDE_OK)
+@mock.patch.object(voice, "cached_synthesize", side_effect=fake_tts)
+class WriterSelfRepairTests(unittest.TestCase):
+    def test_a_draft_that_breaks_a_rule_is_repaired_by_its_author_inside_the_step(self, _tts, _claude):
+        with TempWorkspace() as ws:
+            youtube_ws(ws)
+            bad = script()
+            bad["scenes"][1]["narration"] = "Here is a very short note; read it."   # a semicolon: a rule the checks send back
+            bad = finish(bad)
+            llm = ScriptedLLM({"topic": [topic("Default arguments", ())], "writer": [bad, script(), script()], "editor": [review()]})
+            res = run_crew(ws, DAY, "short-tip", llm=llm, platform="youtube")
+            self.assertTrue(res["ok"], res)
+            events = [json.loads(l) for l in (ws.runs_dir / res["run_id"] / "events.jsonl").read_text().splitlines()]
+            fixes = [e for e in events if e["kind"] == "self_fix"]
+            self.assertTrue(fixes and "0 problem" in fixes[0]["message"], fixes)        # fixed by the author, not sent back to the supervisor
+            self.assertFalse([e for e in events if e["step"] == "supervisor" and e["kind"] == "decision"])
+
+    def test_a_script_sent_back_is_revised_from_the_whole_previous_script(self, _tts, _claude):
+        from postcrew.agents.script import script_revision_block
+
+        class Ctx:
+            previous = {}
+        prev = finish(script())
+        prev["scenes"][1].update(layout="diagram", nodes=["Apple", "River"], edges=["Apple > River: go"])
+        block = script_revision_block(Ctx, ["fix scene 3"], prev)
+        self.assertIn('"nodes"', block)
+        self.assertIn("Apple > River: go", block)                                       # the pictures are shown too, not only the words
+        self.assertEqual(script_revision_block(Ctx, [], prev), "")

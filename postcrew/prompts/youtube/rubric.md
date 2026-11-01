@@ -1,32 +1,29 @@
 HOW EVERY VIDEO SCRIPT IS SCORED (the Script Writer writes to this guide; the Editor scores by it; each criterion 0-100):
 
-hook - the first scene, spoken in the first 3 seconds
-  90+   leads with ONE concrete specific (the problem, a number, a named tool, a result) and makes the viewer's stake
-        obvious; at most ~15 spoken words; no greeting, no "in this video".
-  75-89 concrete, but a slow start (greeting, throat-clearing) or the viewer's stake is only implied.
+hook - the first scene: the professor's opening
+  90+   opens with a situation the student has met or a question they would really ask, names the one thing they will understand by the
+        end, and reassures them it will be built up simply; no greeting, no "in this video".
+  75-89 clear, but it starts with the topic name or a definition instead of the student's problem.
   60-74 a topic label ("Today: JWTs") or several ideas crammed into the opening.
   <60   generic, clickbait, or not paid off later in the video.
 
 value
-  90+   the viewer can do or decide something specific after watching: 2-5 concrete steps, a command, a check, a
-        rule of thumb - and the video says what they will see when it works.
-  70-89 useful but generic, or only one concrete step.
-  <70   nothing to do but "keep this in mind".
+  90+   a student understands the idea AND can use it: every idea is explained what / why / how with the running example and real numbers, each
+        subtopic named in the title is covered properly, the common mistake is shown, and the video ends with a short recap of what to remember.
+  70-89 useful but a subtopic is only mentioned, or the example is thin, or there is no recap.
+  <70   a list of facts to keep in mind; nothing is really explained.
 
-clarity - pacing and structure for ears, not eyes
-  90+   one idea per scene; simple English in short spoken sentences (20 words or fewer); EVERY uncommon technical term
-        is explained in one plain sentence the first time it is said, and then used consistently; the order is what it
-        is, why, how step by step, an example, the common mistake; "..." marks a few deliberate beats; the on-screen
-        words are the KEY words, not the narration repeated; every scene earns its seconds.
-  70-89 one unexplained term, one confusing scene, a long sentence a voice would trip on, on-screen text that
-        duplicates the narration, or a scene that redraws everything or adds more than 3 new things at once.
-        The picture is built for the voice: scenes of 12-25 seconds that each add at most 3 boxes or arrows, which the
-        narration names as they appear; consecutive diagram scenes reuse the same box labels so one picture grows; each
-        scene has its own 2-4 word title; real values and real tool names, not placeholders.
-        An algorithm is shown on a small real example whose data and pointers move step by step (trace scenes); a system is
-        shown by one concrete request travelling through its components with the real data on each arrow (flow scenes).
-        An algorithm or architecture video with only labels, bullet lists or static boxes loses points here (75 at best).
-  <70   a list of terms with no explanations, jargon piled on jargon, out of order, or needs re-watching.
+clarity - could a beginner follow it by ear?
+  90+   one idea at a time, each explained in plain words, then tied to ONE running example the whole video follows (a small story with real
+        numbers); every technical term is explained the first time it is said and used consistently; full spoken sentences (8-20 words),
+        never clipped fragments or lists of terms; after each idea a one-line "in short" sum-up; the order is what it is, why it exists, how it
+        works step by step, an example, the common mistake, a recap; on-screen words are the KEY words, not the narration repeated.
+        The picture follows the voice: a new picture every 6-12 seconds, real values and tool names, one growing diagram, a flow carrying real
+        data, a trace for algorithms.
+  70-89 one unexplained term, one idea that is stated but not shown with the example, a long sentence a voice would trip on, or a scene that
+        adds more than 3 new things at once.
+  <70   a list of terms with no explanations, jargon piled on jargon, clipped note-style lines ("Use it when request times vary."), out of
+        order, or needs re-watching. A script that reads like notes being read aloud cannot score above 69 here.
 
 accuracy
   90+   specifics (numbers, versions, defaults, named-product behaviour) are backed by the sources or reference facts with
@@ -35,19 +32,22 @@ accuracy
   70-89 one claim slightly stronger or vaguer than its source.
   <70   any claim the sources do not support (also a red flag: unsupported_claim / factual_error).
 
-tone    an online teacher: calm, clear and encouraging, spoken, plain; contractions are fine; no hype words, no sales
-        pitch, no begging for likes anywhere in the video EXCEPT the owner's required closing line (below). That line is the
-        owner's standing instruction: it is never "too_promotional", never off-tone, and never a reason to lower tone or format.
-        Judge the tone of everything else.
-        90+ sounds like a good instructor walking a learner through it, using the real technical names.
+tone    a caring professor teaching students: calm, warm, patient and encouraging, spoken, plain; contractions are fine; no hype words, no sales
+        pitch, no begging for likes anywhere in the video EXCEPT the owner's required closing line (below). That line is the owner's standing
+        instruction: it is never "too_promotional", never off-tone, and never a reason to lower tone or format. Judge the tone of everything else.
+        90+ sounds like a real professor who cares whether the class understands: speaks to "you" and "we", checks in at the tricky parts
+            ("Does that make sense?", "Let's go slowly here"), reassures, gives the simple version, uses the real technical names after the
+            plain explanation, and has natural rhythm (a short sentence after a longer one).
+        75-89 correct and calm but impersonal, like a textbook read aloud.
+        <70  clipped, robotic or note-like ("AI reading"), no address to the student, no checking in, or a lecture that never explains.
 speakable (part of format; also a red flag: unpronounceable)
         90+ nothing in the narration needs guessing: no code, identifiers, addresses or odd symbols; numbers, maths and acronyms are in
             forms the voice can say; no lone letters; no hard-to-pronounce coined words. Any such item caps format at 70.
-format  the right length for the video's target (the word count matches the seconds), the right number of scenes, a
+format  the length fits the explanation (nothing rushed, nothing padded; only a Short over 3 minutes is a problem), enough scenes for a new picture every few seconds, a
         title of 40-70 characters that matches the content, a useful description, 5-12 tags, thumbnail text of 2-4
         words, no markdown or web addresses in the narration, and the last scene ends with the owner's closing line (required, see below) after one clear takeaway or question.
 
-A script that would score 85+ on every criterion is short and focused: one promise, the hook in 3 seconds, only what
+A script that would score 85+ on every criterion is focused: one promise, the hook in 3 seconds, only what
 serves the promise, one clear ending. Every extra scene or aside is a chance to lose points on clarity and value - cut
 rather than add.
 

@@ -256,6 +256,14 @@ def _item(pool, item_id):
     raise ValueError("that plan no longer exists")
 
 
+BRIEF_SHORT = ("A vertical Short taught like a calm, caring professor to students: start from a situation the student knows, explain the idea in plain words "
+               "with ONE small real example with numbers, tie every part of the idea back to that example, say it back in one line, show the common mistake, "
+               "and end kindly. Whole spoken sentences, never clipped notes.")
+BRIEF_LONG = ("A 16:9 class by a calm, caring professor for students: begin with a problem the student has met, promise what they will understand, build the idea "
+              "step by step around ONE running example with real numbers, explain what, why and how for every part, check in with the class, say each idea back "
+              "in one line, show the common mistake and its fix, and finish with a short recap and an encouraging line.")
+
+
 def short_fmt(fmt):
     return fmt == "short"
 
@@ -272,13 +280,14 @@ def category_for_item(ws, platform, fmt):
         short = fmt == "short"
         cats[cid] = {"label": "Short video" if short else "Long video", "media": "video", "research": "optional", "fact_check": False,
                      "format": fmt, "target_seconds": platforms.SHORT_DEFAULT_S if short else platforms.LONG_DEFAULT_S, "kicker": "SHORT" if short else "EXPLAINED",
-                     "brief": ("A vertical Short on this plan: a hook in the first 3 seconds, the idea in 2-4 steps, one line "
-                               "asking the viewer to try it. Short sentences, spoken words." if short else
-                               "A 16:9 explainer on this plan: a cold open with the problem, why it matters, the idea built up "
-                               "in 3-5 scenes with one concrete example, the common mistake, what to do next.")}
+                     "brief": (BRIEF_SHORT if short else BRIEF_LONG)}
         ws.save_config(cfg)
     else:   # a category made earlier with a length that is no longer allowed (a Short of 45 seconds)
         c = cats[cid]
+        brief = BRIEF_SHORT if short_fmt(fmt) else BRIEF_LONG
+        if c.get("brief") != brief:   # a category made by an earlier version: teach the way the owner now wants
+            c["brief"] = brief
+            ws.save_config(cfg)
         lo, hi = (15, platforms.SHORT_MAX_S) if short_fmt(fmt) else (60, 1800)
         if not lo <= int(c.get("target_seconds") or 0) <= hi:
             c["target_seconds"] = platforms.SHORT_DEFAULT_S if short_fmt(fmt) else platforms.LONG_DEFAULT_S

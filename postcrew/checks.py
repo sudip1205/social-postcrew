@@ -235,6 +235,38 @@ def split_long_scenes(scenes, spec):
     return out
 
 
+TEACH_CUES = ("imagine", "picture", "suppose", "for example", "think of", "let's say", "say a ", "say we", "say you", "say there")
+ADDRESS = re.compile(r"\b(you|you're|you'll|your|we|we're|we'll|let's|our|us)\b", re.I)
+
+
+def teaching_problems(scenes, spec):
+    """A professor teaching students, not notes read aloud: whole spoken sentences, spoken to the student, with a real example and at least one
+    question. These are the signs of the voice the owner asked for; the Editor judges the rest (the running example, the check-ins, the recap)."""
+    texts = [str(sc.get("narration") or "") for sc in scenes if sc.get("part") != "closing"]
+    text = " ".join(texts)
+    sentences = [x.strip() for x in re.split(r"(?<=[.!?])\s+", text) if x.strip()]
+    if len(sentences) < 4:
+        return []
+    lens = [len(x.split()) for x in sentences]
+    problems, words = [], max(1, len(text.split()))
+    short = sum(1 for n in lens if n <= 3)
+    if short > 0.2 * len(lens):
+        problems.append(f"{short} of {len(lens)} sentences are clipped fragments of three words or fewer: it reads like notes being read aloud. "
+                        f"Write whole, flowing spoken sentences of 8 to 20 words, the way a professor explains to a class")
+    if sum(lens) / len(lens) < 7:
+        problems.append(f"the sentences average {sum(lens) / len(lens):.0f} words: too clipped for a voice. Explain in full sentences of 8 to 20 words")
+    if len(ADDRESS.findall(text)) * 100 / words < 2:
+        problems.append("it never speaks to the student: use 'you', 'we' and 'let's' (\"Let's see what happens to our pizza shop...\")")
+    if "?" not in text:
+        problems.append("a professor asks the class something: add a question to the student (\"Does that make sense?\", \"Why would that happen?\") and answer it")
+    if not any(c in text.lower() for c in TEACH_CUES):
+        problems.append("there is no example: introduce one the whole video follows (\"Imagine a pizza shop with three chefs...\") and tie each idea back to it")
+    for i, sc in enumerate(scenes, 1):
+        if re.search(r"[;:]", str(sc.get("narration") or "")):
+            problems.append(f"scene {i}: no semicolons or colons in narration: write two sentences (a voice cannot pause on them)")
+    return problems
+
+
 def storyboard_problems(scenes, spec):
     """The picture must follow the voice: a new picture every few seconds, each one showing what is being said at that moment."""
     from .render.scenes import split_node
@@ -327,6 +359,7 @@ def script_problems(script, spec, cat, profile):
         problems.append(f"{len(scenes)} scenes: a {spec['format']} video needs {mn}-{mx}, a new picture every few seconds")
     if script.get("source") != "own":   # the owner's own script is theirs: it is checked for rules, not re-storyboarded
         problems += storyboard_problems(scenes, spec)
+        problems += teaching_problems(scenes, spec)
     problems += structure_problems(scenes)
     for i, sc in enumerate(scenes, 1):
         if sc.get("layout") not in SCENE_LAYOUTS:

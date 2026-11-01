@@ -82,6 +82,9 @@ class CrewTests(unittest.TestCase):
     def test_unsourced_number_is_rejected_and_editor_can_rewind_to_research(self, _):
         bad = GOOD_TEXT.replace("Start with one", "Teams report 73% savings. Start with one")
         with TempWorkspace() as ws:
+            cfg = ws.config()
+            cfg["team"]["self_fix_rounds"] = 0   # this test is about the supervisor's decisions, so the author does not repair the draft inside the step
+            ws.save_config(cfg)
             llm = ScriptedLLM(self.script(
                 writer=[writer(bad), writer()],
                 editor=[review(55, ["unsupported_claim"], owner="research")] * 1 + [review()],

@@ -83,6 +83,9 @@ No Stitch screen exists for either view. Both are derived from the shell, design
 ### queue-upload-plan-yt
 - Plan: a day cell can hold up to 5 stacked plans (Next / Then tags, "N plans" chip, "+N more waiting", "+ Add one more") and the current plan has a "Create now" button for manual runs. The Stitch screen shows one plan per day; this goes beyond it. Published plans leave the calendar.
 
+# Workflow: compact assembly chain
+- The Assembly chain no longer scrolls sideways. Stitch edit of the Workflow screen (project screen `workflow-live-youtube-run`): every agent is a small chip (icon, name, state mark and one "try N · $cost" line) in a wrapping row; only the agent that is working (or the one you picked) opens up with its details (elapsed, tries n / max, cost, engine, progress). Sent-back loops are a small rose dashed badge after the chip that sent the work back, and the card header gains a "3 of 8 done · 5 tries · $0.12" pill. Stitch applied this edit as a page patch that its API does not save into the screen file (`design/stitch/workflow-live-youtube-run.html` still shows the tall scrolling cards), so the markup was taken from the edit result.
+
 # Queue / Upload / Plan: YouTube differences from Stitch
 
 - Queue YouTube card: the thumbnail is the real `<video controls>` (native controls) instead of Stitch's custom play button; the 1080x1920/60fps overlay is dropped (not in post data). Long videos use a 16:9 frame.

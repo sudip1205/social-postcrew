@@ -121,7 +121,7 @@ class Supervisor:
                 continue
             attempts[step] += 1
             total += 1
-            run.step(step, "running", attempts=attempts[step])
+            run.step(step, "running", attempts=attempts[step], max_attempts=ctx.cfg["pipeline"]["max_attempts_per_step"])
             run.event(step, "started", f"{agent.title}: attempt {attempts[step]}",
                       {"guidance": guidance[step]} if guidance[step] else None)
             fatal = False

@@ -227,7 +227,7 @@ def validate_config(cfg):
     if not TIME_RE.match(str(cl.get("time", ""))):
         errs.append("cleanup.time must be HH:MM (24h)")
     tm = cfg.get("team", {})
-    for k, lo, hi in (("research", 1, 4), ("writer", 1, 4), ("fire_window", 3, 20), ("polish_rounds", 0, 3)):
+    for k, lo, hi in (("research", 1, 4), ("writer", 1, 4), ("fire_window", 3, 20), ("polish_rounds", 0, 3), ("self_fix_rounds", 0, 4)):
         if not (isinstance(tm.get(k), int) and lo <= tm[k] <= hi):
             errs.append(f"team.{k} must be a whole number {lo}-{hi}")
     if not (isinstance(tm.get("fire_min_success"), (int, float)) and 0 <= tm["fire_min_success"] <= 1):

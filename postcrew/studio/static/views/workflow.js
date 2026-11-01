@@ -56,14 +56,14 @@ async function renderWorkflow() {
           <div><h2 class="font-headline font-bold text-slate-900 text-sm">Assembly chain</h2>
             <p class="text-xs text-slate-500">Every agent in turn, live, with the work sent back when something is not good enough</p></div>
         </div>
-        <div class="flex items-center gap-3 text-[11px] font-medium text-slate-600 overflow-x-auto py-1">
+        <div class="flex flex-wrap items-center gap-4"><div class="flex flex-wrap items-center gap-3 text-[11px] font-medium text-slate-600 py-1">
           <div class="flex items-center gap-1">${icon("check_circle", "text-[14px] text-emerald-600")}<span>Passed</span></div>
           <div class="flex items-center gap-1">${icon("progress_activity", "text-[14px] text-violet-600 animate-spin")}<span>Running</span></div>
           <div class="flex items-center gap-1">${icon("schedule", "text-[14px] text-amber-600")}<span>Waiting</span></div>
           <div class="flex items-center gap-1">${icon("cancel", "text-[14px] text-rose-600")}<span>Rejected / Loop</span></div>
-        </div>
+        </div><div id="wf-sum"></div></div>
       </div>
-      <div class="relative pt-6 pb-12 overflow-x-auto custom-scrollbar" id="wf-graph"></div>
+      <div class="pt-4" id="wf-graph"></div>
     </section>
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
       <section class="lg:col-span-8 bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col overflow-hidden" id="wf-log"></section>
@@ -170,23 +170,41 @@ function wfRewinds() {
   return Object.entries(rewinds).map(([k, n]) => [...k.split(">"), n]);
 }
 
-function nodeHtml(id, st) {
+/* The chain is compact so that every agent fits on a small screen: a chip is an icon, a name, a state mark and one "try · $cost" line. Only the agent that
+   is working (and the one you picked) opens up with its details. */
+const wfCost = info => !info.cost_usd ? "$0.00" : `$${info.cost_usd < 0.1 ? info.cost_usd.toFixed(3) : info.cost_usd.toFixed(2)}`;   // short, so "try 2 · $0.041" fits a chip
+const wfTries = info => Math.max(info.attempts || 0, ["pending", "skipped", "waiting"].includes(info.state) ? 0 : 1);
+
+function chipHtml(id, st) {
   const info = st.steps[id] || { state: "pending", attempts: 0 };
-  const [box, chipCls, ic, spin, word, tc] = WF_NODE[info.state] || WF_NODE.pending;
-  const sel = S.selected === id, selCls = sel && !/ring-4/.test(box) ? " ring-4 ring-violet-100" : "", dur = wfDur(info), team = teamOf(id);
-  const line = info.state === "retrying" ? `Trying again · attempt ${info.attempts}` : `${WF_LINE[info.state] || info.state}${dur && info.state === "passed" ? ` · ${dur}` : ""}${info.state === "running" && info.attempts > 1 ? ` · attempt ${info.attempts}` : ""}`;
-  return `<button type="button" data-step="${esc(id)}" class="flex-1 min-w-0 text-left rounded-xl p-3 flex flex-col justify-between transition-all cursor-pointer ${box}${selCls}">
-    <div class="flex items-start justify-between gap-1 mb-2">
-      ${avatar(id, "w-8 h-8").replace("text-white", "text-white shadow-sm")}
-      <span class="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border ${chipCls}">${icon(ic, `text-[12px]${spin ? " animate-spin" : ""}`)}<span>${esc(dur && info.state === "passed" ? dur : word)}</span></span>
+  const [, , ic, spin, word, tc] = WF_NODE[info.state] || WF_NODE.pending;
+  const line = { passed: "border-emerald-200 bg-emerald-50/60 hover:bg-emerald-50", waiting: "border-amber-300 bg-white hover:bg-slate-50", failed: "border-2 border-rose-500 bg-rose-50/50 ring-2 ring-rose-100",
+    blocked: "border-2 border-rose-500 bg-rose-50/50 ring-2 ring-rose-100", skipped: "border-slate-200 bg-white opacity-60 hover:opacity-90", pending: "border-slate-200 bg-white opacity-70 hover:opacity-100" }[info.state] || "border-slate-200 bg-white";
+  return `<button type="button" data-step="${esc(id)}" title="${esc(agentTitle(id))} · ${esc(word)}" class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-left transition-colors cursor-pointer w-[172px] shadow-sm ${line}">
+    ${avatar(id, "w-7 h-7")}
+    <span class="flex-1 min-w-0"><span class="block text-xs font-bold text-slate-900 truncate">${esc(agentName(id))}</span>
+      <span class="block text-[10px] font-mono leading-none mt-0.5 ${tc}">try ${wfTries(info)} · ${wfCost(info)}</span></span>
+    ${icon(ic, `text-[15px] shrink-0 ${tc}${spin ? " animate-spin" : ""}`)}
+  </button>`;
+}
+
+function openHtml(id, st) {
+  const info = st.steps[id] || { state: "pending", attempts: 0 };
+  const [, chipCls, ic, spin, word, tc] = WF_NODE[info.state] || WF_NODE.pending, dur = wfDur(info);
+  const live = ["running", "retrying"].includes(info.state);
+  const ring = live ? "bg-violet-50/70 border-2 border-violet-600 ring-4 ring-violet-100" : ["failed", "blocked"].includes(info.state) ? "bg-rose-50/40 border-2 border-rose-500 ring-4 ring-rose-100" : "bg-white border-2 border-violet-300 ring-4 ring-violet-50";
+  const line = info.state === "retrying" ? `Trying again · attempt ${info.attempts}` : `${WF_LINE[info.state] || info.state}${info.state === "running" && info.attempts > 1 ? ` · attempt ${info.attempts}` : ""}`;
+  const pill = (label, v, cls = "text-slate-800") => `<div class="bg-white px-3 py-1.5 rounded-lg border border-violet-200 shadow-sm"><span class="text-[10px] text-slate-400 block font-body uppercase font-bold">${label}</span><span class="font-bold ${cls} text-xs font-mono">${v}</span></div>`;
+  return `<button type="button" data-step="${esc(id)}" class="w-full text-left rounded-xl p-4 shadow-sm cursor-pointer ${ring}">
+    <div class="flex flex-wrap items-center justify-between gap-4">
+      <div class="flex items-center gap-3">${avatar(id, "w-10 h-10")}
+        <div><div class="flex items-center gap-2"><span class="text-[10px] font-bold tracking-wider ${live ? "text-violet-700" : "text-slate-500"} uppercase">${esc(agentTitle(id))}</span>
+          <span class="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border ${chipCls}">${icon(ic, `text-[11px]${spin ? " animate-spin" : ""}`)}<span>${esc(word)}</span></span></div>
+          <h3 class="font-headline font-bold text-slate-900 text-sm mt-0.5">${esc(agentName(id))}</h3>
+          <p class="text-xs ${tc} font-medium mt-0.5">${esc(line)}</p></div></div>
+      <div class="flex flex-wrap items-center gap-3">${pill("Elapsed", live ? wfElapsed(info) : dur || "0s")}${pill("Tries", `${wfTries(info)}${info.max_attempts ? ` / ${info.max_attempts}` : ""}`)}${pill("Cost", wfCost(info))}</div>
     </div>
-    <div>
-      <div class="text-[10px] font-semibold tracking-wide ${info.state === "running" ? "text-violet-700" : "text-slate-400"} uppercase flex items-center gap-1"><span>${esc(agentTitle(id))}</span>${sel ? `<span class="w-1.5 h-1.5 rounded-full bg-violet-600" title="Selected agent"></span>` : ""}</div>
-      <h3 class="font-headline font-bold text-slate-900 text-xs mt-0.5">${esc(agentName(id))}</h3>
-      <p class="text-[11px] ${tc} font-medium mt-1">${esc(line)}</p>
-      ${info.engine ? `<div class="mt-1.5 space-y-1">${wfEngine(info.engine)}${["running", "retrying"].includes(info.state) || info.state === "passed" ? wfBar(info) : ""}${info.detail && ["running", "retrying"].includes(info.state) ? `<div class="text-[10px] text-slate-500 truncate" title="${esc(info.detail)}">${esc(info.detail)} · ${info.progress ?? 0}%</div>` : ""}</div>` : ""}
-    </div>
-    <div class="mt-2 pt-2 border-t border-slate-100 text-[10px] text-slate-500 flex items-center justify-between"><span>${info.attempts > 1 ? `${info.attempts} tries` : "Tries"}</span><span class="font-semibold ${info.state === "passed" ? "text-emerald-600" : "text-slate-700"}">${info.cost_usd ? money(info.cost_usd) : info.attempts || 0}</span></div>
+    ${info.engine || info.detail || info.progress != null ? `<div class="mt-3 space-y-1.5">${info.engine ? wfEngine(info.engine) : ""}${live || info.state === "passed" ? wfBar(info, "h-1.5") : ""}${info.detail && live ? `<div class="text-[11px] text-slate-500 truncate" title="${esc(info.detail)}">${esc(info.detail)}</div>` : ""}</div>` : (live ? `<div class="mt-3 w-full bg-violet-200/70 rounded-full h-1.5 overflow-hidden"><div class="h-full bg-gradient-to-r from-violet-600 to-indigo-600 rounded-full w-2/3 animate-pulse"></div></div>` : "")}
   </button>`;
 }
 
@@ -196,22 +214,20 @@ function drawGraph(force) {
   const key = JSON.stringify([st.state, st.interventions, Object.values(st.steps).map(x => [x.state, x.attempts, x.cost_usd, x.progress, x.engine, x.detail]), S.selected, rw]);
   if (!force && key === WF.graphKey) return;
   WF.graphKey = key;
-  const ids = Object.keys(st.steps);
-  el.innerHTML = `<div class="flex items-stretch gap-2.5 min-w-[1240px] relative z-20 pt-4" id="wf-nodes">${ids.map((id, i) =>
-    (i ? `<div class="flex items-center justify-center text-slate-300">${icon("arrow_forward", "text-[18px]")}</div>` : "") + nodeHtml(id, st)).join("")}</div>`;
-  el.querySelectorAll("[data-step]").forEach(n => n.onclick = () => { S.selected = n.dataset.step; WF.graphKey = ""; drawGraph(true); drawDrawer(); drawLog(); });
-  // sent-back arrows: measured from the real node positions
-  const wrap = $("#wf-nodes");
-  const at = id => { const n = wrap.querySelector(`[data-step="${CSS.escape(id)}"]`); return n ? [n.offsetLeft + n.offsetWidth / 2, n.offsetTop] : null; };
-  let svg = "", labels = "";
-  rw.forEach(([from, to, n], idx) => {
-    const a = at(from), b = at(to); if (!a || !b) return;
-    const up = -14 - idx * 10;
-    svg += `<path d="M ${a[0]} ${a[1]} C ${a[0]} ${up}, ${b[0]} ${up}, ${b[0]} ${b[1] - 3}" fill="none" class="stroke-rose-600" stroke-dasharray="6 4" stroke-width="2.5"></path>
-      <polygon class="fill-rose-600" points="${b[0]},${b[1]} ${b[0] - 5},${b[1] - 12} ${b[0] + 5},${b[1] - 12}"></polygon>`;
-    labels += `<div class="absolute pointer-events-none transform -translate-x-1/2 -translate-y-1/2" style="left:${(a[0] + b[0]) / 2}px;top:${up * .75 + 4}px"><div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-50 border border-rose-300 text-rose-700 text-[11px] font-bold shadow-md whitespace-nowrap">${icon("replay", "text-[14px] text-rose-600")}<span>Sent back to ${esc(agentName(to))}${n > 1 ? ` ×${n}` : ""}</span></div></div>`;
+  const ids = Object.keys(st.steps), live = id => ["running", "retrying"].includes(st.steps[id]?.state), open = id => live(id) || S.selected === id;
+  const sum = Object.values(st.steps), done = sum.filter(x => x.state === "passed").length, total = sum.filter(x => x.state !== "skipped").length;
+  const cost = sum.reduce((a, x) => a + (x.cost_usd || 0), 0), tries = sum.reduce((a, x) => a + (x.attempts || 0), 0);
+  wfSet($("#wf-sum"), `<div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 border border-slate-200 text-slate-700 text-xs font-mono font-medium"><span class="w-1.5 h-1.5 rounded-full bg-violet-600"></span><span>${done} of ${total} done · ${tries} ${tries === 1 ? "try" : "tries"} · ${money(cost)}</span></div>`);
+  let html = "", prevOpen = true;
+  ids.forEach((id, i) => {
+    const o = open(id);
+    if (i && !o && !prevOpen) html += `<span class="text-slate-300 flex items-center">${icon("arrow_forward", "text-[16px]")}</span>`;
+    html += o ? `<div class="w-full">${openHtml(id, st)}</div>` : chipHtml(id, st);
+    rw.filter(r => r[0] === id).forEach(([, to, n]) => { html += `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-dashed border-rose-400 bg-rose-50 text-rose-700 text-[11px] font-semibold">${icon("reply", "text-[14px] text-rose-600")}<span>Sent back to ${esc(agentName(to))}${n > 1 ? ` ×${n}` : ""}</span></span>`; });
+    prevOpen = o;
   });
-  if (svg) wrap.insertAdjacentHTML("afterbegin", `<div class="absolute inset-x-0 top-0 pointer-events-none h-full z-10"><svg class="w-full h-full overflow-visible" fill="none">${svg}</svg>${labels}</div>`);
+  el.innerHTML = `<div class="flex flex-wrap items-center gap-2" id="wf-nodes">${html}</div>`;
+  el.querySelectorAll("[data-step]").forEach(n => n.onclick = () => { S.selected = S.selected === n.dataset.step && !live(n.dataset.step) ? null : n.dataset.step; WF.graphKey = ""; drawGraph(true); drawDrawer(); drawLog(); });
 }
 
 /* ---------- audit timeline ---------- */

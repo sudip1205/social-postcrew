@@ -38,7 +38,12 @@ shown with its part. A script passes only if ALL of these are true, and each one
    say. At most a third of the scenes may be words only (statement or points): more is a fix, ask for diagrams, flows, code or traces. Several pictures in a row of the same plain kind (words only) is a fix: ask for a diagram, flow, trace or code scene in between.
 8. The narration can be said smoothly by a voice: no inserted phrase between two commas, no sentence that begins on a number or an acronym,
    no comma after "in", "on", "at", "to", "of", "for", "with", "by", "from", "the" or "a" (these are what made earlier videos sound broken).
-9. Names are written the way they are spoken and shown the same way (a header called "Retry-After" is never narrated as "Retry After").
+9. THE PROFESSOR'S VOICE: it must NOT sound like an AI reading notes. Fail it (and ask for a rewrite of those scenes, quoting the words) if: the narration is
+   clipped fragments or note-style lines; ideas are listed instead of explained; a term is used without its plain meaning; there is no running example with
+   real numbers that EVERY idea is tied back to ("in our pizza shop, the load balancer is..."); a subtopic named in the title or description is only mentioned;
+   there is no check-in with the student ("Does that make sense?", "Let's go slowly") and no one-line "in short" after an idea; or there is no recap.
+   Semicolons and colons in narration are a fix (a voice cannot pause on them). The audience is STUDENTS: warm, patient, simple.
+10. Names are written the way they are spoken and shown the same way (a header called "Retry-After" is never narrated as "Retry After").
 The app also checks the parts mechanically and will not approve a script that lacks one, whatever you score.
 
 "fixes": at most 4, ONE per criterion that keeps the script from passing (lowest score first). Each fix is an exact,

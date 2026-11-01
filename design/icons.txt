@@ -122,6 +122,7 @@ record_voice_over
 refresh
 repeat
 replay
+reply
 robot_2
 save
 schedule

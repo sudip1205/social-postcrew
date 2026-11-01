@@ -8,13 +8,16 @@ script_problems), is pre-reviewed and polished, and only the best goes to the Ed
 A script the owner supplies (assets.py) skips the drafting; it is parsed, completed with metadata and validated and reviewed
 like any other.
 """
+import json
+
 from .. import assets as assets_mod
 from .. import brief as briefmod
 from .. import platforms
+from .. import checks as checks_mod
 from ..checks import PARTS, repeat_problem, script_problems
 from . import team
 from .base import AgentError, guidance_block, recent_block
-from .writer import WriterAgent, research_block, revision_block
+from .writer import WriterAgent, research_block
 
 STEP = {
     "type": "object",
@@ -72,6 +75,19 @@ FORMAT_RULES = {
     "long": "A 16:9 video: open with a short introduction (about 15 seconds), then one idea per scene (about 4-12 scenes per ten minutes), "
             "and finish with one clear next step.",
 }
+
+
+def script_revision_block(ctx, guidance, prev=None):
+    """A script sent back is revised from the WHOLE previous script (every scene with its picture), so a fix to one scene does not re-invent the rest."""
+    prev = prev or ctx.previous.get("writer")
+    if not (guidance and prev and prev.get("scenes")):
+        return ""
+    keep = {k: prev.get(k) for k in ("title", "description", "tags", "thumbnail_text")}
+    keep["scenes"] = [{k: sc.get(k) for k in ("layout", "part", "narration", "on_screen", "items", "code", "language", "nodes", "edges", "cells", "steps") if sc.get(k) not in (None, "", [])}
+                      for sc in prev["scenes"]]
+    return ("\n\nYOUR PREVIOUS SCRIPT was sent back. REVISE it: keep every scene that is fine exactly as it is, and change only what the points below require "
+            "(the picture fields of a scene you do not touch stay as they are). Do not add new claims while fixing.\n<previous_script>\n"
+            + json.dumps(keep, ensure_ascii=False, indent=1) + "\n</previous_script>")
 
 
 def finish(script):
@@ -136,7 +152,8 @@ class ScriptWriter(WriterAgent):
         lo, hi = spec.get("min_words", int(spec["max_words"] * 0.7)), spec["max_words"]
         system = (self.prompt(ctx, format=spec["format"], target_seconds=spec["target_seconds"], min_words=lo, max_words=hi,
                               format_rules=FORMAT_RULES[spec["format"]], wps=spec.get("wps", 2.5), outro=spec.get("outro") or "(none: end with one clear next step)",
-                              shorts_rule="Do not write #Shorts yourself: the app adds it to Shorts.")
+                              shorts_rule="Do not write #Shorts yourself: the app adds it to Shorts.",
+                              short_max_words=(int(checks_mod.SHORT_LIMIT_S * spec.get("wps", 2.5)) if spec["format"] == "short" else "no limit"))
                   + team.persona_block(ctx.ws, member))
         notes = briefmod.cat_context(ctx.cat)
         if platforms.renderer_for(ctx.cfg, ctx.category) in ("blackboard", "explainer"):
@@ -149,7 +166,7 @@ class ScriptWriter(WriterAgent):
                   f"Topic: {topic['topic']}\nAngle: {topic['angle']}\n\n"
                   + research_block(ctx.outputs.get("research"))
                   + f"\n\nRecent videos (do not repeat their hook or structure):\n{recent_block(ctx, 6)}"
-                  + revision_block(ctx, guidance, prev)
+                  + script_revision_block(ctx, guidance, prev)
                   + guidance_block(guidance))
         return finish(self.ask(ctx, system, prompt, SCHEMA, member=member))
 

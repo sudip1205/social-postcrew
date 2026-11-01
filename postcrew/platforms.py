@@ -132,7 +132,7 @@ WORDS_PER_SECOND = 2.5   # how fast a voice-over is read: the script's word budg
 PACE_WPS = {"normal": 2.5, "slow": 2.0}   # a teacher's pace leaves room for pauses and for the picture to build up
 SHORT_MAX_S = 180        # YouTube allows Shorts of up to three minutes
 SHORT_MIN_S, SHORT_TOP_S, LONG_MIN_S = 50, 100, 300   # the owner's lengths: a Short runs 50 to 100 seconds, a long video at least 5 minutes
-SHORT_DEFAULT_S, LONG_DEFAULT_S = 75, 480
+SHORT_DEFAULT_S, LONG_DEFAULT_S = 90, 480
 
 
 def renderer_for(cfg, category=None):

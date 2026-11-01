@@ -69,6 +69,10 @@ class WriterAgent(Agent):
                 cands.append({"member": m, "out": None, "problems": [str(d)], "review": None})
                 continue
             cands.append({"member": m, "out": d, "problems": self.validate(ctx, d), "review": None})
+        broken = [c for c in cands if c["out"] and c["problems"]]
+        if broken and tcfg.get("self_fix_rounds", 2):   # a draft that breaks a rule is repaired by its own author now, not sent back through the supervisor
+            with ThreadPoolExecutor(max_workers=len(broken)) as pool:
+                list(pool.map(lambda c: self._self_fix(ctx, c, guidance, tcfg.get("self_fix_rounds", 2)), broken))
         clean = [c for c in cands if c["out"] and not c["problems"]]
         if tcfg.get("pre_review") and clean:
             with ThreadPoolExecutor(max_workers=len(clean)) as pool:
@@ -132,6 +136,26 @@ class WriterAgent(Agent):
                 raise
             ctx.run.event(self.id, "pre_review_failed", str(e)[:200], level="warning")
             return None
+
+    def _self_fix(self, ctx, cand, guidance, rounds):
+        """The author repairs exactly what the automatic checks found, keeping the rest of the draft, until it is clean or the rounds are used.
+        The draft with the fewest problems is kept."""
+        for n in range(1, rounds + 1):
+            fb = Feedback(list(cand["problems"])[:8], by="the automatic checks", exact=True, why=list(cand["problems"])[:8],
+                          before=list(guidance) + getattr(guidance, "why", []) + getattr(guidance, "before", []), past=getattr(guidance, "past", []))
+            try:
+                d = self._draft(ctx, fb, cand["member"], prev=cand["out"])
+            except AgentError as e:
+                if e.fatal:
+                    raise
+                return
+            problems = self.validate(ctx, d)
+            ctx.run.event(self.id, "self_fix", f"{cand['member']['name']} repaired the draft (round {n}): {len(cand['problems'])} -> {len(problems)} problem(s)"
+                          + (f"; left: {problems[0][:100]}" if problems else ""), level="info" if not problems else "warning")
+            if len(problems) <= len(cand["problems"]):
+                cand["out"], cand["problems"] = d, problems
+            if not cand["problems"]:
+                return
 
     def _polish(self, ctx, best, guidance, pl):
         """A revision by the best draft's author with the pre-review's fixes; kept only if it scores higher."""
