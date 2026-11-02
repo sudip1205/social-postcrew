@@ -57,13 +57,19 @@ def lab_head():
 
 
 def lab_busy():
-    """True while a crew run is in progress on the lab (the update restarts the server: it would kill the run)."""
+    """True while a crew run or a plan generation is in progress on the lab (the update restarts the server: it would kill it)."""
     r = ssh('T=$(cat ~/postcrew/workspace/studio-token 2>/dev/null); curl -s -m 8 -H "Cookie: postcrew_token=$T" -H "X-Postcrew: 1" '
             'localhost:8765/api/overview', 30)
     try:
-        return bool(json.loads(r.stdout).get("running"))
+        d = json.loads(r.stdout)
+        if d.get("running") or d.get("planning"):
+            return True
     except ValueError:
-        return False   # the server does not answer (stopped): nothing to protect
+        pass   # the server does not answer (stopped): nothing to protect
+    # a server that is older than the "planning" flag: the planner's own log shows a generation that started and has not finished
+    p = ssh('f=$(ls -dt ~/postcrew/workspace/plans/*/ 2>/dev/null | head -1); [ -n "$f" ] && find "$f" -name events.jsonl -mmin -3 | grep -q . '
+            '&& ! grep -q "\\"kind\\": \\"finished\\"" "$f/events.jsonl" && echo PLANNING', 30)
+    return "PLANNING" in p.stdout
 
 
 def subject(files):
@@ -133,7 +139,7 @@ def main():
     if lab_head() == head:
         say("ship: " + "; ".join(notes + ["the lab is already up to date"]))
     if lab_busy():
-        say("ship: " + "; ".join(notes + ["the lab was NOT updated: a crew run is in progress there (the update restarts the server). It updates after the next change"]))
+        say("ship: " + "; ".join(notes + ["the lab was NOT updated: a crew run or a plan generation is in progress there (the update restarts the server). It updates after the next change"]))
     u = ssh("~/.local/bin/postcrew-lab update 2>&1 | tail -4", 400)
     if "updated" not in u.stdout and "up to date" not in u.stdout:
         say("ship: " + "; ".join(notes) + f"; the lab update FAILED: {(u.stdout + u.stderr).strip()[-400:]}", 0)

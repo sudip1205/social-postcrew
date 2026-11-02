@@ -200,16 +200,41 @@ async function renderPlan() {
     cell.addEventListener("drop", e => { e.preventDefault(); const id = e.dataTransfer.getData("text/plain"); if (!itemById(id)) return;
       setAssign(id, cell.dataset.drop); if (isYt) return again(); doAssign(); });
   });
+  /* Generate plan is a background job on the server: this page asks for it and then watches it, so a dropped connection, a restart of the
+     Studio or leaving the page loses nothing (a restart carries the job on). */
+  const sleepMs = ms => new Promise(r => setTimeout(r, ms));
+  const busyUi = on => view.querySelectorAll("button").forEach(x => x.disabled = on);
+  async function watchJob() {
+    let fails = 0;
+    for (;;) {
+      let j;
+      try { j = await api(`/api/plan/job?platform=${S.platform}`); fails = 0; }
+      catch (e) { fails++; const el = $("#p-state"); if (el && fails > 2) el.textContent = "The Studio is restarting. The plans carry on being written when it is back…"; if (S.tab !== "plan") return; await sleepMs(4000); continue; }
+      if (S.tab !== "plan") return;
+      const el = $("#p-state");
+      if (j.state === "running") { if (el) el.textContent = `${j.message} (the plans are written in the background: you can leave this page)`; await sleepMs(3000); continue; }
+      PLAN.busy = ""; PLAN.seen = j.started_at;
+      if (j.state === "done") { const r = j.result || {}; toast(`${r.added} plan(s) written and ${r.placed} put on the calendar${r.cleared ? `; ${r.cleared} old plan(s) cleared` : ""}${r.failed ? `; ${r.failed} topic(s) failed` : ""}`); refreshOverview(); }
+      else if (j.state === "error") toast(j.message, true);
+      return again();
+    }
+  }
   $("#p-gen").onclick = async () => {
     if (!d.topics.length) { toast(`Add topics for ${app.label} in Settings first`, true); location.hash = "settings"; return; }
     const waiting = d.counts.assigned + d.counts.unassigned;
     if (waiting && !confirm(`Clear the ${waiting} plan${waiting === 1 ? "" : "s"} that ${waiting === 1 ? "is" : "are"} not made yet and write new ones for this month? Posts already written (in the Queue) and published ones are not touched.`)) return;
-    view.querySelectorAll("button").forEach(x => x.disabled = true);
-    $("#p-state").textContent = S.platform === "youtube" ? "Researching YouTube for each topic (views, likes, trends), then writing the plans: about two to three minutes per topic. Keep this page open…" : "The Planner is writing the plans for your topics (about a minute per topic)…";
-    try { const r = await post("/api/plan/generate", { platform: S.platform, month: d.month });
-      toast(`${r.added} plan(s) written and ${r.placed} put on the calendar${r.cleared ? `; ${r.cleared} old plan(s) cleared` : ""}${r.failed ? `; ${r.failed} topic(s) failed` : ""}`); refreshOverview(); }
-    catch (e) { toast(e.message, true); }
-    PLAN.busy = ""; again();
+    busyUi(true);
+    $("#p-state").textContent = S.platform === "youtube" ? "Researching YouTube for each topic (views, likes, trends), then writing the plans: about a minute per topic…" : "The Planner is writing the plans for your topics (about a minute per topic)…";
+    try { await post("/api/plan/generate", { platform: S.platform, month: d.month }); }
+    catch (e) { toast(e.message, true); busyUi(false); return; }
+    watchJob();
   };
+  const jobNow = d.job && d.job.platform !== "x" ? d.job : null;
+  if (jobNow && jobNow.state === "running") { busyUi(true); $("#p-state").textContent = jobNow.message || "Writing the plans…"; watchJob(); }
+  else if (jobNow && PLAN.seen !== jobNow.started_at && Date.now() - Date.parse(jobNow.started_at) < 3600e3) {   // it ended while you were away: say how it went, once
+    PLAN.seen = jobNow.started_at;
+    if (jobNow.state === "done") { const r = jobNow.result || {}; toast(`${r.added} plan(s) written and ${r.placed} put on the calendar${r.failed ? `; ${r.failed} topic(s) failed` : ""}`); }
+    else if (jobNow.state === "error") toast(jobNow.message, true);
+  }
 }
 VIEWS.plan = renderPlan;

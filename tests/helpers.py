@@ -180,3 +180,15 @@ class TempWorkspace:
 
     def __exit__(self, *a):
         shutil.rmtree(self.dir, ignore_errors=True)
+
+
+def wait_plan_job(get_job, timeout=60):
+    """Generate plan runs as a background job: wait for it to end and return it ({"state": "done", "result": {...}} or an error)."""
+    import time
+    end = time.time() + timeout
+    while time.time() < end:
+        job = get_job()
+        if job.get("state") != "running":
+            return job
+        time.sleep(0.05)
+    raise AssertionError("the plan job did not finish")

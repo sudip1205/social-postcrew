@@ -5,7 +5,7 @@ from datetime import date, datetime
 from unittest import mock
 from zoneinfo import ZoneInfo
 
-from helpers import (TUESDAY, ScriptedLLM, TempWorkspace, fake_fetch, poster_spec, research, review, topic, writer)
+from helpers import (TUESDAY, ScriptedLLM, TempWorkspace, fake_fetch, poster_spec, research, review, topic, wait_plan_job, writer)
 from postcrew import platforms, scheduler
 from postcrew.agents import credentials as cred_mod
 from postcrew.agents import planner as planner_mod
@@ -191,7 +191,10 @@ class StudioPerAppTests(unittest.TestCase):
             plans = [{"title": t, "angle": "buckets", "context": "c", "example": "e", "takeaway": "t", "search_queries": ["q"]} for t in titles]
             st = self.studio(ws)
             with mock.patch("postcrew.llm.make_backend", return_value=ScriptedLLM({"planner": [{"plans": plans}]})):
-                out = st.plan_generate({"platform": "youtube"})
+                st.plan_generate({"platform": "youtube"})
+                job = wait_plan_job(lambda: st.plan_job("youtube"))
+            self.assertEqual(job["state"], "done", job)
+            out = st.plan("youtube")
             self.assertEqual(out["counts"]["plans"], 10)
             day = (local_now(ws.config()).date() + datetime.timedelta(days=1)).isoformat()
             st.plan_assign({"platform": "youtube", "id": out["items"][0]["id"], "date": day, "format": "long"})

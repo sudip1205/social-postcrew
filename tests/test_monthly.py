@@ -513,3 +513,60 @@ class RegenerateTests(unittest.TestCase):
             after = monthly.view(ws, "linkedin", "2026-11", TODAY)
             self.assertEqual(({i["id"] for i in after["items"]}, set(after["days"])), ({i["id"] for i in before["items"]}, set(before["days"])))
             self.assertEqual(set(pl.load_plan(ws)), set(before["days"]))                    # the day plans are back too
+
+
+class PlanJobTests(unittest.TestCase):
+    """Generate plan is a background job that survives a dropped connection and a restart of the Studio."""
+
+    def studio(self, ws):
+        from postcrew.studio.server import Studio
+        return Studio(ws)
+
+    def test_the_job_returns_at_once_reports_progress_and_the_deploy_waits_for_it(self):
+        from unittest import mock
+        from helpers import wait_plan_job
+        gate = __import__("threading").Event()
+
+        class SlowLLM(ScriptedLLM):
+            def call(self, *a, **k):
+                gate.wait(5)
+                return super().call(*a, **k)
+        with TempWorkspace() as ws:
+            cfg = ws.config()
+            cfg["topics"] = ["Breakers"]
+            ws.save_config(cfg)
+            st = self.studio(ws)
+            with mock.patch("postcrew.llm.make_backend", return_value=SlowLLM({"planner": [answer(TITLES[:10])]})):
+                started = st.plan_generate({"platform": "linkedin"})
+                self.assertEqual(started["state"], "running")
+                self.assertTrue(st.planning)                                                    # the lab's deploy hook sees this and waits
+                self.assertTrue(st.overview("linkedin")["planning"])
+                import time
+                for _ in range(100):                                                            # the thread has just started: wait for its first message
+                    if st.plan_job("linkedin")["message"] != "Starting…":
+                        break
+                    time.sleep(0.02)
+                self.assertIn("Topic 1 of 1", st.plan_job("linkedin")["message"])
+                with self.assertRaises(ValueError):                                             # a second press while it runs is refused
+                    st.plan_generate({"platform": "linkedin"})
+                self.assertEqual(st.plan("linkedin")["job"]["state"], "running")
+                gate.set()
+                job = wait_plan_job(lambda: st.plan_job("linkedin"))
+            self.assertEqual((job["state"], job["result"]["added"]), ("done", 10))
+            self.assertFalse(st.planning)
+            self.assertEqual(ws.state("plan-job", {}), {})                                      # the restart marker is gone when it ends
+
+    def test_a_job_that_a_restart_interrupted_is_carried_on(self):
+        from unittest import mock
+        from helpers import wait_plan_job
+        with TempWorkspace() as ws:
+            cfg = ws.config()
+            cfg["topics"] = ["Breakers"]
+            ws.save_config(cfg)
+            ws.save_state("plan-job", {"linkedin": {"month": "2026-11", "started_at": "2026-11-02T06:00:00+00:00"}})   # left behind by a killed server
+            st = self.studio(ws)
+            with mock.patch("postcrew.llm.make_backend", return_value=ScriptedLLM({"planner": [answer(TITLES[:10])]})):
+                st.resume_plan_jobs()
+                job = wait_plan_job(lambda: st.plan_job("linkedin"))
+            self.assertEqual((job["state"], job["resumed"], job["result"]["added"]), ("done", True, 10))
+            self.assertEqual(ws.state("plan-job", {}), {})

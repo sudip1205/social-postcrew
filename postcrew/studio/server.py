@@ -48,6 +48,7 @@ class Studio:
         self.ws, self.port = ws, port
         self.token = token   # set when the Studio is reachable from other computers: every request must carry it
         self.oauth_states = {}
+        self.jobs = {}   # app -> the plan generation running or last finished: {state, message, started_at, month, result}
 
     @property
     def redirect_uri(self):
@@ -72,7 +73,7 @@ class Studio:
         q = [p for p in self.ws.queue() if platforms.platform_of(p) == platform]
         now = crew.local_now(cfg)
         target = crew.target_date(cfg, now)
-        return {"version": __version__, "workspace": str(self.ws.root), "running": crew.is_running(),
+        return {"version": __version__, "workspace": str(self.ws.root), "running": crew.is_running(), "planning": self.planning,
                 "platform": platform,
                 "platforms": [{"id": p, "label": platforms.label(p), "enabled": platforms.is_enabled(full, p)}
                               for p in platforms.PLATFORM_IDS],
@@ -178,18 +179,72 @@ class Studio:
         if not re.fullmatch(r"\d{4}-(0[1-9]|1[0-2])", month):
             raise ValueError("month must look like 2026-11")
         return dict(monthly.view(self.ws, platform, month, today), today=today.isoformat(), this_month=monthly.month_key(today),
-                    planning=cfg["planning"])
+                    planning=cfg["planning"], job=self.jobs.get(platform))
 
     def plan_generate(self, body):
-        """Generate plan: clear the plans not made yet, write the plans for the month's topics (YouTube: researched first) and put them on the days."""
+        """Generate plan, as a background job: the page asks for it and then watches (plan_job), so a slow or interrupted connection loses nothing.
+        It clears the plans not made yet, writes the plans for the month's topics (YouTube: researched first) and puts them on the days."""
         platform, cfg = self._view(body.get("platform"))
         today = crew.local_now(cfg).date()
         month = body.get("month") or monthly.month_key(today)
         if month < monthly.month_key(today):
             raise ValueError("that month is over: plans are written for this month or a coming one")
-        out = monthly.regenerate(self.ws, platform, month, today=today)   # clears the plans not made yet, writes the new ones, fills the month
-        bad = [r["error"] for r in out["topics"].values() if isinstance(r, dict)]
-        return dict(self.plan(platform, month), added=out["added"], failed=len(bad), placed=out["calendar"]["assigned"], cleared=out["cleared"], kept=out["kept"])
+        if not monthly.topics_of(cfg):
+            raise ValueError(f"{platforms.label(platform)} has no topics yet: add some in Settings > Topics, then generate the plan")
+        if (self.jobs.get(platform) or {}).get("state") == "running":
+            raise ValueError("the plans are already being generated for this app: watch the progress here")
+        self._start_plan_job(platform, month, today, resume=False)
+        return self.plan_job(platform)
+
+    def _start_plan_job(self, platform, month, today, resume):
+        job = {"state": "running", "message": "Starting…", "started_at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "month": month,
+               "platform": platform, "resumed": resume}
+        self.jobs[platform] = job
+        marks = self.ws.state("plan-job", {})   # saved while it runs: a restart of the Studio carries it on instead of losing it
+        marks[platform] = {"month": month, "started_at": job["started_at"]}
+        self.ws.save_state("plan-job", marks)
+
+        def say(msg):
+            job["message"] = msg
+
+        def go():
+            try:
+                if resume:   # an interrupted generation: write the topics that are missing, then fill the month
+                    out = monthly.generate(self.ws, platform, month, today=today, progress=say)
+                    say("Putting the plans on the month's days")
+                    out["calendar"] = monthly.auto_assign(self.ws, platform, month, today=today)
+                    out.update(cleared=0, kept=0)
+                else:
+                    out = monthly.regenerate(self.ws, platform, month, today=today, progress=say)
+                bad = [r["error"] for r in out["topics"].values() if isinstance(r, dict)]
+                job.update(state="done", message="Done", result={"added": out["added"], "failed": len(bad), "placed": out["calendar"]["assigned"],
+                                                                 "cleared": out["cleared"], "kept": out["kept"]})
+            except Exception as e:
+                traceback.print_exc()
+                job.update(state="error", message=str(e)[:400])
+            finally:
+                left = self.ws.state("plan-job", {})
+                left.pop(platform, None)
+                self.ws.save_state("plan-job", left)
+        threading.Thread(target=go, daemon=True, name=f"plan-{platform}").start()
+
+    def resume_plan_jobs(self):
+        """At start: carry on any plan generation a restart interrupted."""
+        for platform, m in list(self.ws.state("plan-job", {}).items()):
+            try:
+                cfg = platforms.view(self.ws.config(), platform)
+                self._start_plan_job(platform, m["month"], crew.local_now(cfg).date(), resume=True)
+                print(f"Resuming the {platform} plan generation for {m['month']} that a restart interrupted", flush=True)
+            except Exception:
+                traceback.print_exc()
+
+    def plan_job(self, platform):
+        platform = self._view(platform)[0]
+        return dict(self.jobs.get(platform) or {"state": "idle"}, platform=platform)
+
+    @property
+    def planning(self):
+        return any(j.get("state") == "running" for j in self.jobs.values())
 
     def plan_assign(self, body):
         platform, cfg = self._view(body.get("platform"))
@@ -725,6 +780,7 @@ def make_handler(studio):
                     ("POST", "/api/memory/forget"): lambda: studio.memory_forget(self.body()),
                     ("POST", "/api/plan/generate"): lambda: studio.plan_generate(self.body()),
                     ("GET", "/api/manual"): lambda: studio.manual(q.get("platform")),
+                    ("GET", "/api/plan/job"): lambda: studio.plan_job(q.get("platform")),
                     ("POST", "/api/manual/run"): lambda: studio.manual_run(self.body()),
                     ("POST", "/api/plan/assign"): lambda: studio.plan_assign(self.body()),
                     ("POST", "/api/plan/unassign"): lambda: studio.plan_unassign(self.body()),
@@ -825,6 +881,7 @@ def serve(ws, port=8765, scheduler=True, host="127.0.0.1", token=None):
     local = host in ("127.0.0.1", "localhost", "::1")
     token = None if local else access_token(ws, token)
     studio = Studio(ws, port, token)
+    studio.resume_plan_jobs()
     httpd = ThreadingHTTPServer((host, port), make_handler(studio))
     if scheduler:
         Scheduler(ws).start()

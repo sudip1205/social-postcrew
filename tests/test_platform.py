@@ -10,7 +10,7 @@ from datetime import datetime, timedelta, timezone
 from unittest import mock
 from zoneinfo import ZoneInfo
 
-from helpers import FakeLinkedIn, TempWorkspace, claude_ok
+from helpers import wait_plan_job, FakeLinkedIn, TempWorkspace, claude_ok
 from postcrew import crew, notify, scheduler
 from postcrew.agents import credentials as cred_mod
 from postcrew.defaults import DEFAULT_CONFIG
@@ -329,7 +329,11 @@ class StudioTests(unittest.TestCase):
                   "search_queries": ["q"]} for t in titles]
         llm = ScriptedLLM({"planner": [{"plans": plans}]})
         with mock.patch("postcrew.llm.make_backend", return_value=llm):
-            code, d = self.req("POST", "/api/plan/generate", {})
+            code, started = self.req("POST", "/api/plan/generate", {})
+            self.assertEqual((code, started["state"]), (200, "running"))                 # it returns at once: the plans are written in the background
+            job = wait_plan_job(lambda: self.req("GET", "/api/plan/job")[1])
+        self.assertEqual(job["state"], "done", job)
+        d = dict(self.req("GET", "/api/plan")[1], **job["result"])
         self.assertEqual((code, d["added"]), (200, 10))
         self.assertEqual(d["counts"]["assigned"], d["placed"])                  # generating also puts the plans on the month's free days, at random
         self.assertEqual(d["counts"]["assigned"] + d["counts"]["unassigned"], 10)

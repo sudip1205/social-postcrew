@@ -266,13 +266,13 @@ class MonthPlanner(Agent):
         return out
 
 
-def generate(ws, platform=LINKEDIN, month=None, llm=None, today=None, hint=""):
+def generate(ws, platform=LINKEDIN, month=None, llm=None, today=None, hint="", progress=None):
     """See _generate. A second call for the same app waits for the first, then finds nothing left to write."""
     with _generating.setdefault((str(ws.root), platform), threading.Lock()):
-        return _generate(ws, platform, month, llm, today, hint)
+        return _generate(ws, platform, month, llm, today, hint, progress)
 
 
-def _generate(ws, platform, month, llm, today, hint):
+def _generate(ws, platform, month, llm, today, hint, progress=None):
     """Top up the month's pool to PER_TOPIC plans for each of the app's topics. Returns
     {"added": n, "topics": {topic: n or {"error"}}}. Plans already there (assigned, written or published) count, and nothing
     already planned or published is written again."""
@@ -298,8 +298,10 @@ def _generate(ws, platform, month, llm, today, hint):
                      llm=llm or make_backend(cfg, ws.secrets()), platform=platform)
     run.event("planner", "started", f"{len(todo)} topic(s) for {month}: {', '.join(t for t, _ in todo)}")
     planner, result, added = MonthPlanner(), {}, 0
-    for topic, need in todo:
+    say = progress or (lambda msg: None)
+    for n, (topic, need) in enumerate(todo, 1):
         research = None
+        say(f"Topic {n} of {len(todo)}: " + (f"researching '{topic}' on YouTube" if platform != LINKEDIN else f"writing plans for '{topic}'"))
         if platform != LINKEDIN:   # YouTube: first see what is working on YouTube for this subject
             from . import trends
             run.event("planner", "research", f"researching '{topic}' on YouTube")
@@ -308,6 +310,7 @@ def _generate(ws, platform, month, llm, today, hint):
             run.event("planner", "researched", (f"{len(research['videos'])} videos read: trend {m.get('trend_score')}/100 ({m.get('label')}), "
                                                 f"{m.get('engagement_pct')}% like rate, {m.get('views_per_day', 0):,} views/day") if research["videos"] else research.get("error", "no data"),
                       level="info" if research["videos"] else "warning")
+        say(f"Topic {n} of {len(todo)}: writing the plans for '{topic}'")
         try:
             plans = planner.write(ctx, topic, need, [a for a in avoid if a], (cfg["planning"].get("focus") or "").strip(), research=research)
         except AgentError as e:
@@ -376,20 +379,22 @@ def clear_plans(ws, platform=LINKEDIN):
     return {"cleared": removed, "kept": kept}
 
 
-def regenerate(ws, platform, month, llm=None, today=None, rng=None):
+def regenerate(ws, platform, month, llm=None, today=None, rng=None, progress=None):
     """What the Generate plan button does: clear the plans not made yet, write the month's plans (YouTube: researched on YouTube first) and put
     them on the month's days at random. If no plan could be written the old ones are put back and a ValueError says why.
     Returns {"added", "topics", "cleared", "kept", "calendar"}."""
     snap = snapshot(ws, platform)
     gone = clear_plans(ws, platform)
     try:
-        out = generate(ws, platform, month, llm=llm, today=today)
+        out = generate(ws, platform, month, llm=llm, today=today, progress=progress)
         bad = [r["error"] for r in out["topics"].values() if isinstance(r, dict)]
         if not out["added"]:
             raise ValueError(f"the Planner could not write the plans: {bad[0] if bad else 'nothing was written'}. Your previous plans were kept")
     except Exception:
         restore(ws, platform, snap)
         raise
+    if progress:
+        progress("Putting the plans on the month's days")
     out["calendar"] = auto_assign(ws, platform, month, today=today, rng=rng)
     return dict(out, **gone)
 

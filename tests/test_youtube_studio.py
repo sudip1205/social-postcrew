@@ -9,7 +9,7 @@ import urllib.request
 from http.server import ThreadingHTTPServer
 from unittest import mock
 
-from helpers import TempWorkspace
+from helpers import wait_plan_job, TempWorkspace
 from postcrew import crew, voice
 from postcrew.studio.server import Studio, make_handler
 
@@ -195,8 +195,11 @@ class YouTubeStudioTests(unittest.TestCase):
         plans = [{"title": t, "angle": "buckets", "context": "c", "example": "e", "takeaway": "t",
                   "search_queries": ["q"]} for t in ['Open addressing vs chaining', 'Resizing without pauses', 'Choosing a hash function', 'Collision attacks', 'Load factor tuning', 'Hash maps in databases', 'Iteration order surprises', 'Concurrent hash maps', 'Memory cost of buckets', 'Perfect hashing for fixed keys']]
         with mock.patch("postcrew.llm.make_backend", return_value=ScriptedLLM({"planner": [{"plans": plans}]})):
-            code, d, _ = self.req("POST", "/api/plan/generate", {"platform": "youtube"})
-        self.assertEqual((code, d["added"]), (200, 10), d)
+            code, started, _ = self.req("POST", "/api/plan/generate", {"platform": "youtube"})
+            job = wait_plan_job(lambda: self.req("GET", "/api/plan/job?platform=youtube")[1])
+        self.assertEqual((code, job["state"]), (200, "done"), job)
+        d = dict(self.req("GET", "/api/plan?platform=youtube")[1], **job["result"])
+        self.assertEqual(d["added"], 10, d)
         day = (local_now(self.ws.config()).date() + datetime.timedelta(days=1)).isoformat()
         a, b = d["items"][:2]
         code, d, _ = self.req("POST", "/api/plan/assign", {"platform": "youtube", "id": a["id"], "date": day, "format": "long"})
