@@ -181,18 +181,15 @@ class Studio:
                     planning=cfg["planning"])
 
     def plan_generate(self, body):
-        """Write the plans for the month's topics (the missing ones; never a plan twice)."""
+        """Generate plan: clear the plans not made yet, write the plans for the month's topics (YouTube: researched first) and put them on the days."""
         platform, cfg = self._view(body.get("platform"))
         today = crew.local_now(cfg).date()
         month = body.get("month") or monthly.month_key(today)
         if month < monthly.month_key(today):
             raise ValueError("that month is over: plans are written for this month or a coming one")
-        out = monthly.generate(self.ws, platform, month, today=today)
-        out["calendar"] = monthly.auto_assign(self.ws, platform, month, today=today)   # the plans are put on the month's days at random
+        out = monthly.regenerate(self.ws, platform, month, today=today)   # clears the plans not made yet, writes the new ones, fills the month
         bad = [r["error"] for r in out["topics"].values() if isinstance(r, dict)]
-        if bad and not out["added"]:
-            raise ValueError(f"the Planner could not write the plans: {bad[0]}")
-        return dict(self.plan(platform, month), added=out["added"], failed=len(bad), placed=out["calendar"]["assigned"])
+        return dict(self.plan(platform, month), added=out["added"], failed=len(bad), placed=out["calendar"]["assigned"], cleared=out["cleared"], kept=out["kept"])
 
     def plan_assign(self, body):
         platform, cfg = self._view(body.get("platform"))

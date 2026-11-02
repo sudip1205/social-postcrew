@@ -10,6 +10,7 @@ An item: {id, topic (the owner's line), title, angle, context, example, takeaway
 Assigning writes the day into the app's schedule (schedule.dates) and its plan entry (agents/planner.py), which is what the crew
 and the scheduler already read, so nothing else changes in how a post is made.
 """
+import copy
 import random
 import re
 import threading
@@ -326,6 +327,71 @@ def _generate(ws, platform, month, llm, today, hint):
     bad = [t for t, r in result.items() if isinstance(r, dict) or (want - dict(todo)[t] + r) < floor]
     run.finish("succeeded" if not bad else "failed", f"{added} plan(s) written for {len(todo)} topic(s)")
     return {"added": added, "topics": result}
+
+
+# ---------- starting again ----------
+def _schedule_of(cfg, platform):
+    return cfg["schedule"] if platform == LINKEDIN else cfg["platforms"][platform]["schedule"]
+
+
+def snapshot(ws, platform):
+    """Everything Generate plan is about to change (the pool, the calendar dates and the day plans), so a failed generation can put it back."""
+    return {"pool": copy.deepcopy(load(ws, platform)), "dates": copy.deepcopy(_schedule_of(ws.config(), platform).get("dates") or []),
+            "plan": copy.deepcopy(load_plan(ws, platform))}
+
+
+def restore(ws, platform, snap):
+    with _lock:
+        ws.save_state(_name(platform), snap["pool"])
+        cfg = ws.config()
+        _schedule_of(cfg, platform)["dates"] = snap["dates"]
+        ws.save_config(cfg)
+        ws.save_state(platforms.state_name("plan", platform), {"days": snap["plan"]})
+
+
+def clear_plans(ws, platform=LINKEDIN):
+    """Generate plan starts clean: every plan that is not made yet (in any month, on a day or not) is removed, with its calendar day. A plan
+    whose post is waiting in the Queue is kept (its day stays), and published plans do not need to be kept: the published history is what
+    stops a topic being planned again. Returns {"cleared": n, "kept": n}."""
+    with _lock:
+        pool, posted = load(ws, platform), posted_titles(ws, platform)
+        removed, kept, days = 0, 0, set()
+        for month, meta in list(pool["months"].items()):
+            keep = []
+            for i in meta["items"]:
+                if status_of(i, posted) == "written":
+                    keep.append(i)
+                    kept += 1
+                    continue
+                removed += 1
+                if i.get("assigned"):
+                    days.add(i["assigned"]["date"])
+            if keep:
+                meta["items"] = keep
+            else:
+                del pool["months"][month]
+        ws.save_state(_name(platform), pool)
+        for iso in sorted(days):   # the day loses its plan and its place in the schedule unless a written plan still holds it
+            _sync_day(ws, platform, pool, posted, iso)
+    return {"cleared": removed, "kept": kept}
+
+
+def regenerate(ws, platform, month, llm=None, today=None, rng=None):
+    """What the Generate plan button does: clear the plans not made yet, write the month's plans (YouTube: researched on YouTube first) and put
+    them on the month's days at random. If no plan could be written the old ones are put back and a ValueError says why.
+    Returns {"added", "topics", "cleared", "kept", "calendar"}."""
+    snap = snapshot(ws, platform)
+    gone = clear_plans(ws, platform)
+    try:
+        out = generate(ws, platform, month, llm=llm, today=today)
+        bad = [r["error"] for r in out["topics"].values() if isinstance(r, dict)]
+        if not out["added"]:
+            raise ValueError(f"the Planner could not write the plans: {bad[0] if bad else 'nothing was written'}. Your previous plans were kept")
+    except Exception:
+        restore(ws, platform, snap)
+        raise
+    out["calendar"] = auto_assign(ws, platform, month, today=today, rng=rng)
+    return dict(out, **gone)
 
 
 # ---------- assigning plans to days ----------

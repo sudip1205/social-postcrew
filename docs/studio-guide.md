@@ -188,6 +188,6 @@ Gmail or Telegram if you turned those on.
 
 ## Plans, the calendar and Manual run
 
-- **Generate plan** (or the 1st of the month) writes the plans for your topics. YouTube plans are researched on YouTube first and carry a trend score, views a day, a like rate and the videos studied (open **Details** on a plan). YouTube gets 5-6 plans per topic; LinkedIn gets about a month's days of plans across its topics.
+- **Generate plan** clears the plans that are not made yet and writes new ones (it asks first; posts in the Queue and published ones are untouched, and if nothing can be written the old plans come back). The automatic job on the 1st only adds plans. It writes the plans for your topics. YouTube plans are researched on YouTube first and carry a trend score, views a day, a like rate and the videos studied (open **Details** on a plan). YouTube gets 5-6 plans per topic; LinkedIn gets about a month's days of plans across its topics.
 - The month's days are then filled **at random** (the topics take turns). You can still move, assign or unassign any plan by hand; a plan you assign by hand is made before one placed at random on the same day.
 - The scheduled run makes one post a day. Nothing else starts a run except **Manual run**: pick any plan that is not on the calendar, choose Short or Long (YouTube) and press **Run now**. It is made at once and follows your approval setting.

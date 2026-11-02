@@ -202,10 +202,12 @@ async function renderPlan() {
   });
   $("#p-gen").onclick = async () => {
     if (!d.topics.length) { toast(`Add topics for ${app.label} in Settings first`, true); location.hash = "settings"; return; }
+    const waiting = d.counts.assigned + d.counts.unassigned;
+    if (waiting && !confirm(`Clear the ${waiting} plan${waiting === 1 ? "" : "s"} that ${waiting === 1 ? "is" : "are"} not made yet and write new ones for this month? Posts already written (in the Queue) and published ones are not touched.`)) return;
     view.querySelectorAll("button").forEach(x => x.disabled = true);
     $("#p-state").textContent = S.platform === "youtube" ? "Researching YouTube for each topic (views, likes, trends), then writing the plans: about two to three minutes per topic. Keep this page open…" : "The Planner is writing the plans for your topics (about a minute per topic)…";
     try { const r = await post("/api/plan/generate", { platform: S.platform, month: d.month });
-      toast(r.added ? `${r.added} plan(s) written${r.failed ? `; ${r.failed} topic(s) failed` : ""}` : "Every topic already has its 10 plans"); refreshOverview(); }
+      toast(`${r.added} plan(s) written and ${r.placed} put on the calendar${r.cleared ? `; ${r.cleared} old plan(s) cleared` : ""}${r.failed ? `; ${r.failed} topic(s) failed` : ""}`); refreshOverview(); }
     catch (e) { toast(e.message, true); }
     PLAN.busy = ""; again();
   };

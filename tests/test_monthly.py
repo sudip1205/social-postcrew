@@ -458,3 +458,58 @@ class SpreadTests(unittest.TestCase):
             self.assertEqual(days, sorted(set(days)))                                    # one plan a day
             self.assertNotEqual(days, [f"2026-11-{d:02d}" for d in range(3, 13)])        # not simply the first ten days
             self.assertGreater(max(days), "2026-11-20")                                  # the plans reach into the end of the month
+
+
+class RegenerateTests(unittest.TestCase):
+    """The Generate plan button: clear what is not made yet, write new plans, put them on the month's days."""
+
+    def prepare(self, ws):
+        cfg = ws.config()
+        cfg["topics"] = ["Breakers"]
+        ws.save_config(cfg)
+        monthly.generate(ws, "linkedin", "2026-11", llm=ScriptedLLM({"planner": [answer(TITLES[:10])]}), today=TODAY)
+
+    def test_old_plans_are_cleared_new_ones_written_and_placed_on_the_month(self):
+        with TempWorkspace() as ws:
+            self.prepare(ws)
+            old = {i["title"] for i in monthly.view(ws, "linkedin", "2026-11", TODAY)["items"]}
+            monthly.auto_assign(ws, "linkedin", "2026-11", today=TODAY)
+            self.assertTrue(monthly.view(ws, "linkedin", "2026-11", TODAY)["days"])
+            fresh = ["Alerting on breaker trips", "Breakers and queues", "Chaos testing breakers", "Breakers on the edge", "Shadow traffic for breakers",
+                     "Breakers in batch jobs", "Per-tenant breakers", "Breakers for databases", "Sizing breaker windows", "Breakers in gRPC"]
+            out = monthly.regenerate(ws, "linkedin", "2026-11", llm=ScriptedLLM({"planner": [answer(fresh)]}), today=TODAY)
+            self.assertEqual((out["cleared"], out["added"]), (10, 10))
+            v = monthly.view(ws, "linkedin", "2026-11", TODAY)
+            self.assertEqual({i["title"] for i in v["items"]}, set(fresh))                  # none of the old plans is left
+            self.assertFalse(old & {i["title"] for i in v["items"]})
+            self.assertEqual(v["counts"]["assigned"], 10)                                    # and the new ones are on days of the month
+            self.assertTrue(all(d >= "2026-11-03" for d in v["days"]))
+            self.assertEqual(len(set(v["days"])), 10)
+
+    def test_a_plan_whose_post_is_in_the_queue_is_kept_with_its_day(self):
+        with TempWorkspace() as ws:
+            self.prepare(ws)
+            first = monthly.view(ws, "linkedin", "2026-11", TODAY)["items"][0]
+            monthly.assign(ws, "linkedin", first["id"], "2026-11-10", today=TODAY)
+            ws.save_queue([{"id": "2026-11-10-briefed-x", "platform": "linkedin", "plan_id": first["id"], "topic": first["title"], "status": "queued",
+                            "date": "2026-11-10", "text": "t"}])
+            gone = monthly.clear_plans(ws, "linkedin")
+            self.assertEqual((gone["cleared"], gone["kept"]), (9, 1))
+            v = monthly.view(ws, "linkedin", "2026-11", TODAY)
+            self.assertEqual([i["id"] for i in v["items"]], [first["id"]])
+            self.assertIn("2026-11-10", v["days"])                                           # its day stays
+
+    def test_when_no_plan_can_be_written_the_old_plans_come_back(self):
+        from postcrew.agents import planner as pl
+        from postcrew.llm import LLMError
+        with TempWorkspace() as ws:
+            self.prepare(ws)
+            monthly.auto_assign(ws, "linkedin", "2026-11", today=TODAY)
+            before = monthly.view(ws, "linkedin", "2026-11", TODAY)
+            llm = ScriptedLLM({"planner": [LLMError("the model is down", kind="failed")] * 6})
+            with self.assertRaises(ValueError) as caught:
+                monthly.regenerate(ws, "linkedin", "2026-11", llm=llm, today=TODAY)
+            self.assertIn("previous plans were kept", str(caught.exception))
+            after = monthly.view(ws, "linkedin", "2026-11", TODAY)
+            self.assertEqual(({i["id"] for i in after["items"]}, set(after["days"])), ({i["id"] for i in before["items"]}, set(before["days"])))
+            self.assertEqual(set(pl.load_plan(ws)), set(before["days"]))                    # the day plans are back too
