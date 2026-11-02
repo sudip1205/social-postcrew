@@ -161,7 +161,7 @@ def build_props(scenes, fmt, audio, look=None):
                 "seconds": round(ln, 3), "captions": _captions(words)}
         if key is not None:
             item["key"] = key
-        if sc.get("closing"):   # "Like · Comment · Share · Subscribe": a button for each, pressed when the voice says it
+        if sc.get("closing"):   # "Like · Comment · Subscribe": a button for each (the share request is only said, there is no Share button), pressed when the voice says it
             parts = [p for p in re.split(r"\s*[·•|,/]\s*|\s+and\s+", item["title"]) if p] or [item["title"]]
             item.update(closing=True, items=parts, cues=[_when(p, words, float(sc.get("lead_s") or 0)) for p in parts],
                         buttons=[_button(p) for p in parts])

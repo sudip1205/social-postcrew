@@ -151,17 +151,17 @@ class MovingPicturesTests(unittest.TestCase):
         scenes = [dict(base, layout="flow", on_screen="Down", narration="The load balancer sends requests to server three, which is down.",
                        nodes=["Load Balancer|lucide:network", "Server 3|lucide:server|down", "Server 1|lucide:server|3"],
                        edges=["Load Balancer > Server 3: GET /a x2 !", "Load Balancer > Server 1: ok"]),
-                  dict(base, layout="statement", closing=True, on_screen="Like · Comment · Share · Subscribe",
-                       narration="Please like, comment, share and subscribe.")]
+                  dict(base, layout="statement", closing=True, on_screen="Like · Comment · Subscribe",
+                       narration="Please like, comment and subscribe. And if you liked it, share it with someone.")]
         props, _ = rm.build_props(scenes, "long", None)
         nodes = props["scenes"][0]["nodes"]
         self.assertEqual((nodes[1]["state"], nodes[2]["count"]), ("down", 3))
         e = props["scenes"][0]["edges"][0]
         self.assertEqual((e["label"], e["n"], e["drop"]), ("GET /a", 2, True))
         buttons = props["scenes"][1]["buttons"]
-        self.assertEqual([b["kind"] for b in buttons], ["like", "comment", "share", "subscribe"])
+        self.assertEqual([b["kind"] for b in buttons], ["like", "comment", "subscribe"])               # no Share button: the sharing is only said
         self.assertTrue(all(b["svg"] and b["svg"]["body"] for b in buttons))
-        self.assertEqual(len(props["scenes"][1]["cues"]), 4)
+        self.assertEqual(len(props["scenes"][1]["cues"]), 3)
 
     def test_a_stat_scene_needs_a_number_and_only_remotion_draws_it(self):
         from postcrew.checks import script_problems

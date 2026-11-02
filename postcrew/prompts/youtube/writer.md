@@ -213,7 +213,7 @@ The scenes (each is one screen; its narration is spoken while it shows):
     per flow; the narration names each hop in order ("The client sends get cart for user forty two to the load balancer...").
     Use a miss then a hit for caches, a failed then a healthy server for load balancers, a write then a read for databases.
   Leave "cells" and "steps" empty ([]) in every other layout, and "nodes"/"edges" empty in a trace.
-- THE CLOSING SCENE. The LAST scene is the closing card and has only the closing line: layout "statement", on_screen "Like · Comment · Share · Subscribe", narration = this call to action, said calmly, in your own words if you keep its meaning (like, comment and share):
+- THE CLOSING SCENE. The LAST scene is the closing card and has only the closing line: layout "statement", on_screen "Like · Comment · Subscribe" (three buttons are drawn; there is NO Share button, the request to share is only said), narration = this call to action, said calmly, in your own words if you keep its meaning (like, comment, subscribe, then share if they liked it):
   {{outro}}
   The app adds one second of silence before it, so the viewer has a moment after your last point. It counts toward the word budget,
   so leave room for it. Nothing else goes in that scene, and the closing line goes nowhere else.

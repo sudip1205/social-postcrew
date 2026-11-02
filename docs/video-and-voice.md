@@ -309,4 +309,4 @@ Sources: the Remotion, Manim and Motion Canvas comparisons and the After Effects
 - **Fan-out**: when one box sends to several, the layout puts the sender above the receivers automatically.
 - **Code scenes** are editor windows; the file name is the scene's on-screen title, and up to five output lines in `items` print in a terminal panel.
 - **Stat scenes** (`layout: stat`): `items = ["600 PB", "caption"]`, optional `cells = ["7", "10"]` and a `clip` icon.
-- **Closing card**: `Like · Comment · Share · Subscribe` is drawn as four buttons pressed as the voice says them.
+- **Closing card**: `Like · Comment · Subscribe` is drawn as three buttons pressed as the voice says them. The request to share is only said ("...and if you liked it, share it with someone who would find it helpful"), there is no Share button.

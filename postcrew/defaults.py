@@ -73,7 +73,7 @@ DEFAULT_CONFIG = {
             "video": {
                 "format": "short", "target_seconds": 90, "graphics": True,   # the Storyboard Artist draws icons and cliparts (Remotion videos)
                 # said at the end of every video (the Script Writer writes it into the last scene); empty = no closing line
-                "outro": "If this was useful, please like, comment, share and subscribe, and share it with someone who would find it helpful.",
+                "outro": "If this was useful, please like, comment and subscribe. And if you liked it, share it with someone who would find it helpful.",
                 "look": "auto",                  # auto: off-white page for a vertical video, black page for a wide one. Or paper / ink for both
                 "pace": "slow",                  # slow: a teacher's pace, longer pauses. normal: brisk
                 "voice": {"provider": "elevenlabs", "voice_id": "", "voice_name": "", "model": "eleven_multilingual_v2",
