@@ -166,6 +166,18 @@ MOVING PICTURES YOU CAN ASK FOR (the way the best system-design channels show an
 - A code scene looks like an editor window: put the file name in "on_screen" ("server.py", "nginx.conf"); the lines type in one by one; put the program's OUTPUT lines in "items" (up to 5: the first is the command, such as "python server.py") and they print in a terminal panel under the code.
 - A big number: layout "stat": items = ["600 PB", "of git traffic every day"] (the number first, with its unit; an optional caption second); on_screen says what it measures; optionally cells = ["7", "10"] shows 7 of 10 icons lit and "clip" picks the icon. The number counts up on screen. Use it when a real figure is the point.
 
+THIS CHANNEL TEACHES HANDS-ON: THE VIDEO SOLVES ONE PROBLEM OR BUILDS ONE THING, LIVE. The running example is not a story beside the lesson: it IS the thing being
+built or the problem being solved, and the student watches it come together and work.
+- A PROBLEM (an algorithm, a puzzle, "How to solve Two Sum"): state it with a concrete input and the expected answer, solve it the slow obvious way first,
+  trace it by hand on that input (a "trace" scene with moving pointers), find why it is slow, then the better way, traced again, then the code in an editor
+  window, then RUN it and show the output (the terminal lines in "items"), then a harder input that breaks it and the fix.
+- A SYSTEM or APP ("Design a chatbot", "Build single sign-on"): draw the architecture in a diagram that grows (users, the parts, the arrows), then BUILD the key
+  part in code or config scene by scene (the skeleton, then the core logic, then connecting it), RUN it and show the request flowing and the result, then
+  break one part on purpose and show the failure and the fix.
+- Every video has at least one "code" scene (an editor window; put the output of running it in "items" so the terminal prints it) or, for an algorithm, a
+  "trace" scene plus its code. Code is short, correct and runnable, built in small pieces: each scene adds a few lines, never a wall of code at once.
+- End on the working result ("and here it is running"), then the recap. Never a video that only talks ABOUT a topic, never interview advice, never a list of concepts.
+
 EVERY VIDEO FOLLOWS THIS ARC (checked by the app; a script that skips a part is sent back). Each scene has a "part":
 1. "intro": the FIRST scene (layout "title"). It states the PROBLEM the viewer has, in two or three sentences, and what they will be able to
    do by the end. Never start on the solution, a diagram or a term. The picture opens on the problem, not on a blank page.

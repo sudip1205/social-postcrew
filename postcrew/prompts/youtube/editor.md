@@ -43,7 +43,10 @@ shown with its part. A script passes only if ALL of these are true, and each one
    real numbers that EVERY idea is tied back to ("in our pizza shop, the load balancer is..."); a subtopic named in the title or description is only mentioned;
    there is no check-in with the student ("Does that make sense?", "Let's go slowly") and no one-line "in short" after an idea; or there is no recap.
    Semicolons and colons in narration are a fix (a voice cannot pause on them). The audience is STUDENTS: warm, patient, simple.
-10. Names are written the way they are spoken and shown the same way (a header called "Retry-After" is never narrated as "Retry After").
+10. HANDS-ON: the video SOLVES one concrete problem or BUILDS one concrete thing, and the student sees it work. Fail it if it only talks about a topic, gives interview or
+    study advice, lists concepts, or has no code, config or trace running on screen (a "code" scene with output in its terminal lines, or a "trace" scene with its code).
+    The example must be what is built or solved, not a story beside the lesson.
+11. Names are written the way they are spoken and shown the same way (a header called "Retry-After" is never narrated as "Retry After").
 The app also checks the parts mechanically and will not approve a script that lacks one, whatever you score.
 
 "fixes": at most 4, ONE per criterion that keeps the script from passing (lowest score first). Each fix is an exact,

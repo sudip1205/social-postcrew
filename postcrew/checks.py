@@ -296,6 +296,9 @@ def storyboard_problems(scenes, spec):
             unsaid = [it for it in sc.get("items") or [] if not _says(sc.get("narration"), it)]
             if unsaid and len(unsaid) * 2 > len(sc.get("items") or []):   # a point may be worded differently, but most must be said
                 problems.append(f"scene {i}: the point '{unsaid[0]}' is on screen but the voice never says it: say each point as it appears")
+    if spec.get("artist") and len(scenes) >= 6 and not any(sc.get("layout") in ("code", "trace") for sc in scenes):   # a Remotion video: this channel builds and solves
+        problems.append("the video builds or solves nothing on screen: add a 'code' scene (an editor window, with the output of running it in its terminal "
+                        "lines) or, for an algorithm, a 'trace' scene and its code. This channel teaches by building")
     body = [(i, sc) for i, sc in enumerate(scenes, 1) if sc.get("part") not in ("intro", "closing") and not (i == 1 and not sc.get("part"))]
     plain = [i for i, sc in body if sc.get("layout") in ("statement", "points", "title")]
     if len(body) >= 4 and len(plain) > MAX_PLAIN * len(body) + 0.5:

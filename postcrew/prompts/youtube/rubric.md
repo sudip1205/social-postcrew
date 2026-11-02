@@ -8,7 +8,7 @@ hook - the first scene: the professor's opening
   <60   generic, clickbait, or not paid off later in the video.
 
 value
-  90+   a student understands the idea AND can use it: every idea is explained what / why / how with the running example and real numbers, each
+  90+   the video solves or builds ONE concrete thing live and ends with it working (code or config on screen and run, its output shown); a student understands the idea AND can use it: every idea is explained what / why / how with the running example and real numbers, each
         subtopic named in the title is covered properly, the common mistake is shown, and the video ends with a short recap of what to remember.
   70-89 useful but a subtopic is only mentioned, or the example is thin, or there is no recap.
   <70   a list of facts to keep in mind; nothing is really explained.

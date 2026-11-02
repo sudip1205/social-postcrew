@@ -570,3 +570,74 @@ class PlanJobTests(unittest.TestCase):
                 job = wait_plan_job(lambda: st.plan_job("linkedin"))
             self.assertEqual((job["state"], job["resumed"], job["result"]["added"]), ("done", True, 10))
             self.assertEqual(ws.state("plan-job", {}), {})
+
+
+class NicheAndTopicsTests(unittest.TestCase):
+    """The YouTube niche is hands-on builds and solved problems; plans follow the topics that are in Settings now."""
+
+    def test_interview_advice_and_concept_lists_are_refused_but_solving_and_building_are_planned(self):
+        bad = ["How to Answer Any System Design Interview: A 5-Step Framework", "Vector Databases Explained: What Interviewers Expect You to Know",
+               "System Design Interview Tips for Beginners", "Backend Developer Roadmap", "10 concepts every engineer should know",
+               "Cracking the Coding Interview: how to prepare"]
+        good = ["How to Solve Two Sum: Brute Force to Hash Map, in Python", "Design a Chatbot: Build the Whole Pipeline Step by Step",
+                "Build Single Sign-On with OAuth 2: the Login Flow by Hand", "LRU Cache: Solve the Interview Problem in Python"]
+        for t in bad:
+            self.assertTrue(monthly.MonthPlanner.problems(plan(t), [], youtube=True), t)
+            self.assertFalse([p for p in monthly.MonthPlanner.problems(plan(t), [], youtube=False) if "interviews" in p])   # LinkedIn is not restricted
+        for t in good:
+            self.assertEqual(monthly.MonthPlanner.problems(plan(t), [], youtube=True), [], t)
+
+    def test_research_searches_build_and_tutorial_videos_not_interview_ones(self):
+        from postcrew import trends
+        self.assertNotIn("interview", " ".join(trends.SUFFIXES))
+        self.assertTrue(any("build" in s for s in trends.SUFFIXES))
+
+    def test_a_remotion_video_must_build_or_solve_something_on_screen(self):
+        from postcrew.checks import storyboard_problems
+        spec = {"format": "long", "wps": 2.5, "artist": True}
+        talk = [{"layout": "diagram", "part": "idea", "nodes": ["A", "B"], "narration": "a b"}] * 6
+        self.assertTrue(any("builds or solves nothing" in p for p in storyboard_problems(talk, spec)))
+        built = talk[:5] + [{"layout": "code", "part": "example", "code": "x = 1", "narration": "x"}]
+        self.assertFalse(any("builds or solves nothing" in p for p in storyboard_problems(built, spec)))
+        self.assertFalse(any("builds or solves nothing" in p for p in storyboard_problems(talk, dict(spec, artist=False))))   # other renderers are not asked
+
+    def test_plans_of_topics_removed_from_settings_are_dropped_with_their_days(self):
+        with TempWorkspace() as ws:
+            cfg = ws.config()
+            cfg["topics"] = ["Breakers", "Retries"]
+            ws.save_config(cfg)
+            from unittest import mock
+            with mock.patch.object(monthly, "per_topic", lambda p, m, t: 5):
+                monthly.generate(ws, "linkedin", "2026-11", llm=ScriptedLLM({"planner": [answer(TITLES[:5]), answer(TITLES[5:10])]}), today=TODAY)
+            monthly.auto_assign(ws, "linkedin", "2026-11", today=TODAY)
+            before = monthly.view(ws, "linkedin", "2026-11", TODAY)
+            self.assertEqual({i["topic"] for i in before["items"]}, {"Breakers", "Retries"})
+            cfg = ws.config()
+            cfg["topics"] = ["Retries"]                                                       # the owner changes the topics in Settings
+            ws.save_config(cfg)
+            self.assertEqual(monthly.prune_stale_topics(ws, "linkedin"), 5)
+            after = monthly.view(ws, "linkedin", "2026-11", TODAY)
+            self.assertEqual({i["topic"] for i in after["items"]}, {"Retries"})
+            self.assertTrue(set(after["days"]) < set(before["days"]) and len(after["days"]) == 5)   # the old topic's days left the calendar too
+            from postcrew.agents import planner as pl
+            self.assertEqual(set(pl.load_plan(ws)), set(after["days"]))
+
+    def test_a_removed_topic_whose_post_is_already_written_is_kept(self):
+        with TempWorkspace() as ws:
+            cfg = ws.config()
+            cfg["topics"] = ["Breakers"]
+            ws.save_config(cfg)
+            monthly.generate(ws, "linkedin", "2026-11", llm=ScriptedLLM({"planner": [answer(TITLES[:5])]}), today=TODAY)
+            first = monthly.view(ws, "linkedin", "2026-11", TODAY)["items"][0]
+            monthly.assign(ws, "linkedin", first["id"], "2026-11-10", today=TODAY)
+            ws.save_queue([{"id": "x", "platform": "linkedin", "plan_id": first["id"], "topic": first["title"], "status": "queued", "date": "2026-11-10", "text": "t"}])
+            cfg = ws.config()
+            cfg["topics"] = ["Something else"]
+            ws.save_config(cfg)
+            self.assertEqual(monthly.prune_stale_topics(ws, "linkedin"), 4)
+            self.assertEqual([i["id"] for i in monthly.view(ws, "linkedin", "2026-11", TODAY)["items"]], [first["id"]])
+
+    def test_pruning_an_unknown_app_does_nothing_instead_of_failing(self):
+        with TempWorkspace() as ws:
+            self.assertEqual(monthly.prune_stale_topics(ws, "myspace"), 0)
+            monthly.sync_all(ws, "myspace")                                                    # a run for an unknown app is refused later, not here

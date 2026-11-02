@@ -53,6 +53,11 @@ SCHEMA = {
 }
 
 
+# interview coaching, career advice, roadmaps, tips and concept lists are not what the YouTube channel makes (hands-on builds and solved problems are)
+NOT_NICHE = re.compile(r"(how to|ways? to|steps? to|tips?|framework|strategy|guide)\b[^.?!]{0,40}\b(answer|ace|crack|pass|nail|prepare|prep|survive)\b[^.?!]{0,30}\binterview"
+                       r"|\bwhat (the )?interviewers?\b|\binterview (tips|framework|strategy|prep|preparation|mistakes|checklist|roadmap)\b|\b(any|every|a) (system design |coding )?interview\b"
+                       r"|\bcrack(ing)? the\b[^.?!]{0,20}\binterview|\binterview\b[^.?!]{0,25}\b(how to|tips|prepare|prep)\b|\broadmap\b|\bcareer\b|\b\d+ (concepts|things|tips|mistakes|rules)\b", re.I)
+
 TREND = {
     "type": "object",
     "properties": {
@@ -236,7 +241,7 @@ class MonthPlanner(Agent):
                 continue
             guidance = []
             for p in data.get("plans", []):
-                problems = self.problems(p, taken + [g["title"] for g in got])
+                problems = self.problems(p, taken + [g["title"] for g in got], youtube=ctx.platform != LINKEDIN)
                 if problems:
                     guidance.append(f"'{p.get('title', '?')}': " + "; ".join(problems))
                     continue
@@ -253,8 +258,11 @@ class MonthPlanner(Agent):
         return got
 
     @staticmethod
-    def problems(p, taken):
+    def problems(p, taken, youtube=False):
         title, out = (p.get("title") or "").strip(), []
+        if youtube and NOT_NICHE.search(f"{title} {p.get('angle', '')}"):
+            out.append("this is advice about interviews, careers or learning paths, or a list of concepts: the channel only makes hands-on videos that "
+                       "SOLVE one concrete problem or BUILD one concrete thing. Plan the problem or the build itself")
         if not 5 <= len(title) <= 90:
             out.append(f"the title must be 5-90 characters (got {len(title)})")
         for key in ("angle", "context", "example", "takeaway"):
@@ -282,6 +290,7 @@ def _generate(ws, platform, month, llm, today, hint, progress=None):
     topics = topics_of(cfg)
     if not topics:
         raise ValueError(f"{platforms.label(platform)} has no topics yet: add some in Settings > Topics, then generate the plan")
+    prune_stale_topics(ws, platform)   # plans of topics you removed from Settings do not live on
     with _lock:
         pool = load(ws, platform)
         have = pool["months"].setdefault(month, {"generated_at": None, "topics": [], "items": []})
@@ -379,6 +388,36 @@ def clear_plans(ws, platform=LINKEDIN):
     return {"cleared": removed, "kept": kept}
 
 
+def prune_stale_topics(ws, platform=LINKEDIN):
+    """Plans for a topic that is no longer in Settings are removed (with their calendar day), unless their post is already written. Changing the
+    topics in Settings therefore changes what is planned, instead of the old topics living on in the calendar. Returns the number removed."""
+    try:
+        topics = {t.lower() for t in topics_of(platforms.view(ws.config(), platform))}
+    except KeyError:   # not an app of this workspace: nothing to prune (the caller reports the unknown app itself)
+        return 0
+    with _lock:
+        pool, posted = load(ws, platform), posted_titles(ws, platform)
+        gone, days = 0, set()
+        for month, meta in list(pool["months"].items()):
+            keep = []
+            for i in meta["items"]:
+                if i["topic"].lower() in topics or status_of(i, posted) in ("written", "published"):
+                    keep.append(i)
+                    continue
+                gone += 1
+                if i.get("assigned"):
+                    days.add(i["assigned"]["date"])
+            if len(keep) != len(meta["items"]):
+                meta["items"] = keep
+                if not keep:
+                    del pool["months"][month]
+        if gone:
+            ws.save_state(_name(platform), pool)
+            for iso in sorted(days):
+                _sync_day(ws, platform, pool, posted, iso)
+    return gone
+
+
 def regenerate(ws, platform, month, llm=None, today=None, rng=None, progress=None):
     """What the Generate plan button does: clear the plans not made yet, write the month's plans (YouTube: researched on YouTube first) and put
     them on the month's days at random. If no plan could be written the old ones are put back and a ValueError says why.
@@ -408,12 +447,12 @@ def _item(pool, item_id):
     raise ValueError("that plan no longer exists")
 
 
-BRIEF_SHORT = ("A vertical Short taught like a calm, caring professor to students: start from a situation the student knows, explain the idea in plain words "
-               "with ONE small real example with numbers, tie every part of the idea back to that example, say it back in one line, show the common mistake, "
-               "and end kindly. Whole spoken sentences, never clipped notes.")
-BRIEF_LONG = ("A 16:9 class by a calm, caring professor for students: begin with a problem the student has met, promise what they will understand, build the idea "
-              "step by step around ONE running example with real numbers, explain what, why and how for every part, check in with the class, say each idea back "
-              "in one line, show the common mistake and its fix, and finish with a short recap and an encouraging line.")
+BRIEF_SHORT = ("A vertical hands-on Short taught like a calm, caring professor to students: it SOLVES one concrete problem or BUILDS one small thing live. State the "
+               "problem or the goal with a real input, build it in a few small steps (code or a diagram that grows, one running example with numbers), RUN it and show the "
+               "result, show the common mistake, and end kindly. Whole spoken sentences, never clipped notes, never interview advice.")
+BRIEF_LONG = ("A 16:9 hands-on class by a calm, caring professor for students: it SOLVES one concrete problem or BUILDS one concrete thing from start to finish. Begin with the "
+              "problem the student has, draw the plan, then build it step by step (code in an editor window with its output, or a growing diagram), explaining what, why and how "
+              "for every part, run it and show it working, break it on purpose and fix it, check in with the class, and finish with a short recap. Never interview advice.")
 
 
 def short_fmt(fmt):
@@ -508,6 +547,7 @@ def _sync_day(ws, platform, pool, posted, iso):
 
 def sync_all(ws, platform=LINKEDIN):
     """Bring every day that has assigned plans up to date (cheap; run before each scheduled and each manual run, and when the page opens)."""
+    prune_stale_topics(ws, platform)
     with _lock:
         pool = load(ws, platform)
         dates = sorted({i["assigned"]["date"] for i in _all_items(pool) if i.get("assigned")})

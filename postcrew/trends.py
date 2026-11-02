@@ -23,7 +23,7 @@ from datetime import datetime, timezone
 UA = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36",
       "Accept-Language": "en-US,en;q=0.9", "Cookie": "CONSENT=YES+1; SOCS=CAI"}
 PERIODS = {"month": "EgIIBA%3D%3D", "year": "EgIIBQ%3D%3D", "short": "EgIYAQ%3D%3D"}   # YouTube's own search filters: this month, this year, under 4 minutes
-SUFFIXES = ("", " explained", " interview", " tutorial")
+SUFFIXES = ("", " how to build step by step", " tutorial implementation", " explained")   # hands-on videos: how to build and solve, not interview advice
 UNIT_DAYS = {"second": 0, "minute": 0, "hour": 0, "day": 1, "week": 7, "month": 30, "year": 365,
              "s": 0, "min": 0, "h": 0, "d": 1, "w": 7, "mo": 30, "y": 365}
 

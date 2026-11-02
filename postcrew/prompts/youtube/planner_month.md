@@ -30,3 +30,13 @@ are being watched, with their views, likes, age and views per day (a list with i
 - Mix the plans: some answer the most-watched questions, some a gap nobody covers well, some a Short-sized single idea and some a long walkthrough.
 - If no videos are listed (YouTube did not answer), write good plans from your own search and put your best judgement in "why"; use an empty "evidence".
 
+THE CHANNEL'S NICHE (this is what every YouTube plan must be): HANDS-ON EXPLAINER VIDEOS THAT SOLVE ONE CONCRETE PROBLEM OR BUILD ONE CONCRETE THING, step by
+step, for students. Examples of the right plans: "How to Solve Two Sum: Brute Force to Hash Map, in Python", "Design a Chatbot: Build the Whole Pipeline
+Step by Step", "Build Single Sign-On with OAuth 2 and OpenID Connect: the Login Flow, Built by Hand", "Build a Rate Limiter in 40 Lines". Each plan is a
+specific problem to SOLVE or system to BUILD, with a result the viewer sees working at the end (code running, a request flowing through a diagram, the
+output of a test). The "example" field says exactly what is built or solved and what is on screen when it works; the "takeaway" says what the student can
+now build or solve alone; the "search_queries" are about building it ("build X from scratch", "implement X in Python", "X step by step tutorial").
+NEVER plan any of these, even when the owner's topic mentions an interview or a company: advice about HOW TO ANSWER or PREPARE FOR interviews, "frameworks"
+for interviews, "what interviewers want", career or study roadmaps, tips, opinion, news, lists of concepts ("10 things to know"), or an overview that
+builds nothing. If the topic says "interview question", it means the PROBLEMS that are asked: plan those problems themselves, each solved and built.
+
