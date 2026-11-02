@@ -81,7 +81,7 @@ async function renderWorkflow() {
 }
 
 function drawEmptyRun() {
-  $("#wf-head").innerHTML = `<div class="lg:col-span-12 bg-white rounded-xl border border-slate-200 p-4 shadow-sm">${emptyState("schema", "No runs yet. Start the crew from the Overview and it will appear here, live.")}</div>`;
+  $("#wf-head").innerHTML = `<div class="lg:col-span-12 bg-white rounded-xl border border-slate-200 p-4 shadow-sm">${emptyState("schema", "No runs yet. Runs start from the schedule, or from Manual run, and appear here live.")}</div>`;
   $("#wf-graph").innerHTML = ""; $("#wf-log").innerHTML = ""; $("#wf-drawer").innerHTML = ""; $("#wf-memory").innerHTML = "";
 }
 

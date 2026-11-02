@@ -20,8 +20,10 @@ PROJECT = "12643280043223938531"
 API = "https://stitch.googleapis.com/v1"
 # Screens Stitch made with "edit screens" are not always placed on the canvas, so they are not "visible": list them here to sync them.
 # SUPERSEDED screens are skipped (the old screen was replaced by the new one).
-PINNED = {"ea789ed29bc94bfe838a978ea6ce0d38"}   # Content Plan > Monthly Editorial Board (replaces the weekly board)
+PINNED = {"53bdc98102bd48a890aa0b855057589d",   # Manual Run (the only place a run is started by hand)
+          "6fc2c37b162e40e0af98510221ee7e2a"}   # Content Plan > Monthly Editorial Board with the research details (replaces the weekly board and the first monthly version)
 SUPERSEDED = {"aae9f43f535e4625bfeb3cb4c2b2eabc",   # Plan > Weekly Editorial Board
+              "ea789ed29bc94bfe838a978ea6ce0d38",   # the monthly board before the research details
               "1fc154c1dcae4b868d90494649baa18b"}   # the first draft of the monthly plan (a second version was kept)
 OUT = Path(__file__).resolve().parent.parent / "design" / "stitch"
 

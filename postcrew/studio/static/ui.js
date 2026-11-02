@@ -95,3 +95,34 @@ const sectionHead = (ic, title, sub, tint = "violet") => `<div class="flex items
   <div><h2 class="font-headline font-bold text-lg text-slate-900">${esc(title)}</h2><p class="text-sm text-slate-500 mt-0.5">${esc(sub || "")}</p></div></div>`;
 const emptyState = (ic, text) => `<div class="flex flex-col items-center gap-2 py-10 text-slate-400">${icon(ic, "text-3xl")}<p class="text-sm">${esc(text)}</p></div>`;
 const errorBanner = msg => `<div class="flex items-center gap-2.5 bg-rose-50 border border-rose-200 text-rose-800 text-sm rounded-xl px-4 py-3">${icon("error", "text-rose-600 shrink-0")}<span>${esc(msg)}</span></div>`;
+
+/* ---------- YouTube research of a plan (shared by the Plan and Manual run pages) ---------- */
+const TREND_LOOK = { hot: ["Hot", "bg-orange-50 text-orange-700 border-orange-200", "local_fire_department"], steady: ["Steady", "bg-sky-50 text-sky-700 border-sky-200", "trending_up"],
+  niche: ["Niche", "bg-slate-100 text-slate-600 border-slate-200", "bar_chart"] };
+const kNum = n => n == null ? "n/a" : n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(n >= 1e4 ? 0 : 1)}k` : `${Math.round(n)}`;
+const agoDays = d => d == null ? "" : d < 1 ? "today" : d < 14 ? `${d}d ago` : d < 60 ? `${Math.round(d / 7)}w ago` : d < 700 ? `${Math.round(d / 30)}mo ago` : `${Math.round(d / 365)}y ago`;
+/* the chips under a plan's title: how trendy, how fast it is watched, how liked, how many videos were studied */
+function researchChips(r, cls = "") {
+  if (!r) return "";
+  if (r.unavailable) return `<div class="flex flex-wrap gap-1.5 mt-2 ${cls}"><span class="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md border border-slate-200 bg-slate-50 text-slate-500">${icon("cloud_off", "text-[12px]")}<span>No YouTube numbers for this plan</span></span></div>`;
+  const [word, tone, ic] = TREND_LOOK[r.label] || TREND_LOOK.niche, pill = "inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md border border-slate-200 bg-slate-50 text-slate-600";
+  return `<div class="flex flex-wrap gap-1.5 mt-2 ${cls}">
+    <span class="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md border ${tone}" title="Trend score from how fast recent videos on this are watched">${icon(ic, "text-[12px]")}<span>${word} ${r.trend_score ?? "?"}/100</span></span>
+    ${r.views_per_day != null ? `<span class="${pill}">${icon("visibility", "text-[12px]")}<span>${kNum(r.views_per_day)} views/day</span></span>` : ""}
+    ${r.engagement_pct != null ? `<span class="${pill}" title="Likes as a share of views, on the videos studied">${icon("favorite", "text-[12px]")}<span>${r.engagement_pct}% like rate</span></span>` : ""}
+    ${r.videos?.length ? `<span class="${pill}">${icon("smart_display", "text-[12px]")}<span>${r.videos.length} ${r.videos.length === 1 ? "video" : "videos"} studied</span></span>` : ""}</div>`;
+}
+/* the expandable part: why now, what the trending videos cover, where they fall short, and the videos themselves */
+function researchDetails(r) {
+  if (!r) return "";
+  const h = t => `<div class="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">${t}</div>`;
+  const vids = (r.videos || []).slice(0, 4).map(v => `<a href="${esc(v.url || "#")}" target="_blank" rel="noopener" class="flex items-center justify-between gap-2 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 hover:border-violet-300">
+      <span class="min-w-0"><span class="block text-[11px] font-semibold text-slate-800 truncate">${esc(v.title)}</span><span class="block text-[10px] text-slate-400 truncate">${esc(v.channel || "")}${v.age_days != null ? ` · ${agoDays(v.age_days)}` : ""}${v.engagement_pct != null ? ` · ${v.engagement_pct}% liked` : ""}</span></span>
+      <span class="shrink-0 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 rounded px-1.5 py-0.5">${kNum(v.views)} views</span></a>`).join("");
+  return `<div class="bg-slate-50 rounded-lg p-2.5 border border-slate-100 space-y-2.5">
+    ${r.why ? `<div>${h("Why this topic now")}<p class="text-[11px] text-slate-600 leading-snug">${esc(r.why)}</p></div>` : ""}
+    ${r.covers?.length ? `<div>${h("What trending videos cover")}<div class="flex flex-wrap gap-1">${r.covers.map(c => `<span class="px-1.5 py-0.5 rounded bg-white border border-slate-200 text-[10px] text-slate-600">${esc(c)}</span>`).join("")}</div></div>` : ""}
+    ${r.gap ? `<div>${h("Where they fall short")}<p class="text-[11px] text-slate-600 leading-snug">${esc(r.gap)}</p></div>` : ""}
+    ${vids ? `<div>${h("Videos studied")}<div class="space-y-1">${vids}</div></div>` : ""}
+    ${r.niche?.videos ? `<div class="text-[10px] text-slate-400">The whole topic: ${kNum(r.niche.median_views)} median views, ${r.niche.engagement_pct ?? "?"}% like rate, ${r.niche.videos} videos read${r.researched_at ? ` on ${esc(String(r.researched_at).slice(0, 10))}` : ""}.</div>` : ""}</div>`;
+}

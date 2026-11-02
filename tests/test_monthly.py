@@ -267,3 +267,194 @@ class AssignedLengthTests(unittest.TestCase):
             self.assertEqual(ws.config()["platforms"]["youtube"]["categories"][cid]["target_seconds"], 90)
             self.assertEqual(monthly.category_for_item(ws, "youtube", "long"), "assigned-long")
             self.assertEqual(ws.config()["platforms"]["youtube"]["categories"]["assigned-long"]["target_seconds"], 480)
+
+
+class TrendPlanningTests(unittest.TestCase):
+    """YouTube plans come from what works on YouTube; the calendar is filled at random; plans can be run by hand."""
+
+    def video(self, i, views, likes, age, short=False):
+        return {"id": f"vid{i:08d}"[:11], "title": f"Load balancer video {i}", "channel": "Chan", "views": views, "likes": likes, "age_days": age,
+                "seconds": 45 if short else 600, "description": "0:00 Intro\\n1:00 Round robin\\n2:00 Health checks", "chapters": [], "tags": ["lb"]}
+
+    def research(self):
+        from postcrew import trends
+        vids = [trends.with_rates(self.video(i, 50000 * (i + 1), 2500 * (i + 1), 20 + i * 10)) for i in range(5)]
+        return {"topic": "Load balancers", "researched_at": "2026-11-03T00:00:00+00:00", "videos": vids, "metrics": trends.metrics(vids)}
+
+    def yt_answer(self, research, n=6):
+        ids = [v["id"] for v in research["videos"]]
+        plans = []
+        for i in range(n):
+            p = plan(TITLES[i], i)
+            p["trend"] = {"why": "views are climbing", "evidence": [ids[i % 5], "not-a-real-id"], "covers": ["round robin"], "gap": "no worked example"}
+            plans.append(p)
+        return {"plans": plans}
+
+    def test_each_topic_gets_five_or_six_researched_plans_on_youtube_and_a_months_days_on_linkedin(self):
+        from helpers import REAL_PER_TOPIC
+        self.assertEqual(REAL_PER_TOPIC("youtube", "2026-11", ["a", "b", "c"]), 6)
+        self.assertEqual(REAL_PER_TOPIC("linkedin", "2026-11", ["a", "b", "c"]), 10)       # 30 days over 3 topics
+        self.assertEqual(REAL_PER_TOPIC("linkedin", "2026-12", ["a"]), 31)                  # one post a day is all it needs
+        from unittest import mock
+        res = self.research()
+        with TempWorkspace() as ws:
+            cfg = ws.config()
+            cfg["platforms"]["youtube"].update(enabled=True, topics=["Load balancers"])
+            ws.save_config(cfg)
+            with mock.patch.object(monthly, "per_topic", REAL_PER_TOPIC), mock.patch("postcrew.trends.niche_research", return_value=res):
+                out = monthly.generate(ws, "youtube", "2026-11", llm=ScriptedLLM({"planner": [self.yt_answer(res)]}), today=TODAY)
+            self.assertEqual(out["added"], 6)
+            items = monthly.view(ws, "youtube", "2026-11", TODAY)["items"]
+            r = items[0]["research"]
+            self.assertEqual(r["why"], "views are climbing")
+            self.assertEqual(len(r["videos"]), 1)                                            # the made-up id was dropped, the real one kept
+            self.assertTrue(r["trend_score"] and r["label"] in ("hot", "steady", "niche") and r["engagement_pct"])
+            self.assertIn("round robin", r["covers"])
+
+    def test_the_calendar_is_filled_at_random_with_every_topic_taking_turns_and_nothing_overwritten(self):
+        import random
+        with TempWorkspace() as ws:
+            cfg = ws.config()
+            cfg["topics"] = ["Breakers", "Retries"]
+            ws.save_config(cfg)
+            titles = TITLES[:10]
+            monthly.generate(ws, "linkedin", "2026-11", llm=ScriptedLLM({"planner": [answer(titles)]}), today=TODAY)
+            first = monthly.view(ws, "linkedin", "2026-11", TODAY)["items"][0]
+            monthly.assign(ws, "linkedin", first["id"], "2026-11-10", today=TODAY)                   # by hand, before
+            out = monthly.auto_assign(ws, "linkedin", "2026-11", today=TODAY, rng=random.Random(1))
+            v = monthly.view(ws, "linkedin", "2026-11", TODAY)
+            self.assertGreater(out["assigned"], 0)
+            self.assertNotIn("2026-11-10", out["days"])                                              # a day that already had a plan is left alone
+            self.assertTrue(all(d >= "2026-11-03" for d in v["days"]))                              # never a day that is over
+            self.assertEqual(v["days"]["2026-11-10"][0]["id"], first["id"])
+            again = monthly.auto_assign(ws, "linkedin", "2026-11", today=TODAY, rng=random.Random(2))
+            self.assertEqual(again["assigned"], 0 if v["counts"]["unassigned"] == 0 else again["assigned"])   # nothing placed twice
+
+    def test_a_plan_can_be_run_by_hand_and_goes_first_today(self):
+        with TempWorkspace() as ws:
+            cfg = ws.config()
+            cfg["platforms"]["youtube"].update(enabled=True, topics=["Breakers"])
+            ws.save_config(cfg)
+            monthly.generate(ws, "youtube", "2026-11", llm=ScriptedLLM({"planner": [answer(TITLES[:10])]}), today=TODAY)
+            rows = monthly.unassigned(ws, "youtube")
+            self.assertEqual(len(rows), 10)
+            a, b = rows[0], rows[1]
+            monthly.assign(ws, "youtube", a["id"], "2026-11-03", "short", today=TODAY)              # already waiting today
+            info = monthly.run_plan(ws, "youtube", b["id"], "long", today=TODAY)
+            self.assertEqual((info["date"], info["category"]), ("2026-11-03", "assigned-long"))
+            self.assertEqual(planner.load_plan(ws, "youtube")["2026-11-03"]["plan_id"], b["id"])    # the crew makes the chosen plan, not the one waiting
+            self.assertNotIn(b["id"], [r["id"] for r in monthly.unassigned(ws, "youtube")])
+
+    def test_a_plan_you_choose_is_made_before_one_placed_at_random(self):
+        import random
+        with TempWorkspace() as ws:
+            cfg = ws.config()
+            cfg["topics"] = ["Breakers"]
+            ws.save_config(cfg)
+            monthly.generate(ws, "linkedin", "2026-11", llm=ScriptedLLM({"planner": [answer(TITLES[:10])]}), today=TODAY)
+            monthly.auto_assign(ws, "linkedin", "2026-11", today=TODAY, rng=random.Random(3))
+            v = monthly.view(ws, "linkedin", "2026-11", TODAY)
+            day, auto_id = next(iter(v["days"].items()))[0], next(iter(v["days"].values()))[0]["id"]
+            mine = next(i for i in v["items"] if i["status"] == "assigned" and i["assigned"]["date"] != day)   # every plan is on a day: move one here
+            monthly.assign(ws, "linkedin", mine["id"], day, today=TODAY)
+            self.assertEqual(monthly.view(ws, "linkedin", "2026-11", TODAY)["days"][day][0]["id"], mine["id"])   # first in line
+            self.assertEqual(monthly.view(ws, "linkedin", "2026-11", TODAY)["days"][day][1]["id"], auto_id)
+
+
+class TrendParsingTests(unittest.TestCase):
+    def test_what_youtube_shows_is_read_into_numbers(self):
+        from postcrew import trends
+        self.assertEqual((trends.parse_views("3,255,515 views"), trends.parse_views("1.2M views"), trends.parse_views("No views"), trends.parse_views("hello")),
+                         (3255515, 1200000, 0, None))
+        self.assertEqual((trends.parse_age("2y ago"), trends.parse_age("6 months ago"), trends.parse_age("Streamed 3 weeks ago"), trends.parse_age("5 hours ago")),
+                         (730, 180, 21, 0))
+        self.assertEqual((trends.parse_duration("1:05:22"), trends.parse_duration("7:56")), (3922, 476))
+        chapters = trends.parse_chapters("Intro\n0:00 Start\n1:30 Round robin\n4:10 Health checks\nthanks")
+        self.assertEqual([c["title"] for c in chapters], ["Start", "Round robin", "Health checks"])
+        self.assertEqual(trends.parse_chapters("0:00 only one"), [])
+
+    def test_trend_and_engagement_come_from_views_per_day_and_likes(self):
+        from postcrew import trends
+        hot = [trends.with_rates({"id": f"v{i:010d}", "title": "t", "views": 400000, "likes": 20000, "age_days": 60, "seconds": 600}) for i in range(4)]
+        m = trends.metrics(hot)
+        self.assertEqual((m["label"], m["engagement_pct"]), ("hot", 5.0))
+        self.assertGreaterEqual(m["trend_score"], 70)
+        slow = [trends.with_rates({"id": f"w{i:010d}", "title": "t", "views": 900, "likes": 20, "age_days": 400, "seconds": 600}) for i in range(4)]
+        self.assertEqual(trends.metrics(slow)["label"], "niche")
+        self.assertEqual(trends.metrics([]), {})
+
+    def test_a_search_page_and_a_watch_page_are_parsed_and_a_dead_network_gives_nothing(self):
+        import json
+        from postcrew import trends
+        data = {"contents": [{"videoRenderer": {"videoId": "abcdefghijk", "title": {"runs": [{"text": "Load balancers"}]}, "ownerText": {"runs": [{"text": "Chan"}]},
+                                                 "viewCountText": {"simpleText": "120,000 views"}, "publishedTimeText": {"simpleText": "3 weeks ago"},
+                                                 "lengthText": {"simpleText": "12:30"}}}]}
+        page = "<script>var ytInitialData = " + json.dumps(data) + ";</script>"
+        hits = trends.parse_search(page)
+        self.assertEqual((hits[0]["id"], hits[0]["views"], hits[0]["age_days"], hits[0]["seconds"]), ("abcdefghijk", 120000, 21, 750))
+        watch = '"viewCount":"120000","likeCount":"4800","publishDate":"2026-10-12T00:00:00-07:00","shortDescription":"0:00 Intro\\n1:00 A\\n2:00 B","keywords":["lb","nginx"]'
+        info = trends.parse_watch(watch)
+        self.assertEqual((info["views"], info["likes"], info["tags"]), (120000, 4800, ["lb", "nginx"]))
+        self.assertEqual(len(info["chapters"]), 3)
+        def dead(url, timeout=25):
+            raise OSError("no network")
+        out = trends.niche_research("anything", fetcher=dead)
+        self.assertEqual((out["videos"], out["metrics"]), ([], {}))
+        self.assertIn("did not answer", out["error"])
+
+
+class TrendingStudyTests(unittest.TestCase):
+    def test_the_researcher_studies_the_trending_videos_and_the_writer_is_told_what_they_miss(self):
+        from unittest import mock
+        from postcrew import trends
+        from postcrew.agents.base import RunContext
+        from postcrew.agents.research import ResearchAgent
+        from postcrew.agents.writer import research_block
+        from postcrew.runlog import RunLog
+        vids = [trends.with_rates({"id": f"vid{i:08d}", "title": f"Load balancer {i}", "channel": "Chan", "views": 90000 * (i + 1), "likes": 3000 * (i + 1),
+                                   "age_days": 30 + i, "seconds": 600, "description": "0:00 Intro\n1:00 Round robin\n3:00 Health checks", "chapters":
+                                   [{"at": 0, "title": "Intro"}, {"at": 60, "title": "Round robin"}, {"at": 180, "title": "Health checks"}], "tags": ["lb"]})
+                for i in range(3)]
+        research = {"topic": "Load balancers", "videos": vids, "metrics": trends.metrics(vids)}
+        answer = {"videos": [{"id": vids[0]["id"], "opening": "a site that crashed", "structure": ["intro", "round robin", "health checks"],
+                              "covers": ["round robin"], "works": "clear story", "weak": "no failure case"},
+                             {"id": "not-listed", "opening": "x", "structure": [], "covers": [], "works": "", "weak": ""}],
+                  "common_topics": ["round robin", "health checks"], "gaps": ["no worked example"], "outline": ["problem", "idea", "mistake"], "title_patterns": ["a number"]}
+        with TempWorkspace() as ws:
+            cfg = ws.config()
+            cfg["platforms"]["youtube"].update(enabled=True)
+            ws.save_config(cfg)
+            cat = monthly.category_for_item(ws, "youtube", "short")
+            ycfg = platforms_view(ws, "youtube")
+            run = RunLog(ws.root / "runs" / "t", "t", meta={})
+            ctx = RunContext(ws=ws, cfg=ycfg, day=TODAY, category=cat, run=run, llm=ScriptedLLM({"research": [answer]}), platform="youtube")
+            ctx.outputs["topic"] = {"topic": "Load balancers", "angle": "how they pick a server"}
+            with mock.patch("postcrew.trends.niche_research", return_value=research):
+                t = ResearchAgent()._trending(ctx, ctx.outputs["topic"])
+        self.assertEqual([v["id"] for v in t["videos"]], [vids[0]["id"]])                      # an id the model made up is dropped
+        self.assertEqual(t["videos"][0]["views"], 90000)                                       # the numbers are YouTube's, not the model's
+        self.assertEqual(t["gaps"], ["no worked example"])
+        text = research_block({"verified": [], "trending": t})
+        self.assertIn("TRENDING VIDEOS ON THIS TOPIC", text)
+        self.assertIn("no worked example", text)
+        self.assertIn("opens with a site that crashed", text)
+
+
+def platforms_view(ws, platform):
+    from postcrew import platforms
+    return platforms.view(ws.config(), platform)
+
+
+class SpreadTests(unittest.TestCase):
+    def test_fewer_plans_than_days_land_on_random_days_across_the_whole_month(self):
+        import random
+        with TempWorkspace() as ws:
+            cfg = ws.config()
+            cfg["topics"] = ["Breakers"]
+            ws.save_config(cfg)
+            monthly.generate(ws, "linkedin", "2026-11", llm=ScriptedLLM({"planner": [answer(TITLES[:10])]}), today=TODAY)
+            days = monthly.auto_assign(ws, "linkedin", "2026-11", today=TODAY, rng=random.Random(5))["days"]
+            self.assertEqual(len(days), 10)
+            self.assertEqual(days, sorted(set(days)))                                    # one plan a day
+            self.assertNotEqual(days, [f"2026-11-{d:02d}" for d in range(3, 13)])        # not simply the first ten days
+            self.assertGreater(max(days), "2026-11-20")                                  # the plans reach into the end of the month

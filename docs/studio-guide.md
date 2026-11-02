@@ -184,3 +184,10 @@ The bell in the top right shows unread notifications: a post is ready or publish
 why, a team member was replaced, a token is expiring, publishing or a first comment failed. Each has a link
 to the tab where you can act. **Mark all read** clears the badge. The same notifications go to the desktop,
 Gmail or Telegram if you turned those on.
+
+
+## Plans, the calendar and Manual run
+
+- **Generate plan** (or the 1st of the month) writes the plans for your topics. YouTube plans are researched on YouTube first and carry a trend score, views a day, a like rate and the videos studied (open **Details** on a plan). YouTube gets 5-6 plans per topic; LinkedIn gets about a month's days of plans across its topics.
+- The month's days are then filled **at random** (the topics take turns). You can still move, assign or unassign any plan by hand; a plan you assign by hand is made before one placed at random on the same day.
+- The scheduled run makes one post a day. Nothing else starts a run except **Manual run**: pick any plan that is not on the calendar, choose Short or Long (YouTube) and press **Run now**. It is made at once and follows your approval setting.

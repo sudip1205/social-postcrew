@@ -115,16 +115,7 @@ function openUploadDialog(post, focus) {
   dlg.onclick = e => { if (e.target === dlg) close(); };
   $("#up-use", dlg).onclick = () => {
     close();
-    toast(`Your files are used the next time the crew runs for ${date}`);
-    const bar = document.createElement("div");   // toast() has no action slot: a small secondary action beside it
-    bar.className = "fixed bottom-16 left-1/2 -translate-x-1/2 z-50";
-    bar.innerHTML = button("secondary", "play_arrow", "Run the crew now for this date", `type="button"`);
-    document.body.appendChild(bar);
-    const gone = setTimeout(() => bar.remove(), 12000);
-    bar.querySelector("button").onclick = async () => {
-      clearTimeout(gone); bar.remove();
-      try { await post("/api/runs", { date, platform: "youtube", dry_run: false }); location.hash = "workflow"; } catch (e) { toast(e.message, true); }
-    };
+    toast(`Your files are used when the schedule runs for ${date}`);
   };
   document.addEventListener("keydown", onKey);
   document.body.appendChild(dlg);

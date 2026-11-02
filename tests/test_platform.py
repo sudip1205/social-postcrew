@@ -330,8 +330,9 @@ class StudioTests(unittest.TestCase):
         llm = ScriptedLLM({"planner": [{"plans": plans}]})
         with mock.patch("postcrew.llm.make_backend", return_value=llm):
             code, d = self.req("POST", "/api/plan/generate", {})
-        self.assertEqual((code, d["added"], d["counts"]["unassigned"], d["days"]), (200, 10, 10, {}))
-        self.assertEqual(planner.load_plan(self.ws), {})                      # generating never fills a day
+        self.assertEqual((code, d["added"]), (200, 10))
+        self.assertEqual(d["counts"]["assigned"], d["placed"])                  # generating also puts the plans on the month's free days, at random
+        self.assertEqual(d["counts"]["assigned"] + d["counts"]["unassigned"], 10)
         month, today = d["month"], local_now(self.ws.config()).date()
         day = (today.replace(day=1) + __import__("datetime").timedelta(days=62)).isoformat()   # a later month: always in the future
         code, d = self.req("POST", "/api/plan/assign", {"id": d["items"][0]["id"], "date": day})
@@ -340,7 +341,7 @@ class StudioTests(unittest.TestCase):
         self.assertEqual(self.req("POST", "/api/plan/assign", {"id": "nope", "date": day})[0], 400)
         pid = planner.load_plan(self.ws)[day]["plan_id"]
         code, d = self.req("POST", "/api/plan/unassign", {"id": pid, "month": month})
-        self.assertEqual((code, planner.load_plan(self.ws)), (200, {}))
+        self.assertEqual((code, day in planner.load_plan(self.ws)), (200, False))                # the day it was moved to is empty again
         self.assertEqual(self.req("GET", "/api/plan?month=2026-13")[0], 400)
 
     def test_published_list_add_and_remove(self):

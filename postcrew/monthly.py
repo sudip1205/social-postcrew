@@ -10,11 +10,12 @@ An item: {id, topic (the owner's line), title, angle, context, example, takeaway
 Assigning writes the day into the app's schedule (schedule.dates) and its plan entry (agents/planner.py), which is what the crew
 and the scheduler already read, so nothing else changes in how a post is made.
 """
+import random
 import re
 import threading
 import time
 import uuid
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from . import brief as briefmod
 from . import platforms
@@ -24,7 +25,9 @@ from .checks import norm, repeat_problem
 from .platforms import LINKEDIN
 from .runlog import RunLog
 
-PER_TOPIC = 10
+PER_TOPIC = 10        # kept for callers that ask how many plans one topic gets (LinkedIn now plans a month's days across its topics)
+PER_TOPIC_YT = 6      # YouTube: 5-6 trend-researched plans per topic; more than the days, because plans can also be run by hand
+MIN_PER_TOPIC_YT = 5
 FORMATS = ("short", "long")
 MAX_PER_DAY = 5   # plans waiting on one day
 _lock = threading.Lock()
@@ -32,7 +35,7 @@ _generating = {}   # one generation at a time per app: the scheduler and the Gen
 
 SCHEMA = {
     "type": "object",
-    "properties": {"plans": {"type": "array", "maxItems": PER_TOPIC + 2, "items": {
+    "properties": {"plans": {"type": "array", "maxItems": 12, "items": {
         "type": "object",
         "properties": {
             "title": {"type": "string", "description": "working title, 5-90 characters"},
@@ -47,6 +50,38 @@ SCHEMA = {
     "required": ["plans"],
     "additionalProperties": False,
 }
+
+
+TREND = {
+    "type": "object",
+    "properties": {
+        "why": {"type": "string", "description": "1-2 sentences: why this is a good topic right now, from the videos' numbers"},
+        "evidence": {"type": "array", "items": {"type": "string"}, "maxItems": 4,
+                     "description": "ids of the listed videos that show demand for this plan"},
+        "covers": {"type": "array", "items": {"type": "string"}, "maxItems": 5, "description": "what those videos cover"},
+        "gap": {"type": "string", "description": "what they miss or explain badly: where this plan can be better"},
+    },
+    "required": ["why", "evidence", "covers", "gap"], "additionalProperties": False,
+}
+
+
+def schema_for(platform):
+    """The Planner's answer: YouTube plans also say which trending videos they answer to (and why, what those cover, what they miss)."""
+    if platform == LINKEDIN:
+        return SCHEMA
+    item = dict(SCHEMA["properties"]["plans"]["items"])
+    item["properties"] = dict(item["properties"], trend=TREND)
+    item["required"] = item["required"] + ["trend"]
+    return dict(SCHEMA, properties={"plans": dict(SCHEMA["properties"]["plans"], items=item)})
+
+
+def per_topic(platform, month, topics):
+    """How many plans each topic gets. LinkedIn: a month's days spread over its topics (one post a day is all it needs). YouTube: 5-6 per topic."""
+    if platform != LINKEDIN:
+        return PER_TOPIC_YT
+    first = date.fromisoformat(month + "-01")
+    days = (date(first.year + (first.month == 12), first.month % 12 + 1, 1) - first).days
+    return max(3, -(-days // max(1, len(topics))))
 
 
 # ---------- the pool ----------
@@ -132,36 +167,66 @@ def view(ws, platform=LINKEDIN, month=None, today=None):
     count = lambda s: sum(1 for i in items if i["status"] == s)
     return {"platform": platform, "month": month, "items": items, "days": days,
             "topics": topics_of(cfg), "plan_topics": meta.get("topics", []), "generated_at": meta.get("generated_at"),
-            "next_plan": nxt.isoformat(), "per_topic": PER_TOPIC,
+            "next_plan": nxt.isoformat(), "per_topic": per_topic(platform, month, topics_of(cfg)),
             "counts": {"plans": len(items), "assigned": count("assigned") + count("written"), "unassigned": count("unassigned"),
                        "published": count("published")},
             "max_per_day": MAX_PER_DAY, "formats": platform != LINKEDIN, "default_format": (cfg.get("video") or {}).get("format", "short")}
 
 
 # ---------- generating ----------
+def _research_block(research):
+    from . import trends
+    m = research.get("metrics") or {}
+    return ("\n\nWHAT IS WORKING ON YOUTUBE RIGHT NOW FOR THIS TOPIC (real numbers read from YouTube today; ids are for the 'evidence' field):\n"
+            + trends.brief_videos(research["videos"]) + "\n"
+            + (f"Overall: median {m.get('median_views', 0):,} views per video, {m.get('views_per_day', 0):,} views per day, "
+               f"{m.get('engagement_pct')}% of viewers like, trend {m.get('trend_score')}/100 ({m.get('label')}).\n" if m else ""))
+
+
+def _plan_research(trend, research, ids):
+    """What a plan stores of its research: how trendy it is, how engaging, the videos that show it, what they cover and what they miss."""
+    from . import trends
+    chosen = [i for i in (trend.get("evidence") or []) if i in ids][:4]
+    vids = trends.evidence(research["videos"], chosen)
+    full = [v for v in research["videos"] if v["id"] in chosen]
+    m = trends.metrics(full) or {}
+    niche = research.get("metrics") or {}
+    return {"why": str(trend.get("why") or "").strip(), "covers": [str(c).strip() for c in trend.get("covers") or []][:5], "gap": str(trend.get("gap") or "").strip(),
+            "videos": vids, "trend_score": m.get("trend_score", niche.get("trend_score")), "label": m.get("label", niche.get("label")),
+            "avg_views": m.get("avg_views", niche.get("avg_views")), "avg_likes": m.get("avg_likes", niche.get("avg_likes")),
+            "engagement_pct": m.get("engagement_pct", niche.get("engagement_pct")), "views_per_day": m.get("views_per_day", niche.get("views_per_day")),
+            "niche": {k: niche.get(k) for k in ("videos", "median_views", "avg_likes", "engagement_pct", "views_per_day", "trend_score", "label")},
+            "researched_at": research.get("researched_at")}
+
+
 class MonthPlanner(Agent):
     id = "planner"
     title = "Planner"
     name = "Vega"
     role = "Writes the plans for each of your topics once a month; you assign them to days."
 
-    def write(self, ctx, topic, need, avoid, hint=""):
-        """Up to `need` new plans for one topic: [{title, angle, context, example, takeaway, search_queries}]."""
+    def write(self, ctx, topic, need, avoid, hint="", research=None):
+        """Up to `need` new plans for one topic: [{title, angle, context, example, takeaway, search_queries}]. For YouTube `research` is the niche
+        research (trends.niche_research): each plan then also says which trending videos it answers, and carries their numbers."""
         got, guidance = [], []
         system = self.prompt(ctx, "planner_month")
         tools = ["WebSearch"]
-        for _attempt in range(ctx.cfg["pipeline"]["max_attempts_per_step"]):
+        schema = schema_for(ctx.platform)
+        videos = (research or {}).get("videos") or []
+        ids = {v["id"] for v in videos}
+        for _attempt in range(ctx.cfg["pipeline"]["max_attempts_per_step"] + max(0, -(-need // 8) - 1)):
             left = need - len(got)
             if left <= 0:
                 break
             taken = avoid + [g["title"] for g in got]
-            prompt = (f"THE OWNER'S TOPIC: {topic}\n\nWrite {left} plan(s) about it."
+            prompt = (f"THE OWNER'S TOPIC: {topic}\n\nWrite {min(left, 8)} plan(s) about it."
+                      + (_research_block(research) if videos else "")
                       + (f"\n\nWHAT THE OWNER ASKED FOR: {hint}" if hint else "")
                       + ("\n\nAlready planned or published (never repeat these or the same idea in other words):\n"
                          + "\n".join(f"- {t}" for t in taken[-120:]) if taken else "")
                       + guidance_block(guidance))
             try:
-                data = self.ask(ctx, system, prompt, SCHEMA, tools)
+                data = self.ask(ctx, system, prompt, schema, tools)
             except AgentError as e:
                 ctx.run.event("planner", "error", str(e), level="error")
                 guidance = [str(e)]
@@ -174,7 +239,12 @@ class MonthPlanner(Agent):
                 if problems:
                     guidance.append(f"'{p.get('title', '?')}': " + "; ".join(problems))
                     continue
-                got.append({k: (p[k].strip() if isinstance(p[k], str) else p[k]) for k in SCHEMA["properties"]["plans"]["items"]["required"]})
+                plan = {k: (p[k].strip() if isinstance(p[k], str) else p[k]) for k in SCHEMA["properties"]["plans"]["items"]["required"]}
+                if videos:
+                    plan["research"] = _plan_research(p.get("trend") or {}, research, ids)
+                elif ctx.platform != LINKEDIN:   # YouTube did not answer: the plan says so instead of showing made-up numbers
+                    plan["research"] = {"unavailable": True, "why": str((p.get("trend") or {}).get("why") or "").strip()}
+                got.append(plan)
                 if len(got) >= need:
                     break
             ctx.run.event("planner", "validated", f"{topic}: {len(got)} of {need} plan(s) accepted",
@@ -214,8 +284,10 @@ def _generate(ws, platform, month, llm, today, hint):
     with _lock:
         pool = load(ws, platform)
         have = pool["months"].setdefault(month, {"generated_at": None, "topics": [], "items": []})
-        todo = [(t, PER_TOPIC - sum(1 for i in have["items"] if i["topic"] == t)) for t in topics]
-        todo = [(t, n) for t, n in todo if n > 0]
+        want = per_topic(platform, month, topics)
+        floor = MIN_PER_TOPIC_YT if platform != LINKEDIN else want   # a YouTube topic with 5 plans is complete; 6 is the aim
+        todo = [(t, want - sum(1 for i in have["items"] if i["topic"] == t)) for t in topics]
+        todo = [(t, n) for t, n in todo if n > 0 and want - n < floor]
         if not todo:
             return {"added": 0, "topics": {}}
         avoid = [i["title"] for i in _all_items(pool)] + [p.get("topic", "") for p in ws.recent_posts(200, platform)]
@@ -226,8 +298,17 @@ def _generate(ws, platform, month, llm, today, hint):
     run.event("planner", "started", f"{len(todo)} topic(s) for {month}: {', '.join(t for t, _ in todo)}")
     planner, result, added = MonthPlanner(), {}, 0
     for topic, need in todo:
+        research = None
+        if platform != LINKEDIN:   # YouTube: first see what is working on YouTube for this subject
+            from . import trends
+            run.event("planner", "research", f"researching '{topic}' on YouTube")
+            research = trends.niche_research(topic, log=lambda m: run.event("planner", "video", m))
+            m = research.get("metrics") or {}
+            run.event("planner", "researched", (f"{len(research['videos'])} videos read: trend {m.get('trend_score')}/100 ({m.get('label')}), "
+                                                f"{m.get('engagement_pct')}% like rate, {m.get('views_per_day', 0):,} views/day") if research["videos"] else research.get("error", "no data"),
+                      level="info" if research["videos"] else "warning")
         try:
-            plans = planner.write(ctx, topic, need, [a for a in avoid if a], (cfg["planning"].get("focus") or "").strip())
+            plans = planner.write(ctx, topic, need, [a for a in avoid if a], (cfg["planning"].get("focus") or "").strip(), research=research)
         except AgentError as e:
             result[topic] = {"error": str(e)[:300]}
             continue
@@ -242,7 +323,7 @@ def _generate(ws, platform, month, llm, today, hint):
         avoid += [p["title"] for p in plans]
         result[topic] = len(plans)
         added += len(plans)
-    bad = [t for t, r in result.items() if isinstance(r, dict) or r < dict(todo)[t]]
+    bad = [t for t, r in result.items() if isinstance(r, dict) or (want - dict(todo)[t] + r) < floor]
     run.finish("succeeded" if not bad else "failed", f"{added} plan(s) written for {len(todo)} topic(s)")
     return {"added": added, "topics": result}
 
@@ -314,7 +395,7 @@ def _live_items(pool, posted, iso=None):
     the order they were assigned. All days, or just `iso`."""
     live = [i for i in _all_items(pool) if i.get("assigned") and (iso is None or i["assigned"]["date"] == iso)
             and status_of(i, posted) in ("assigned", "written")]
-    return sorted(live, key=lambda i: (i["assigned"]["date"], status_of(i, posted) != "written", i["assigned"].get("seq", 0)))
+    return sorted(live, key=lambda i: (i["assigned"]["date"], status_of(i, posted) != "written", bool(i["assigned"].get("auto")), i["assigned"].get("seq", 0)))
 
 
 def _entry(item, cat, fmt, platform):
@@ -330,6 +411,8 @@ def _entry(item, cat, fmt, platform):
         entry["brief"] = brief
     if platform != LINKEDIN:
         entry["format"] = fmt
+        if item.get("research") and not item["research"].get("unavailable"):
+            entry["research"] = item["research"]   # the trending videos behind this plan: the Researcher studies them for the script
     return entry
 
 
@@ -364,7 +447,7 @@ def sync_all(ws, platform=LINKEDIN):
             _sync_day(ws, platform, pool, posted, iso)
 
 
-def assign(ws, platform, item_id, day, fmt=None, today=None):
+def assign(ws, platform, item_id, day, fmt=None, today=None, auto=False):
     """Put a plan on a date; a date can hold several, made one at a time. For YouTube `fmt` is "short" or "long". Moves the plan if it
     was on another date. A plan is on one date only."""
     day = date.fromisoformat(day)
@@ -388,7 +471,8 @@ def assign(ws, platform, item_id, day, fmt=None, today=None):
         if not category_for_item(ws, platform, fmt):
             raise ValueError("no post type is available for this app")
         old = (item.get("assigned") or {}).get("date")
-        item["assigned"] = {"date": iso, "seq": int(time.time() * 1000), **({"format": fmt} if platform != LINKEDIN else {})}
+        item["assigned"] = {"date": iso, "seq": int(time.time() * 1000), **({"format": fmt} if platform != LINKEDIN else {}),
+                            **({"auto": True} if auto else {})}   # a plan put on a day at random yields to one you chose: yours is made first
         ws.save_state(_name(platform), pool)
         if old and old != iso:
             _sync_day(ws, platform, pool, posted, old)
@@ -412,6 +496,69 @@ def unassign(ws, platform, item_id):
     return item
 
 
+def auto_assign(ws, platform, month=None, today=None, rng=None):
+    """After a month's plans are written: put the plans that are not on a day yet on the days of the month that have no plan and no post, at
+    random, taking turns between the topics so every subject gets its share. Days already holding a plan (by hand or before) are left as they are.
+    Plans that do not fit stay unassigned: on YouTube there are more plans than days, and the rest are the ones you can run by hand.
+    Returns {"assigned": n, "days": [dates]}."""
+    from .crew import post_for
+    rng, today = rng or random.Random(), today or date.today()
+    month = month or month_key(today)
+    first = date.fromisoformat(month + "-01")
+    last = date(first.year + (first.month == 12), first.month % 12 + 1, 1) - timedelta(days=1)
+    pool, posted = load(ws, platform), posted_titles(ws, platform)
+    busy = {i["assigned"]["date"] for i in _live_items(pool, posted)}
+    free = [d.isoformat() for d in (first + timedelta(n) for n in range((last - first).days + 1))
+            if d >= today and d.isoformat() not in busy and not post_for(ws, d, platform)]
+    by_topic = {}
+    for i in pool["months"].get(month, {}).get("items", []):
+        if status_of(i, posted) == "unassigned":
+            by_topic.setdefault(i["topic"], []).append(i)
+    for rows in by_topic.values():
+        rng.shuffle(rows)
+    order, done = list(by_topic), []
+    rng.shuffle(order)
+    waiting = sum(len(rows) for rows in by_topic.values())
+    if waiting < len(free):   # fewer plans than free days: they land on random days across the whole month, not on the first ones
+        free = sorted(rng.sample(free, waiting))
+    for iso in free:
+        order = [t for t in order if by_topic[t]]
+        if not order:
+            break
+        topic = order.pop(0)
+        order.append(topic)   # the next day takes the next topic
+        item = by_topic[topic].pop()
+        try:
+            assign(ws, platform, item["id"], iso, today=today, auto=True)
+            done.append(iso)
+        except ValueError:
+            continue
+    return {"assigned": len(done), "days": done}
+
+
+def unassigned(ws, platform=LINKEDIN):
+    """Every plan not on a day and not made yet, in all months, the most promising first: what the Manual run page offers."""
+    pool, posted = load(ws, platform), posted_titles(ws, platform)
+    rows = [dict(i, status="unassigned", month=m) for m, mm in pool["months"].items() for i in mm["items"] if status_of(i, posted) == "unassigned"]
+    return sorted(rows, key=lambda r: (-((r.get("research") or {}).get("trend_score") or 0), r["title"]))
+
+
+def run_plan(ws, platform, item_id, fmt, today=None):
+    """Manual run: make a plan now, as a Short or a Long video (YouTube), whatever day it is on. It is put first on today's date and the crew is
+    started for today by the caller; the scheduler and the calendar are not otherwise touched. Returns {"date", "category", "item"}."""
+    today = today or date.today()
+    item = assign(ws, platform, item_id, today.isoformat(), fmt=fmt, today=today)
+    with _lock:   # first in line today, so the crew picks this plan and not another one waiting on the same day
+        pool = load(ws, platform)
+        posted = posted_titles(ws, platform)
+        mine = _item(pool, item_id)
+        others = [i for i in _live_items(pool, posted, today.isoformat()) if i["id"] != item_id and status_of(i, posted) != "written"]
+        mine["assigned"]["seq"] = min([i["assigned"].get("seq", 0) for i in others] + [mine["assigned"]["seq"]]) - 1
+        ws.save_state(_name(platform), pool)
+        _sync_day(ws, platform, pool, posted, today.isoformat())
+    return {"date": today.isoformat(), "category": category_for_item(ws, platform, fmt), "item": item}
+
+
 # ---------- the scheduler's job ----------
 def plan_month(ws, today, llm=None, platform=LINKEDIN):
     """The scheduler's monthly job: write this month's plans for the app's topics. {} when it has no topics."""
@@ -419,6 +566,7 @@ def plan_month(ws, today, llm=None, platform=LINKEDIN):
     if not topics_of(cfg):
         return {}
     out = generate(ws, platform, month_key(today), llm=llm, today=today)
+    out["calendar"] = auto_assign(ws, platform, month_key(today), today=today)   # the month's days are filled at random
     if out["added"] or any(isinstance(r, dict) for r in out["topics"].values()):
         from .notify import notify
         bad = {t: r["error"] for t, r in out["topics"].items() if isinstance(r, dict)}

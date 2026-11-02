@@ -65,7 +65,7 @@ function ovRunsBody(runs, total) {
       <th class="py-3 px-6" scope="col">Status &amp; Verdict</th><th class="py-3 px-6" scope="col">Pipeline Name</th><th class="py-3 px-6" scope="col">Timestamp</th>
       <th class="py-3 px-6" scope="col">Token Burn &amp; Cost</th><th class="py-3 px-6 text-right" scope="col">Actions</th></tr></thead>
     <tbody class="divide-y divide-slate-100">${runs.slice(0, 10).map(ovRunRow).join("")}</tbody></table></div>`
-    : emptyState("terminal", "No runs yet. Start one above, or wait for the scheduler.");
+    : emptyState("terminal", "No runs yet. Wait for the scheduler, or start one in Manual run.");
   return `${table}
     <div class="p-4 bg-slate-50/50 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between text-xs text-slate-500 gap-2">
       <div class="flex items-center gap-2">${icon("info", "text-sm text-slate-400")}<span>Showing latest ${Math.min(runs.length, 10)} runs from ${total} total executions.</span></div>
@@ -121,7 +121,7 @@ async function renderOverview() {
       </div>
       <div class="flex items-center gap-2.5">
         <button id="ov-sync" class="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-lg bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 shadow-sm transition-all active:scale-95">${icon("refresh", "text-slate-500 text-base")}<span>Sync Pipelines</span></button>
-        <button id="ov-runnow" class="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-lg bg-violet-600 hover:bg-violet-700 text-white shadow-sm shadow-violet-200 transition-all active:scale-95">${icon("bolt", "text-base")}<span>Run now</span></button>
+        <button id="pause" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors">${icon(o.paused ? "play_arrow" : "pause", "text-xs")}<span>${o.paused ? "Resume schedule" : "Pause schedule"}</span></button>
       </div>
     </div>
 
@@ -135,54 +135,7 @@ async function renderOverview() {
     </section>
 
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-      <section id="ov-run" class="lg:col-span-5 bg-white rounded-xl p-6 border border-slate-200 shadow-sm space-y-6">
-        <div>
-          <div class="flex items-center gap-2">
-            <div class="w-7 h-7 rounded-lg bg-violet-100 text-violet-700 flex items-center justify-center">${icon("play_circle", "text-base")}</div>
-            <h2 class="text-lg font-bold font-headline text-slate-900">Run the crew now</h2>
-            <span class="flex-1"></span>
-            <button id="pause" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors">${icon(o.paused ? "play_arrow" : "pause", "text-xs")}<span>${o.paused ? "Resume schedule" : "Pause schedule"}</span></button>
-          </div>
-          <p class="text-xs text-slate-500 mt-1 leading-relaxed">Trigger an on-demand multi-agent cycle outside of the scheduled cron jobs.</p>
-        </div>
-        <form class="space-y-4" onsubmit="event.preventDefault();">
-          <div>
-            <label class="flex items-center gap-1.5 text-xs font-semibold text-slate-700 mb-1.5" for="run-date">${icon("event", "text-slate-400 text-sm")}<span>Target publication slot</span></label>
-            <div class="relative">
-              <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">${icon("calendar_today", "text-base")}</div>
-              <input id="run-date" type="date" value="${esc(o.next.run_for || o.next.generate_for)}" class="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-slate-200 bg-slate-50/50 text-slate-800 font-medium focus:ring-2 focus:ring-violet-500 focus:border-violet-500 cursor-pointer"/>
-            </div>
-            <p class="text-[11px] text-slate-400 mt-1">Select the calendar cadence slot where drafts will be queued.</p>
-          </div>
-          <div>
-            <label class="flex items-center gap-1.5 text-xs font-semibold text-slate-700 mb-1.5" for="run-cat">${icon("lightbulb", "text-slate-400 text-sm")}<span>Category</span></label>
-            <div class="relative">
-              <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">${icon("feed", "text-base")}</div>
-              <select id="run-cat" class="w-full pl-9 pr-8 py-2 text-sm rounded-lg border border-slate-200 bg-white text-slate-800 font-medium focus:ring-2 focus:ring-violet-500 focus:border-violet-500 appearance-none cursor-pointer"><option value="">As scheduled for that day</option>${cats}</select>
-              <div class="absolute inset-y-0 right-0 pr-2.5 flex items-center pointer-events-none text-slate-400">${icon("expand_more", "text-base")}</div>
-            </div>
-            <p class="text-[11px] text-slate-400 mt-1">The topic and angle are chosen by the crew for this category.</p>
-          </div>
-          <div class="bg-violet-50/50 border border-violet-100 rounded-xl p-3.5 flex items-start justify-between gap-3">
-            <div>
-              <div class="flex items-center gap-1.5">
-                ${icon("flag", "text-violet-600 text-base")}
-                <span class="text-xs font-semibold text-slate-800">${tip("Rehearsal", "Runs every agent but skips the queue, so nothing can be published")} mode</span>
-                <span class="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">Dry-Run</span>
-              </div>
-              <p class="text-[11px] text-slate-500 mt-1 leading-snug">Simulates agent writing and quality gates without creating live pending items.</p>
-            </div>
-            <label class="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5">
-              <input id="run-dry" checked class="sr-only peer" type="checkbox" aria-label="Rehearsal mode"/>
-              <div class="w-10 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-violet-600"></div>
-            </label>
-          </div>
-          <button id="run-go" class="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-violet-600 hover:bg-violet-700 text-white font-semibold text-sm shadow-sm shadow-violet-200 transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed" type="button" ${o.running ? "disabled" : ""}>${icon("play_arrow", "text-lg")}<span>${o.running ? "A run is in progress…" : "Launch Crew Run"}</span></button>
-        </form>
-        ${pods ? `<div class="pt-4 border-t border-slate-100"><span class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block mb-2">Engaged Pod Squad</span><div class="flex flex-wrap gap-2 text-xs">${pods}</div></div>` : ""}
-      </section>
-
-      <section class="lg:col-span-7 bg-white rounded-xl p-6 border border-slate-200 shadow-sm space-y-4">
+      <section class="lg:col-span-12 bg-white rounded-xl p-6 border border-slate-200 shadow-sm space-y-4">
         <div class="flex items-center justify-between">
           <div>
             <div class="flex items-center gap-2">
@@ -197,6 +150,8 @@ async function renderOverview() {
         <div class="mt-3 bg-slate-50 border border-slate-200/70 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between text-xs text-slate-600 gap-2">
           <div class="flex items-center gap-3"><span class="flex items-center gap-1.5 font-medium"><span class="w-2.5 h-2.5 rounded-full ${a.dot}"></span><span>${planned} ${esc(appName(app))} ${planned === 1 ? "post" : "posts"} planned</span></span></div>
         </div>
+        <div class="pt-2 flex items-center justify-end text-xs text-slate-500"><span class="mr-1.5">Want to make something right now?</span><a class="inline-flex items-center gap-1 font-semibold text-violet-700 hover:text-violet-800 transition-colors" href="#manual"><span>Open Manual run</span>${icon("arrow_forward", "text-sm")}</a></div>
+        ${pods ? `<div class="pt-4 border-t border-slate-100"><span class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block mb-2">Engaged Pod Squad</span><div class="flex flex-wrap gap-2 text-[11px]">${pods}</div></div>` : ""}
       </section>
     </div>
 
@@ -219,18 +174,9 @@ async function renderOverview() {
     </div>`;
 
   $("#ov-sync").onclick = () => renderOverview();
-  $("#ov-runnow").onclick = () => { $("#ov-run").scrollIntoView({ behavior: "smooth", block: "start" }); $("#run-go").focus(); };
-  $("#run-go").onclick = ovStartRun;
   $("#pause").onclick = async () => { await post("/api/pause", { paused: !o.paused }); renderOverview(); };
   ovBindRuns();
   if (runs.some(r => ["running", "retrying", "working"].includes(r.state))) { clearTimeout(ovTimer); ovTimer = setTimeout(ovPoll, 4000); }
-}
-
-async function ovStartRun() {
-  try {
-    const r = await post("/api/runs", { date: $("#run-date").value, category: $("#run-cat").value, dry_run: $("#run-dry").checked, platform: S.platform });
-    S.runId = r.run_id; toast("Crew started"); location.hash = "workflow";
-  } catch (e) { toast(e.message, true); }
 }
 
 VIEWS.overview = renderOverview;

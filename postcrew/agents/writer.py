@@ -38,7 +38,30 @@ def research_block(research):
             lines += [f'    quote: "{e}"' for e in s["found"]]
     if research.get("notes"):
         lines.append(f"Researcher notes: {research['notes']}")
+    lines += trending_block(research.get("trending"))
     return "\n".join(lines)
+
+
+def trending_block(t):
+    """What the videos already working on this topic cover and miss (a video's research): to meet what viewers expect and fill the gaps, never to copy."""
+    if not t:
+        return []
+    m = t.get("metrics") or {}
+    lines = ["", "TRENDING VIDEOS ON THIS TOPIC (how they are built; study them, never copy their words or order):"
+             + (f" trend {m.get('trend_score')}/100, {m.get('engagement_pct')}% like rate, {m.get('views_per_day', 0):,} views a day" if m else "")]
+    for v in t.get("videos", []):
+        lines.append(f"- {v.get('views', 0):,} views" + (f", {v['engagement_pct']}% liked" if v.get("engagement_pct") else "") + f": opens with {v.get('opening', '')}")
+        if v.get("structure"):
+            lines.append("    parts: " + " > ".join(v["structure"][:8]))
+        if v.get("weak"):
+            lines.append(f"    weak: {v['weak']}")
+    if t.get("common_topics"):
+        lines.append("Viewers expect these (cover them, in your own way): " + "; ".join(t["common_topics"]))
+    if t.get("gaps"):
+        lines.append("Nobody does these well (make them the best part of your video): " + "; ".join(t["gaps"]))
+    if t.get("outline"):
+        lines.append("A suggested order: " + " > ".join(t["outline"]))
+    return lines
 
 
 def revision_block(ctx, guidance, prev=None):

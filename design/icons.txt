@@ -11,6 +11,7 @@ auto_awesome
 auto_fix_high
 auto_schedule
 autorenew
+bar_chart
 bedtime
 bolt
 build
@@ -29,6 +30,7 @@ checklist
 chevron_left
 chevron_right
 close
+cloud_off
 dashboard
 data_usage
 date_range
@@ -44,6 +46,8 @@ drive_folder_upload
 edit
 edit_calendar
 edit_note
+electric_bolt
+equalizer
 error
 event
 event_available
@@ -53,7 +57,9 @@ event_repeat
 event_upcoming
 expand_less
 expand_more
+explore
 fact_check
+favorite
 feed
 file_upload
 filter_list
@@ -78,12 +84,14 @@ image
 inbox
 info
 insights
+inventory_2
 key
 laptop_chromebook
 lightbulb
 link
 link_off
 list
+local_fire_department
 lock
 mail
 map
@@ -115,6 +123,7 @@ psychology
 public
 publish
 published_with_changes
+query_stats
 radar
 radio_button_unchecked
 receipt_long
@@ -136,6 +145,7 @@ settings
 shield
 smart_display
 smart_toy
+sort
 speed
 stay_current_portrait
 stop
@@ -144,6 +154,7 @@ swap_horiz
 sync
 table_rows
 terminal
+thumb_up
 timer
 travel_explore
 trending_up
@@ -152,6 +163,7 @@ undo
 verified
 verified_user
 video_call
+video_library
 videocam
 view_agenda
 view_carousel

@@ -41,18 +41,16 @@ async function renderPlan() {
   for (let n = 1; cells.length % 7; n++) cells.push({ out: true, n, m: MON3[M % 12] });
   const todayCls = x => x.iso === d.today ? `border-2 border-violet-600 bg-violet-50/30` : `border-slate-200 bg-white`;
   const dayNum = (x, extra = "") => `<div class="flex items-center justify-between"><div class="flex items-center gap-1"><span class="text-xs font-mono font-bold ${x.iso === d.today ? `text-violet-700` : `text-slate-800`}">${x.n}</span>${x.iso === d.today ? `<span class="text-[9px] px-1 py-0.5 rounded bg-violet-600 text-white font-semibold">Today</span>` : ""}</div>${extra}</div>`;
-  /* one plan waiting on a day: the first is the one the schedule (or Create now) makes next; the others wait for it to be published */
+  /* one plan waiting on a day: the first is the one the schedule makes next; the others wait for it to be published */
   const planRow = (x, it, first) => {
     const fmt = it.format === "long" ? "Long" : it.format === "short" ? "Short" : "", ytText = appOf("youtube").text;
     const tag = it.status === "written" ? `<span class="text-[9px] px-1.5 py-0.5 rounded-full font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">Written</span>`
       : first ? `<span class="text-[9px] px-1.5 py-0.5 rounded-full font-semibold bg-blue-50 text-blue-700 border border-blue-200">Next</span>`
       : `<span class="text-[9px] px-1.5 py-0.5 rounded-full font-semibold bg-slate-100 text-slate-500 border border-slate-200">Then</span>`;
-    const make = first && it.status === "assigned" && x.iso >= d.today
-      ? `<button type="button" data-make="${x.iso}" data-title="${esc(it.title)}" title="Create this post now. The scheduled run makes one post a day; this makes the next one by hand." class="mt-1.5 w-full text-[10px] font-semibold text-violet-700 bg-violet-50 hover:bg-violet-100 rounded px-2 py-1 flex items-center justify-center gap-1 cursor-pointer">${icon("play_arrow", "text-[12px]")}<span>Create now</span></button>` : "";
     return `<div class="bg-white rounded-lg border-l-4 ${app.border} border border-slate-200 p-2 shadow-sm hover:border-violet-300">
       <button type="button" data-jump="${it.id}" class="text-left w-full">
         <div class="flex items-center gap-1 mb-1 flex-wrap">${tag}${fmt ? `<span class="px-1.5 py-0.5 text-[9px] font-bold rounded bg-red-50 ${ytText}">${fmt}</span>` : ""}</div>
-        <p class="text-[11px] font-semibold text-slate-800 line-clamp-2 leading-snug">${esc(it.title)}</p></button>${make}</div>`;
+        <p class="text-[11px] font-semibold text-slate-800 line-clamp-2 leading-snug">${esc(it.title)}</p></button></div>`;
   };
   const dayCell = x => {
     if (x.out) return `<div class="min-h-[120px] rounded-xl border border-slate-200/50 bg-slate-100/50 p-2 opacity-50 flex flex-col justify-between"><span class="text-xs font-mono text-slate-400 font-medium">${x.n}</span><span class="text-[10px] text-slate-400 italic text-center">${x.m}</span></div>`;
@@ -76,7 +74,8 @@ async function renderPlan() {
     ${block("help_center", "Context (why it matters)", `<p class="text-slate-500 leading-normal">${esc(i.context)}</p>`)}
     ${block("travel_explore", "Research topics", `<div class="flex flex-wrap gap-1">${(i.search_queries || []).map(q => `<span class="px-1.5 py-0.5 rounded bg-white border border-slate-200 text-slate-600 text-[9px]">${esc(q)}</span>`).join("")}</div>`)}
     ${block("deployed_code", "Real-world example", `<p class="text-slate-500 leading-normal">${esc(i.example)}</p>`)}
-    ${block("lightbulb", "Takeaway", `<p class="text-slate-500 leading-normal">${esc(i.takeaway)}</p>`)}</div>`;
+    ${block("lightbulb", "Takeaway", `<p class="text-slate-500 leading-normal">${esc(i.takeaway)}</p>`)}
+    ${i.research && !i.research.unavailable ? block("query_stats", "YouTube research", researchDetails(i.research)) : ""}</div>`;
   const popover = i => {
     const a = PLAN.assign, days = [];
     for (let n = 1; n <= dim; n++) days.push(planIso(Y, M, n));
@@ -113,7 +112,7 @@ async function renderPlan() {
         : `<button type="button" data-assign="${i.id}" class="text-[10px] font-semibold text-white bg-violet-600 hover:bg-violet-700 px-2.5 py-1 rounded-lg transition flex items-center gap-1 shadow-sm cursor-pointer"><span>Assign</span>${icon("calendar_add_on", "text-[11px]")}</button>`}</div>
       <p class="font-headline font-semibold text-xs text-slate-800 mt-2 leading-snug">${esc(i.title)}</p>
       <p class="text-[11px] text-slate-500 mt-1 ${open ? `` : `line-clamp-2`} leading-relaxed">${esc(i.angle)}</p>
-      ${open ? details(i) : ""}${assigning ? popover(i) : ""}
+      ${researchChips(i.research)}${open ? details(i) : ""}${assigning ? popover(i) : ""}
       <div class="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-400"><button type="button" data-more="${i.id}" class="text-violet-600 font-medium hover:underline flex items-center gap-0.5"><span>${open ? "Collapse details" : "Details"}</span>${icon(open ? "expand_less" : "expand_more", "text-[12px]")}</button></div></div>`;
   };
   const stat = (k, label) => `<button type="button" data-status="${k}" class="px-2 py-0.5 rounded font-medium ${PLAN.status === k ? `bg-violet-600 text-white` : `bg-slate-100 text-slate-600 hover:bg-slate-200`}">${label}</button>`;
@@ -152,7 +151,7 @@ async function renderPlan() {
     <div class="p-4 border-b border-slate-200">
       <div class="flex items-center justify-between mb-1.5"><div class="flex items-center gap-2">${icon("auto_awesome", "text-violet-600 text-[20px]", true)}<h2 class="font-headline font-bold text-sm text-slate-900">Generated plans</h2></div>
         <span class="text-[10px] font-mono font-semibold bg-violet-50 text-violet-700 px-2 py-0.5 rounded-full border border-violet-100">${c.plans} plans · ${topicIds.length} ${topicIds.length === 1 ? "topic" : "topics"}</span></div>
-      <p class="text-[11px] text-slate-500 leading-normal">${d.per_topic} plans per topic. Assign any plan to a day.</p>
+      <p class="text-[11px] text-slate-500 leading-normal">${d.per_topic} plans per topic. The month's days are filled at random; plans without a day stay here for <a href="#manual" class="text-violet-700 font-semibold">Manual run</a>.</p>
       <div class="mt-2.5 relative">${icon("search", "text-[16px] text-slate-400 absolute left-2.5 top-2")}<input id="p-search" value="${esc(PLAN.q)}" class="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg pl-8 pr-3 py-1.5 placeholder-slate-400 text-slate-800 focus:outline-none focus:ring-1 focus:ring-violet-500 focus:bg-white" placeholder="Search plans…" type="text"></div>
       <div class="flex items-center gap-1 mt-2.5 overflow-x-auto text-[10px] font-medium pb-1">${tchip("", "All topics")}${topicIds.map(t => tchip(t, t)).join("")}</div>
       <div class="flex items-center gap-1 mt-1.5 text-[10px]"><span class="text-slate-400 mr-1">Status:</span>${stat("unassigned", `Unassigned (${c.unassigned})`)}${stat("assigned", `Assigned (${c.assigned})`)}${stat("published", `Published (${c.published})`)}${stat("all", "All")}</div></div>
@@ -160,7 +159,7 @@ async function renderPlan() {
     <div class="p-3 bg-slate-50 border-t border-slate-200 flex flex-col gap-1 text-[11px] text-slate-500"><div class="flex items-center justify-between font-medium">
       <span class="flex items-center gap-1">${icon("calendar_today", "text-[14px] text-violet-600")}<span>${generated ? `Plan generated ${esc(generated)} · from ${d.plan_topics.length} ${d.plan_topics.length === 1 ? "topic" : "topics"}` : "No plan generated for this month yet"}</span></span>
       <span class="text-violet-700 font-semibold">Next ${esc(planNiceDay(d.next_plan).replace(/^\w+ /, ""))}</span></div>
-      <p class="text-[10px] text-slate-400">A day holds up to ${d.max_per_day} plans, made one at a time: the schedule makes the first, and Create now makes the next after it is published. A published plan is struck out here and leaves the calendar.</p></div></aside></main>`;
+      <p class="text-[10px] text-slate-400">A day holds up to ${d.max_per_day} plans, made one at a time: the schedule makes the first, then the next one after it is published. A published plan is struck out here and leaves the calendar.</p></div></aside></main>`;
 
   /* ---------- behaviour ---------- */
   const again = () => renderPlan();
@@ -193,13 +192,6 @@ async function renderPlan() {
     const first = shown.find(i => !i.assigned && i.status === "unassigned");
     if (!first) return toast(c.plans ? "Every plan is already assigned or published" : "Generate the plan first, then assign its plans to days", !c.plans);
     setAssign(first.id, b.dataset.pick); PLAN.status = "unassigned"; again(); });
-  // make the day's next plan by hand (the scheduled run makes one post a day)
-  view.querySelectorAll("[data-make]").forEach(b => b.onclick = async () => {
-    if (!confirm(`Create "${b.dataset.title}" now? The crew writes it, then it follows your approval setting (it may be published).`)) return;
-    b.disabled = true;
-    try { const r = await post("/api/runs", { platform: S.platform, date: b.dataset.make }); S.runId = r.run_id; toast("Crew started"); location.hash = "workflow"; refreshOverview(); }
-    catch (e) { toast(e.message, true); b.disabled = false; }
-  });
   // drag a plan onto a day
   view.querySelectorAll("[data-plan][draggable]").forEach(el => el.addEventListener("dragstart", e => e.dataTransfer.setData("text/plain", el.dataset.plan)));
   view.querySelectorAll("[data-drop]").forEach(cell => {

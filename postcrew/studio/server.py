@@ -188,16 +188,34 @@ class Studio:
         if month < monthly.month_key(today):
             raise ValueError("that month is over: plans are written for this month or a coming one")
         out = monthly.generate(self.ws, platform, month, today=today)
+        out["calendar"] = monthly.auto_assign(self.ws, platform, month, today=today)   # the plans are put on the month's days at random
         bad = [r["error"] for r in out["topics"].values() if isinstance(r, dict)]
         if bad and not out["added"]:
             raise ValueError(f"the Planner could not write the plans: {bad[0]}")
-        return dict(self.plan(platform, month), added=out["added"], failed=len(bad))
+        return dict(self.plan(platform, month), added=out["added"], failed=len(bad), placed=out["calendar"]["assigned"])
 
     def plan_assign(self, body):
         platform, cfg = self._view(body.get("platform"))
         today = crew.local_now(cfg).date()
         item = monthly.assign(self.ws, platform, str(body.get("id") or ""), str(body.get("date") or ""), body.get("format"), today)
         return self.plan(platform, body.get("month") or item["assigned"]["date"][:7])
+
+    def manual(self, platform):
+        """The Manual run page: every plan that is not on a day and not made yet."""
+        platform, cfg = self._view(platform)
+        return {"platform": platform, "items": monthly.unassigned(self.ws, platform), "formats": platform != platforms.LINKEDIN,
+                "default_format": (cfg.get("video") or {}).get("format", "short"), "running": crew.is_running()}
+
+    def manual_run(self, body):
+        """Run one plan now (Short or Long for YouTube): the crew starts at once for today, with this plan."""
+        platform, cfg = self._view(body.get("platform"))
+        if crew.is_running():
+            raise ValueError("a crew run is already in progress")
+        today = crew.local_now(cfg).date()
+        fmt = body.get("format") if platform != platforms.LINKEDIN else None
+        info = monthly.run_plan(self.ws, platform, str(body.get("id") or ""), fmt, today)
+        run = self.start_run({"platform": platform, "date": info["date"], "category": info["category"], **({"format": fmt} if fmt else {})})
+        return dict(run, plan=info["item"]["title"])
 
     def plan_unassign(self, body):
         platform = self._view(body.get("platform"))[0]
@@ -709,6 +727,8 @@ def make_handler(studio):
                     ("GET", "/api/memory"): lambda: studio.memory(),
                     ("POST", "/api/memory/forget"): lambda: studio.memory_forget(self.body()),
                     ("POST", "/api/plan/generate"): lambda: studio.plan_generate(self.body()),
+                    ("GET", "/api/manual"): lambda: studio.manual(q.get("platform")),
+                    ("POST", "/api/manual/run"): lambda: studio.manual_run(self.body()),
                     ("POST", "/api/plan/assign"): lambda: studio.plan_assign(self.body()),
                     ("POST", "/api/plan/unassign"): lambda: studio.plan_unassign(self.body()),
                     ("GET", "/api/agents"): lambda: studio.agents(),

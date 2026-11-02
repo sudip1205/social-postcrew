@@ -7,13 +7,14 @@ const DAY_NAMES = { mon: "Monday", tue: "Tuesday", wed: "Wednesday", thu: "Thurs
 const PROVIDERS = { "claude-code": "Claude Code (Claude plan)", anthropic: "Claude API", openai: "OpenAI API", "openai-compatible": "OpenAI-compatible server", demo: "Demo (scripted answers, no AI)" };
 const PLATFORM_IDS = ["linkedin", "youtube"];
 const TABS = [["overview", "Overview", "dashboard"], ["plan", "Plan", "calendar_month"], ["team", "Crew", "groups"], ["workflow", "Workflow", "schema"],
-  ["queue", "Queue", "format_list_bulleted"], ["settings", "Settings", "settings"], ["credentials", "Credentials", "key"]];
+  ["queue", "Queue", "format_list_bulleted"], ["manual", "Manual run", "play_circle"], ["settings", "Settings", "settings"], ["credentials", "Credentials", "key"]];
 // the <main> of each Stitch screen (design/stitch/<screen>.html): page width, padding and spacing differ per screen
 const PAGE = {
   overview: "max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8",
   plan: "flex flex-col",   // Stitch: header bar, then <main class="flex-1 flex overflow-hidden"> (inside the view)
   queue: "w-full max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col gap-6",
   workflow: "w-full max-w-[1560px] mx-auto p-4 md:p-6 space-y-6",
+  manual: "max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6",
   settings: "max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8",
   team: "max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6",     // no Stitch screen: same as Overview
   credentials: "max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6",

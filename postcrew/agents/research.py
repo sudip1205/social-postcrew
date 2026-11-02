@@ -34,6 +34,29 @@ SEARCH_SCHEMA = {
     "additionalProperties": False,
 }
 
+TRENDING_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "videos": {"type": "array", "maxItems": 6, "items": {
+            "type": "object",
+            "properties": {
+                "id": {"type": "string"},
+                "opening": {"type": "string", "description": "how it starts: the hook or the question it opens with"},
+                "structure": {"type": "array", "items": {"type": "string"}, "maxItems": 8, "description": "its parts in order, from the chapters and description"},
+                "covers": {"type": "array", "items": {"type": "string"}, "maxItems": 8},
+                "works": {"type": "string", "description": "why viewers likely watch and like it"},
+                "weak": {"type": "string", "description": "what it explains badly or leaves out"},
+            },
+            "required": ["id", "opening", "structure", "covers", "works", "weak"], "additionalProperties": False}},
+        "common_topics": {"type": "array", "items": {"type": "string"}, "maxItems": 10, "description": "what almost every trending video covers: viewers expect it"},
+        "gaps": {"type": "array", "items": {"type": "string"}, "maxItems": 6, "description": "what they miss or do badly: where this video can be better"},
+        "outline": {"type": "array", "items": {"type": "string"}, "maxItems": 10, "description": "a suggested order of parts for OUR video, teaching students"},
+        "title_patterns": {"type": "array", "items": {"type": "string"}, "maxItems": 5},
+    },
+    "required": ["videos", "common_topics", "gaps", "outline", "title_patterns"],
+    "additionalProperties": False,
+}
+
 EXTRACT_SCHEMA = {
     "type": "object",
     "properties": {
@@ -73,6 +96,54 @@ class ResearchAgent(Agent):
         return ctx.cat.get("research", "optional") != "off" or ctx.cat["media"] == "animation"
 
     def run(self, ctx, guidance):
+        out = self._sources(ctx, guidance)
+        if getattr(ctx, "platform", "linkedin") != "linkedin":   # a video: also study the videos that are already working on this topic
+            try:
+                trending = self._trending(ctx, ctx.outputs["topic"])
+            except AgentError as e:
+                if e.fatal:
+                    raise
+                ctx.run.event(self.id, "trending", f"the trending videos could not be studied: {str(e)[:160]}", level="warning")
+                trending = None
+            if trending:
+                out = dict(out, trending=trending)
+        return out
+
+    def _trending(self, ctx, topic):
+        """How the videos that are working right now on this topic are built: what they cover, how they open and end, what they miss. The numbers
+        come from YouTube (trends.py), the analysis from one model call over their titles, descriptions, chapters and tags. {} when YouTube says nothing."""
+        from .. import trends
+        from .planner import load_plan
+        entry = load_plan(ctx.ws, ctx.platform).get(ctx.day.isoformat()) or {}
+        known = {v["id"]: v for v in (entry.get("research") or {}).get("videos", []) if v.get("id")}
+        fresh = trends.niche_research(topic["topic"], max_videos=8, log=None)
+        by = {v["id"]: v for v in fresh["videos"]}
+        for vid, v in known.items():   # the videos that made this a plan, even if a new search no longer lists them
+            by.setdefault(vid, dict(v, description="", tags=v.get("tags") or []))
+        videos = sorted(by.values(), key=lambda v: -(v.get("views_per_day") or 0))[:6]
+        if not videos:
+            ctx.run.event(self.id, "trending", fresh.get("error") or "no trending videos found for this topic", level="warning")
+            return {}
+        rows = []
+        for v in videos:
+            rows.append(f"VIDEO {v['id']}: {v['title']} ({v.get('channel', '')}); {v['views']:,} views, "
+                        + (f"{v['likes']:,} likes ({v['engagement_pct']}%), " if v.get("likes") is not None else "")
+                        + f"{v.get('age_days', '?')} days old, {'a Short' if v.get('short') else 'long'}\n"
+                        + (("  chapters: " + "; ".join(f"{c['at'] // 60}:{c['at'] % 60:02d} {c['title']}" for c in v["chapters"][:14]) + "\n") if v.get("chapters") else "")
+                        + (f"  tags: {', '.join(v['tags'][:10])}\n" if v.get("tags") else "")
+                        + (f"  description: {(v.get('description') or '')[:700]}\n" if v.get("description") else ""))
+        prompt = (f"Topic: {topic['topic']}\nAngle: {topic.get('angle', '')}\nFormat: {ctx.video.get('format', 'short')} video, for students\n\n"
+                  "THE VIDEOS THAT ARE WORKING NOW (read from YouTube today):\n" + "\n".join(rows))
+        analysis = self.ask(ctx, self.prompt(ctx, "research_trending"), prompt, TRENDING_SCHEMA)
+        ids = {v["id"] for v in videos}
+        analysis["videos"] = [dict(a, **{k: next((v.get(k) for v in videos if v["id"] == a["id"]), None) for k in ("url", "views", "likes", "engagement_pct", "views_per_day")})
+                              for a in analysis.get("videos", []) if a.get("id") in ids]
+        analysis["metrics"] = trends.metrics(videos)
+        ctx.run.event(self.id, "trending", f"studied {len(videos)} trending video(s): {len(analysis.get('common_topics', []))} common topics, "
+                                           f"{len(analysis.get('gaps', []))} gap(s) to fill", {"videos": [v["id"] for v in videos]})
+        return analysis
+
+    def _sources(self, ctx, guidance):
         topic = ctx.outputs["topic"]
         if topic.get("algo"):  # trusted, built-in reference facts: no web needed
             return {"sources": [], "facts": [], "notes": "", "reference": tracers.TRACERS[topic["algo"]].facts()}

@@ -18,3 +18,15 @@ put on any day of the month, so each must stand on its own and be specific enoug
   not invent versions, numbers or release dates.
 - Spread the plans: some foundations, some pitfalls, some how-tos, some comparisons.
 - If the owner asked for something, follow it.
+
+PLANS FOR YOUTUBE ARE BUILT FROM WHAT IS WORKING NOW. Below the owner's topic you are given real numbers read from YouTube today: the videos that
+are being watched, with their views, likes, age and views per day (a list with ids). Use them:
+- Write plans a student is searching for AND that the numbers say are working: a subject with many views per day, or a recent video far above the
+  usual views, is demand. Prefer angles with a high like rate (engaged viewers) and fresh uploads. Do NOT copy a video: find the question behind it and
+  teach it better, as a calm professor with a real example for students.
+- Each plan has a "trend": "why" (one or two sentences using the numbers: "recent videos on this get about 4,000 views a day and 4% like them"),
+  "evidence" (the ids of 1-4 listed videos that show the demand; only ids from the list), "covers" (what those videos cover, in a few phrases), and
+  "gap" (what they miss or explain badly: the reason this plan will be better, such as no worked example, no failure case, too fast for a beginner).
+- Mix the plans: some answer the most-watched questions, some a gap nobody covers well, some a Short-sized single idea and some a long walkthrough.
+- If no videos are listed (YouTube did not answer), write good plans from your own search and put your best judgement in "why"; use an empty "evidence".
+

@@ -1,25 +1,15 @@
 {
   "project": "12643280043223938531",
   "screens": {
-    "overview-dashboard": {
-      "id": "f9e911626e34418484d73a862538047d",
-      "title": "Overview Dashboard",
-      "sha": "fe5db4f75e2bb95f"
-    },
     "queue": {
       "id": "b0b0338252cb4527a3dfe5760bc35b7a",
       "title": "Queue",
       "sha": "0b4a45119a21baed"
     },
-    "content-plan-monthly-editorial-board": {
-      "id": "ea789ed29bc94bfe838a978ea6ce0d38",
-      "title": "Content Plan > Monthly Editorial Board",
-      "sha": "1ed5eea0346204b2"
-    },
-    "settings-apps-schedules": {
-      "id": "84aa2b8110794f14a33170e5f55a81c2",
-      "title": "Settings > Apps & Schedules",
-      "sha": "e1a0204d8dfd6d69"
+    "manual-run": {
+      "id": "53bdc98102bd48a890aa0b855057589d",
+      "title": "Manual Run",
+      "sha": "94f242894308aaf0"
     },
     "upload-your-own-youtube": {
       "id": "8756f30d8d644248b1ec132498ff7d38",
@@ -30,6 +20,21 @@
       "id": "9b5d6d00910a49209590c7d1c58d48c1",
       "title": "Workflow > Live YouTube Run",
       "sha": "3664856813e803d0"
+    },
+    "settings-apps-schedules": {
+      "id": "84aa2b8110794f14a33170e5f55a81c2",
+      "title": "Settings > Apps & Schedules",
+      "sha": "e1a0204d8dfd6d69"
+    },
+    "content-plan-monthly-editorial-board": {
+      "id": "6fc2c37b162e40e0af98510221ee7e2a",
+      "title": "Content Plan > Monthly Editorial Board",
+      "sha": "7fbf58cba0ff0c5e"
+    },
+    "overview-dashboard": {
+      "id": "f9e911626e34418484d73a862538047d",
+      "title": "Overview Dashboard",
+      "sha": "fe5db4f75e2bb95f"
     }
   }
 }
