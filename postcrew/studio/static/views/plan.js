@@ -203,7 +203,7 @@ async function renderPlan() {
   $("#p-gen").onclick = async () => {
     if (!d.topics.length) { toast(`Add topics for ${app.label} in Settings first`, true); location.hash = "settings"; return; }
     view.querySelectorAll("button").forEach(x => x.disabled = true);
-    $("#p-state").textContent = "The Planner is writing the plans for your topics (about a minute per topic)…";
+    $("#p-state").textContent = S.platform === "youtube" ? "Researching YouTube for each topic (views, likes, trends), then writing the plans: about two to three minutes per topic. Keep this page open…" : "The Planner is writing the plans for your topics (about a minute per topic)…";
     try { const r = await post("/api/plan/generate", { platform: S.platform, month: d.month });
       toast(r.added ? `${r.added} plan(s) written${r.failed ? `; ${r.failed} topic(s) failed` : ""}` : "Every topic already has its 10 plans"); refreshOverview(); }
     catch (e) { toast(e.message, true); }
