@@ -43,3 +43,17 @@ Turn it off in Settings > YouTube when the first videos look right.
 - **The last step says "This site can't be reached"**: that is expected when the Studio runs on another computer (such as the AI lab). Google sends the browser to `http://localhost:8765/oauth/youtube/callback?...`, and `localhost` is the computer you are sitting at. In Credentials, click **Connect YouTube**, allow access, **copy the whole address from the address bar** and paste it into **Finish connecting**. (Alternative: open an SSH tunnel with `ssh -L 8765:localhost:8765 user@lab` and use `http://localhost:8765` for the whole sign-in.)
 - **The register-this-redirect step**: add exactly `http://localhost:8765/oauth/youtube/callback` (with your port) as an authorised redirect URI, never the lab's network address: Google does not accept a private address.
 - **"Google rejected the YouTube connection" after a few days**: if the OAuth consent screen's *Publishing status* is **Testing**, Google expires the refresh token after 7 days. In Google Cloud Console open *APIs & Services > OAuth consent screen* and press **Publish app** (a personal app can stay unverified); the connection then no longer expires every week.
+
+### Publishing the app (Branding page)
+
+Google asks for four things before it lets an external app leave Testing. In *Google Auth Platform > Branding* (https://console.cloud.google.com/auth/branding) enter:
+
+| Field | Value |
+|---|---|
+| App name | `Postcrew` |
+| User support email | your own Google account email |
+| Application home page | `https://github.com/sudip1205/social-postcrew` |
+| Application privacy policy link | `https://github.com/sudip1205/social-postcrew/blob/main/PRIVACY.md` |
+| Developer contact information | your email |
+
+If the page asks for **Authorized domains**, add `github.com` (this only matters if you ever apply for Google's verification). Save, then go to *Audience* and press **Publish app**, and only then connect YouTube in Postcrew, so the new sign-in does not expire after 7 days.
