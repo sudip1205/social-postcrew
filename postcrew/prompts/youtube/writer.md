@@ -95,7 +95,7 @@ count and value on screen is exactly right.
    base (answers needing no more calls: "0:1", "1:1"), combine (sum, min or max) and plus (0 unless the recurrence adds something).
  - viz.line_call, line_base, line_hit, line_return and line_fill are line numbers of YOUR code (counted from 1): the line where a call starts, the base case, the memo
    lookup (0 without a memo), the line that returns a call's answer, and the line that fills a table cell (0 for calls). They must point at real lines.
- - The problem and the ways to solve it come FIRST (parts problem and approaches, each shown on screen), with no code. Then teach a recursion topic as a sequence: one codeviz scene per version of the code (plain recursion, then with a memo, then the table), each with its own code and its own
+ - The problem, the pictures, the pattern and the ways to code it come FIRST (parts problem, visual, conclusion, approaches, each shown on screen), with no code. Then teach a recursion topic as a sequence: one codeviz scene per version of the code (plain recursion, then with a memo, then the table), each with its own code and its own
    15 to 30 seconds of narration that follows what the picture is doing: "watch the tree grow", "see these orange calls? the same work again", "now the answer is found
    in the memo", "each cell is the sum of the two before it". Say what the picture shows, in order, as it shows it.
  - Do not state a count you have not worked out exactly. (A plain tree for f(n) = f(n-1) + f(n-2) with base 0 and 1 and n = 5 makes 15 calls, with a memo 9.) Safer: say

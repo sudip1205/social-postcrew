@@ -29,19 +29,19 @@ shown with its part. A script passes only if ALL of these are true, and each one
 1b. THEN THE PROBLEM, STATED PROPERLY (part "problem"): exactly what is asked, in plain words, with a small real example (the input and the answer it must
    give) and what makes it hard. A viewer who has never seen the problem must be able to say what it asks. If the solution or code appears before this, or the
    problem is only hinted at, that is a fix and caps "clarity" at 69.
-1c. THEN THE WAYS IT CAN BE SOLVED (part "approaches"), BEFORE the solution and before any code: each way named and compared in plain words (what it does, what it
-   costs), shown side by side on screen, and which one is built first. If the video jumps straight to one solution, that is a fix and caps "clarity" at 69.
-1d. THEN THE IDEA EXPLAINED WITH PICTURES, AS TO A CHILD (part "visual", at least two drawings) and its CONCLUSION (part "conclusion"), BEFORE any code or technical term:
+1c. THEN THE IDEA EXPLAINED WITH PICTURES, AS TO A CHILD (part "visual", at least two drawings) and its CONCLUSION (part "conclusion"), BEFORE any code or technical term:
    the smallest case first, then one bigger case at a time, each drawn with its real answer, in everyday words a ten-year-old follows (no recursion, memoization, dynamic
    programming, complexity in this part), then the pattern the pictures showed, stated and shown. Fail it (and cap "clarity" at 69) if code or technical terms come before the
    conclusion, if the visual part is only words, if the cases do not grow, or if the numbers drawn are wrong (a staircase of 4 steps has 5 ways when hops are 1 or 2).
+1d. THEN THE WAYS IT CAN BE CODED (part "approaches"), AFTER the conclusion and BEFORE the solution's code: each way named and compared in plain words (what it does, what it
+   costs), shown side by side on screen, and which one is built first. If the video jumps straight to one solution, that is a fix and caps "clarity" at 69.
 2. THEN THE SOLUTION AND ITS CODE (part "idea"): the chosen way, explained step by step, each new term explained once.
 3. THEN A WORKING EXAMPLE (part "example"): concrete round values (a real request, array, command or snippet) walked through so the viewer
    sees the idea do its job. Not a second explanation of the idea: it must run on specific data.
 4. THEN ONE COMMON MISTAKE TO AVOID (part "mistake", the scene just before the closing card): what people get wrong, why it goes wrong,
    and the fix, SHOWN as a picture (flow, diagram, code or trace), not a list of words. A recap or a generic tip is not a mistake.
 5. THEN THE CLOSING CARD (part "closing"), alone in the last scene.
-6. The scenes appear in exactly that order, and each part is more than a filler sentence.
+6. The scenes appear in exactly this order: intro, problem, visual, conclusion, approaches, idea, example, mistake, closing, and each part is more than a filler sentence.
 7. THE STORYBOARD FOLLOWS THE VOICE: no scene holds one picture for longer than about 12 seconds of narration (16 at most in a long video);
    every box, point, step or value the narration describes is on the screen in that scene, and nothing is on screen that the voice does not
    say. At most a third of the scenes may be words only (statement or points): more is a fix, ask for diagrams, flows, code or traces. Several pictures in a row of the same plain kind (words only) is a fix: ask for a diagram, flow, trace or code scene in between.
