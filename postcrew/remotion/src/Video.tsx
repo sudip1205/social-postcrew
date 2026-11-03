@@ -5,6 +5,7 @@ import {useFonts} from "./fonts";
 import type {Box, Caption, Edge, Scene, Step, Svg, VideoProps} from "./types";
 import {Colored, EXT} from "./code";
 import {CodeViz} from "./CodeViz";
+import {Stairs} from "./Stairs";
 
 /*
  * The scenes follow postcrew/remotion/STYLE.md: a flat page, one accent colour, thin rules, slow eased reveals (never a bounce), the
@@ -98,6 +99,7 @@ const Body: React.FC<{p: VideoProps; s: Scene}> = ({p, s}) => {
     case "points": return <WithClip clip={s.clip} short={short}><Points s={s} short={short} /></WithClip>;
     case "code": return <Code s={s} short={short} />;
     case "codeviz": return <CodeViz s={s} short={short} />;
+    case "paths": return <Stairs s={s} short={short} />;
     case "diagram":
     case "flow": return <Diagram s={s} short={short} flow={s.layout === "flow"} />;
     case "trace": return <Trace s={s} short={short} />;

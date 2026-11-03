@@ -31,6 +31,10 @@ shown with its part. A script passes only if ALL of these are true, and each one
    problem is only hinted at, that is a fix and caps "clarity" at 69.
 1c. THEN THE WAYS IT CAN BE SOLVED (part "approaches"), BEFORE the solution and before any code: each way named and compared in plain words (what it does, what it
    costs), shown side by side on screen, and which one is built first. If the video jumps straight to one solution, that is a fix and caps "clarity" at 69.
+1d. THEN THE IDEA EXPLAINED WITH PICTURES, AS TO A CHILD (part "visual", at least two drawings) and its CONCLUSION (part "conclusion"), BEFORE any code or technical term:
+   the smallest case first, then one bigger case at a time, each drawn with its real answer, in everyday words a ten-year-old follows (no recursion, memoization, dynamic
+   programming, complexity in this part), then the pattern the pictures showed, stated and shown. Fail it (and cap "clarity" at 69) if code or technical terms come before the
+   conclusion, if the visual part is only words, if the cases do not grow, or if the numbers drawn are wrong (a staircase of 4 steps has 5 ways when hops are 1 or 2).
 2. THEN THE SOLUTION AND ITS CODE (part "idea"): the chosen way, explained step by step, each new term explained once.
 3. THEN A WORKING EXAMPLE (part "example"): concrete round values (a real request, array, command or snippet) walked through so the viewer
    sees the idea do its job. Not a second explanation of the idea: it must run on specific data.

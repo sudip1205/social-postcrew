@@ -430,11 +430,15 @@ class FindabilityTests(unittest.TestCase):
 
 
 class VideoArcTests(unittest.TestCase):
-    """Every video: intro, the problem (with an example), the ways to solve it, then the solution and its code, an example, a common mistake and the closing card."""
-    ARC = ("intro", "problem", "approaches", "idea", "idea", "example", "mistake", "closing")
+    """Every video: intro, the problem (with an example), the idea drawn as to a child (small cases, then bigger), the pattern, the ways to code it, then the solution and its code, an example, a common mistake and the closing card."""
+    ARC = ("intro", "problem", "visual", "visual", "conclusion", "approaches", "idea", "idea", "example", "mistake", "closing")
+    DRAWN = {"visual": "paths", "conclusion": "points", "approaches": "flow", "mistake": "flow"}
 
     def arc(self, parts=None, **layouts):
-        return [{"part": p, "layout": layouts.get(p, "flow" if p in ("mistake", "approaches") else "statement")} for p in (parts or self.ARC)]
+        return [{"part": p, "layout": layouts.get(p, self.DRAWN.get(p, "statement"))} for p in (parts or self.ARC)]
+
+    def without(self, *gone):
+        return self.arc([p for p in self.ARC if p not in gone])
 
     def test_the_arc_is_checked(self):
         from postcrew.checks import structure_problems
@@ -442,23 +446,35 @@ class VideoArcTests(unittest.TestCase):
         words = [dict(sc, layout="points") if sc["part"] == "mistake" else sc for sc in self.arc()]
         self.assertTrue(any("must be a picture" in m for m in structure_problems(words)))   # the mistake is shown, not listed
         self.assertEqual(structure_problems([{}, {}]), [])                       # an owner's own script says no parts: not checked
-        abrupt = self.arc([p for p in self.ARC if p != "intro"])
-        self.assertTrue(any("introduction" in m for m in structure_problems(abrupt)))
-        no_mistake = self.arc([p for p in self.ARC if p != "mistake"])
-        self.assertTrue(any("'mistake'" in m for m in structure_problems(no_mistake)))
-        swapped = self.arc(("intro", "problem", "approaches", "example", "idea", "mistake", "closing"))
+        self.assertTrue(any("introduction" in m for m in structure_problems(self.without("intro"))))
+        self.assertTrue(any("'mistake'" in m for m in structure_problems(self.without("mistake"))))
+        swapped = self.arc(("intro", "problem", "visual", "visual", "conclusion", "approaches", "example", "idea", "mistake", "closing"))
         self.assertTrue(any("out of order" in m for m in structure_problems(swapped)))
-        no_end = self.arc(self.ARC[:-1])
-        self.assertTrue(any("closing" in m for m in structure_problems(no_end)))
+        self.assertTrue(any("closing" in m for m in structure_problems(self.arc(self.ARC[:-1]))))
 
     def test_the_problem_and_the_ways_come_before_the_solution(self):
         from postcrew.checks import structure_problems
-        no_problem = structure_problems(self.arc([p for p in self.ARC if p != "problem"]))
-        self.assertTrue(any("part 'problem'" in m and "what is asked" in m for m in no_problem))
-        no_ways = structure_problems(self.arc([p for p in self.ARC if p != "approaches"]))
-        self.assertTrue(any("part 'approaches'" in m and "before any solution or code" in m for m in no_ways))
-        jump = structure_problems(self.arc(("intro", "idea", "problem", "approaches", "idea", "example", "mistake", "closing")))
+        self.assertTrue(any("part 'problem'" in m and "what is asked" in m for m in structure_problems(self.without("problem"))))
+        self.assertTrue(any("part 'approaches'" in m and "before any solution or code" in m for m in structure_problems(self.without("approaches"))))
+        jump = structure_problems(self.arc(("intro", "idea", "problem", "visual", "visual", "conclusion", "approaches", "idea", "example", "mistake", "closing")))
         self.assertTrue(any("out of order" in m and "BEFORE the solution" in m for m in jump))   # the solution first, the problem after
+
+    def test_the_idea_is_drawn_for_a_child_before_the_code(self):
+        from postcrew.checks import structure_problems
+        self.assertTrue(any("part 'visual'" in m and "as to a child" in m for m in structure_problems(self.without("visual"))))
+        self.assertTrue(any("part 'conclusion'" in m for m in structure_problems(self.without("conclusion"))))
+        one = structure_problems(self.arc(("intro", "problem", "visual", "conclusion", "approaches", "idea", "example", "mistake", "closing")))
+        self.assertTrue(any("at least two pictures" in m for m in one))           # the cases must grow
+        words = structure_problems(self.arc(visual="statement"))
+        self.assertTrue(any("every 'visual' scene is a drawing" in m for m in words))
+        code_first = self.arc()
+        code_first[2]["layout"] = "code"
+        self.assertTrue(any("every 'visual' scene is a drawing" in m or "no code before the conclusion" in m for m in structure_problems(code_first)))
+        early = self.arc()
+        early[1]["layout"] = "codeviz"                                              # code in the problem part, before the pictures and the conclusion
+        self.assertTrue(any("no code before the conclusion" in m for m in structure_problems(early)))
+        plain_end = structure_problems(self.arc(conclusion="statement"))
+        self.assertTrue(any("'conclusion' scene shows the pattern" in m for m in plain_end))
 
     def test_the_ways_are_shown_not_only_said(self):
         from postcrew.checks import structure_problems

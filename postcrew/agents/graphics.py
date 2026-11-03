@@ -110,7 +110,7 @@ class GraphicsAgent(Agent):
         changed, spec = [], ctx.video
         for f in fixes:
             n = f["scene"]
-            if not 1 <= n <= len(scenes) or scenes[n - 1].get("part") == "closing" or scenes[n - 1].get("layout") == "codeviz":   # a code walk-through is drawn from its own numbers
+            if not 1 <= n <= len(scenes) or scenes[n - 1].get("part") == "closing" or scenes[n - 1].get("layout") in ("codeviz", "paths"):   # a code walk-through is drawn from its own numbers
                 continue
             old = scenes[n - 1]
             new = dict(old, **{k: f.get(k, old.get(k)) for k in VISUAL_KEYS})   # the narration is never in the replacement

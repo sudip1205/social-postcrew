@@ -172,7 +172,7 @@ def text_problems(text, cat, profile, first_comment=""):
 YOUTUBE_TITLE_MAX, YOUTUBE_DESC_MAX, YOUTUBE_TAGS_MAX = 100, 5000, 500
 from . import speech  # noqa: E402
 
-SCENE_LAYOUTS = ("title", "statement", "points", "code", "diagram", "trace", "flow", "stat", "codeviz")
+SCENE_LAYOUTS = ("title", "statement", "points", "code", "diagram", "trace", "flow", "stat", "codeviz", "paths")
 
 
 SENTENCE_MAX = 30
@@ -211,7 +211,7 @@ def split_long_scenes(scenes, spec):
     out = []
     for sc in scenes:
         words = (sc.get("narration") or "").split()
-        if sc.get("part") == "closing" or sc.get("layout") == "codeviz" or len(words) <= cap_words + int(4 * float(spec.get("wps") or 2.5)):   # a code walk-through keeps its one picture
+        if sc.get("part") == "closing" or sc.get("layout") in ("codeviz", "paths") or len(words) <= cap_words + int(4 * float(spec.get("wps") or 2.5)):   # a code walk-through keeps its one picture
             out.append(sc)
             continue
         sentences = re.findall(r"[^.!?]+[.!?]+\s*|[^.!?]+$", sc["narration"])
@@ -279,7 +279,7 @@ def storyboard_problems(scenes, spec):
     for i, sc in enumerate(scenes, 1):
         words = len((sc.get("narration") or "").split())
         secs = words / float(spec.get("wps") or 2.5)
-        if sc.get("part") != "closing" and secs > cap + 4 and not spec.get("artist") and sc.get("layout") != "codeviz":   # with the Storyboard Artist a long scene is split for it
+        if sc.get("part") != "closing" and secs > cap + 4 and not spec.get("artist") and sc.get("layout") not in ("codeviz", "paths"):   # with the Storyboard Artist a long scene is split for it
             problems.append(f"scene {i}: about {secs:.0f} seconds on one picture while the voice talks: split it into scenes of at most "
                             f"{cap} seconds ({int(cap * float(spec.get('wps') or 2.5))} words), each showing the part being said")
         layout = sc.get("layout")
@@ -315,13 +315,15 @@ def storyboard_problems(scenes, spec):
 STOP_WORDS = set("that this with from have they them then than what when where which while your will would there their about into more some such only also very just like been being were because these those each other over under again further here being does done make made makes know take".split())
 
 
-PARTS = ("intro", "problem", "approaches", "idea", "example", "mistake", "closing")
+PARTS = ("intro", "problem", "visual", "conclusion", "approaches", "idea", "example", "mistake", "closing")
 PART_HELP = {"intro": "a short opening that names the situation and promises what the viewer will understand",
              "problem": "the problem stated properly: what is asked, with a small real example (the input, and the answer it should give)",
+             "visual": "the idea explained with pictures, as to a child: the smallest case first, then one bigger case at a time, each drawn (no code and no technical terms yet)",
+             "conclusion": "what the pictures showed: the pattern or rule, stated in plain words and shown as a picture",
              "approaches": "the different ways the problem can be solved, each named and compared in a sentence, before any solution or code",
              "idea": "the chosen solution, the idea", "example": "a worked example that shows it working",
              "mistake": "one common mistake to avoid"}
-ARC = "intro, problem, approaches, idea (the solution), example (worked, with code), mistake, then the closing card"
+ARC = "intro, problem, visual (small cases drawn, then bigger), conclusion (the pattern), approaches, idea (the solution and its code), example, mistake, then the closing card"
 
 
 def structure_problems(scenes):
@@ -341,6 +343,18 @@ def structure_problems(scenes):
     idx = [parts.index(p) for p in order if p in parts]
     if idx != sorted(idx):
         problems.append(f"the parts are out of order: {ARC}. The problem and the ways to solve it are explained BEFORE the solution and its code")
+    seen = [sc for sc in scenes if sc.get("part") == "visual"]
+    if len(seen) == 1:
+        problems.append("the 'visual' part needs at least two pictures, growing: the smallest case first (2 steps), then a bigger one (3 steps), then another, so the viewer sees the pattern appear")
+    if seen and any(sc.get("layout") not in ("paths", "diagram", "flow", "trace", "stat") for sc in seen):
+        problems.append("every 'visual' scene is a drawing, not words or code: a 'paths' staircase, a 'diagram', a 'flow', a 'trace' or a 'stat'")
+    concl = [sc for sc in scenes if sc.get("part") == "conclusion"]
+    if concl and not any(sc.get("layout") in ("points", "trace", "diagram", "flow", "stat", "paths") for sc in concl):
+        problems.append("the 'conclusion' scene shows the pattern the pictures revealed (points, a trace of the numbers, a diagram), not only a sentence")
+    first_code = next((i for i, sc in enumerate(scenes) if sc.get("layout") in ("code", "codeviz")), None)
+    first_end = next((i for i, sc in enumerate(scenes) if sc.get("part") == "conclusion"), None)
+    if first_code is not None and first_end is not None and first_code < first_end:
+        problems.append("no code before the conclusion: first explain it with pictures, as to a child, state the pattern, and only then show the code and the technical terms")
     ways = [sc for sc in scenes if sc.get("part") == "approaches"]
     if ways and not any(sc.get("layout") in ("diagram", "flow", "points") for sc in ways):   # the ways are laid out side by side, not only said
         problems.append("the 'approaches' scene must show the ways on screen: a 'diagram' or 'flow' with one box for each way (Plain recursion, Memo, Table), or 'points' listing them")
@@ -381,7 +395,12 @@ def script_problems(script, spec, cat, profile):
             problems.append(f"scene {i}: layout must be one of {SCENE_LAYOUTS}")
         if not (sc.get("narration") or "").strip():
             problems.append(f"scene {i} has no narration")
-        if sc.get("layout") == "codeviz":
+        if sc.get("layout") == "paths":
+            from . import pathviz
+            problems += pathviz.problems(sc.get("paths"), i)
+            if len((sc.get("narration") or "").split()) < 12:
+                problems.append(f"scene {i}: a 'paths' scene narrates the staircase as it is climbed: at least 12 words")
+        elif sc.get("layout") == "codeviz":
             from . import codeviz
             code_problem = check_code(sc.get("code") or "", sc.get("language") or "")
             if code_problem:

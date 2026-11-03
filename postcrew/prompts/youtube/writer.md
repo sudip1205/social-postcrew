@@ -110,7 +110,7 @@ time and money, so fix it now. Read your finished script scene by scene and tick
  [ ] ONE running example with real numbers is introduced early, and EVERY idea is tied back to it by name ("in our pizza shop, ...").
  [ ] Every idea is explained as what, why, how (with numbers). Every subtopic named in the title or description has its own explanation. No term appears before its plain meaning.
  [ ] There are check-ins with the student ("Does that make sense?", "Let's go slowly here") and at least one real question you then answer; each idea ends with a one-line "in short".
- [ ] The scenes follow the parts in order: intro (the opening), problem (what is asked, with an example input and its answer), approaches (the ways to solve it, side by side, no code yet), idea (the chosen solution and its code), example (running on real values), mistake (shown as a picture, with the fix), closing. No code and no solution before the problem and the ways have been explained. A short recap comes before the closing.
+ [ ] The scenes follow the parts in order: intro (the opening), problem (what is asked, with an example input and its answer), visual (two or more drawings, the smallest case first, then bigger ones, in everyday words), conclusion (the pattern, shown), approaches (the ways to code it, side by side, no code yet), idea (the chosen solution and its code), example (running on real values), mistake (shown as a picture, with the fix), closing. NO code and NO technical term before the conclusion. A short recap comes before the closing.
  [ ] It sounds like a person talking to a class: whole sentences of 8 to 20 words, "you", "we" and "let's", contractions, no clipped note-like lines, no lists of terms, no semicolons or colons.
  THE PICTURES
  [ ] A new picture at least every 6 to 12 seconds of narration (15 to 30 words per scene, never more than 16 seconds). At most one scene in three is words only; the rest are diagrams, flows, traces or code.
@@ -202,18 +202,36 @@ EVERY VIDEO FOLLOWS THIS ARC (checked by the app; a script that skips a part is 
 2. "problem": one or two scenes. STATE THE PROBLEM PROPERLY before any solution: exactly what is being asked, in plain words, with ONE small real example
    (the input, and the answer it must give: "five stairs, one or two steps at a time: how many different ways to reach the top? The answer is eight"),
    and what makes it hard. A viewer who has never seen the problem must be able to say what it asks after this part.
-3. "approaches": one or two scenes. THE WAYS IT CAN BE SOLVED, laid out BEFORE the solution and before any code: name each way in one sentence and say how it
-   differs and what it costs (plain recursion tries everything, a memo remembers answers, a table builds them up from the bottom). Show them side by side on
-   screen (a "diagram" with one box for each way, or "points"). Then say which one you will build first and why. No code yet.
-4. "idea": one to three scenes. NOW the SOLUTION: the chosen way, in plain words, and its code. Build it from the first way to the best way if the ways build on
-   each other. This is where the code starts.
-5. "example": one to three scenes. A WORKING EXAMPLE with real round values that shows the idea doing its job (a trace, a flow, a code scene).
-6. "mistake": the scene(s) just before the closing card: ONE COMMON MISTAKE to avoid. SHOW it: a "flow" or "diagram" in which the wrong path
+3. "visual": TWO TO FIVE scenes. EXPLAIN THE IDEA WITH PICTURES, AS TO A CHILD, BEFORE ANY CODE AND ANY TECHNICAL WORD. Start with the SMALLEST case, draw it, and
+   work it out in front of the viewer ("one step: only one way. Two steps: let's see... two ways."). Then ONE BIGGER CASE AT A TIME (two steps, three steps, four steps,
+   five steps), each its own drawing with the real answer counted on screen, so the viewer SEES the pattern appear before you name it. Speak simple everyday words
+   a ten-year-old follows: no terms such as recursion, memoization, dynamic programming, complexity or algorithm in this part. Every visual scene is a real drawing:
+   "paths" (a staircase with an arrow for every way up: use it for any "how many ways" problem), "diagram" or "flow" (boxes and arrows that grow), "trace" (cells
+   with a pointer moving) or "stat". Never words only, never code here.
+4. "conclusion": one or two scenes. WHAT THE PICTURES SHOWED: state the pattern in plain words ("each answer is the two before it added together: 1, 2, 3, 5, 8")
+   and show it (a "trace" of the numbers with its note, or "points", or a "diagram"). Only now introduce the technical names, one at a time, each tied to what the viewer
+   just saw ("this idea has a name: dynamic programming").
+5. "approaches": one or two scenes. THE WAYS IT CAN BE CODED, laid out before the code: name each way in one sentence and say how it differs and what it costs (plain
+   recursion tries everything, a memo remembers answers, a table builds them up from the bottom). Show them side by side on screen (a "diagram" with one box for each
+   way, or "points"). Then say which one you will build first and why. No code yet.
+6. "idea": one to three scenes. NOW the SOLUTION IN CODE: the chosen way, with its technical terms, now that the viewer understands the picture. Build it from the first way
+   to the best way if the ways build on each other. This is where the code starts.
+7. "example": one to three scenes. A WORKING EXAMPLE with real round values that shows the idea doing its job (a trace, a flow, a code scene).
+8. "mistake": the scene(s) just before the closing card: ONE COMMON MISTAKE to avoid. SHOW it: a "flow" or "diagram" in which the wrong path
    goes wrong (a box that fails, a wrong value on an arrow), then the fix on the same picture; or a "code" scene with the wrong line and the right
    one. Never a list or a sentence on a blank page. Say what goes wrong, why, and the fix.
-7. "closing": the last scene only (below).
-The scenes appear in this order and no other. In a Short each part is one or two scenes, still all seven. NEVER jump to the solution or the code before
-the problem has been stated with its example and the ways to solve it have been laid out: a viewer who is handed code first is lost.
+9. "closing": the last scene only (below).
+The scenes appear in this order and no other. In a Short each part is one or two scenes (the visual part two or more), still all nine. NEVER jump to the code, or use a
+technical term, before the problem has been stated with its example, the idea has been drawn from small cases to bigger ones, and the pattern has been stated: a viewer
+who is handed code first is lost. Pictures first, as to a child; code and technical terms second.
+KEEP A SHORT SHORT: with this arc a Short has about 11 to 14 scenes, each of 12 to 28 words (the staircase cases about 12 to 20 words each, said as they play). One scene for each
+hop of the story, no filler, and the whole narration under {{short_max_words}} words. Cut the example or the recap before you cut a picture.
+
+THE STAIRCASE SCENE (layout "paths", one scene per case). Set "paths" to {kind "stairs", title, n (1 to 6 steps), moves (the hops allowed: [1, 2] is one or two steps at a
+time)}. The app finds EVERY way up and draws each one: a little figure hops from step to step along an arrow while "WAYS" counts up and each way is written ("1 + 2").
+You do not draw it and the count is always right (2 steps: 2 ways, 3 steps: 3, 4 steps: 5, 5 steps: 8). Narrate it as it plays, in the order it plays ("one hop of one,
+then another... that is one way. Or one hop of two... that is the second way."). Use one paths scene for 2 steps, one for 3, one for 4 and one for 5, then a conclusion.
+You may state the number of ways only if you are sure (the app's count is the truth)
 
 LENGTH IS FREE. Research and write as much as the topic needs to be explained properly: the problem, the idea, a worked example that runs on
 real values, the common mistake. About {{target_seconds}} seconds ({{format}}) is only a guide; go longer when the topic deserves it, shorter when

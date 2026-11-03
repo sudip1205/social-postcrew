@@ -12,7 +12,7 @@ import json
 
 from .. import assets as assets_mod
 from .. import brief as briefmod
-from .. import codeviz, platforms
+from .. import codeviz, pathviz, platforms
 from .. import checks as checks_mod
 from ..checks import PARTS, repeat_problem, script_problems
 from . import team
@@ -38,9 +38,9 @@ STEP = {
 SCENE = {
     "type": "object",
     "properties": {
-        "layout": {"type": "string", "enum": ["title", "statement", "points", "code", "diagram", "trace", "flow", "stat", "codeviz"]},
+        "layout": {"type": "string", "enum": ["title", "statement", "points", "code", "diagram", "trace", "flow", "stat", "codeviz", "paths"]},
         "part": {"type": "string", "enum": list(PARTS),
-                 "description": "which part of the video this scene is: intro (a short opening), problem (what is asked, with an example input and answer), approaches (the ways it can be solved, compared, no code yet), idea (the chosen solution), example (worked example with code), mistake (a common mistake to avoid), closing (the like, comment, share card)"},
+                 "description": "which part of the video this scene is: intro (a short opening), problem (what is asked, with an example input and answer), visual (the idea drawn as to a child: the smallest case first, then bigger ones), conclusion (the pattern the pictures showed), approaches (the ways it can be solved, compared, no code yet), idea (the chosen solution), example (worked example with code), mistake (a common mistake to avoid), closing (the like, comment, share card)"},
         "narration": {"type": "string", "description": "what the voice says; spoken sentences, no markdown"},
         "on_screen": {"type": "string", "description": "the key words shown big (or the heading above the points)"},
         "items": {"type": "array", "items": {"type": "string"}, "maxItems": 5},
@@ -54,6 +54,7 @@ SCENE = {
         "steps": {"type": "array", "maxItems": 12, "items": STEP,
                   "description": "trace: what happens to the data, one entry per move, in the order the voice says it"},
         "viz": codeviz.VIZ,
+        "paths": pathviz.PATHS,
         "seconds": {"type": "number"},
     },
     "required": ["layout", "part", "narration", "on_screen", "items", "code", "language", "nodes", "edges", "cells", "steps", "seconds"],   # viz: only a codeviz scene has one
@@ -84,7 +85,7 @@ def script_revision_block(ctx, guidance, prev=None):
     if not (guidance and prev and prev.get("scenes")):
         return ""
     keep = {k: prev.get(k) for k in ("title", "description", "tags", "thumbnail_text")}
-    keep["scenes"] = [{k: sc.get(k) for k in ("layout", "part", "narration", "on_screen", "items", "code", "language", "nodes", "edges", "cells", "steps", "viz") if sc.get(k) not in (None, "", [])}
+    keep["scenes"] = [{k: sc.get(k) for k in ("layout", "part", "narration", "on_screen", "items", "code", "language", "nodes", "edges", "cells", "steps", "viz", "paths") if sc.get(k) not in (None, "", [])}
                       for sc in prev["scenes"]]
     return ("\n\nYOUR PREVIOUS SCRIPT was sent back. REVISE it: keep every scene that is fine exactly as it is, and change only what the points below require "
             "(the picture fields of a scene you do not touch stay as they are). Do not add new claims while fixing.\n<previous_script>\n"

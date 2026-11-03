@@ -6,9 +6,9 @@ export type Step = {
   t: number; pointers: {name: string; at: number}[]; active: number[]; out: number[]; found: number[]; note: string; memo: string[];
 };
 export type Scene = {
-  layout: "title" | "statement" | "points" | "code" | "diagram" | "flow" | "trace" | "stat" | "codeviz";
+  layout: "title" | "statement" | "points" | "code" | "diagram" | "flow" | "trace" | "stat" | "codeviz" | "paths";
   title: string; items: string[]; code: string; language: string; seconds: number; captions: Caption[];
-  nodes?: Box[]; edges?: Edge[]; cells?: string[]; steps?: Step[]; cues?: number[]; closing?: boolean; key?: number; clip?: Svg; viz?: Viz; buttons?: {label: string; kind: string; svg?: Svg | null}[];
+  nodes?: Box[]; edges?: Edge[]; cells?: string[]; steps?: Step[]; cues?: number[]; closing?: boolean; key?: number; clip?: Svg; viz?: Viz; paths?: PathsViz; buttons?: {label: string; kind: string; svg?: Svg | null}[];
 };
 /** The colours of a look: defined in postcrew/render/looks.py and sent with every render. */
 export type Theme = {
@@ -25,3 +25,5 @@ export type VizEvent = {t: number; kind: "call" | "base" | "hit" | "return"; nod
 export type VizNode = {label: string; parent: number; dup: boolean; hit: boolean; value: number | null; x: number; y: number; depth: number};
 export type VizCell = {label: string; arg: number; value: number; from: number[]; t: number; line: number};
 export type Viz = {kind: "calls" | "table"; title: string; nodes?: VizNode[]; events?: VizEvent[]; leaves?: number; levels?: number; memo?: boolean; calls?: number; cells?: VizCell[]; combine?: string; plus?: number};
+/** A staircase and every way up it (postcrew/pathviz.py props). */
+export type PathsViz = {kind: "stairs"; title: string; n: number; moves: number[]; per: number; paths: {hops: number[]; label: string; t: number}[]};
