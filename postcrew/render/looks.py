@@ -24,16 +24,20 @@ LOOKS = {
         "bg": "#0D0D0D", "surface": "#161615", "text": "#C7C7C7", "muted": "#8C8C8C", "rule": "#2B2A27",
         "accent": "#24C1FF", "accentSoft": "rgba(36, 193, 255, 0.16)", "highlight": "#FA7900", "positive": "#FA7900",
     },
+    "neon": {   # the motion-graphics look: a dark navy page with a cyan glow
+        "bg": "#050B16", "surface": "#0D1A2E", "text": "#FFFFFF", "muted": "#7C8CA6", "rule": "#1D3150",
+        "accent": "#29B6F6", "accentSoft": "rgba(41, 182, 246, 0.16)", "highlight": "#29B6F6", "positive": "#3DDC97",
+    },
 }
 CHOICES = ("auto",) + tuple(LOOKS)
 DEFAULT = "auto"
 
 
 def resolve(name, fmt="short"):
-    """The look to use: a vertical video (short) is paper, a wide one (long), ink, unless a look is chosen."""
+    """The look to use: a vertical video (short) is neon (dark blue), a wide one (long), ink, unless a look is chosen."""
     if name in LOOKS:
         return name
-    return "paper" if fmt == "short" else "ink"
+    return "neon" if fmt == "short" else "ink"
 
 
 def theme(name=None, fmt="short"):

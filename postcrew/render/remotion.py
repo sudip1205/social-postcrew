@@ -10,6 +10,7 @@ import shutil
 import subprocess
 from pathlib import Path
 
+from .. import codeviz
 from . import iconlib, looks, timeline, video
 from .scenes import FORMATS, edge_marks, node_extra, parse_edge, parse_pointer, split_node
 from .video import FPS, VideoError
@@ -165,6 +166,8 @@ def build_props(scenes, fmt, audio, look=None):
             parts = [p for p in re.split(r"\s*[·•|,/]\s*|\s+and\s+", item["title"]) if p] or [item["title"]]
             item.update(closing=True, items=parts, cues=[_when(p, words, float(sc.get("lead_s") or 0)) for p in parts],
                         buttons=[_button(p) for p in parts])
+        if layout == "codeviz" and isinstance(sc.get("viz"), dict):   # the code with a live picture of it running (postcrew/codeviz.py)
+            item["viz"] = codeviz.props(sc["viz"], ln)
         if layout == "stat":
             item["cues"] = [_when(sc.get("on_screen"), words)]
         if sc.get("clip") and iconlib.svg(sc["clip"]):   # a clipart beside a words scene

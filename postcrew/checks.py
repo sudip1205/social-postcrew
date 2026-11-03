@@ -172,7 +172,7 @@ def text_problems(text, cat, profile, first_comment=""):
 YOUTUBE_TITLE_MAX, YOUTUBE_DESC_MAX, YOUTUBE_TAGS_MAX = 100, 5000, 500
 from . import speech  # noqa: E402
 
-SCENE_LAYOUTS = ("title", "statement", "points", "code", "diagram", "trace", "flow", "stat")
+SCENE_LAYOUTS = ("title", "statement", "points", "code", "diagram", "trace", "flow", "stat", "codeviz")
 
 
 SENTENCE_MAX = 30
@@ -211,7 +211,7 @@ def split_long_scenes(scenes, spec):
     out = []
     for sc in scenes:
         words = (sc.get("narration") or "").split()
-        if sc.get("part") == "closing" or len(words) <= cap_words + int(4 * float(spec.get("wps") or 2.5)):
+        if sc.get("part") == "closing" or sc.get("layout") == "codeviz" or len(words) <= cap_words + int(4 * float(spec.get("wps") or 2.5)):   # a code walk-through keeps its one picture
             out.append(sc)
             continue
         sentences = re.findall(r"[^.!?]+[.!?]+\s*|[^.!?]+$", sc["narration"])
@@ -275,7 +275,7 @@ def storyboard_problems(scenes, spec):
     for i, sc in enumerate(scenes, 1):
         words = len((sc.get("narration") or "").split())
         secs = words / float(spec.get("wps") or 2.5)
-        if sc.get("part") != "closing" and secs > cap + 4 and not spec.get("artist"):   # with the Storyboard Artist a long scene is split for it
+        if sc.get("part") != "closing" and secs > cap + 4 and not spec.get("artist") and sc.get("layout") != "codeviz":   # with the Storyboard Artist a long scene is split for it
             problems.append(f"scene {i}: about {secs:.0f} seconds on one picture while the voice talks: split it into scenes of at most "
                             f"{cap} seconds ({int(cap * float(spec.get('wps') or 2.5))} words), each showing the part being said")
         layout = sc.get("layout")
@@ -296,7 +296,7 @@ def storyboard_problems(scenes, spec):
             unsaid = [it for it in sc.get("items") or [] if not _says(sc.get("narration"), it)]
             if unsaid and len(unsaid) * 2 > len(sc.get("items") or []):   # a point may be worded differently, but most must be said
                 problems.append(f"scene {i}: the point '{unsaid[0]}' is on screen but the voice never says it: say each point as it appears")
-    if spec.get("artist") and len(scenes) >= 6 and not any(sc.get("layout") in ("code", "trace") for sc in scenes):   # a Remotion video: this channel builds and solves
+    if spec.get("artist") and len(scenes) >= 6 and not any(sc.get("layout") in ("code", "trace", "codeviz") for sc in scenes):   # a Remotion video: this channel builds and solves
         problems.append("the video builds or solves nothing on screen: add a 'code' scene (an editor window, with the output of running it in its terminal "
                         "lines) or, for an algorithm, a 'trace' scene and its code. This channel teaches by building")
     body = [(i, sc) for i, sc in enumerate(scenes, 1) if sc.get("part") not in ("intro", "closing") and not (i == 1 and not sc.get("part"))]
@@ -333,7 +333,7 @@ def structure_problems(scenes):
     if idx != sorted(idx):
         problems.append("the parts are out of order: intro (problem), idea (solution), example (worked example), mistake (common mistake), closing")
     mistakes = [sc for sc in scenes if sc.get("part") == "mistake"]
-    if mistakes and not any(sc.get("layout") in ("diagram", "flow", "code", "trace") for sc in mistakes):   # the mistake is shown, not only said
+    if mistakes and not any(sc.get("layout") in ("diagram", "flow", "code", "trace", "codeviz") for sc in mistakes):   # the mistake is shown, not only said
         if True:
             problems.append("the common mistake scene must be a picture, not words: a 'flow' or 'diagram' showing the wrong path and then "
                             "the fix, or a 'code' scene with the wrong line and the right one (layout diagram, flow, code or trace)")
@@ -369,7 +369,15 @@ def script_problems(script, spec, cat, profile):
             problems.append(f"scene {i}: layout must be one of {SCENE_LAYOUTS}")
         if not (sc.get("narration") or "").strip():
             problems.append(f"scene {i} has no narration")
-        if sc.get("layout") == "code":
+        if sc.get("layout") == "codeviz":
+            from . import codeviz
+            code_problem = check_code(sc.get("code") or "", sc.get("language") or "")
+            if code_problem:
+                problems.append(f"scene {i}: {code_problem}")
+            elif len((sc.get("code") or "").strip().splitlines()) > 12:
+                problems.append(f"scene {i}: the code of a codeviz scene is at most 12 lines: it shares the screen with its picture")
+            problems += codeviz.problems(sc.get("viz"), sc.get("code"), i)
+        elif sc.get("layout") == "code":
             code_problem = check_code(sc.get("code") or "", sc.get("language") or "")
             if code_problem:
                 problems.append(f"scene {i}: {code_problem}")
@@ -413,7 +421,7 @@ def script_problems(script, spec, cat, profile):
     if spec.get("outro") and len(scenes) > 1 and any(w in (scenes[-2].get("narration") or "").lower() for w in ("like and subscribe", "like, comment")):
         problems.append("the closing line belongs only in the last scene, on its own: take it out of the scene before")
     need = needed_visual(spec, cat)
-    if need and len(scenes) >= 3 and not any(sc.get("layout") == need for sc in scenes):
+    if need and len(scenes) >= 3 and not any(sc.get("layout") == need or (need == "trace" and sc.get("layout") == "codeviz") for sc in scenes):
         problems.append({"trace": "this is an algorithm video: add a 'trace' scene that walks the example array (cells) with moving "
                                   "pointers, the arithmetic of each step in its note, ending with the answer found",
                          "flow": "this is a system-design video: add a 'flow' scene that follows one concrete request through the "

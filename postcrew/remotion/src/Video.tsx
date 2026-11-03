@@ -3,6 +3,8 @@ import {AbsoluteFill, Sequence, interpolate} from "remotion";
 import {FONT, MONO, ThemeContext, ease, keyWord, useProgress, useT, useTheme} from "./theme";
 import {useFonts} from "./fonts";
 import type {Box, Caption, Edge, Scene, Step, Svg, VideoProps} from "./types";
+import {Colored, EXT} from "./code";
+import {CodeViz} from "./CodeViz";
 
 /*
  * The scenes follow postcrew/remotion/STYLE.md: a flat page, one accent colour, thin rules, slow eased reveals (never a bounce), the
@@ -53,7 +55,7 @@ const Shell: React.FC<{p: VideoProps; s: Scene}> = ({p, s}) => {
   const fade = useProgress(0, 0.7);
   const push = 1 + 0.014 * Math.min(1, t / Math.max(1, s.seconds));   // a very slow push-in: the page is never fully still
   return (
-    <AbsoluteFill style={{background: th.bg, fontFamily: FONT, color: th.text}}>
+    <AbsoluteFill style={{background: th.name === "neon" ? `radial-gradient(ellipse 80% 40% at 50% 38%, ${th.accentSoft}, transparent 70%), ${th.bg}` : th.bg, fontFamily: FONT, color: th.text}}>
       <div style={{position: "absolute", inset: short ? "170px 96px 400px" : "90px 150px 190px", display: "flex", flexDirection: "column",
         opacity: fade, transform: `scale(${push})`, transformOrigin: "left center"}}>
         <Body p={p} s={s} />
@@ -95,6 +97,7 @@ const Body: React.FC<{p: VideoProps; s: Scene}> = ({p, s}) => {
     case "statement": return <WithClip clip={s.clip} short={short}><Statement text={s.title} short={short} keyAt={s.key} /></WithClip>;
     case "points": return <WithClip clip={s.clip} short={short}><Points s={s} short={short} /></WithClip>;
     case "code": return <Code s={s} short={short} />;
+    case "codeviz": return <CodeViz s={s} short={short} />;
     case "diagram":
     case "flow": return <Diagram s={s} short={short} flow={s.layout === "flow"} />;
     case "trace": return <Trace s={s} short={short} />;
@@ -170,24 +173,6 @@ const PointRow: React.FC<{n: number; text: string; at: number; short: boolean}> 
   );
 };
 
-const KEYWORDS = /\b(def|return|if|else|elif|for|while|in|not|and|or|import|from|class|const|let|var|function|new|true|false|True|False|None|null|async|await|break|continue|try|except|catch|finally|raise|throw|with|as|yield|switch|case|default|select|where|insert|into|values|create|table|upstream|server|location|proxy_pass|listen)\b/;
-const TOKEN = new RegExp(`(#.*$|//.*$|--.*$)|("[^"]*"|'[^']*')|\\b(\\d+(?:\\.\\d+)?)\\b|${KEYWORDS.source}`, "g");
-const EXT: Record<string, string> = {python: "py", javascript: "js", typescript: "ts", java: "java", go: "go", sql: "sql", bash: "sh", shell: "sh", nginx: "conf", yaml: "yml", json: "json", rust: "rs", c: "c", cpp: "cpp"};
-/** One line of code with its colours: comments muted, strings in the positive colour, numbers highlighted, keywords in the accent. */
-const Colored: React.FC<{line: string}> = ({line}) => {
-  const th = useTheme(), out: React.ReactNode[] = [];
-  let last = 0, m: RegExpExecArray | null;
-  TOKEN.lastIndex = 0;
-  while ((m = TOKEN.exec(line))) {
-    if (m.index > last) out.push(line.slice(last, m.index));
-    const col = m[1] ? th.muted : m[2] ? th.positive : m[3] ? th.highlight : th.accent;
-    out.push(<span key={m.index} style={{color: col, fontWeight: m[1] || m[2] || m[3] ? 400 : 700, fontStyle: m[1] ? "italic" : "normal"}}>{m[0]}</span>);
-    last = m.index + m[0].length;
-    if (m[0].length === 0) TOKEN.lastIndex++;
-  }
-  if (last < line.length) out.push(line.slice(last));
-  return <>{out}</>;
-};
 /** A code scene drawn as an editor window: title bar, a file tab, line numbers, the line being typed highlighted with a blinking caret, and, when the
  *  scene has output lines in "items", a terminal panel that prints them once the code is typed. */
 const Code: React.FC<{s: Scene; short: boolean}> = ({s, short}) => {

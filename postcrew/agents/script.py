@@ -12,7 +12,7 @@ import json
 
 from .. import assets as assets_mod
 from .. import brief as briefmod
-from .. import platforms
+from .. import codeviz, platforms
 from .. import checks as checks_mod
 from ..checks import PARTS, repeat_problem, script_problems
 from . import team
@@ -38,7 +38,7 @@ STEP = {
 SCENE = {
     "type": "object",
     "properties": {
-        "layout": {"type": "string", "enum": ["title", "statement", "points", "code", "diagram", "trace", "flow", "stat"]},
+        "layout": {"type": "string", "enum": ["title", "statement", "points", "code", "diagram", "trace", "flow", "stat", "codeviz"]},
         "part": {"type": "string", "enum": list(PARTS),
                  "description": "which part of the video this scene is: intro (the problem), idea (the solution), example (worked example), mistake (a common mistake to avoid), closing (the like, comment, share card)"},
         "narration": {"type": "string", "description": "what the voice says; spoken sentences, no markdown"},
@@ -53,9 +53,10 @@ SCENE = {
                   "description": "trace: the example data, e.g. an array: ['2','7','11','15'] (at most 6 characters each)"},
         "steps": {"type": "array", "maxItems": 12, "items": STEP,
                   "description": "trace: what happens to the data, one entry per move, in the order the voice says it"},
+        "viz": codeviz.VIZ,
         "seconds": {"type": "number"},
     },
-    "required": ["layout", "part", "narration", "on_screen", "items", "code", "language", "nodes", "edges", "cells", "steps", "seconds"],
+    "required": ["layout", "part", "narration", "on_screen", "items", "code", "language", "nodes", "edges", "cells", "steps", "seconds"],   # viz: only a codeviz scene has one
     "additionalProperties": False,
 }
 SCHEMA = {
@@ -83,7 +84,7 @@ def script_revision_block(ctx, guidance, prev=None):
     if not (guidance and prev and prev.get("scenes")):
         return ""
     keep = {k: prev.get(k) for k in ("title", "description", "tags", "thumbnail_text")}
-    keep["scenes"] = [{k: sc.get(k) for k in ("layout", "part", "narration", "on_screen", "items", "code", "language", "nodes", "edges", "cells", "steps") if sc.get(k) not in (None, "", [])}
+    keep["scenes"] = [{k: sc.get(k) for k in ("layout", "part", "narration", "on_screen", "items", "code", "language", "nodes", "edges", "cells", "steps", "viz") if sc.get(k) not in (None, "", [])}
                       for sc in prev["scenes"]]
     return ("\n\nYOUR PREVIOUS SCRIPT was sent back. REVISE it: keep every scene that is fine exactly as it is, and change only what the points below require "
             "(the picture fields of a scene you do not touch stay as they are). Do not add new claims while fixing.\n<previous_script>\n"

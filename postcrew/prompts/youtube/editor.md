@@ -46,6 +46,9 @@ shown with its part. A script passes only if ALL of these are true, and each one
 10. HANDS-ON: the video SOLVES one concrete problem or BUILDS one concrete thing, and the student sees it work. Fail it if it only talks about a topic, gives interview or
     study advice, lists concepts, or has no code, config or trace running on screen (a "code" scene with output in its terminal lines, or a "trace" scene with its code).
     The example must be what is built or solved, not a story beside the lesson.
+10b. CODE AND PICTURE: a "codeviz" scene shows the real code with a live picture of it running (a call tree or a table). It counts as the hands-on code and as the trace for item 10. Check
+    that the code is correct, that the narration follows what the picture does in the order it does it, and that any call count the voice states is right (a plain tree for
+    f(n) = f(n-1) + f(n-2), base 0 and 1, n = 5 has 15 calls; with a memo, 9). A codeviz scene may run 15 to 30 seconds of narration: that is not "one picture too long", the picture keeps moving.
 11. Names are written the way they are spoken and shown the same way (a header called "Retry-After" is never narrated as "Retry After").
 The app also checks the parts mechanically and will not approve a script that lacks one, whatever you score.
 

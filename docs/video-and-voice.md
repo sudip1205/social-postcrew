@@ -273,6 +273,13 @@ words in `script.md` are checked against the approved script, so the picture age
 `theme` (paper, clean, chalk, blueprint, midnight, editorial), `music`, `watermark` (explainroo asks you to keep its small credit),
 `review`. The Video Editor step is skipped: explainroo does its own checks.
 
+### Code with a picture of it running (`codeviz`)
+
+For recursion and dynamic programming the writer uses a `codeviz` scene: the real code in an editor window, with the running line lit, and a live picture under it. The
+writer does not draw the picture; it describes the recursion (`viz`: kind `calls` or `table`, `fn`, `n`, `steps`, `base`, `combine`, `plus`, `memo` and the line numbers
+of the call, base case, memo lookup, return and table fill) and `postcrew/codeviz.py` runs it, lays the tree out and times every step. The scene is drawn by
+`postcrew/remotion/src/CodeViz.tsx`. Shorts use the dark `neon` look by default (Settings > Video look: paper, ink or neon).
+
 ### The look of a video
 
 Videos are drawn on a flat page: white for a vertical video and black for a wide one (**Settings > YouTube > Video look**: Automatic, or

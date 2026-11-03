@@ -77,7 +77,7 @@ class RemotionTests(unittest.TestCase):
     def test_a_look_is_off_white_or_black_with_one_accent(self):
         from postcrew.render import looks
         self.assertEqual(looks.theme("ink")["name"], "ink")
-        self.assertEqual(looks.theme("neon", "short")["name"], "paper")   # an unknown look is chosen by the format
+        self.assertEqual(looks.theme("sepia", "short")["name"], "neon")   # an unknown look is chosen by the format
         self.assertEqual(looks.theme(None, "long")["name"], "ink")
         for name, t in looks.LOOKS.items():
             r, g, b = (int(t["bg"][i:i + 2], 16) for i in (1, 3, 5))
@@ -91,11 +91,11 @@ class RemotionTests(unittest.TestCase):
         self.assertEqual((p["accent"], p["highlight"], p["positive"], p["text"]), ("#279CF5", "#FA7900", "#068200", "#424242"))   # on white
         self.assertEqual((k["accent"], k["highlight"], k["text"]), ("#24C1FF", "#FA7900", "#C7C7C7"))                              # on black
         self.assertEqual(k["positive"], "#FA7900")      # there is no green on black: what was found is orange
-        self.assertEqual((looks.resolve("auto", "short"), looks.resolve("auto", "long")), ("paper", "ink"))   # white vertical, black wide
+        self.assertEqual((looks.resolve("auto", "short"), looks.resolve("auto", "long")), ("neon", "ink"))   # dark blue vertical, black wide
         self.assertEqual((looks.resolve("ink", "short"), looks.resolve("paper", "long")), ("ink", "paper"))  # unless chosen
-        self.assertEqual(looks.resolve("neon", "long"), "ink")
+        self.assertEqual(looks.resolve("sepia", "long"), "ink")
         base = {"video": {"format": "short", "look": "auto"}}
-        self.assertEqual(platforms.video_spec(base)["look"], "paper")
+        self.assertEqual(platforms.video_spec(base)["look"], "neon")
         self.assertEqual(platforms.video_spec(base, {"format": "long"})["look"], "ink")
         self.assertEqual(platforms.video_spec({"video": {"format": "long", "look": "paper"}})["look"], "paper")
         props, _ = rm.build_props([{"layout": "title", "on_screen": "x", "narration": "Hello."}], "long", None)

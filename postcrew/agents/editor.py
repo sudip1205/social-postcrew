@@ -48,6 +48,8 @@ def script_material(ctx, w):
         parts.append(f"Scene {i} [{sc.get('part') or 'no part'} / {sc.get('layout')}, ~{sc.get('seconds', 0):.0f}s] on screen: {sc.get('on_screen') or '-'}"
                      + (f" | items: {'; '.join(sc['items'])}" if sc.get("items") else "")
                      + (f"\n  code ({sc.get('language')}):\n  " + sc["code"].replace("\n", "\n  ") if sc.get("code") else ""))
+        if sc.get("viz"):   # code with a live picture of it running: what the picture is
+            parts.append("  picture: " + json.dumps(sc["viz"], ensure_ascii=False))
         parts.append(f"  narration: {sc.get('narration', '')}")
         said = speech.speakable(sc.get("narration", ""))
         if said and said.lower() != " ".join(str(sc.get("narration", "")).split()).lower():

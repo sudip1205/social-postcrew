@@ -85,6 +85,24 @@ SOUND LIKE A PERSON, NOT A SCRIPT (the voice is a real human voice; the words de
   * Ordinary words in lowercase ("up", "not"); capitals only for real acronyms.
 - No list-speak and no robotic signposts ("Firstly", "In conclusion", "Let us now"). No filler like "um". No sales tone.
 
+CODE AND A PICTURE OF IT RUNNING (layout "codeviz"). When the lesson is code that calls itself or fills a table (recursion, memoization, dynamic programming), teach it with
+codeviz scenes instead of a plain code scene. The screen shows your REAL code (at most 12 lines, Python unless the topic needs another language) and, under it, a live
+picture of that code running while the line that is running is lit. You do not draw the picture: you describe the recursion in "viz" and the app runs it, so every call,
+count and value on screen is exactly right.
+ - viz.kind "calls" draws the tree of calls (memo false: the plain version, repeated work glows; memo true: a repeated call is answered at once, shown in green).
+   viz.kind "table" draws the bottom-up table filling cell by cell with its formula.
+ - fn (the function's name in your code), n (the input: 2 to 6 for plain calls, 2 to 10 for a memo or a table), steps (how a call splits: [1, 2] means f(n-1) and f(n-2)),
+   base (answers needing no more calls: "0:1", "1:1"), combine (sum, min or max) and plus (0 unless the recurrence adds something).
+ - viz.line_call, line_base, line_hit, line_return and line_fill are line numbers of YOUR code (counted from 1): the line where a call starts, the base case, the memo
+   lookup (0 without a memo), the line that returns a call's answer, and the line that fills a table cell (0 for calls). They must point at real lines.
+ - Teach a recursion topic as a sequence: one codeviz scene per version of the code (plain recursion, then with a memo, then the table), each with its own code and its own
+   15 to 30 seconds of narration that follows what the picture is doing: "watch the tree grow", "see these orange calls? the same work again", "now the answer is found
+   in the memo", "each cell is the sum of the two before it". Say what the picture shows, in order, as it shows it.
+ - Do not state a count you have not worked out exactly. (A plain tree for f(n) = f(n-1) + f(n-2) with base 0 and 1 and n = 5 makes 15 calls, with a memo 9.) Safer: say
+   "many repeated calls" and let the picture show the number.
+ - Other topics keep their usual pictures: a flow for a system, a trace for an array walk, code for a short snippet. Use codeviz only where code and a picture of it
+   running teach better than either alone.
+
 BEFORE YOU ANSWER, CHECK YOUR OWN SCRIPT. The Editor and the automatic checks will send back anything below that is wrong, and every round trip costs the owner
 time and money, so fix it now. Read your finished script scene by scene and tick each point:
  THE TEACHING
