@@ -66,7 +66,7 @@ const Tree: React.FC<{viz: Viz; t: number}> = ({viz, t}) => {
   const nodes = viz.nodes ?? [], events = viz.events ?? [];
   const W = 840, H = 440, leaves = viz.leaves ?? 1, levels = viz.levels ?? 1;
   const nw = Math.max(58, Math.min(150, W / leaves - 6)), nh = Math.max(46, Math.min(72, H / levels - 18));
-  const fs = Math.max(17, Math.min(30, nw * 0.27));
+  const longest = Math.max(4, ...nodes.map((n) => n.label.length + 2)), fs = Math.max(13, Math.min(30, (nw - 10) / (longest * 0.62)));   // the label must fit its box
   const appeared = (i: number) => events.find((e) => e.node === i && e.kind === "call")?.t ?? 1e9;
   const done = (i: number) => events.find((e) => e.node === i && e.kind !== "call")?.t ?? 1e9;
   const last = [...events].reverse().find((e) => e.t <= t);
