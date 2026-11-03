@@ -459,13 +459,18 @@ def transcribe(video, log=print):
     except ImportError:
         log("no transcript: install faster-whisper (pip install faster-whisper) to measure narration pace")
         return None
-    try:
-        log("transcribing the narration (faster-whisper, small model)")
-        model = WhisperModel("small", device="auto", compute_type="int8")
-        segs, _info = model.transcribe(str(video), vad_filter=True)
-        segments = [{"start": round(s.start, 2), "end": round(s.end, 2), "text": s.text.strip()} for s in segs]
-        text = " ".join(s["text"] for s in segments)
-        return {"text": text, "segments": segments, "words": len(text.split())}
-    except Exception as e:   # a missing model download or GPU problem must not stop the analysis
-        log(f"no transcript: {str(e)[:160]}")
-        return None
+    log("transcribing the narration (faster-whisper, small model)")
+    last = None
+    for device in ("auto", "cpu"):   # a GPU without its CUDA libraries fails only when used: then the CPU, which is fast enough for a Short
+        try:
+            model = WhisperModel("small", device=device, compute_type="int8")
+            segs, _info = model.transcribe(str(video), vad_filter=True)
+            segments = [{"start": round(s.start, 2), "end": round(s.end, 2), "text": s.text.strip()} for s in segs]
+            text = " ".join(s["text"] for s in segments)
+            return {"text": text, "segments": segments, "words": len(text.split())}
+        except Exception as e:   # a missing model download or GPU problem must not stop the analysis
+            last = e
+            if device == "auto":
+                log(f"the GPU could not transcribe ({str(e)[:100]}): using the CPU")
+    log(f"no transcript: {str(last)[:160]}")
+    return None

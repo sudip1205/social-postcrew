@@ -281,6 +281,25 @@ class ScriptAndUrlTests(unittest.TestCase):
             self.assertIn("myth then truth", text)
 
 
+class TranscribeTests(unittest.TestCase):
+    def test_a_gpu_without_cuda_falls_back_to_the_cpu(self):
+        import sys
+        devices = []
+
+        class Model:
+            def __init__(self, name, device, compute_type):
+                devices.append(device)
+                if device == "auto":
+                    raise RuntimeError("Library libcublas.so.12 is not found or cannot be loaded")
+
+            def transcribe(self, path, vad_filter):
+                return [SimpleNamespace(start=0.0, end=1.0, text=" hello there ")], None
+        with mock.patch.dict(sys.modules, {"faster_whisper": SimpleNamespace(WhisperModel=Model)}):
+            out = lib.transcribe("v.mp4", log=lambda m: None)
+        self.assertEqual(devices, ["auto", "cpu"])
+        self.assertEqual((out["text"], out["words"]), ("hello there", 2))
+
+
 class StudioApiTests(unittest.TestCase):
     def test_upload_analyse_approve_through_the_api(self):
         import io
