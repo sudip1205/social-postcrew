@@ -162,8 +162,10 @@ def view(ws, platform=LINKEDIN, month=None, today=None):
     for i in _live_items(pool, posted):
         iso = i["assigned"]["date"]
         if iso.startswith(month):
+            r = i.get("research") or {}
             days.setdefault(iso, []).append({"id": i["id"], "title": i["title"], "topic": i["topic"], "status": status_of(i, posted),
-                                             "format": i["assigned"].get("format")})
+                                             "format": i["assigned"].get("format"),
+                                             "trend": {"label": r.get("label"), "score": r.get("trend_score")} if r.get("trend_score") is not None else None})
     for iso, rows in days.items():
         for n, r in enumerate(rows, 1):
             r["position"], r["of"] = n, len(rows)

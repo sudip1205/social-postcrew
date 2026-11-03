@@ -49,7 +49,7 @@ async function renderPlan() {
       : `<span class="text-[9px] px-1.5 py-0.5 rounded-full font-semibold bg-slate-100 text-slate-500 border border-slate-200">Then</span>`;
     return `<div class="bg-white rounded-lg border-l-4 ${app.border} border border-slate-200 p-2 shadow-sm hover:border-violet-300">
       <button type="button" data-jump="${it.id}" class="text-left w-full">
-        <div class="flex items-center gap-1 mb-1 flex-wrap">${tag}${fmt ? `<span class="px-1.5 py-0.5 text-[9px] font-bold rounded bg-red-50 ${ytText}">${fmt}</span>` : ""}</div>
+        <div class="flex items-center gap-1 mb-1 flex-wrap">${tag}${fmt ? `<span class="px-1.5 py-0.5 text-[9px] font-bold rounded bg-red-50 ${ytText}">${fmt}</span>` : ""}${it.trend ? `<span class="px-1.5 py-0.5 text-[9px] font-bold rounded border ${(TREND_LOOK[it.trend.label] || TREND_LOOK.niche)[1]}" title="Trend score of this topic on YouTube">${(TREND_LOOK[it.trend.label] || TREND_LOOK.niche)[0]} ${it.trend.score}</span>` : ""}</div>
         <p class="text-[11px] font-semibold text-slate-800 line-clamp-2 leading-snug">${esc(it.title)}</p></button></div>`;
   };
   const dayCell = x => {
@@ -94,18 +94,22 @@ async function renderPlan() {
       <div class="flex items-center justify-end gap-1.5 pt-1"><button type="button" data-cancel class="px-2.5 py-1 text-[11px] rounded text-slate-600 hover:bg-slate-200">Cancel</button>
         <button type="button" data-confirm ${a.date ? "" : "disabled"} class="px-3 py-1 text-[11px] rounded-lg bg-violet-600 text-white font-semibold shadow-sm hover:bg-violet-700 disabled:opacity-50">${a.date ? `Assign to ${esc(planNiceDay(a.date))}` : "Pick a day"}</button></div></div>`;
   };
+  const moreBtn = (i, open) => `<button type="button" data-more="${i.id}" class="text-violet-600 font-medium hover:underline flex items-center gap-0.5"><span>${open ? "Collapse details" : "Details"}</span>${icon(open ? "expand_less" : "expand_more", "text-[12px]")}</button>`;
   const planCard = i => {
     const topic = `<span class="px-1.5 py-0.5 rounded text-[9px] font-semibold border ${pillOf(i.topic)}">${esc(i.topic)}</span>`;
     if (i.status === "published") return `<div class="p-3 bg-slate-50 rounded-xl border border-slate-200 opacity-85" data-plan="${i.id}"><div class="flex items-start justify-between gap-2">
         <span class="px-2 py-0.5 rounded text-[9px] font-semibold bg-slate-200 text-slate-700 flex items-center gap-1">${icon("check_circle", "text-[11px] text-emerald-600")}<span>Published</span></span><span class="text-[10px] text-slate-400 font-medium">Archive</span></div>
-        <p class="font-headline font-semibold text-xs text-slate-600 mt-2 leading-snug line-through">${esc(i.title)}</p><p class="text-[10px] text-slate-400 mt-1 italic">Published, never planned again</p></div>`;
-    if (i.assigned) { const a = i.assigned, written = i.status === "written", spot = onDay(a.date).find(r => r.id === i.id);
+        <p class="font-headline font-semibold text-xs text-slate-600 mt-2 leading-snug line-through">${esc(i.title)}</p><p class="text-[10px] text-slate-400 mt-1 italic">Published, never planned again</p>
+        ${researchChips(i.research)}${PLAN.open.has(i.id) ? details(i) : ""}
+        <div class="mt-2 pt-2 border-t border-slate-200 text-[10px] flex items-center justify-between">${topic}${moreBtn(i, PLAN.open.has(i.id))}</div></div>`;
+    if (i.assigned) { const a = i.assigned, written = i.status === "written", spot = onDay(a.date).find(r => r.id === i.id), open = PLAN.open.has(i.id);
       return `<div class="p-3 bg-emerald-50/40 rounded-xl border border-emerald-200/80 transition-all" data-plan="${i.id}"><div class="flex items-start justify-between gap-2">
         <span class="px-2 py-0.5 rounded text-[9px] font-semibold bg-emerald-100 text-emerald-800 flex items-center gap-1">${icon("check", "text-[11px]")}<span>Assigned to ${esc(planNiceDay(a.date))}${spot && spot.of > 1 ? ` · ${spot.position} of ${spot.of}` : ""}</span></span>
         <span class="text-[10px] text-emerald-700 font-mono font-medium">${written ? "Written" : spot && spot.position > 1 ? "Waiting" : "Scheduled"}</span></div>
-        <p class="font-headline font-semibold text-xs text-slate-800 mt-2 leading-snug">${esc(i.title)}</p><p class="text-[11px] text-slate-500 mt-1 line-clamp-2">${esc(i.angle)}</p>
-        <div class="mt-2 pt-2 border-t border-emerald-100 text-[10px] text-slate-400 flex items-center justify-between"><span>${topic}${a.format ? ` · ${a.format === "long" ? "Long" : "Short"} video` : ""}</span>
-          ${written ? "" : `<button type="button" data-unassign="${i.id}" class="text-slate-400 hover:text-rose-600 text-[10px] underline cursor-pointer">Unassign</button>`}</div></div>`; }
+        <p class="font-headline font-semibold text-xs text-slate-800 mt-2 leading-snug">${esc(i.title)}</p><p class="text-[11px] text-slate-500 mt-1 ${open ? "" : "line-clamp-2"} leading-relaxed">${esc(i.angle)}</p>
+        ${researchChips(i.research)}${open ? details(i) : ""}
+        <div class="mt-2 pt-2 border-t border-emerald-100 text-[10px] text-slate-400 flex items-center justify-between gap-2"><span class="min-w-0 truncate">${topic}${a.format ? ` · ${a.format === "long" ? "Long" : "Short"} video` : ""}</span>
+          <span class="flex items-center gap-2 shrink-0">${moreBtn(i, open)}${written ? "" : `<button type="button" data-unassign="${i.id}" class="text-slate-400 hover:text-rose-600 text-[10px] underline cursor-pointer">Unassign</button>`}</span></div></div>`; }
     const open = PLAN.open.has(i.id), assigning = PLAN.assign?.id === i.id;
     return `<div class="p-3 bg-white rounded-xl border ${assigning ? `border-2 border-violet-500 shadow-md` : open ? `border-violet-300 ring-2 ring-violet-100 shadow-sm` : `border-slate-200 hover:border-violet-300 hover:shadow-sm`} transition-all relative" data-plan="${i.id}" draggable="true">
       <div class="flex items-start justify-between gap-2">${topic}${assigning ? `<span class="text-[9px] font-semibold text-violet-700 bg-violet-100 px-1.5 py-0.5 rounded">Assigning…</span>`
