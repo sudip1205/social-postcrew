@@ -6,7 +6,7 @@ const WEEKDAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
 const DAY_NAMES = { mon: "Monday", tue: "Tuesday", wed: "Wednesday", thu: "Thursday", fri: "Friday", sat: "Saturday", sun: "Sunday" };
 const PROVIDERS = { "claude-code": "Claude Code (Claude plan)", anthropic: "Claude API", openai: "OpenAI API", "openai-compatible": "OpenAI-compatible server", demo: "Demo (scripted answers, no AI)" };
 const PLATFORM_IDS = ["linkedin", "youtube"];
-const TABS = [["overview", "Overview", "dashboard"], ["plan", "Plan", "calendar_month"], ["team", "Crew", "groups"], ["workflow", "Workflow", "schema"],
+const TABS = [["overview", "Overview", "dashboard"], ["plan", "Plan", "calendar_month"], ["team", "Crew", "groups"], ["style", "Style", "school"], ["workflow", "Workflow", "schema"],
   ["queue", "Queue", "format_list_bulleted"], ["manual", "Manual run", "play_circle"], ["settings", "Settings", "settings"], ["credentials", "Credentials", "key"]];
 // the <main> of each Stitch screen (design/stitch/<screen>.html): page width, padding and spacing differ per screen
 const PAGE = {
@@ -18,6 +18,7 @@ const PAGE = {
   settings: "max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8",
   team: "max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6",     // no Stitch screen: same as Overview
   credentials: "max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6",
+  style: "max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6",          // no Stitch screen: same as Crew
 };
 const VIEWS = {};   // tab id -> render function, registered by views/*.js
 

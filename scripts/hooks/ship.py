@@ -9,7 +9,7 @@ Steps (each one stops the chain if it fails; nothing is committed on a failure):
   2. refuse to commit anything that looks like a secret or a big media file.
   3. run the tests (python3 -m unittest discover -s tests) and the UI style check. A failure is sent back to Claude (exit 2) with the last lines.
   4. commit (the message comes from the first new CHANGELOG line), push origin main.
-  5. update the lab (`postcrew-lab update`), unless a crew run is in progress there: the update restarts the server and would kill a video
+  5. update the lab (`postcrew-lab update`), unless a crew run, a plan generation or a reference analysis is in progress there: the update restarts the server and would kill a video
      that is being made. That deploy is simply done after the next change instead (step 1 notices the lab is behind).
 
 The lab address is $POSTCREW_LAB (default sudip@192.168.1.174). Output: a JSON {"systemMessage": ...} on stdout so the summary is shown.
@@ -62,7 +62,7 @@ def lab_busy():
             'localhost:8765/api/overview', 30)
     try:
         d = json.loads(r.stdout)
-        if d.get("running") or d.get("planning"):
+        if d.get("running") or d.get("planning") or d.get("analyzing"):
             return True
     except ValueError:
         pass   # the server does not answer (stopped): nothing to protect

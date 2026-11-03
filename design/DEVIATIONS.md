@@ -114,3 +114,17 @@ No Stitch screen exists for either view. Both are derived from the shell, design
 - Settings: the "Coming soon" badge on the YouTube card and the disabled controls are removed; the card no longer has an opacity wash.
 - Credentials: the YouTube card copies the LinkedIn card (no Stitch screen); "Connect YouTube" is disabled until client ID and secret are saved.
 - Credentials: new "Voice" section with an ElevenLabs card (violet left border: ElevenLabs has no brand colour in the design system).
+
+### style
+# Style page (Motion Studio reference library): no Stitch screen
+
+- New "Style" tab (between Crew and Workflow) with no Stitch screen, like Crew and Credentials: built from the shell, design.md and the same
+  components (card, sectionHead, chip, button, emptyState, errorBanner, tip). Page width and spacing copy the Crew page.
+- The "Add a reference" card copies the zones of upload-your-own-youtube.html (tinted icon tile, title + sub line, white inner box with the
+  dashed drop button and "Up to ..." limit) for the upload and the URL. The two "What should the crew analyse?" cards (Screens, Script) are
+  checkbox cards with the same tinted icon tiles; the selected card gets a violet border and wash.
+- Reference rows reuse the Crew member card (rounded-xl border p-4) with status chips (Not analysed, Waiting, Downloading, Analyzing,
+  Needs your review, Approved, Rejected, Failed) and small outlined action buttons in the Crew page's style; "What the crew learned" is a
+  native <details>.
+- House style text is shown as preformatted text (it is the exact brief the agents receive).
+

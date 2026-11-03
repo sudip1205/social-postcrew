@@ -1,9 +1,10 @@
 """`postcrew motion ...`: the Reference Library, the house style, feedback, and a quality check of any finished video.
 
-    postcrew motion add VIDEO --rights own|licensed|permission|public-domain [--title T] [--creator C] [--notes N] [--no-analyze]
+    postcrew motion add VIDEO|URL --rights own|licensed|permission|public-domain [--analyze screen,script] [--transcript FILE]
+                        [--title T] [--creator C] [--notes N] [--no-analyze]
     postcrew motion list
     postcrew motion show ID
-    postcrew motion analyze ID            # measure + describe again (a newer analyser, or after a failure)
+    postcrew motion analyze ID [--analyze screen,script] [--transcript FILE]   # again (a newer analyser, or after a failure)
     postcrew motion approve ID | reject ID | delete ID
     postcrew motion style                 # the current house style
     postcrew motion style --build         # merge the approved references into a new version
@@ -23,16 +24,22 @@ from . import library as lib
 def add_parser(sub):
     m = sub.add_parser("motion", help="Motion Studio: reference videos, house style, feedback, quality check")
     ms = m.add_subparsers(dest="mcmd", required=True)
-    a = ms.add_parser("add", help="add a video you are allowed to learn from")
-    a.add_argument("file")
+    a = ms.add_parser("add", help="add a video (file or URL) you are allowed to learn from")
+    a.add_argument("file", help="a video file, or the video's URL (fetched with yt-dlp)")
+    a.add_argument("--analyze", default="screen", help="what to analyse: screen, script or screen,script (default screen)")
+    a.add_argument("--transcript", help="a text file with the narration (for the script analysis)")
     a.add_argument("--rights", required=True, choices=lib.RIGHTS, help="your right to use it: own, licensed, permission, public-domain")
     a.add_argument("--title", default="")
     a.add_argument("--creator", default="")
     a.add_argument("--notes", default="", help="what you like about it (the analyser reads this)")
     a.add_argument("--no-analyze", action="store_true")
     ms.add_parser("list")
-    for name in ("show", "analyze", "approve", "reject", "delete"):
+    for name in ("show", "approve", "reject", "delete"):
         ms.add_parser(name).add_argument("id")
+    an_p = ms.add_parser("analyze")
+    an_p.add_argument("id")
+    an_p.add_argument("--analyze", default="", help="screen, script or screen,script (default: what it was analysed for before)")
+    an_p.add_argument("--transcript", help="a text file with the narration")
     st = ms.add_parser("style", help="the house style")
     st.add_argument("--build", action="store_true", help="merge the approved references into a new version")
     st.add_argument("--use", type=int, help="make version N current again")
@@ -59,12 +66,16 @@ def run(ws, a):
     c = a.mcmd
     try:
         if c == "add":
-            meta = L.add(a.file, a.rights, a.title, a.creator, a.notes)
-            print(f"added {meta['id']}: {meta['title']} ({meta['seconds']:.0f}s, {meta['width']}x{meta['height']}, rights: {meta['rights']})")
+            if a.file.startswith(("http://", "https://")):
+                meta = L.add_url(a.file, a.rights, a.title, a.creator, a.notes)
+                print(f"added {meta['id']}: {a.file} (rights: {meta['rights']}); fetched when analysed")
+            else:
+                meta = L.add(a.file, a.rights, a.title, a.creator, a.notes)
+                print(f"added {meta['id']}: {meta['title']} ({meta['seconds']:.0f}s, {meta['width']}x{meta['height']}, rights: {meta['rights']})")
             if a.no_analyze:
                 return 0
-            from .analyze import analyze
-            analyze(ws, meta["id"])
+            from .analyze import process
+            process(ws, meta["id"], _modes(a.analyze), _read(a.transcript))
             return 0
         if c == "list":
             refs = L.references()
@@ -81,9 +92,8 @@ def run(ws, a):
             print(json.dumps({"meta": L.meta(a.id), "analysis": L.analysis(a.id)}, indent=1))
             return 0
         if c == "analyze":
-            from .analyze import analyze
-            L.set_status(a.id, "analyzing")
-            analyze(ws, a.id)
+            from .analyze import process
+            process(ws, a.id, _modes(a.analyze) if a.analyze else (L.meta(a.id).get("modes") or ["screen"]), _read(a.transcript))
             return 0
         if c in ("approve", "reject"):
             if c == "approve" and not L.analysis(a.id):
@@ -131,10 +141,22 @@ def run(ws, a):
             prefs = L.forget_preference(a.forget) if a.forget else L.preferences()
             print("\n".join(f"{i}. {p['rule']}" for i, p in enumerate(prefs, 1)) or "no approved preferences yet")
             return 0
-    except (ValueError, KeyError) as e:
+    except (ValueError, KeyError, RuntimeError, OSError) as e:
         print(f"motion {c}: {str(e).strip(chr(39))}")
         return 2
     return 1
+
+
+def _modes(text):
+    modes = [m.strip() for m in str(text or "").split(",") if m.strip()]
+    bad = [m for m in modes if m not in lib.MODES]
+    if bad or not modes:
+        raise ValueError(f"--analyze takes {', '.join(lib.MODES)} (comma-separated)")
+    return modes
+
+
+def _read(path):
+    return Path(path).expanduser().read_text() if path else ""
 
 
 def check(ws, target, ai=True, llm=None, log=print):

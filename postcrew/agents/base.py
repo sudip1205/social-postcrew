@@ -105,6 +105,14 @@ class Agent:
                 "name": p.get("name", "") or "the account owner"}
         if "{{rubric}}" in text:  # the scoring guide the Writer writes to and the Editor scores by
             base["rubric"] = self._prompt_file(ctx, "rubric").read_text().strip()
+        if "{{script_style}}" in text:   # YouTube: the script style learned from your approved reference videos (Motion Studio)
+            from ..motion.library import Library
+            try:
+                st = Library(ctx.ws).script_brief()
+            except Exception:
+                st = ""
+            base["script_style"] = (f"\n{st}\nFollow this style in HOW you write (hook, rhythm, sentences, devices), inside the required "
+                                    f"parts and rules below, which always win. Never copy a reference's words.\n") if st else ""
         if "{{brief_rules}}" in text:  # the owner's per-post brief, as the reviewers must judge it
             from .. import brief as briefmod
             base["brief_rules"] = briefmod.editor_rules(briefmod.of(ctx))

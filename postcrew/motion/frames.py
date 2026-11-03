@@ -66,9 +66,14 @@ def detect_cuts(path, threshold=0.27, min_shot=0.4):
 
 
 def shots(path, seconds=None, threshold=0.27, max_shots=60):
-    """[(start, end)] shots of a video, from its cuts. Very long shots are kept whole; too many shots are merged evenly."""
+    """[(start, end)] shots of a video, from its cuts. Very long shots are kept whole; too many shots are merged evenly.
+    Motion graphics on a dark page change softly (a fade, a card sliding in) and hardly register at a camera-footage threshold: when
+    fewer than one cut per 15 seconds is found, the threshold is lowered step by step."""
     seconds = seconds or probe(path)["seconds"]
-    cuts = [t for t in detect_cuts(path, threshold) if 0.3 < t < seconds - 0.3]
+    for th in (threshold, 0.12, 0.06):
+        cuts = [t for t in detect_cuts(path, th) if 0.3 < t < seconds - 0.3]
+        if len(cuts) >= seconds / 15:
+            break
     edges = [0.0] + cuts + [seconds]
     out = [(edges[i], edges[i + 1]) for i in range(len(edges) - 1) if edges[i + 1] - edges[i] > 0.05]
     while len(out) > max_shots:   # merge the shortest shot with its neighbour

@@ -36,17 +36,44 @@ rendering time. That happens at most `max_redraws` times (1). A video still unde
 
 A typical check costs about $0.08 at API prices (one Sonnet call with three contact sheets); a redraw adds one more.
 
-## The reference library
+## The reference library: the Style page
 
-The crew learns *how* good explainers look and move from videos you are allowed to use, never *what* they say. Profiles and patterns are
-abstract ("a big number counts up, then a short label explains it"). A reference's script, frames, voice, music and branding are never
-reused, and Postcrew never downloads videos from YouTube or any other site: you add a file.
+The crew learns *how* good explainers look, move and are written from videos you are allowed to use, never *what* they say. Profiles and
+patterns are abstract ("a big number counts up, then a short label explains it", "state the common belief, then show it failing"). A
+reference's words, frames, voice, music and branding are never reused.
+
+Open **Style** in the Studio:
+
+1. **Add a reference**: upload a video file, or paste its URL (fetched with [yt-dlp](https://github.com/yt-dlp/yt-dlp) on the computer
+   running Postcrew). Say what right you have to use it: you made it, licensed it, have the creator's permission, or it is public domain.
+   A public video is not yours to download: YouTube's terms forbid downloading other people's videos without permission. For those, analyse
+   only the script and paste the transcript yourself: nothing is downloaded.
+2. **Choose what to analyse**:
+   - **Screens**: frames of every shot are measured (cuts, seconds per shot, screen use, colours) and a vision model describes the layout,
+     type, motion, how each scene is built and the reusable scene patterns. Needs the video.
+   - **Script**: the narration is studied for its hook, the order and length of its parts, its sentences, how it addresses the viewer, its
+     devices and its ending, as rules a writer can follow and abstract script patterns. Needs the words: pasted, the video's subtitles (a URL),
+     or local transcription with faster-whisper (an upload).
+   You can analyse the other part later with **Analyse screens** / **Analyse script** on the reference.
+3. **Review** "What the crew learned", then **Approve** the ones worth learning from (or Reject).
+4. **Build from approved videos**: a new house-style version. The screens shape the Creative Director's plans and the Quality Director's
+   judgement; the script style goes into the Script Writer's instructions (within your required parts: problem, ways, pictures first, code,
+   mistake, closing, which always win). Versions are kept: switch back with the version buttons or **Back to built-in**.
+
+Analyses run one at a time in the background; the page shows each one's progress. A Studio restart stops a running analysis (the reference
+is marked failed with the reason; analyse it again), and the automatic deploy waits while one is running.
+
+Optional extras, on the computer running Postcrew: `pip install "postcrew[motion]"` (or `pip install yt-dlp faster-whisper` in its
+environment) for URLs and local transcription.
+
+The same from the command line:
 
 ```bash
 # 1. add a video you made, licensed or have permission for (a Short or one explainer, at most 10 minutes)
-postcrew motion add ~/Videos/best-short.mp4 --rights own --notes "love the pacing and the big numbers"
-#    it is measured (cuts, seconds per shot, screen use, colours, narration pace if faster-whisper is installed)
-#    and a vision model describes every shot, the style and the reusable patterns
+postcrew motion add ~/Videos/best-short.mp4 --rights own --analyze screen,script --notes "love the pacing and the big numbers"
+postcrew motion add https://www.youtube.com/shorts/... --rights own --analyze script     # subtitles only, no video
+postcrew motion add https://... --rights permission --analyze script --transcript narration.txt
+postcrew motion analyze 20261103-a1b2c3 --analyze screen                                # the other part, later
 
 postcrew motion list                 # status of every reference and the current house style
 postcrew motion show 20261103-a1b2c3 # the full analysis: scenes, profile, patterns, strengths, weaknesses
@@ -62,8 +89,6 @@ postcrew motion style                # read it; --use 1 goes back to version 1, 
 5 to 10 references in the style you want is a good start. The built-in house style applies until you build one, and its quality floor
 (text at least 40 px, no empty or half-empty screens, no long stills, no walls of text) always stays in a built style.
 
-Narration pace is measured only with [faster-whisper](https://github.com/SYSTRAN/faster-whisper): `pip install faster-whisper` in
-Postcrew's environment. Without it, everything else works.
 
 ## Checking any video
 

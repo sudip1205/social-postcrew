@@ -51,6 +51,8 @@ class Studio:
         self.token = token   # set when the Studio is reachable from other computers: every request must carry it
         self.oauth_states = {}
         self.jobs = {}   # app -> the plan generation running or last finished: {state, message, started_at, month, result}
+        from .motion_api import MotionAPI
+        self.motion = MotionAPI(ws)   # the Style page: reference videos analysed in the background
 
     @property
     def redirect_uri(self):
@@ -76,6 +78,7 @@ class Studio:
         now = crew.local_now(cfg)
         target = crew.target_date(cfg, now)
         return {"version": __version__, "workspace": str(self.ws.root), "running": crew.is_running(), "planning": self.planning,
+                "analyzing": self.motion.busy,
                 "platform": platform,
                 "platforms": [{"id": p, "label": platforms.label(p), "enabled": platforms.is_enabled(full, p)}
                               for p in platforms.PLATFORM_IDS],
@@ -778,6 +781,14 @@ def make_handler(studio):
                         n = int(self.headers.get("Content-Length") or 0)
                         return self.send(200, studio.asset_upload(platform, day, q.get("kind", ""), q.get("name", ""),
                                                                   self.rfile, n))
+                if method == "GET" and p.startswith("/motion-media/"):   # a reference's frames, contact sheets and video
+                    return self.media(ws.root / "motion" / "references" / p[len("/motion-media/"):], ws.root / "motion" / "references")
+                if p == "/api/motion/references/upload" and method == "POST":
+                    return self.send(200, studio.motion.upload(q, self.rfile, int(self.headers.get("Content-Length") or 0)))
+                m = re.match(r"^/api/motion/references/([a-z0-9-]+)/(analyze|approve|reject|delete)$", p)
+                if m and method == "POST":
+                    rid, what = m.groups()
+                    return self.send(200, studio.motion.analyze(rid, self.body()) if what == "analyze" else studio.motion.action(rid, what))
                 m = re.match(r"^/api/team/(fire|hire|lesson-remove)$", p)
                 if m and method == "POST":
                     return self.send(200, studio.team_action(m.group(1), self.body()))
@@ -785,6 +796,10 @@ def make_handler(studio):
                 if method == "POST" and m:
                     return self.send(200, studio.queue_action(m.group(1), m.group(2), self.body()))
                 routes = {
+                    ("GET", "/api/motion"): lambda: studio.motion.state(),
+                    ("POST", "/api/motion/references/url"): lambda: studio.motion.add_url(self.body()),
+                    ("POST", "/api/motion/style"): lambda: studio.motion.style(self.body()),
+                    ("POST", "/api/motion/feedback"): lambda: studio.motion.feedback(self.body()),
                     ("GET", "/api/overview"): lambda: studio.overview(q.get("platform")),
                     ("GET", "/api/plan"): lambda: studio.plan(q.get("platform"), q.get("month")),
                     ("GET", "/api/team"): lambda: studio.team(),

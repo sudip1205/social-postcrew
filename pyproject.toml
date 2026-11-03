@@ -11,6 +11,10 @@ urls = {Homepage = "https://github.com/sudip1205/social-postcrew", Documentation
 license = {text = "MIT"}
 requires-python = ">=3.9"
 dependencies = ["Pillow>=10"]
+
+[project.optional-dependencies]
+# Motion Studio extras: add reference videos by URL (yt-dlp) and transcribe narration locally (faster-whisper)
+motion = ["yt-dlp", "faster-whisper"]
 classifiers = ["Programming Language :: Python :: 3", "License :: OSI Approved :: MIT License", "Operating System :: POSIX"]
 
 [project.scripts]

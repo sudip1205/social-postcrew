@@ -12,8 +12,14 @@ What it is for: the crew makes its own scripts and pictures; references teach it
 colour, motion, how a scene is built), never WHAT they say. Nothing is copied: a style profile and a pattern are abstract (\"a big number
 counts up, then a label explains it\"), never a reference's script, frames, voice, music or brand.
 
-Rights: a reference is only accepted with a rights declaration (own, licensed or permission). Postcrew never downloads videos from
-YouTube or any other site: you add a file you are allowed to use.
+Rights: a reference is only accepted with a rights declaration (own, licensed, permission or public domain). A file you upload is copied;
+a URL is fetched with yt-dlp (motion/fetch.py) only after that declaration, for your own videos or ones you have permission to use. A
+public video is not automatically yours to download: platform terms (YouTube's included) forbid downloading other people's videos
+without permission.
+
+Two kinds of analysis, chosen per reference (MODES):
+  screen  frames: layout, type, colour, motion, how a scene is built -> the house style's visual system and scene patterns
+  script  the transcript: hook, structure, pacing, wording devices -> the house style's script style, which the Script Writer follows
 """
 import json
 import re
@@ -26,7 +32,9 @@ from pathlib import Path
 from . import frames as fr
 
 RIGHTS = ("own", "licensed", "permission", "public-domain")
-STATUSES = ("analyzing", "profile_review", "ready", "rejected", "failed")
+STATUSES = ("new", "queued", "downloading", "analyzing", "profile_review", "ready", "rejected", "failed")
+BUSY = ("queued", "downloading", "analyzing")
+MODES = ("screen", "script")   # what to learn from a reference: its pictures, its words (or both)
 VIDEO_EXT = (".mp4", ".mov", ".m4v", ".webm", ".mkv")
 MAX_SECONDS = 600            # a reference longer than 10 minutes is refused (a Short or one explainer is what is needed)
 MAX_MB = 1024
@@ -123,7 +131,7 @@ class Library:
                 continue
         return sorted(out, key=lambda m: m.get("created_at", ""), reverse=True)
 
-    def add(self, path, rights, title="", creator="", notes="", tags=()):
+    def add(self, path, rights, title="", creator="", notes="", tags=(), move=False):
         """Copy an authorised video file into the library. Returns its meta. Does not analyse it yet."""
         src = Path(path).expanduser()
         if rights not in RIGHTS:
@@ -138,14 +146,66 @@ class Library:
         info = fr.probe(src)
         if info["seconds"] > MAX_SECONDS:
             raise ValueError(f"{src.name} is {info['seconds']:.0f}s long: references are at most {MAX_SECONDS}s (a Short or one explainer)")
+        rid, d = self._new()
+        (shutil.move if move else shutil.copy2)(str(src), str(d / f"source{src.suffix.lower()}"))
+        meta = {"id": rid, "title": title or src.stem, "creator": creator, "rights": rights, "notes": notes, "tags": list(tags),
+                "source_type": "file", "source_url": "", "file": f"source{src.suffix.lower()}", "original_name": src.name,
+                "status": "new", "created_at": now(), "analyzer_version": None, "analyzed": [],
+                **{k: info[k] for k in ("seconds", "width", "height", "fps", "has_audio")}}
+        return self._save_meta(rid, meta)
+
+    def _new(self):
         rid = time.strftime("%Y%m%d") + "-" + uuid.uuid4().hex[:6]
         d = self.refs / rid
         d.mkdir(parents=True)
-        shutil.copy2(src, d / f"source{src.suffix.lower()}")
-        meta = {"id": rid, "title": title or src.stem, "creator": creator, "rights": rights, "notes": notes, "tags": list(tags),
-                "file": f"source{src.suffix.lower()}", "original_name": src.name, "status": "analyzing", "created_at": now(),
-                "analyzer_version": None, **{k: info[k] for k in ("seconds", "width", "height", "fps", "has_audio")}}
+        return rid, d
+
+    def add_url(self, url, rights, title="", creator="", notes=""):
+        """A reference fetched from a URL later (motion/fetch.py). Only the record is made here; status "new"."""
+        if rights not in RIGHTS:
+            raise ValueError(f"say what rights you have to this video: one of {', '.join(RIGHTS)}")
+        url = str(url or "").strip()
+        if not re.match(r"^https?://[^\s/]+\.[^\s]+$", url):
+            raise ValueError("give the full address of the video, starting with https://")
+        rid, _d = self._new()
+        meta = {"id": rid, "title": title or url, "creator": creator, "rights": rights, "notes": notes, "tags": [],
+                "source_type": "url", "source_url": url, "file": "", "original_name": "", "status": "new", "created_at": now(),
+                "analyzer_version": None, "analyzed": [], "seconds": 0, "width": 0, "height": 0, "fps": 0, "has_audio": False}
         return self._save_meta(rid, meta)
+
+    def attach_file(self, rid, path):
+        """The fetched video becomes the reference's source file."""
+        src = Path(path)
+        info = fr.probe(src)
+        if info["seconds"] > MAX_SECONDS:
+            raise ValueError(f"the video is {info['seconds']:.0f}s long: references are at most {MAX_SECONDS}s")
+        meta = self.meta(rid)
+        dest = self.refs / rid / f"source{src.suffix.lower()}"
+        if src.resolve() != dest.resolve():
+            shutil.move(str(src), str(dest))
+        meta.update(file=dest.name, **{k: info[k] for k in ("seconds", "width", "height", "fps", "has_audio")})
+        return self._save_meta(rid, meta)
+
+    def update(self, rid, **fields):
+        meta = self.meta(rid)
+        meta.update(fields)
+        return self._save_meta(rid, meta)
+
+    def video_path(self, rid):
+        m = self.meta(rid)
+        return (self.refs / rid / m["file"]) if m.get("file") else None
+
+    def transcript(self, rid):
+        p = self._dir(rid) / "transcript.txt"
+        return p.read_text() if p.exists() else ""
+
+    def save_transcript(self, rid, text, source):
+        text = str(text or "").strip()
+        if not text:
+            return ""
+        (self._dir(rid) / "transcript.txt").write_text(text[:60000])
+        self.update(rid, transcript_source=source, transcript_words=len(text.split()))
+        return text
 
     def set_status(self, rid, status, reason=""):
         if status not in STATUSES:
@@ -183,21 +243,27 @@ class Library:
                  "fill": round(sum(s["fill"] for s in measured) / len(measured), 3) if measured else None,
                  "height": round(sum(s["height"] for s in measured) / len(measured), 3) if measured else None,
                  "palette": _common_palette([s["palette"] for s in measured])}
-        transcript = transcribe(video, log)
-        if transcript and transcript.get("words"):
-            facts["words_per_second"] = round(transcript["words"] / max(meta["seconds"], 1), 2)
-        meta.update(measured=facts, transcript=bool(transcript))
+        words = len(self.transcript(rid).split())
+        if words and meta["seconds"]:
+            facts["words_per_second"] = round(words / meta["seconds"], 2)
+        meta.update(measured=facts)
         self._save_meta(rid, meta)
-        (d / "shots.json").write_text(json.dumps({"shots": measured, "transcript": transcript}, indent=1))
-        return {"shots": measured, "facts": facts, "sheets": [str(s) for s in sheets], "transcript": transcript}
+        (d / "shots.json").write_text(json.dumps({"shots": measured}, indent=1))
+        return {"shots": measured, "facts": facts, "sheets": [str(s) for s in sheets]}
 
-    def save_analysis(self, rid, analysis):
+    def sheets(self, rid):
+        return sorted((self._dir(rid) / "frames").glob("sheet-*.png"))
+
+    def save_analysis(self, rid, mode, result):
+        """Keep one mode's result next to the other's: {"screen": {...}, "script": {...}}."""
+        if mode not in MODES:
+            raise ValueError(f"mode must be one of {MODES}")
+        a = self.analysis(rid) or {}
+        a[mode] = dict(result, analyzer_version=ANALYZER_VERSION, analyzed_at=now())
+        (self._dir(rid) / "analysis.json").write_text(json.dumps(a, indent=1))
         meta = self.meta(rid)
-        analysis["analyzer_version"] = ANALYZER_VERSION
-        analysis["analyzed_at"] = now()
-        (self._dir(rid) / "analysis.json").write_text(json.dumps(analysis, indent=1))
-        meta.update(status="profile_review", analyzer_version=ANALYZER_VERSION)
-        return self._save_meta(rid, meta)
+        meta.update(analyzer_version=ANALYZER_VERSION, analyzed=sorted(set(meta.get("analyzed") or []) | {mode}))
+        return self._save_meta(rid, meta), a
 
     def approved(self):
         """(meta, analysis) of every reference you approved."""
@@ -318,12 +384,28 @@ class Library:
 
     # ---------- what the crew reads ----------
     def patterns(self):
-        """Every abstract pattern: the house style's own, then the approved references'."""
+        """Every abstract scene pattern: the house style's own, then the approved references' (screen analyses)."""
         out = [dict(p, source="house") for p in self.house().get("patterns", [])]
         for m, a in self.approved():
-            for p in a.get("patterns") or []:
+            for p in (a.get("screen") or {}).get("patterns") or []:
                 out.append(dict(p, source=m["id"]))
         return out
+
+    def script_brief(self):
+        """The script style for the Script Writer: the house style's, else empty (the writer's own rules apply)."""
+        sc = self.house().get("script") or {}
+        if not sc:
+            return ""
+        lines = [f"SCRIPT STYLE (learned from your approved reference videos, house style v{self.house().get('version', 0)}):"]
+        for k, label in (("hook_type", "hook"), ("structure", "structure"), ("tone", "tone"), ("sentence_style", "sentences"),
+                         ("pacing", "pacing"), ("ending", "ending")):
+            if sc.get(k):
+                lines.append(f"- {label}: {sc[k]}")
+        lines += [f"- {r}" for r in sc.get("rules") or []]
+        if sc.get("patterns"):
+            lines.append("Script patterns you may use (abstract recipes, never anyone's words):")
+            lines += [f"- {p['name']} ({p['purpose']}): {p['recipe']}" for p in sc["patterns"]]
+        return "\n".join(lines)
 
     def relevant_patterns(self, purpose, text, n=3):
         """The patterns that fit one scene best: same purpose first, then shared words."""

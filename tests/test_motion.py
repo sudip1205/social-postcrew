@@ -44,6 +44,16 @@ ANALYSIS = {"summary": "fast, bold", "scenes": [{"shot": 1, "purpose": "hook", "
             "strengths": ["big type"], "weaknesses": ["a slow middle"]}
 
 
+TRANSCRIPT = ("Most people get this wrong. They think a cache makes every read fast. Watch what happens when the cache is cold. "
+              "The first request goes all the way to the database, and that takes two hundred milliseconds. The second one is instant. "
+              "So the trick is not the cache, it is what you keep in it. Here is the rule I use.")
+SCRIPT = {"summary": "contrarian hook, one example", "structure": [{"part": "hook", "purpose": "hook", "share": 10, "technique": "the wrong belief"}],
+          "devices": ["contrast"], "profile": {"hook_type": "the wrong answer first", "structure": "hook > example > rule", "tone": "direct",
+                                               "sentence_style": "short", "pacing": "brisk", "ending": "one rule", "rules": ["one idea per sentence"]},
+          "patterns": [{"name": "myth then truth", "purpose": "hook", "recipe": "state the common belief, then show it failing"}],
+          "strengths": ["clear"], "weaknesses": ["no recap"]}
+
+
 @unittest.skipUnless(FFMPEG, "ffmpeg not installed")
 class FrameTests(unittest.TestCase):
     def setUp(self):
@@ -191,13 +201,25 @@ class AnalyzeTests(unittest.TestCase):
             with mock.patch.object(lib, "transcribe", return_value=None):
                 meta, a = an.analyze(ws, meta["id"], llm=llm, log=lambda m: None)
             self.assertEqual(meta["status"], "profile_review")
+            self.assertEqual(meta["analyzed"], ["screen"])
             self.assertTrue(llm.images and all(Path(p).exists() for p in llm.images))   # the model saw the contact sheets
-            self.assertGreater(a["measured"]["shots"], 1)
+            self.assertGreater(a["screen"]["measured"]["shots"], 1)
             with self.assertRaises(ValueError):
                 an.build_house(ws, llm=llm, log=lambda m: None)   # nothing approved yet
+            # the script too, from a pasted transcript: no images, its own result next to the screens'
+            sllm = ScriptedLLM({"motion": [SCRIPT]})
+            meta, a = an.process(ws, meta["id"], ["script"], transcript=TRANSCRIPT, llm=sllm, log=lambda m: None)
+            self.assertEqual(meta["analyzed"], ["screen", "script"])
+            self.assertEqual(meta["transcript_source"], "pasted")
+            self.assertFalse(sllm.images)
+            self.assertIn("screen", a)
+            self.assertEqual(a["script"]["measured"]["words"], len(TRANSCRIPT.split()))
             L.set_status(meta["id"], "ready")
-            house = {"profile": ANALYSIS["profile"], "patterns": ANALYSIS["patterns"], "why": "shared bold look"}
+            house = {"profile": ANALYSIS["profile"], "patterns": ANALYSIS["patterns"], "script": SCRIPT["profile"],
+                     "script_patterns": SCRIPT["patterns"], "why": "shared bold look"}
             style = an.build_house(ws, llm=ScriptedLLM({"motion": [house]}), log=lambda m: None)
+            self.assertEqual(style["script"]["hook_type"], "the wrong answer first")
+            self.assertIn("the wrong answer first", L.script_brief())
             self.assertEqual(style["version"], 1)
             self.assertIn("small unreadable text", style["constraints"]["avoid"])   # the quality floor stays
             self.assertIn("clutter", style["constraints"]["avoid"])
@@ -205,6 +227,101 @@ class AnalyzeTests(unittest.TestCase):
             self.assertEqual(L.house()["profile_name"], "Bold minimal")
             self.assertTrue(any(p["source"] == meta["id"] for p in L.patterns()))
         shutil.rmtree(tmp, ignore_errors=True)
+
+
+class ScriptAndUrlTests(unittest.TestCase):
+    def test_a_url_reference_is_fetched_for_what_was_asked_only(self):
+        from postcrew.motion import fetch as fetch_mod
+        with TempWorkspace() as ws:
+            L = lib.Library(ws)
+            with self.assertRaises(ValueError):
+                L.add_url("not a url", "own")
+            with self.assertRaises(ValueError):
+                L.add_url("https://example.com/v", "it-is-public")
+            meta = L.add_url("https://example.com/shorts/abc", "own")
+            calls = []
+
+            def fake_fetch(url, dest, video=True, subs=True, log=print):
+                calls.append((video, subs))
+                return {"title": "Cache myths", "creator": "Me", "seconds": 40, "video": None, "transcript": TRANSCRIPT}
+            with mock.patch.object(fetch_mod, "fetch", side_effect=fake_fetch):
+                meta, a = an.process(ws, meta["id"], ["script"], llm=ScriptedLLM({"motion": [SCRIPT]}), log=lambda m: None)
+            self.assertEqual(calls, [(False, True)])          # script only: subtitles, no video
+            self.assertEqual(meta["title"], "Cache myths")
+            self.assertEqual(meta["transcript_source"], "subtitles")
+            self.assertEqual(meta["status"], "profile_review")
+
+    def test_a_script_analysis_without_words_fails_with_the_reason(self):
+        with TempWorkspace() as ws:
+            L = lib.Library(ws)
+            meta = L.add_url("https://example.com/v", "own")
+            with mock.patch("postcrew.motion.fetch.fetch", return_value={"title": "", "creator": "", "seconds": 30, "video": None, "transcript": ""}):
+                with self.assertRaises(an.AnalyzeError):
+                    an.process(ws, meta["id"], ["script"], llm=ScriptedLLM({}), log=lambda m: None)
+            self.assertEqual(L.meta(meta["id"])["status"], "failed")
+            self.assertIn("transcript", L.meta(meta["id"])["status_reason"])
+
+    def test_subtitles_become_plain_text_without_the_scrolling_repeats(self):
+        from postcrew.motion.fetch import vtt_text
+        vtt = ("WEBVTT\nKind: captions\nLanguage: en\n\n00:00:00.000 --> 00:00:02.000\nmost people get\n\n"
+               "00:00:02.000 --> 00:00:04.000\nmost people get\nthis <c>wrong</c>\n\n00:00:04.000 --> 00:00:05.000\nthis wrong\n")
+        self.assertEqual(vtt_text(vtt), "most people get this wrong")
+
+    def test_the_script_writer_gets_the_learned_style(self):
+        from postcrew.agents.script import ScriptWriter
+        with TempWorkspace() as ws:
+            ctx = fake_ctx(ws, {"scenes": []}, None)
+            text = ScriptWriter().prompt(ctx, "writer")
+            self.assertNotIn("{{script_style}}", text)
+            self.assertNotIn("SCRIPT STYLE", text)          # nothing learned yet: the writer's own rules
+            L = lib.Library(ws)
+            L.save_house(dict(lib.DEFAULT_HOUSE, script=dict(SCRIPT["profile"], patterns=SCRIPT["patterns"])))
+            text = ScriptWriter().prompt(ctx, "writer")
+            self.assertIn("SCRIPT STYLE", text)
+            self.assertIn("myth then truth", text)
+
+
+class StudioApiTests(unittest.TestCase):
+    def test_upload_analyse_approve_through_the_api(self):
+        import io
+        from postcrew.studio.motion_api import MotionAPI
+        tmp = Path(tempfile.mkdtemp())
+        with TempWorkspace() as ws:
+            api = MotionAPI(ws)
+            with self.assertRaises(ValueError):
+                api.upload({"name": "a.mp4", "rights": ""}, io.BytesIO(b"x"), 1)     # no rights declared
+            with self.assertRaises(ValueError):
+                api.upload({"name": "a.exe", "rights": "own"}, io.BytesIO(b"x"), 1)  # not a video
+            if FFMPEG:
+                three_scenes(tmp / "v.mp4")
+                data = (tmp / "v.mp4").read_bytes()
+                rid = api.upload({"name": "v.mp4", "rights": "own", "title": "Mine"}, io.BytesIO(data), len(data))["reference"]["id"]
+                self.assertFalse(list((Path(ws.root) / "motion" / "incoming").iterdir()))   # the upload was moved in
+                with mock.patch("postcrew.motion.analyze.process") as proc:
+                    api.analyze(rid, {"modes": ["script"], "transcript": "words"})
+                    api.worker.join(10)
+                proc.assert_called_once()
+                self.assertEqual(proc.call_args[0][2], ["script"])
+                with self.assertRaises(ValueError):
+                    api.analyze(rid, {"modes": []})
+                with self.assertRaises(ValueError):
+                    api.action(rid, "approve")        # nothing analysed yet
+                lib.Library(ws).update(rid, analyzed=["script"], status="profile_review")
+                st = api.action(rid, "approve")
+                self.assertEqual(st["references"][0]["status"], "ready")
+                api.action(rid, "delete")
+                self.assertEqual(api.state()["references"], [])
+        shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_a_restart_marks_half_done_analyses_failed(self):
+        from postcrew.studio.motion_api import MotionAPI
+        with TempWorkspace() as ws:
+            L = lib.Library(ws)
+            rid = L.add_url("https://example.com/v", "own")["id"]
+            L.set_status(rid, "downloading")
+            MotionAPI(ws)
+            self.assertEqual(L.meta(rid)["status"], "failed")
+            self.assertIn("restarted", L.meta(rid)["status_reason"])
 
 
 class DirectorTests(unittest.TestCase):
