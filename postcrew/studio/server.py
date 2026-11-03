@@ -502,6 +502,16 @@ class Studio:
         notify_mod.notify(self.ws, "YouTube connected", f"Connected to the channel {ch.get('title', '')}.", level="success")
         return ch.get("title", "")
 
+    def youtube_finish(self, body):
+        """Finish a YouTube sign-in whose last redirect could not open. Google always sends the browser to http://localhost:<port>/oauth/youtube/callback; when the
+        Studio is used over the network, "localhost" is the other computer and the page does not load. The owner pastes the address the browser was sent to
+        (it carries the code and the state) and the Studio finishes the sign-in itself."""
+        url = str(body.get("url") or "").strip()
+        q = {k: v[0] for k, v in parse_qs(urlparse(url).query).items()}
+        if not (q.get("code") or q.get("error")):
+            raise ValueError("paste the whole address from the browser's address bar: it looks like http://localhost:8765/oauth/youtube/callback?state=...&code=...")
+        return {"channel": self.youtube_callback(q)}
+
     def disconnect(self, app):
         if app == "youtube":
             self.ws.update_secrets(youtube_refresh_token=None, youtube_channel_title=None)
@@ -780,6 +790,7 @@ def make_handler(studio):
                     ("POST", "/api/memory/forget"): lambda: studio.memory_forget(self.body()),
                     ("POST", "/api/plan/generate"): lambda: studio.plan_generate(self.body()),
                     ("GET", "/api/manual"): lambda: studio.manual(q.get("platform")),
+                    ("POST", "/api/youtube/finish"): lambda: studio.youtube_finish(self.body()),
                     ("GET", "/api/plan/job"): lambda: studio.plan_job(q.get("platform")),
                     ("POST", "/api/manual/run"): lambda: studio.manual_run(self.body()),
                     ("POST", "/api/plan/assign"): lambda: studio.plan_assign(self.body()),

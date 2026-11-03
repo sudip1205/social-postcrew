@@ -36,3 +36,10 @@ The Studio shows the channel name when it works. `postcrew doctor` also reports 
 
 Every app starts in **practice mode**: the crew makes the video and queues it, and the publisher only logs what it would upload.
 Turn it off in Settings > YouTube when the first videos look right.
+
+
+## Connecting from another computer, and when the sign-in keeps expiring
+
+- **The last step says "This site can't be reached"**: that is expected when the Studio runs on another computer (such as the AI lab). Google sends the browser to `http://localhost:8765/oauth/youtube/callback?...`, and `localhost` is the computer you are sitting at. In Credentials, click **Connect YouTube**, allow access, **copy the whole address from the address bar** and paste it into **Finish connecting**. (Alternative: open an SSH tunnel with `ssh -L 8765:localhost:8765 user@lab` and use `http://localhost:8765` for the whole sign-in.)
+- **The register-this-redirect step**: add exactly `http://localhost:8765/oauth/youtube/callback` (with your port) as an authorised redirect URI, never the lab's network address: Google does not accept a private address.
+- **"Google rejected the YouTube connection" after a few days**: if the OAuth consent screen's *Publishing status* is **Testing**, Google expires the refresh token after 7 days. In Google Cloud Console open *APIs & Services > OAuth consent screen* and press **Publish app** (a personal app can stay unverified); the connection then no longer expires every week.

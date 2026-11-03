@@ -53,6 +53,11 @@ async function renderCredentials() {
     <div class="flex items-center gap-2 flex-wrap mt-4">${ytReady ? `<a class="${BTN.primary}" href="/oauth/youtube/start">${icon("link")}<span>${ytConn ? "Reconnect YouTube" : "Connect YouTube"}</span></a>`
         : button("primary", "link", "Connect YouTube", 'disabled title="Save the client ID and secret first"')}
       ${button("secondary", "sync", "Check connection", 'id="yt-check"')}${ytConn ? `<button class="${CRED_DANGER}" id="yt-disconnect">${icon("link_off")}<span>Disconnect</span></button>` : ""}</div>
+    ${ytReady && !["localhost", "127.0.0.1"].includes(location.hostname) ? `<div class="mt-4 rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-xs text-amber-900 space-y-2">
+      <div class="font-semibold flex items-center gap-1.5">${icon("info", "text-[16px]")}<span>Using the Studio over the network? Finish the sign-in here</span></div>
+      <p>Google ends the sign-in by sending your browser to <span class="${CRED_MONO}">localhost</span>, which is this computer, not the Studio, so the last page says <i>"This site can't be reached"</i>. That is expected. Click <b>Connect YouTube</b>, allow access, then <b>copy the whole address from the browser's address bar</b> (it starts with <span class="${CRED_MONO}">http://localhost:8765/oauth/youtube/callback?</span>) and paste it here:</p>
+      <div class="flex gap-2"><input class="${CRED_INPUT}" id="yt-paste" placeholder="http://localhost:8765/oauth/youtube/callback?state=...&code=..." autocomplete="off">
+        ${button("primary", "check_circle", "Finish connecting", 'id="yt-finish" type="button"')}</div></div>` : ""}
     ${sub("Google OAuth client")}
     <div class="grid gap-3 md:grid-cols-2">${field("Client ID", set(s.youtube_client_id), `<input class="${CRED_INPUT}" id="yt-cid" value="${esc(s.youtube_client_id || "")}" autocomplete="off">`)}
       ${field("Client secret", set(s.youtube_client_secret), `<input class="${CRED_INPUT}" id="yt-csecret" type="password" placeholder="${s.youtube_client_secret ? "•••••••• (saved, type to replace)" : ""}" autocomplete="new-password">`)}</div>
@@ -62,7 +67,7 @@ async function renderCredentials() {
       <li>Create a project in the ${a("https://console.cloud.google.com/projectcreate", "Google Cloud console")}.</li>
       <li>Open <b>APIs &amp; Services &gt; Library</b> and enable <b>YouTube Data API v3</b>.</li>
       <li>Set up the <b>OAuth consent screen</b> (External, add yourself as a test user), then create an <b>OAuth client ID</b> of type <b>Web application</b>.</li>
-      <li>Add this authorised redirect URI exactly: <span class="${CRED_MONO}">${esc(window.location.origin + "/oauth/youtube/callback")}</span></li>
+      <li>Add this authorised redirect URI exactly: <span class="${CRED_MONO}">${esc(d.youtube_redirect_uri || (window.location.origin + "/oauth/youtube/callback"))}</span></li>
       <li>Paste the client ID and secret above, save, then click <b>Connect YouTube</b> and allow access.</li>
       <li>Good to know: an app Google has not verified uploads videos as <b>private</b>, and the default quota allows about 6 uploads a day. See ${a(DOCS + "youtube-setup.md", "the YouTube setup guide")}.</li></ol></details></div>`;
 
@@ -116,6 +121,10 @@ async function renderCredentials() {
   if ($("#disconnect")) $("#disconnect").onclick = async () => { if (!confirm("Remove the LinkedIn token from this computer?")) return; await post("/api/credentials/disconnect"); renderCredentials(); };
   $("#save-app").onclick = () => { const body = { linkedin_client_id: $("#cid").value.trim() }; if ($("#csecret").value) body.linkedin_client_secret = $("#csecret").value.trim(); save(body, "App details saved"); };
   $("#yt-save").onclick = () => { const body = { youtube_client_id: $("#yt-cid").value.trim() }; if ($("#yt-csecret").value) body.youtube_client_secret = $("#yt-csecret").value.trim(); save(body, "YouTube app details saved"); };
+  if ($("#yt-finish")) $("#yt-finish").onclick = async () => { const url = $("#yt-paste").value.trim(); if (!url) { $("#yt-paste").focus(); return; }
+    $("#yt-finish").disabled = true;
+    try { const r = await post("/api/youtube/finish", { url }); toast(`YouTube connected${r.channel ? `: ${r.channel}` : ""}`); } catch (e) { toast(e.message, true); }
+    renderCredentials(); refreshOverview(); };
   $("#yt-check").onclick = async () => { $("#yt-check").disabled = true; try { await post("/api/credentials/check"); toast("Checked"); } catch (e) { toast(e.message, true); } renderCredentials(); refreshOverview(); };
   if ($("#yt-disconnect")) $("#yt-disconnect").onclick = async () => { if (!confirm("Disconnect the YouTube channel from this computer?")) return;
     try { await post("/api/credentials/disconnect", { app: "youtube" }); } catch (e) { toast(e.message, true); } renderCredentials(); };

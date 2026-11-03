@@ -239,3 +239,32 @@ class YouTubeStudioTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class YouTubeFinishTests(unittest.TestCase):
+    """A sign-in whose last redirect (to localhost) could not open is finished from the pasted address."""
+
+    def test_the_pasted_address_finishes_the_sign_in_and_a_bad_paste_is_refused(self):
+        from unittest import mock
+        from postcrew.studio.server import Studio
+        from postcrew import youtube
+        with TempWorkspace() as ws:
+            ws.update_secrets(youtube_client_id="cid", youtube_client_secret="secret")
+            st = Studio(ws)
+            with self.assertRaises(ValueError) as e:
+                st.youtube_finish({"url": "http://localhost:8765/nothing"})
+            self.assertIn("whole address", str(e.exception))
+            with self.assertRaises(ValueError):                                                  # a state this Studio never issued
+                st.youtube_finish({"url": "http://localhost:8765/oauth/youtube/callback?state=yt-forged&code=abc"})
+            state = "yt-" + "x" * 20
+            from datetime import datetime, timezone
+            st.oauth_states[state] = datetime.now(timezone.utc)
+            fake_channel = mock.Mock()
+            fake_channel.channel.return_value = {"title": "Dip-Dive"}
+            with mock.patch.object(youtube, "exchange_code", return_value={"refresh_token": "r1"}) as ex, \
+                    mock.patch.object(youtube, "YouTube", return_value=fake_channel), mock.patch("postcrew.studio.server.run_check"):
+                out = st.youtube_finish({"url": f"http://localhost:8765/oauth/youtube/callback?state={state}&code=4%2F0AbC&scope=x"})
+            self.assertEqual(out, {"channel": "Dip-Dive"})
+            self.assertEqual(ex.call_args[0][2], "4/0AbC")                                          # the code was taken from the pasted address, decoded
+            self.assertEqual(ws.secrets()["youtube_refresh_token"], "r1")
+            self.assertNotIn(state, st.oauth_states)                                                # a state works once
