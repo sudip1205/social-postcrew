@@ -33,6 +33,8 @@ def enqueue_youtube(ws, cfg, run_id, day, category, outputs, review):
     mode = cfg["publishing"]["approval"]
     if (outputs.get("hooks") or {}).get("unresolved"):   # a fault the Hooks agent could not fix: a person decides, whatever the approval setting
         mode = "manual"
+    if (outputs.get("quality") or {}).get("held"):   # the Quality Director still finds the picture weak after its redraws: a person decides
+        mode = "manual"
     post = {
         "id": pid, "platform": platform, "run_id": run_id, "date": day.isoformat(), "category": category,
         "topic": script["title"], "text": script["description"], "first_comment": "",
@@ -57,6 +59,10 @@ def enqueue_youtube(ws, cfg, run_id, day, category, outputs, review):
     gate = outputs.get("hooks")   # the Hooks agent's check of sound and frames (no AI)
     if gate:
         post["youtube"]["quality"] = {k: gate.get(k) for k in ("score", "repaired", "checked")}
+    q = outputs.get("quality")   # the Quality Director's verdict on the finished picture
+    if q:
+        post["youtube"]["picture"] = {k: q.get(k) for k in ("score", "scores", "summary", "held", "redrawn", "round", "vision")}
+        post["youtube"]["picture"]["notes"] = ([f["message"] for f in q.get("findings") or []] + list(q.get("problems") or []))[:10]
     check = outputs.get("video_review")   # the Video Editor's verdict on the finished video (blackboard videos)
     if check:
         post["youtube"]["video_review"] = {k: check.get(k) for k in ("verdict", "score", "first_score", "redrawn", "summary", "measured")}

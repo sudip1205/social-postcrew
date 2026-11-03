@@ -117,10 +117,13 @@ class Agent:
             text = text.replace("{{" + k + "}}", str(v))
         return text
 
-    def ask(self, ctx, system, prompt, schema, tools=(), member=None, agent_id=None):
-        """member: a team member dict (their model, if any, overrides the agent's). agent_id: settings to use."""
+    def ask(self, ctx, system, prompt, schema, tools=(), member=None, agent_id=None, images=()):
+        """member: a team member dict (their model, if any, overrides the agent's). agent_id: settings to use.
+        images: picture files the model looks at (the Quality Director's frames)."""
         aid = agent_id or self.id
         kw = {"member": member["id"]} if member else {}
+        if images:
+            kw["images"] = [str(p) for p in images]
         if member and member.get("model"):
             kw["model"] = member["model"]
         try:

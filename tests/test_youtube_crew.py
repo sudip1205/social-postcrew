@@ -229,7 +229,8 @@ class YouTubeCrewTests(unittest.TestCase):
             steps = json.loads((ws.runs_dir / res["run_id"] / "status.json").read_text())["steps"]
             self.assertEqual({k: v["state"] for k, v in steps.items()},
                              {**{s: "passed" for s in ("credentials", "topic", "research", "writer", "editor", "voice", "media",
-                                                      "hooks", "publisher")}, "video_review": "skipped", "graphics": "skipped"})   # slides videos: no second review, no icons
+                                                      "hooks", "quality", "publisher")}, "video_review": "skipped", "graphics": "skipped",
+                              "direction": "skipped"})   # slides videos: no second review, no icons, no visual plan; the picture is still watched
             self.assertEqual(llm.agents_called().count("editor"), 3)      # reviewed like any post
             post = ws.queue()[0]
             self.assertEqual((post["platform"], post["status"], post["id"]), ("youtube", "awaiting_approval",

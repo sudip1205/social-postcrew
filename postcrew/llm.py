@@ -87,8 +87,12 @@ class ClaudeCode:
             cmd += ["--allowedTools", ",".join(tools)]
         return cmd, int(s.get("timeout_s", 600))
 
-    def call(self, agent_id, system, prompt, schema, tools=(), cwd=None, model=None, member=None):
-        """model: override the agent's model (a team member's own model). member: for logs and test doubles."""
+    def call(self, agent_id, system, prompt, schema, tools=(), cwd=None, model=None, member=None, images=()):
+        """model: override the agent's model (a team member's own model). member: for logs and test doubles.
+        images: picture files the model must look at; Claude Code opens them itself with its Read tool (read-only)."""
+        if images:
+            tools = list(tools) + ([] if "Read" in tools else ["Read"])
+            prompt += image_note(images)
         if not self.available():
             raise LLMError(f"Claude Code CLI '{self.binary}' not found. Install it (https://claude.com/claude-code) "
                            f"and run `claude` once to log in.", kind="not_installed")
@@ -134,6 +138,23 @@ SEARCH_USD = 0.01  # web search, per search (both providers charge about $10 per
 NO_SEARCH_NOTE = ("\n\nNOTE: web search is not available with this AI provider. Suggest only pages you are confident "
                   "exist (official announcements, docs, release notes, repositories); every page is downloaded and "
                   "checked, and pages that do not exist are rejected.")
+
+
+def image_note(images):
+    return ("\n\nIMAGES: open and look at every one of these picture files with the Read tool before you answer (they are the "
+            "frames you are judging):\n" + "\n".join(f"- {p}" for p in images))
+
+
+def image_parts(images):
+    """[(media_type, base64)] for picture files sent inline to an API."""
+    import base64
+    out = []
+    for p in images:
+        with open(p, "rb") as f:
+            data = f.read()
+        kind = "image/jpeg" if str(p).lower().endswith((".jpg", ".jpeg")) else "image/png"
+        out.append((kind, base64.b64encode(data).decode()))
+    return out
 
 
 def parse_json(text):
@@ -213,11 +234,12 @@ class APIBackend:
         return (self.model_id(agent_id, model), int(s.get("timeout_s", 600)), float(s.get("max_budget_usd", 1.0)),
                 int(self.api.get("max_output_tokens", 16000)))
 
-    def call(self, agent_id, system, prompt, schema, tools=(), cwd=None, model=None, member=None):
+    def call(self, agent_id, system, prompt, schema, tools=(), cwd=None, model=None, member=None, images=()):
         if not self.available():
             raise LLMError(f"no {self.name} API key: add it in Studio > Credentials (or set {KEY_ENV[self.name]})",
                            kind="auth")
         t0 = time.time()
+        self.images = image_parts(images) if images else []   # pictures sent with the prompt (vision models only)
         res = self.ask(agent_id, system, prompt, schema, list(tools), model)
         res.duration_s = round(time.time() - t0, 1)
         return res
@@ -240,7 +262,8 @@ class Anthropic(APIBackend):
         # The system prompt (rubric, voice, facts about you) is the same on every call an agent makes in a run, so
         # it is cached: a repeat read costs a tenth. The Editor sends the same whole request several times.
         ephemeral = {"type": "ephemeral"}
-        content = [{"type": "text", "text": prompt, **({"cache_control": ephemeral} if agent_id == "editor" else {})}]
+        content = [{"type": "image", "source": {"type": "base64", "media_type": k, "data": d}} for k, d in getattr(self, "images", [])]
+        content += [{"type": "text", "text": prompt, **({"cache_control": ephemeral} if agent_id == "editor" else {})}]
         messages, cost, turns, force = [{"role": "user", "content": content}], 0.0, 0, not search
         system_blocks = [{"type": "text", "text": system, "cache_control": ephemeral}]
         while turns < 8:
@@ -276,7 +299,10 @@ class OpenAI(APIBackend):
 
     def ask(self, agent_id, system, prompt, schema, tools, model):
         model, timeout, budget, max_tokens = self.settings(agent_id, model)
-        body = {"model": model, "instructions": system, "input": prompt, "max_output_tokens": max_tokens,
+        pics = getattr(self, "images", [])
+        user = ([{"role": "user", "content": [{"type": "input_image", "image_url": f"data:{k};base64,{d}"} for k, d in pics]
+                  + [{"type": "input_text", "text": prompt}]}] if pics else prompt)
+        body = {"model": model, "instructions": system, "input": user, "max_output_tokens": max_tokens,
                 "text": {"format": {"type": "json_schema", "name": "answer", "schema": schema, "strict": False}}}
         if "WebSearch" in tools:
             body["tools"] = [{"type": "web_search"}]
@@ -305,7 +331,10 @@ class OpenAICompatible(APIBackend):
         model, timeout, budget, max_tokens = self.settings(agent_id, model)
         if "WebSearch" in tools:
             prompt += NO_SEARCH_NOTE
-        messages = [{"role": "system", "content": system}, {"role": "user", "content": prompt}]
+        pics = getattr(self, "images", [])
+        user = ([{"type": "image_url", "image_url": {"url": f"data:{k};base64,{d}"}} for k, d in pics]
+                + [{"type": "text", "text": prompt}]) if pics else prompt
+        messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
         body = {"model": model, "messages": messages, "max_tokens": max_tokens,
                 "response_format": {"type": "json_schema", "json_schema": {"name": "answer", "schema": schema}}}
         try:

@@ -149,6 +149,7 @@ Every tab, panel and button is explained in the [Studio guide](https://github.co
 | [Connect LinkedIn](https://github.com/sudip1205/social-postcrew/blob/main/docs/linkedin-setup.md) | the developer app, OAuth, token expiry, the first comment |
 | [Connect YouTube](https://github.com/sudip1205/social-postcrew/blob/main/docs/youtube-setup.md) | the Google app, OAuth, quota, unverified-app limits |
 | [YouTube videos](https://github.com/sudip1205/social-postcrew/blob/main/docs/video-and-voice.md) | script, ElevenLabs voice, Short or long, diagram and blackboard videos, ideas with context, your own files, animation MCP |
+| [Motion Studio](https://github.com/sudip1205/social-postcrew/blob/main/docs/motion-studio.md) | the Creative Director, the Quality Director that watches every video, learning a house style from your reference videos, feedback |
 | [Studio guide](https://github.com/sudip1205/social-postcrew/blob/main/docs/studio-guide.md) | every tab and button |
 | [Configuration reference](https://github.com/sudip1205/social-postcrew/blob/main/docs/configuration.md) | every setting in `config.json`, categories, secrets, the workspace folder, prompts |
 | [The crew](https://github.com/sudip1205/social-postcrew/blob/main/docs/agents.md) | each agent, the review loop, memory, the roster |

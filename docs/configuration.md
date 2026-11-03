@@ -100,6 +100,11 @@ Same `schedule`, `planning`, `categories` and `publishing` keys as above, plus:
 | `video.voice` | see below | `provider` (`elevenlabs`), `voice_id`, `voice_name`, `model` (`eleven_multilingual_v2`), `speed` (0.7-1.2). |
 | `video.renderer` | `"ffmpeg"` | `ffmpeg` (slides and captions) or `mcp` (an animation MCP server, with `video.mcp` = `command`, `args`, `tool`, `timeout_s`). |
 | `video.captions` | `true` | Burn captions into the video. |
+| `video.motion.director` | `true` | The Creative Director plans every scene's picture before it is drawn ([Motion Studio](motion-studio.md)). |
+| `video.motion.quality` | `true` | The Quality Director watches the finished video and redraws weak scenes. |
+| `video.motion.min_score` | `75` | Picture score (0-100) under which weak scenes are redesigned and drawn again with the same voice. |
+| `video.motion.max_redraws` | `1` | How many times a run may redraw (0-3). |
+| `video.motion.hold_below` | `60` | A video still under this score waits for your approval, whatever the approval setting. |
 
 A YouTube topic (category) takes the usual keys (`label`, `brief`, `research`, `fact_check`, `ideas`, `max_source_age_days`) with
 `"media": "video"`, and may set its own `format` and `target_seconds`. YouTube starts with no topics: create yours in Settings > Topics

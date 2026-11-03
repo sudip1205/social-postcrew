@@ -31,6 +31,8 @@ from .frames import HyperFramesAgent, RemotionAgent, RemotionFramesAgent
 from .hooks import HooksAgent
 from .video import VideoAgent
 from .video_review import VideoReviewAgent
+from .direction import CreativeDirectorAgent
+from .quality import QualityDirectorAgent
 from .voice import VoiceAgent
 from .writer import WriterAgent
 
@@ -38,8 +40,10 @@ CREW = [CredentialsAgent(), TopicAgent(), ResearchAgent(), WriterAgent(), MediaA
         FormatterAgent(), PublisherAgent()]
 # The YouTube crew: the same supervisor, topic scout, researchers, writer team (as the Script Writer) and Editor. The Editor
 # reviews the SCRIPT, so the voice and the video are only made after it passes: nothing is spent on a script sent back.
-YOUTUBE_CREW = [CredentialsAgent(), TopicAgent(), ResearchAgent(), ScriptWriter(), EditorAgent(), GraphicsAgent(), VoiceAgent(), VideoAgent(),
-                VideoReviewAgent(), HooksAgent(), PublisherAgent()]
+# Motion Studio: the Creative Director plans every scene's picture before the Storyboard Artist draws it; the Quality Director watches the
+# finished video and sends weak scenes back to be drawn again (the voice is reused).
+YOUTUBE_CREW = [CredentialsAgent(), TopicAgent(), ResearchAgent(), ScriptWriter(), EditorAgent(), CreativeDirectorAgent(), GraphicsAgent(),
+                VoiceAgent(), VideoAgent(), VideoReviewAgent(), HooksAgent(), QualityDirectorAgent(), PublisherAgent()]
 CREWS = {"linkedin": CREW, "youtube": YOUTUBE_CREW}
 ORDER = [a.id for a in CREW]
 FIXABLE = ["topic", "research", "writer", "voice", "text_frames", "data_frames", "media"]   # steps the supervisor may send work back to
@@ -265,6 +269,10 @@ class Supervisor:
 
     def _diagnose(self, ctx, step, problems, out, attempts):
         """Ask the supervisor model what to do. Deterministic fallback when it is unavailable."""
+        if step == "quality":   # the Quality Director already redesigned the weak scenes: draw the video again, the voice is kept
+            first = next((s for s in ("text_frames", "data_frames", "media") if s in self.order), "media")
+            return {"action": "rewind", "target": first, "instructions": problems[:6],
+                    "reason": "the Quality Director redesigned weak scenes: drawing the video again with the same voice"}
         default_target = step
         if step == "editor" and out:
             default_target = out.get("fix_owner") if out.get("fix_owner") in FIXABLE else "writer"

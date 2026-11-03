@@ -98,6 +98,10 @@ class GraphicsAgent(Agent):
             secs = len((sc.get("narration") or "").split()) / wps
             now = {k: sc.get(k) for k in VISUAL_KEYS if sc.get(k)}
             lines.append(f"SCENE {i} [{sc.get('part') or '-'}] about {secs:.0f}s\n  narration: {sc.get('narration', '')}\n  picture now: {now}")
+            d = sc.get("direction") or {}
+            if d.get("visual"):   # the Creative Director's plan for this scene
+                lines.append(f"    DIRECTOR: {d.get('purpose', '')}; show {d['visual']}; focus on {d.get('focus', '')}; "
+                             f"beats: {' > '.join(d.get('beats') or [])}; layout {d.get('layout', '')}")
             for n in sc.get("nodes") or []:
                 label = label_of(n)
                 lines.append(f"    icons for box '{label}': {', '.join(h['id'] for h in iconlib.search(label, 5)) or '(none found: pick one yourself)'}")

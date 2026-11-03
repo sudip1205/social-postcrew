@@ -199,6 +199,8 @@ def main(argv=None):
     pi = sub.add_parser("plan-import", help="load per-day topic briefs from a text file")
     pi.add_argument("file")
     pi.add_argument("--apply-schedule", action="store_true", help="also schedule each day's category on that weekday")
+    from .motion import cli as motion_cli
+    motion_cli.add_parser(sub)
     a = ap.parse_args(argv)
 
     if a.cmd == "demo" and not a.workspace:
@@ -206,6 +208,8 @@ def main(argv=None):
     ws = Workspace(a.workspace).init()
     if a.cmd == "demo":
         return cmd_demo(ws, a.port, browser=not a.no_browser)
+    if a.cmd == "motion":
+        return motion_cli.run(ws, a)
     if a.cmd == "init":
         print(f"Workspace ready: {ws.root}\nNext: python3 -m postcrew serve, then open http://localhost:8765")
         return 0

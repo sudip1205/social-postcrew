@@ -105,6 +105,15 @@ def _validate_video(v, pre):
         errs.append(f"{pre}video.mcp.args must be a list of strings")
     if not (isinstance(mcp.get("timeout_s", 600), int) and 30 <= mcp.get("timeout_s", 600) <= 3600):
         errs.append(f"{pre}video.mcp.timeout_s must be 30-3600 seconds")
+    mo = v.get("motion") or {}
+    for k in ("director", "quality"):
+        if not isinstance(mo.get(k, True), bool):
+            errs.append(f"{pre}video.motion.{k} must be true or false")
+    for k, d in (("min_score", 75), ("hold_below", 60)):
+        if not (isinstance(mo.get(k, d), int) and 0 <= mo.get(k, d) <= 100):
+            errs.append(f"{pre}video.motion.{k} must be a score 0-100")
+    if not (isinstance(mo.get("max_redraws", 1), int) and 0 <= mo.get("max_redraws", 1) <= 3):
+        errs.append(f"{pre}video.motion.max_redraws must be 0-3")
     return errs
 
 

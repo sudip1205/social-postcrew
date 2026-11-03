@@ -76,8 +76,9 @@ class ScriptedLLM:
         self.cost = cost
         self.lock = __import__("threading").Lock()
 
-    def call(self, agent_id, system, prompt, schema, tools=(), cwd=None, model=None, member=None):
+    def call(self, agent_id, system, prompt, schema, tools=(), cwd=None, model=None, member=None, images=()):
         with self.lock:
+            self.images = list(images)
             return self._call(agent_id, system, prompt, schema, tools, model, member)
 
     def _call(self, agent_id, system, prompt, schema, tools, model, member):

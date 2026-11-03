@@ -14,7 +14,8 @@ from .workspace import write_json
 
 # The order steps appear in the workflow graph.
 STEPS = ["credentials", "topic", "research", "writer", "media", "editor", "formatter", "publisher"]
-YOUTUBE_STEPS = ["credentials", "topic", "research", "writer", "editor", "graphics", "voice", "media", "video_review", "hooks", "publisher"]
+YOUTUBE_STEPS = ["credentials", "topic", "research", "writer", "editor", "direction", "graphics", "voice", "media", "video_review", "hooks",
+                 "quality", "publisher"]
 STATES = ["pending", "running", "passed", "failed", "retrying", "skipped", "blocked", "waiting"]
 
 

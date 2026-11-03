@@ -68,7 +68,7 @@ class Demo:
     def available(self):
         return True
 
-    def call(self, agent_id, system, prompt, schema, tools=(), cwd=None, model=None, member=None):
+    def call(self, agent_id, system, prompt, schema, tools=(), cwd=None, model=None, member=None, images=()):
         self.sleep(self.pause_s)
         data = self.answer(agent_id, prompt, schema)
         if data is None:

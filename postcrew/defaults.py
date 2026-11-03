@@ -4,7 +4,8 @@ Everything here can be changed in the Studio (Settings tab) or by editing config
 Secrets (LinkedIn app, tokens, Telegram) never live here; they go to workspace/secrets.json.
 """
 
-AGENT_IDS = ["planner", "topic", "research", "writer", "reviewer", "media", "editor", "formatter", "publisher", "supervisor", "credentials", "video_review", "explainroo", "graphics"]
+AGENT_IDS = ["planner", "topic", "research", "writer", "reviewer", "media", "editor", "formatter", "publisher", "supervisor", "credentials", "video_review", "explainroo", "graphics",
+             "direction", "quality", "motion"]
 
 DEFAULT_CONFIG = {
     "version": 1,
@@ -87,6 +88,9 @@ DEFAULT_CONFIG = {
                 # renderer "remotion": the project shipped in postcrew/remotion; `path` points at your own copy of it
                 "remotion": {"path": ""},
                 "captions": True,
+                # Motion Studio: the Creative Director plans the pictures, the Quality Director watches the finished video. A video under
+                # min_score is redrawn (at most max_redraws times, same voice); one still under hold_below waits for your approval
+                "motion": {"director": True, "quality": True, "min_score": 75, "max_redraws": 1, "hold_below": 60},
             },
             "categories": {},   # the topics you create in Settings > Topics (YOUTUBE_EXAMPLE_TOPICS has four to copy from)
         },
@@ -130,6 +134,9 @@ DEFAULT_CONFIG = {
             "editor": {"model": "sonnet", "timeout_s": 300, "max_budget_usd": 0.4},
             "graphics": {"model": "sonnet", "timeout_s": 600, "max_budget_usd": 0.8},   # the Storyboard Artist: icons and cliparts for every scene
             "video_review": {"model": "sonnet", "timeout_s": 300, "max_budget_usd": 0.4},   # the Video Editor, after the video is drawn
+            "direction": {"model": "sonnet", "timeout_s": 400, "max_budget_usd": 0.6},   # Creative Director: plans every scene's picture
+            "quality": {"model": "sonnet", "timeout_s": 400, "max_budget_usd": 0.8},     # Quality Director: looks at the finished frames
+            "motion": {"model": "sonnet", "timeout_s": 900, "max_budget_usd": 1.0},      # Motion Studio: reference analysis, house style
             "explainroo": {"model": "sonnet", "timeout_s": 900, "max_budget_usd": 2.0},   # writes the pictures of an explainroo video
             "supervisor": {"model": "haiku", "timeout_s": 180, "max_budget_usd": 0.2},
         },
