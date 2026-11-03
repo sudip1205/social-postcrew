@@ -151,6 +151,9 @@ def build_props(scenes, fmt, audio, look=None):
     if fmt not in FORMATS:
         raise VideoError(f"unknown format '{fmt}'")
     lengths = video._scene_lengths(scenes, audio)
+    for i, sc in enumerate(scenes):   # a code-and-picture scene stays up until its picture has run at a pace the viewer can follow (the voice is padded with silence)
+        if sc.get("layout") == "codeviz" and isinstance(sc.get("viz"), dict) and not codeviz.problems(sc["viz"], sc.get("code"), i + 1):
+            lengths[i] = max(lengths[i], codeviz.min_seconds(sc["viz"]))
     out, carry = [], {"nodes": []}
     for i, (sc, ln) in enumerate(zip(scenes, lengths)):
         a = audio[i] if isinstance(audio, (list, tuple)) else None

@@ -216,13 +216,17 @@ def split_long_scenes(scenes, spec):
             continue
         sentences = re.findall(r"[^.!?]+[.!?]+\s*|[^.!?]+$", sc["narration"])
         chunks, cur = [], ""
-        for sent in sentences:
-            if cur and len((cur + sent).split()) > cap_words:
+        if sc.get("layout") in PLAIN_LAYOUTS and len(sentences) >= 2:   # a words-only scene is cut in two, at the sentence nearest the middle: three cards of text in a row is what the storyboard rules refuse
+            cut = min(range(1, len(sentences)), key=lambda k: abs(len("".join(sentences[:k]).split()) - len(words) / 2))
+            chunks = ["".join(sentences[:cut]).strip(), "".join(sentences[cut:]).strip()]
+        else:
+            for sent in sentences:
+                if cur and len((cur + sent).split()) > cap_words:
+                    chunks.append(cur.strip())
+                    cur = ""
+                cur += sent
+            if cur.strip():
                 chunks.append(cur.strip())
-                cur = ""
-            cur += sent
-        if cur.strip():
-            chunks.append(cur.strip())
         for i, text in enumerate(chunks):
             part = dict(sc, narration=text)
             if i:
@@ -374,6 +378,8 @@ def script_problems(script, spec, cat, profile):
             code_problem = check_code(sc.get("code") or "", sc.get("language") or "")
             if code_problem:
                 problems.append(f"scene {i}: {code_problem}")
+            elif len((sc.get("narration") or "").split()) < 28:
+                problems.append(f"scene {i}: a codeviz scene narrates its picture as it runs: at least 28 words (the tree growing, the repeated calls, the memo hits, the table filling, in order)")
             elif len((sc.get("code") or "").strip().splitlines()) > 12:
                 problems.append(f"scene {i}: the code of a codeviz scene is at most 12 lines: it shares the screen with its picture")
             problems += codeviz.problems(sc.get("viz"), sc.get("code"), i)

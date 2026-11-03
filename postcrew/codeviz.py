@@ -139,6 +139,14 @@ def problems(v, code, n):
     return out
 
 
+def min_seconds(v):
+    """How long the scene must stay up for its picture to be followed: every step at a readable pace, and a rest at the end."""
+    if v.get("kind") == "calls":
+        sim, _ = simulate_calls(v)
+        return START_S + 0.3 * len(sim["events"]) + TAIL_S
+    return START_S + 0.6 * (int(v["n"]) + 1) + TAIL_S
+
+
 def _layout(nodes):
     """x in 0..1 (leaves spread, a parent above the middle of its children) and the depth of every node."""
     kids = {i: [] for i in range(len(nodes))}

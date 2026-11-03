@@ -72,7 +72,7 @@ class TheChecks(unittest.TestCase):
         self.assertEqual(codeviz.problems(dict(MEMOIZED, n=9), MEMO, 2), [])   # a memo stays small at 9
 
     def test_a_codeviz_scene_in_a_script(self):
-        scene = {"layout": "codeviz", "part": "idea", "narration": "Watch the tree grow.", "on_screen": "Plain recursion", "items": [], "code": REC, "language": "python",
+        scene = {"layout": "codeviz", "part": "idea", "narration": "Let us write the plain version and watch the tree of calls grow. See the glowing calls? The same stair is solved again and again, and that repeated work is the problem we will fix next.", "on_screen": "Plain recursion", "items": [], "code": REC, "language": "python",
                  "nodes": [], "edges": [], "cells": [], "steps": [], "seconds": 0, "viz": PLAIN}
         spec = platforms.video_spec({"video": {"format": "short", "target_seconds": 90, "renderer": "remotion", "outro": OUTRO}})
         problems = checks.script_problems(finish({"title": "Climbing stairs, step by step", "description": "x" * 60, "tags": ["a", "b", "c"], "thumbnail_text": "Stairs", "scenes": [scene]}),
@@ -130,6 +130,28 @@ class TheProps(unittest.TestCase):
     def test_it_is_drawn_by_remotion_and_a_short_is_dark_blue(self):
         self.assertEqual(hf.engine_for({"layout": "codeviz"}), "remotion")
         self.assertEqual(looks.theme(None, "short")["name"], "neon")
+
+    def test_a_short_scene_stays_up_until_its_picture_has_run(self):
+        scene = {"layout": "codeviz", "on_screen": "Plain recursion", "narration": "Watch the tree grow.", "code": REC, "language": "python", "items": [], "viz": PLAIN, "seconds": 3}
+        props, lengths = rm.build_props([scene], "short", None, look="neon")
+        self.assertGreaterEqual(lengths[0], codeviz.min_seconds(PLAIN))
+        self.assertAlmostEqual(props["scenes"][0]["seconds"], lengths[0], places=2)
+        times = [e["t"] for e in props["scenes"][0]["viz"]["events"]]
+        self.assertGreater(times[1] - times[0], 0.25)   # a pace the viewer can follow
+
+    def test_a_codeviz_scene_needs_words_for_its_picture(self):
+        spec = platforms.video_spec({"video": {"format": "short", "target_seconds": 90, "renderer": "remotion", "outro": OUTRO}})
+        scene = {"layout": "codeviz", "part": "idea", "narration": "Watch the tree grow.", "on_screen": "Plain recursion", "items": [], "code": REC, "language": "python",
+                 "nodes": [], "edges": [], "cells": [], "steps": [], "seconds": 0, "viz": PLAIN}
+        got = checks.script_problems(finish({"title": "Climbing stairs, step by step", "description": "x" * 60, "tags": ["a", "b", "c"], "thumbnail_text": "Stairs", "scenes": [scene]}),
+                                     spec, {"id": "s", "label": "Short", "kicker": "S"}, {})
+        self.assertTrue(any("at least 28 words" in p for p in got))
+
+    def test_words_only_scenes_are_split_in_two_at_most(self):
+        intro = {"layout": "title", "part": "intro", "narration": "Have you ever written a function that works for five and then crawls for bigger numbers? Picture a library at the top of a staircase climbed one or two steps at a time. We will solve it three ways, slowly, and watch what each one does."}
+        out = checks.split_long_scenes([intro], {"format": "short", "wps": 2.5})
+        self.assertLessEqual(len(out), 2)
+        self.assertEqual(" ".join(sc["narration"] for sc in out), intro["narration"])
 
     def test_the_storyboard_artist_never_redraws_it(self):
         scenes = [{"layout": "codeviz", "part": "idea", "narration": "x", "viz": PLAIN, "code": REC, "on_screen": "Plain recursion", "items": [], "nodes": [], "edges": [], "cells": [], "steps": [], "language": "python"}]
