@@ -86,8 +86,10 @@ def _validate_video(v, pre):
         errs.append(f"{pre}video.target_seconds must be {_SECONDS_HINT}")
     if v.get("pace", "normal") not in ("slow", "normal"):
         errs.append(f"{pre}video.pace must be slow or normal")
-    if v.get("look", "auto") not in ("auto", "paper", "ink"):
-        errs.append(f"{pre}video.look must be auto, paper (off-white) or ink (black)")
+    if v.get("look", "auto") not in ("auto", "paper", "ink", "neon"):
+        errs.append(f"{pre}video.look must be auto, paper (off-white), ink (black) or neon (dark blue)")
+    if v.get("short_style", "quiz") not in ("quiz", "classic"):
+        errs.append(f"{pre}video.short_style must be quiz (A-or-B rounds) or classic (a taught walk-through)")
     if v.get("renderer") not in RENDERERS:
         errs.append(f"{pre}video.renderer must be one of {RENDERERS}")
     voice = v.get("voice") or {}

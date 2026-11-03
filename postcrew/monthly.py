@@ -449,9 +449,9 @@ def _item(pool, item_id):
     raise ValueError("that plan no longer exists")
 
 
-BRIEF_SHORT = ("A vertical hands-on Short taught like a calm, caring professor to students: it SOLVES one concrete problem or BUILDS one small thing live. State the "
-               "problem or the goal with a real input, build it in a few small steps (code or a diagram that grows, one running example with numbers), RUN it and show the "
-               "result, show the common mistake, and end kindly. Whole spoken sentences, never clipped notes, never interview advice.")
+BRIEF_SHORT = ("A vertical A-or-B quiz Short about one hands-on topic (solve a problem or build a thing): a spoken introduction that states the problem, then three to five rounds in which "
+               "two real ways of doing the same job run side by side (a nested loop against a hash map, a cache against a database, a linear scan against binary search, O of n against O of n "
+               "squared) and the viewer picks the better one, ending on the common mistake, then the answer key. The topic must have comparisons a student can guess, never interview advice.")
 BRIEF_LONG = ("A 16:9 hands-on class by a calm, caring professor for students: it SOLVES one concrete problem or BUILDS one concrete thing from start to finish. Begin with the "
               "problem the student has, draw the plan, then build it step by step (code in an editor window with its output, or a growing diagram), explaining what, why and how "
               "for every part, run it and show it working, break it on purpose and fix it, check in with the class, and finish with a short recap. Never interview advice.")

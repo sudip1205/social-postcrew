@@ -273,6 +273,14 @@ words in `script.md` are checked against the approved script, so the picture age
 `theme` (paper, clean, chalk, blueprint, midnight, editorial), `music`, `watermark` (explainroo asks you to keep its small credit),
 `review`. The Video Editor step is skipped: explainroo does its own checks.
 
+### The quiz Short
+
+Every Short is an A-or-B quiz: an introduction that states the problem, three to five rounds (two tiles that play the same task side by side, a spoken
+countdown, then the answer and the reason), and a closing card with the answer key. A tile is a `trace` (cells and the steps over them), a `link`
+(packets between two boxes, with the milliseconds one takes), a `curve` (how work grows) or `bars`. The shape and its checks live in `postcrew/quiz.py`,
+the writer prompt in `postcrew/prompts/youtube/writer_quiz.md`, and the scene is drawn by `postcrew/remotion/src/Versus.tsx` in the dark `neon` look.
+`video.short_style: "classic"` brings back the taught walk-through; a long video is never a quiz.
+
 ### The look of a video
 
 Videos are drawn on a flat page: white for a vertical video and black for a wide one (**Settings > YouTube > Video look**: Automatic, or

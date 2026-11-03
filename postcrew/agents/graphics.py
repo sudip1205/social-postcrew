@@ -87,7 +87,8 @@ class GraphicsAgent(Agent):
             "every box, a clipart beside every words scene. Never touches the narration.")
 
     def applies(self, ctx):
-        return (ctx.video.get("renderer") == "remotion" and bool((ctx.cfg.get("video") or {}).get("graphics", True)) and iconlib.available())
+        return (ctx.video.get("renderer") == "remotion" and not ctx.video.get("quiz") and   # a quiz Short is drawn by its rounds: the writer already made every picture
+                bool((ctx.cfg.get("video") or {}).get("graphics", True)) and iconlib.available())
 
     # ---------- what the artist is shown ----------
     @staticmethod

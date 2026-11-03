@@ -10,6 +10,7 @@ import shutil
 import subprocess
 from pathlib import Path
 
+from .. import quiz
 from . import iconlib, looks, timeline, video
 from .scenes import FORMATS, edge_marks, node_extra, parse_edge, parse_pointer, split_node
 from .video import FPS, VideoError
@@ -151,6 +152,7 @@ def build_props(scenes, fmt, audio, look=None):
         raise VideoError(f"unknown format '{fmt}'")
     lengths = video._scene_lengths(scenes, audio)
     out, carry = [], {"nodes": []}
+    rounds = sum(1 for sc in scenes if sc.get("layout") == "versus")
     for i, (sc, ln) in enumerate(zip(scenes, lengths)):
         a = audio[i] if isinstance(audio, (list, tuple)) else None
         words = _times(sc, ln, a)
@@ -165,6 +167,12 @@ def build_props(scenes, fmt, audio, look=None):
             parts = [p for p in re.split(r"\s*[·•|,/]\s*|\s+and\s+", item["title"]) if p] or [item["title"]]
             item.update(closing=True, items=parts, cues=[_when(p, words, float(sc.get("lead_s") or 0)) for p in parts],
                         buttons=[_button(p) for p in parts])
+        if layout == "versus":   # a quiz round: two tiles that play together, the countdown, the answer (postcrew/quiz.py)
+            item.update(versus=quiz.versus_props(sc, words, sum(1 for x in scenes[:i + 1] if x.get("layout") == "versus"), rounds, ln), captions=[])
+        if rounds and (layout == "versus" or sc.get("closing") or i == 0):
+            item["engine"] = "remotion"
+        if sc.get("closing") and rounds:   # the closing card of a quiz carries the answer key
+            item["answers"] = quiz.answers(scenes)
         if layout == "stat":
             item["cues"] = [_when(sc.get("on_screen"), words)]
         if sc.get("clip") and iconlib.svg(sc["clip"]):   # a clipart beside a words scene

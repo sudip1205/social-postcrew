@@ -77,7 +77,7 @@ class RemotionTests(unittest.TestCase):
     def test_a_look_is_off_white_or_black_with_one_accent(self):
         from postcrew.render import looks
         self.assertEqual(looks.theme("ink")["name"], "ink")
-        self.assertEqual(looks.theme("neon", "short")["name"], "paper")   # an unknown look is chosen by the format
+        self.assertEqual(looks.theme("sepia", "short")["name"], "paper")   # an unknown look is chosen by the format
         self.assertEqual(looks.theme(None, "long")["name"], "ink")
         for name, t in looks.LOOKS.items():
             r, g, b = (int(t["bg"][i:i + 2], 16) for i in (1, 3, 5))
@@ -93,7 +93,7 @@ class RemotionTests(unittest.TestCase):
         self.assertEqual(k["positive"], "#FA7900")      # there is no green on black: what was found is orange
         self.assertEqual((looks.resolve("auto", "short"), looks.resolve("auto", "long")), ("paper", "ink"))   # white vertical, black wide
         self.assertEqual((looks.resolve("ink", "short"), looks.resolve("paper", "long")), ("ink", "paper"))  # unless chosen
-        self.assertEqual(looks.resolve("neon", "long"), "ink")
+        self.assertEqual(looks.resolve("sepia", "long"), "ink")
         base = {"video": {"format": "short", "look": "auto"}}
         self.assertEqual(platforms.video_spec(base)["look"], "paper")
         self.assertEqual(platforms.video_spec(base, {"format": "long"})["look"], "ink")

@@ -12,7 +12,7 @@ import json
 
 from .. import assets as assets_mod
 from .. import brief as briefmod
-from .. import platforms
+from .. import platforms, quiz
 from .. import checks as checks_mod
 from ..checks import PARTS, repeat_problem, script_problems
 from . import team
@@ -38,7 +38,7 @@ STEP = {
 SCENE = {
     "type": "object",
     "properties": {
-        "layout": {"type": "string", "enum": ["title", "statement", "points", "code", "diagram", "trace", "flow", "stat"]},
+        "layout": {"type": "string", "enum": ["title", "statement", "points", "code", "diagram", "trace", "flow", "stat", "versus"]},
         "part": {"type": "string", "enum": list(PARTS),
                  "description": "which part of the video this scene is: intro (the problem), idea (the solution), example (worked example), mistake (a common mistake to avoid), closing (the like, comment, share card)"},
         "narration": {"type": "string", "description": "what the voice says; spoken sentences, no markdown"},
@@ -53,9 +53,10 @@ SCENE = {
                   "description": "trace: the example data, e.g. an array: ['2','7','11','15'] (at most 6 characters each)"},
         "steps": {"type": "array", "maxItems": 12, "items": STEP,
                   "description": "trace: what happens to the data, one entry per move, in the order the voice says it"},
+        "versus": quiz.VERSUS,
         "seconds": {"type": "number"},
     },
-    "required": ["layout", "part", "narration", "on_screen", "items", "code", "language", "nodes", "edges", "cells", "steps", "seconds"],
+    "required": ["layout", "part", "narration", "on_screen", "items", "code", "language", "nodes", "edges", "cells", "steps", "seconds"],   # versus: only a quiz round has one
     "additionalProperties": False,
 }
 SCHEMA = {
@@ -72,6 +73,8 @@ SCHEMA = {
 
 FORMAT_RULES = {
     "short": "A vertical 9:16 Short (up to 3 minutes): a short introduction that opens with the problem, then one idea built up scene by scene.",
+    "quiz": "A vertical 9:16 Short made as a quiz: a spoken introduction that states the problem, three to five rounds (layout 'versus') in which two ways of doing "
+            "the same thing run side by side and the viewer picks the better one, then the closing card with the answer key.",
     "long": "A 16:9 video: open with a short introduction (about 15 seconds), then one idea per scene (about 4-12 scenes per ten minutes), "
             "and finish with one clear next step.",
 }
@@ -83,7 +86,7 @@ def script_revision_block(ctx, guidance, prev=None):
     if not (guidance and prev and prev.get("scenes")):
         return ""
     keep = {k: prev.get(k) for k in ("title", "description", "tags", "thumbnail_text")}
-    keep["scenes"] = [{k: sc.get(k) for k in ("layout", "part", "narration", "on_screen", "items", "code", "language", "nodes", "edges", "cells", "steps") if sc.get(k) not in (None, "", [])}
+    keep["scenes"] = [{k: sc.get(k) for k in ("layout", "part", "narration", "on_screen", "items", "code", "language", "nodes", "edges", "cells", "steps", "versus") if sc.get(k) not in (None, "", [])}
                       for sc in prev["scenes"]]
     return ("\n\nYOUR PREVIOUS SCRIPT was sent back. REVISE it: keep every scene that is fine exactly as it is, and change only what the points below require "
             "(the picture fields of a scene you do not touch stay as they are). Do not add new claims while fixing.\n<previous_script>\n"
@@ -95,6 +98,8 @@ def finish(script):
     scenes = []
     for sc in script.get("scenes") or []:
         sc = dict(sc)
+        if sc.get("layout") == "versus":   # a quiz round is spoken as its question, the countdown and its explanation
+            sc["narration"] = quiz.compose(sc)
         sc["narration"] = " ".join((sc.get("narration") or "").split())
         sc["items"] = [i for i in sc.get("items") or [] if i]
         sc["nodes"] = [n.strip() for n in sc.get("nodes") or [] if n and n.strip()]
@@ -150,8 +155,8 @@ class ScriptWriter(WriterAgent):
     def _draft(self, ctx, guidance, member, prev=None):
         topic, spec = ctx.outputs["topic"], ctx.video
         lo, hi = spec.get("min_words", int(spec["max_words"] * 0.7)), spec["max_words"]
-        system = (self.prompt(ctx, format=spec["format"], target_seconds=spec["target_seconds"], min_words=lo, max_words=hi,
-                              format_rules=FORMAT_RULES[spec["format"]], wps=spec.get("wps", 2.5), outro=spec.get("outro") or "(none: end with one clear next step)",
+        system = (self.prompt(ctx, "writer_quiz" if spec.get("quiz") else None, format=spec["format"], target_seconds=spec["target_seconds"], min_words=lo, max_words=hi,
+                              format_rules=FORMAT_RULES["quiz" if spec.get("quiz") else spec["format"]], wps=spec.get("wps", 2.5), outro=spec.get("outro") or "(none: end with one clear next step)",
                               shorts_rule="Do not write #Shorts yourself: the app adds it to Shorts.",
                               short_max_words=(int(checks_mod.SHORT_LIMIT_S * spec.get("wps", 2.5)) if spec["format"] == "short" else "no limit"))
                   + team.persona_block(ctx.ws, member))
