@@ -49,18 +49,6 @@ shown with its part. A script passes only if ALL of these are true, and each one
 11. Names are written the way they are spoken and shown the same way (a header called "Retry-After" is never narrated as "Retry After").
 The app also checks the parts mechanically and will not approve a script that lacks one, whatever you score.
 
-QUIZ SHORTS. When the scenes are layout "versus", the video is an A-or-B quiz Short and items 1 to 10 above are replaced by this checklist (the rest of this
-review, speakability and the closing line, still applies). Each one that is false is a fix:
-Q1. It opens with a spoken introduction (part "intro") that states a real problem and promises the quiz and its number of rounds. It does not start on a round.
-Q2. There are three to five rounds in the order idea, example, mistake (the last round is the common mistake against the right way), then the closing card.
-Q3. FAIRNESS: in every round the better way is genuinely better for the reason the voice gives, the steps and numbers on screen are right (check each trace step's
-    arithmetic, each ms, each bar, each curve), and the pick text does not give the answer away. A round whose winner is wrong or arguable is a serious fix.
-Q4. The winners vary (A in some rounds, B in others) and the rounds are different comparisons of ONE subject, in a sensible order from the basic idea to the mistake.
-Q5. The reveal explains WHY in plain spoken words a student follows, using the numbers on screen; it is not a restatement of the answer.
-Q6. The answer key (each round's name and answer) matches what the rounds showed. The closing asks for their score, then the owner's closing line.
-Q7. The tone is a calm, kind professor with a game's energy: whole sentences, no hype, no slang. Short spoken question lines are fine (this is a quiz).
-Do not ask for diagrams, code, traces or a running example scene: a round is its own picture. Judge rounds by Q3 first.
-
 "fixes": at most 4, ONE per criterion that keeps the script from passing (lowest score first). Each fix is an exact,
 minimal edit the writer can apply as written: name the scene and quote the words to change, then give the replacement
 wording ("Scene 1, replace the narration with: '...'", "Delete scene 4"). Rules for fixes:

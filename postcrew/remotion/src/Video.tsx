@@ -3,7 +3,6 @@ import {AbsoluteFill, Sequence, interpolate} from "remotion";
 import {FONT, MONO, ThemeContext, ease, keyWord, useProgress, useT, useTheme} from "./theme";
 import {useFonts} from "./fonts";
 import type {Box, Caption, Edge, Scene, Step, Svg, VideoProps} from "./types";
-import {AnswerKey, VersusScene} from "./Versus";
 
 /*
  * The scenes follow postcrew/remotion/STYLE.md: a flat page, one accent colour, thin rules, slow eased reveals (never a bounce), the
@@ -113,7 +112,7 @@ const Statement: React.FC<{text: string; short: boolean; big?: boolean; keyAt?: 
 
 /** The closing card: real-looking buttons (Like, Comment, Share, Subscribe). Each appears, and is pressed when the voice says its word: it dips, ripples
  *  and changes state (a filled thumb with a +1, a ringing bell that turns "Subscribed"). */
-const PressButton: React.FC<{b: {label: string; kind: string; svg?: Svg | null}; at: number; short: boolean; index: number; compact?: boolean}> = ({b, at, short, index, compact}) => {
+const PressButton: React.FC<{b: {label: string; kind: string; svg?: Svg | null}; at: number; short: boolean; index: number}> = ({b, at, short, index}) => {
   const th = useTheme(), {t} = useT();
   const enter = useProgress(Math.max(0, at - 0.9 + index * 0.05), 0.7);
   const dt = t - at, press = 0.16;
@@ -124,12 +123,12 @@ const PressButton: React.FC<{b: {label: string; kind: string; svg?: Svg | null};
   const ring = dt >= press && dt < press + 1.1 ? (dt - press) / 1.1 : -1;
   const wiggle = b.kind === "subscribe" && pressed && dt < press + 1.2 ? Math.sin((dt - press) * 26) * 22 * (1 - (dt - press) / 1.2) : 0;
   const pop = b.kind === "like" && pressed && dt < press + 0.9 ? (dt - press) / 0.9 : -1;
-  const h = compact ? 100 : short ? 132 : 104, isz = compact ? 42 : short ? 60 : 46, fs = compact ? 38 : short ? 54 : 42;
+  const h = short ? 132 : 104, isz = short ? 60 : 46, fs = short ? 54 : 42;
   const label = b.kind === "subscribe" && pressed ? "Subscribed" : b.label;
   return (
     <div style={{position: "relative", opacity: enter, transform: `translateY(${(1 - enter) * 30}px) scale(${scale})`}}>
       {ring >= 0 && <div style={{position: "absolute", inset: 0, borderRadius: h, border: `4px solid ${hot}`, opacity: 0.6 * (1 - ring), transform: `scale(${1 + ring * 0.35})`}} />}
-      <div style={{height: h, padding: `0 ${compact ? 26 : short ? 56 : 44}px`, borderRadius: h, display: "flex", alignItems: "center", justifyContent: "center", gap: 22,
+      <div style={{height: h, padding: `0 ${short ? 56 : 44}px`, borderRadius: h, display: "flex", alignItems: "center", justifyContent: "center", gap: 22,
         background: pressed ? hot : th.surface, border: `3px solid ${pressed ? hot : th.text}`, color: pressed ? th.bg : th.text, boxShadow: pressed ? "none" : `0 6px 0 ${th.rule}`,
         fontWeight: 700, fontSize: fs, letterSpacing: -1, whiteSpace: "nowrap"}}>
         <svg width={isz} height={(isz * (b.svg?.h ?? 24)) / (b.svg?.w ?? 24)} viewBox={`0 0 ${b.svg?.w ?? 24} ${b.svg?.h ?? 24}`} style={{color: "inherit", transform: `rotate(${wiggle}deg)`, transformOrigin: "50% 15%"}}
@@ -142,16 +141,6 @@ const PressButton: React.FC<{b: {label: string; kind: string; svg?: Svg | null};
 };
 const Closing: React.FC<{s: Scene; short: boolean}> = ({s, short}) => {
   const buttons = s.buttons ?? s.items.map((x) => ({label: x, kind: x.toLowerCase(), svg: null}));
-  if (s.answers?.length) {   // a quiz: the answer key above, the buttons in a row below it
-    return (
-      <div style={{flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-between"}}>
-        <AnswerKey rows={s.answers} />
-        <div style={{display: "flex", gap: 20, justifyContent: "center", marginTop: 40}}>
-          {buttons.map((bt, i) => <PressButton key={i} b={bt} at={s.cues?.[i] ?? 0.8 + i * 0.8} short={short} index={i} compact />)}
-        </div>
-      </div>
-    );
-  }
   return (
     <div style={{flex: 1, display: "flex", flexDirection: short ? "column" : "row", flexWrap: "wrap", alignItems: "center", justifyContent: "center", gap: short ? 44 : 40}}>
       {buttons.map((bt, i) => <PressButton key={i} b={bt} at={s.cues?.[i] ?? 0.8 + i * 0.8} short={short} index={i} />)}
@@ -477,7 +466,7 @@ export const Video: React.FC<VideoProps> = (p) => {
       <AbsoluteFill style={{background: p.theme.bg}}>
         {p.scenes.map((s, i) => {
           const d = Math.max(1, Math.round(s.seconds * p.fps));
-          const el = <Sequence key={i} from={from} durationInFrames={d}>{s.layout === "versus" && s.versus ? <VersusScene s={s} /> : <Shell p={p} s={s} />}</Sequence>;
+          const el = <Sequence key={i} from={from} durationInFrames={d}><Shell p={p} s={s} /></Sequence>;
           from += d;
           return el;
         })}

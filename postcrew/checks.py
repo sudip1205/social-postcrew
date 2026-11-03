@@ -172,7 +172,7 @@ def text_problems(text, cat, profile, first_comment=""):
 YOUTUBE_TITLE_MAX, YOUTUBE_DESC_MAX, YOUTUBE_TAGS_MAX = 100, 5000, 500
 from . import speech  # noqa: E402
 
-SCENE_LAYOUTS = ("title", "statement", "points", "code", "diagram", "trace", "flow", "stat", "versus")
+SCENE_LAYOUTS = ("title", "statement", "points", "code", "diagram", "trace", "flow", "stat")
 
 
 SENTENCE_MAX = 30
@@ -181,7 +181,7 @@ SENTENCE_MAX = 30
 def needed_visual(spec, cat):
     """The scene a video of this topic must contain so the viewer sees the example move: 'trace' for algorithms, 'flow' for system
     design and architecture. Only for the explainer and Remotion renderers, the ones that draw them."""
-    if (spec or {}).get("renderer") not in ("explainer", "remotion") or (spec or {}).get("quiz"):   # a quiz Short shows its examples inside its rounds
+    if (spec or {}).get("renderer") not in ("explainer", "remotion"):
         return ""
     kind = " ".join(str((cat or {}).get(k) or "") for k in ("id", "label", "kicker")).lower()
     if any(w in kind for w in ("leetcode", "algorithm")):
@@ -333,7 +333,7 @@ def structure_problems(scenes):
     if idx != sorted(idx):
         problems.append("the parts are out of order: intro (problem), idea (solution), example (worked example), mistake (common mistake), closing")
     mistakes = [sc for sc in scenes if sc.get("part") == "mistake"]
-    if mistakes and not any(sc.get("layout") in ("diagram", "flow", "code", "trace", "versus") for sc in mistakes):   # the mistake is shown, not only said
+    if mistakes and not any(sc.get("layout") in ("diagram", "flow", "code", "trace") for sc in mistakes):   # the mistake is shown, not only said
         if True:
             problems.append("the common mistake scene must be a picture, not words: a 'flow' or 'diagram' showing the wrong path and then "
                             "the fix, or a 'code' scene with the wrong line and the right one (layout diagram, flow, code or trace)")
@@ -360,10 +360,7 @@ def script_problems(script, spec, cat, profile):
     mn, mx = (3 if spec["format"] == "short" else 4), 80
     if not mn <= len(scenes) <= mx:
         problems.append(f"{len(scenes)} scenes: a {spec['format']} video needs {mn}-{mx}, a new picture every few seconds")
-    if script.get("source") != "own" and spec.get("quiz"):   # a Short is a quiz of A-or-B rounds: its own rules replace the storyboard and teaching ones
-        from . import quiz
-        problems += quiz.problems(scenes, spec)
-    elif script.get("source") != "own":   # the owner's own script is theirs: it is checked for rules, not re-storyboarded
+    if script.get("source") != "own":   # the owner's own script is theirs: it is checked for rules, not re-storyboarded
         problems += storyboard_problems(scenes, spec)
         problems += teaching_problems(scenes, spec)
     problems += structure_problems(scenes)
@@ -372,10 +369,7 @@ def script_problems(script, spec, cat, profile):
             problems.append(f"scene {i}: layout must be one of {SCENE_LAYOUTS}")
         if not (sc.get("narration") or "").strip():
             problems.append(f"scene {i} has no narration")
-        if sc.get("layout") == "versus":
-            from . import quiz
-            problems += quiz.round_problems(sc, i)
-        elif sc.get("layout") == "code":
+        if sc.get("layout") == "code":
             code_problem = check_code(sc.get("code") or "", sc.get("language") or "")
             if code_problem:
                 problems.append(f"scene {i}: {code_problem}")

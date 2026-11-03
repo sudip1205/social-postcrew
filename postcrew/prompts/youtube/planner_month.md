@@ -27,7 +27,7 @@ are being watched, with their views, likes, age and views per day (a list with i
 - Each plan has a "trend": "why" (one or two sentences using the numbers: "recent videos on this get about 4,000 views a day and 4% like them"),
   "evidence" (the ids of 1-4 listed videos that show the demand; only ids from the list), "covers" (what those videos cover, in a few phrases), and
   "gap" (what they miss or explain badly: the reason this plan will be better, such as no worked example, no failure case, too fast for a beginner).
-- Mix the plans: some answer the most-watched questions, some a gap nobody covers well, some a Short-sized single idea and some a long walkthrough. A Short is an A-or-B quiz: a Short plan's angle must name the two ways the viewer will compare ("nested loops against a hash map, a cache against a database"), so choose Short topics that have such comparisons.
+- Mix the plans: some answer the most-watched questions, some a gap nobody covers well, some a Short-sized single idea and some a long walkthrough.
 - If no videos are listed (YouTube did not answer), write good plans from your own search and put your best judgement in "why"; use an empty "evidence".
 
 THE CHANNEL'S NICHE (this is what every YouTube plan must be): HANDS-ON EXPLAINER VIDEOS THAT SOLVE ONE CONCRETE PROBLEM OR BUILD ONE CONCRETE THING, step by

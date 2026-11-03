@@ -165,7 +165,4 @@ def video_spec(cfg, category=None, entry=None, options=None):
     spec["look"] = looks.resolve(base.get("look"), spec["format"])   # auto: white for a vertical video, black for a wide one
     spec["renderer"] = renderer_for(cfg, None) if not category else (category.get("renderer") or renderer_for(cfg, None))
     spec["artist"] = bool(base.get("graphics", True)) and spec["renderer"] == "remotion"   # the Storyboard Artist splits long scenes and draws each part
-    spec["quiz"] = spec["format"] == "short" and spec["renderer"] == "remotion" and base.get("short_style", "quiz") == "quiz"   # a Short is a quiz of A-or-B rounds (postcrew/quiz.py)
-    if spec["quiz"] and base.get("look", "auto") == "auto":
-        spec["look"] = "neon"
     return spec

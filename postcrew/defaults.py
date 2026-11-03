@@ -74,8 +74,7 @@ DEFAULT_CONFIG = {
                 "format": "short", "target_seconds": 90, "graphics": True,   # the Storyboard Artist draws icons and cliparts (Remotion videos)
                 # said at the end of every video (the Script Writer writes it into the last scene); empty = no closing line
                 "outro": "If this was useful, please like, comment and subscribe. And if you liked it, share it with someone who would find it helpful.",
-                "short_style": "quiz",           # quiz: every Short is an A-or-B quiz (dark blue page, postcrew/quiz.py). classic: a taught walk-through
-                "look": "auto",                  # auto: dark blue (neon) for a quiz Short, off-white for another vertical video, black for a wide one. Or paper / ink / neon
+                "look": "auto",                  # auto: off-white page for a vertical video, black page for a wide one. Or paper / ink for both
                 "pace": "slow",                  # slow: a teacher's pace, longer pauses. normal: brisk
                 "voice": {"provider": "elevenlabs", "voice_id": "", "voice_name": "", "model": "eleven_multilingual_v2",
                           "speed": 1.0},

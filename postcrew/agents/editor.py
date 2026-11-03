@@ -48,12 +48,6 @@ def script_material(ctx, w):
         parts.append(f"Scene {i} [{sc.get('part') or 'no part'} / {sc.get('layout')}, ~{sc.get('seconds', 0):.0f}s] on screen: {sc.get('on_screen') or '-'}"
                      + (f" | items: {'; '.join(sc['items'])}" if sc.get("items") else "")
                      + (f"\n  code ({sc.get('language')}):\n  " + sc["code"].replace("\n", "\n  ") if sc.get("code") else ""))
-        v = sc.get("versus")
-        if v:   # a quiz round: the two tiles, as the viewer sees them
-            parts.append(f"  ROUND: winner {v.get('winner')} | badge: {v.get('badge')} | caption: {v.get('caption')} | answer key: {v.get('name')} - {v.get('answer')}")
-            for tag in ("a", "b"):
-                t = v.get(tag) or {}
-                parts.append(f"  tile {tag.upper()} ({t.get('kind')}): {t.get('sub')} | " + json.dumps({k: t[k] for k in ("cells", "steps", "src", "dst", "ms", "fail", "fn", "label", "bars") if t.get(k) not in (None, "", [], 0, False)}, ensure_ascii=False))
         parts.append(f"  narration: {sc.get('narration', '')}")
         said = speech.speakable(sc.get("narration", ""))
         if said and said.lower() != " ".join(str(sc.get("narration", "")).split()).lower():
