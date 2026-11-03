@@ -430,23 +430,42 @@ class FindabilityTests(unittest.TestCase):
 
 
 class VideoArcTests(unittest.TestCase):
-    """Every video: intro (the problem), idea (the solution), example, a common mistake, then the closing card."""
+    """Every video: intro, the problem (with an example), the ways to solve it, then the solution and its code, an example, a common mistake and the closing card."""
+    ARC = ("intro", "problem", "approaches", "idea", "idea", "example", "mistake", "closing")
+
+    def arc(self, parts=None, **layouts):
+        return [{"part": p, "layout": layouts.get(p, "flow" if p in ("mistake", "approaches") else "statement")} for p in (parts or self.ARC)]
 
     def test_the_arc_is_checked(self):
         from postcrew.checks import structure_problems
-        ok = [{"part": p, "layout": "flow" if p == "mistake" else "statement"} for p in ("intro", "idea", "idea", "example", "mistake", "closing")]
-        self.assertEqual(structure_problems(ok), [])
-        words = [dict(sc, layout="points") if sc["part"] == "mistake" else sc for sc in ok]
+        self.assertEqual(structure_problems(self.arc()), [])
+        words = [dict(sc, layout="points") if sc["part"] == "mistake" else sc for sc in self.arc()]
         self.assertTrue(any("must be a picture" in m for m in structure_problems(words)))   # the mistake is shown, not listed
         self.assertEqual(structure_problems([{}, {}]), [])                       # an owner's own script says no parts: not checked
-        abrupt = [{"part": p} for p in ("idea", "example", "mistake", "closing")]
+        abrupt = self.arc([p for p in self.ARC if p != "intro"])
         self.assertTrue(any("introduction" in m for m in structure_problems(abrupt)))
-        no_mistake = [{"part": p} for p in ("intro", "idea", "example", "closing")]
+        no_mistake = self.arc([p for p in self.ARC if p != "mistake"])
         self.assertTrue(any("'mistake'" in m for m in structure_problems(no_mistake)))
-        swapped = [{"part": p} for p in ("intro", "example", "idea", "mistake", "closing")]
+        swapped = self.arc(("intro", "problem", "approaches", "example", "idea", "mistake", "closing"))
         self.assertTrue(any("out of order" in m for m in structure_problems(swapped)))
-        no_end = [{"part": p} for p in ("intro", "idea", "example", "mistake")]
+        no_end = self.arc(self.ARC[:-1])
         self.assertTrue(any("closing" in m for m in structure_problems(no_end)))
+
+    def test_the_problem_and_the_ways_come_before_the_solution(self):
+        from postcrew.checks import structure_problems
+        no_problem = structure_problems(self.arc([p for p in self.ARC if p != "problem"]))
+        self.assertTrue(any("part 'problem'" in m and "what is asked" in m for m in no_problem))
+        no_ways = structure_problems(self.arc([p for p in self.ARC if p != "approaches"]))
+        self.assertTrue(any("part 'approaches'" in m and "before any solution or code" in m for m in no_ways))
+        jump = structure_problems(self.arc(("intro", "idea", "problem", "approaches", "idea", "example", "mistake", "closing")))
+        self.assertTrue(any("out of order" in m and "BEFORE the solution" in m for m in jump))   # the solution first, the problem after
+
+    def test_the_ways_are_shown_not_only_said(self):
+        from postcrew.checks import structure_problems
+        self.assertEqual(structure_problems(self.arc(approaches="points")), [])
+        self.assertEqual(structure_problems(self.arc(approaches="diagram")), [])
+        said = structure_problems(self.arc(approaches="statement"))
+        self.assertTrue(any("'approaches' scene must show the ways" in m for m in said))
 
 
 class EditorVideoRulesTests(unittest.TestCase):

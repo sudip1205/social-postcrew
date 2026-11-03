@@ -95,7 +95,7 @@ count and value on screen is exactly right.
    base (answers needing no more calls: "0:1", "1:1"), combine (sum, min or max) and plus (0 unless the recurrence adds something).
  - viz.line_call, line_base, line_hit, line_return and line_fill are line numbers of YOUR code (counted from 1): the line where a call starts, the base case, the memo
    lookup (0 without a memo), the line that returns a call's answer, and the line that fills a table cell (0 for calls). They must point at real lines.
- - Teach a recursion topic as a sequence: one codeviz scene per version of the code (plain recursion, then with a memo, then the table), each with its own code and its own
+ - The problem and the ways to solve it come FIRST (parts problem and approaches, each shown on screen), with no code. Then teach a recursion topic as a sequence: one codeviz scene per version of the code (plain recursion, then with a memo, then the table), each with its own code and its own
    15 to 30 seconds of narration that follows what the picture is doing: "watch the tree grow", "see these orange calls? the same work again", "now the answer is found
    in the memo", "each cell is the sum of the two before it". Say what the picture shows, in order, as it shows it.
  - Do not state a count you have not worked out exactly. (A plain tree for f(n) = f(n-1) + f(n-2) with base 0 and 1 and n = 5 makes 15 calls, with a memo 9.) Safer: say
@@ -110,7 +110,7 @@ time and money, so fix it now. Read your finished script scene by scene and tick
  [ ] ONE running example with real numbers is introduced early, and EVERY idea is tied back to it by name ("in our pizza shop, ...").
  [ ] Every idea is explained as what, why, how (with numbers). Every subtopic named in the title or description has its own explanation. No term appears before its plain meaning.
  [ ] There are check-ins with the student ("Does that make sense?", "Let's go slowly here") and at least one real question you then answer; each idea ends with a one-line "in short".
- [ ] The scenes follow the parts in order: intro (the problem), idea (the solution), example (running on real values), mistake (shown as a picture, with the fix), closing. A short recap comes before the closing.
+ [ ] The scenes follow the parts in order: intro (the opening), problem (what is asked, with an example input and its answer), approaches (the ways to solve it, side by side, no code yet), idea (the chosen solution and its code), example (running on real values), mistake (shown as a picture, with the fix), closing. No code and no solution before the problem and the ways have been explained. A short recap comes before the closing.
  [ ] It sounds like a person talking to a class: whole sentences of 8 to 20 words, "you", "we" and "let's", contractions, no clipped note-like lines, no lists of terms, no semicolons or colons.
  THE PICTURES
  [ ] A new picture at least every 6 to 12 seconds of narration (15 to 30 words per scene, never more than 16 seconds). At most one scene in three is words only; the rest are diagrams, flows, traces or code.
@@ -197,15 +197,23 @@ built or the problem being solved, and the student watches it come together and 
 - End on the working result ("and here it is running"), then the recap. Never a video that only talks ABOUT a topic, never interview advice, never a list of concepts.
 
 EVERY VIDEO FOLLOWS THIS ARC (checked by the app; a script that skips a part is sent back). Each scene has a "part":
-1. "intro": the FIRST scene (layout "title"). It states the PROBLEM the viewer has, in two or three sentences, and what they will be able to
-   do by the end. Never start on the solution, a diagram or a term. The picture opens on the problem, not on a blank page.
-2. "idea": one to three scenes. The SOLUTION: the idea, in plain words, with the diagram that grows.
-3. "example": one to three scenes. A WORKING EXAMPLE with real round values that shows the idea doing its job (a trace, a flow, a code scene).
-4. "mistake": the scene(s) just before the closing card: ONE COMMON MISTAKE to avoid. SHOW it: a "flow" or "diagram" in which the wrong path
+1. "intro": the FIRST scene (layout "title"). A short opening: the situation the viewer has met, and what they will be able to do by the end,
+   in two or three sentences. Never start on the solution, a diagram or a term. The picture opens on the situation, not on a blank page.
+2. "problem": one or two scenes. STATE THE PROBLEM PROPERLY before any solution: exactly what is being asked, in plain words, with ONE small real example
+   (the input, and the answer it must give: "five stairs, one or two steps at a time: how many different ways to reach the top? The answer is eight"),
+   and what makes it hard. A viewer who has never seen the problem must be able to say what it asks after this part.
+3. "approaches": one or two scenes. THE WAYS IT CAN BE SOLVED, laid out BEFORE the solution and before any code: name each way in one sentence and say how it
+   differs and what it costs (plain recursion tries everything, a memo remembers answers, a table builds them up from the bottom). Show them side by side on
+   screen (a "diagram" with one box for each way, or "points"). Then say which one you will build first and why. No code yet.
+4. "idea": one to three scenes. NOW the SOLUTION: the chosen way, in plain words, and its code. Build it from the first way to the best way if the ways build on
+   each other. This is where the code starts.
+5. "example": one to three scenes. A WORKING EXAMPLE with real round values that shows the idea doing its job (a trace, a flow, a code scene).
+6. "mistake": the scene(s) just before the closing card: ONE COMMON MISTAKE to avoid. SHOW it: a "flow" or "diagram" in which the wrong path
    goes wrong (a box that fails, a wrong value on an arrow), then the fix on the same picture; or a "code" scene with the wrong line and the right
    one. Never a list or a sentence on a blank page. Say what goes wrong, why, and the fix.
-5. "closing": the last scene only (below).
-The scenes appear in this order and no other. In a Short each part is one or two scenes, still all five.
+7. "closing": the last scene only (below).
+The scenes appear in this order and no other. In a Short each part is one or two scenes, still all seven. NEVER jump to the solution or the code before
+the problem has been stated with its example and the ways to solve it have been laid out: a viewer who is handed code first is lost.
 
 LENGTH IS FREE. Research and write as much as the topic needs to be explained properly: the problem, the idea, a worked example that runs on
 real values, the common mistake. About {{target_seconds}} seconds ({{format}}) is only a guide; go longer when the topic deserves it, shorter when

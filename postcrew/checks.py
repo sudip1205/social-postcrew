@@ -315,27 +315,35 @@ def storyboard_problems(scenes, spec):
 STOP_WORDS = set("that this with from have they them then than what when where which while your will would there their about into more some such only also very just like been being were because these those each other over under again further here being does done make made makes know take".split())
 
 
-PARTS = ("intro", "idea", "example", "mistake", "closing")
-PART_HELP = {"intro": "the problem the viewer has", "idea": "the solution, the idea", "example": "a worked example that shows it working",
+PARTS = ("intro", "problem", "approaches", "idea", "example", "mistake", "closing")
+PART_HELP = {"intro": "a short opening that names the situation and promises what the viewer will understand",
+             "problem": "the problem stated properly: what is asked, with a small real example (the input, and the answer it should give)",
+             "approaches": "the different ways the problem can be solved, each named and compared in a sentence, before any solution or code",
+             "idea": "the chosen solution, the idea", "example": "a worked example that shows it working",
              "mistake": "one common mistake to avoid"}
+ARC = "intro, problem, approaches, idea (the solution), example (worked, with code), mistake, then the closing card"
 
 
 def structure_problems(scenes):
-    """Every video follows one arc: intro (the problem), idea (the solution), example (worked example), mistake (a common mistake to
-    avoid), then the closing card. Scripts that do not say their parts (the owner's own) are not checked."""
+    """Every video follows one arc: intro (the opening), problem (what is asked, with an example), approaches (the ways to solve it), idea (the
+    solution), example (worked, with code), mistake (a common mistake to avoid), then the closing card. The solution never comes before the problem
+    and the ways are explained. Scripts that do not say their parts (the owner's own) are not checked."""
     parts = [sc.get("part") for sc in scenes]
     if not any(parts):
         return []
     problems, order = [], [p for p in PARTS if p != "closing"]
     if parts[0] != "intro":
-        problems.append("the video must open with an introduction that states the problem (first scene, part 'intro'): it must not start "
-                        "on the solution or a diagram")
+        problems.append("the video must open with an introduction (first scene, part 'intro') that names the situation and promises what the viewer "
+                        "will understand: it must not start on the solution or a diagram")
     for part in order:
         if part not in parts:
-            problems.append(f"no scene has part '{part}': every video needs {PART_HELP[part]} (intro, idea, example, mistake, then the closing card)")
+            problems.append(f"no scene has part '{part}': every video needs {PART_HELP[part]} ({ARC})")
     idx = [parts.index(p) for p in order if p in parts]
     if idx != sorted(idx):
-        problems.append("the parts are out of order: intro (problem), idea (solution), example (worked example), mistake (common mistake), closing")
+        problems.append(f"the parts are out of order: {ARC}. The problem and the ways to solve it are explained BEFORE the solution and its code")
+    ways = [sc for sc in scenes if sc.get("part") == "approaches"]
+    if ways and not any(sc.get("layout") in ("diagram", "flow", "points") for sc in ways):   # the ways are laid out side by side, not only said
+        problems.append("the 'approaches' scene must show the ways on screen: a 'diagram' or 'flow' with one box for each way (Plain recursion, Memo, Table), or 'points' listing them")
     mistakes = [sc for sc in scenes if sc.get("part") == "mistake"]
     if mistakes and not any(sc.get("layout") in ("diagram", "flow", "code", "trace", "codeviz") for sc in mistakes):   # the mistake is shown, not only said
         if True:

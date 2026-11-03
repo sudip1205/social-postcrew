@@ -40,7 +40,7 @@ SCENE = {
     "properties": {
         "layout": {"type": "string", "enum": ["title", "statement", "points", "code", "diagram", "trace", "flow", "stat", "codeviz"]},
         "part": {"type": "string", "enum": list(PARTS),
-                 "description": "which part of the video this scene is: intro (the problem), idea (the solution), example (worked example), mistake (a common mistake to avoid), closing (the like, comment, share card)"},
+                 "description": "which part of the video this scene is: intro (a short opening), problem (what is asked, with an example input and answer), approaches (the ways it can be solved, compared, no code yet), idea (the chosen solution), example (worked example with code), mistake (a common mistake to avoid), closing (the like, comment, share card)"},
         "narration": {"type": "string", "description": "what the voice says; spoken sentences, no markdown"},
         "on_screen": {"type": "string", "description": "the key words shown big (or the heading above the points)"},
         "items": {"type": "array", "items": {"type": "string"}, "maxItems": 5},
@@ -72,8 +72,8 @@ SCHEMA = {
 }
 
 FORMAT_RULES = {
-    "short": "A vertical 9:16 Short (up to 3 minutes): a short introduction that opens with the problem, then one idea built up scene by scene.",
-    "long": "A 16:9 video: open with a short introduction (about 15 seconds), then one idea per scene (about 4-12 scenes per ten minutes), "
+    "short": "A vertical 9:16 Short (up to 3 minutes): a short opening, the problem with an example, the ways it can be solved, then the chosen solution built up scene by scene with its code.",
+    "long": "A 16:9 video: open with a short introduction (about 15 seconds), state the problem, lay out the ways to solve it, then one idea per scene (about 4-12 scenes per ten minutes), "
             "and finish with one clear next step.",
 }
 

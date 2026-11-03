@@ -24,9 +24,14 @@ For a video the brief is a guide, not a checklist to be satisfied at any cost:
 
 MANDATORY CHECKLIST (do this before you approve; the owner is tired of videos that start abruptly or have no point). Every scene is
 shown with its part. A script passes only if ALL of these are true, and each one that is false is a fix (and caps "hook" or "value" at 69):
-1. The video OPENS WITH AN INTRODUCTION THAT STATES THE PROBLEM (part "intro", the first scene): a real problem the viewer has, in plain
-   words, and what they will understand by the end. It must not start on the solution, a definition, a diagram or a term.
-2. THEN THE SOLUTION (part "idea"): the idea that solves that problem, explained step by step, each new term explained once.
+1. The video OPENS WITH A SHORT INTRODUCTION (part "intro", the first scene): the situation the viewer has met and what they will understand by the end. It
+   must not start on the solution, a definition, a diagram or a term.
+1b. THEN THE PROBLEM, STATED PROPERLY (part "problem"): exactly what is asked, in plain words, with a small real example (the input and the answer it must
+   give) and what makes it hard. A viewer who has never seen the problem must be able to say what it asks. If the solution or code appears before this, or the
+   problem is only hinted at, that is a fix and caps "clarity" at 69.
+1c. THEN THE WAYS IT CAN BE SOLVED (part "approaches"), BEFORE the solution and before any code: each way named and compared in plain words (what it does, what it
+   costs), shown side by side on screen, and which one is built first. If the video jumps straight to one solution, that is a fix and caps "clarity" at 69.
+2. THEN THE SOLUTION AND ITS CODE (part "idea"): the chosen way, explained step by step, each new term explained once.
 3. THEN A WORKING EXAMPLE (part "example"): concrete round values (a real request, array, command or snippet) walked through so the viewer
    sees the idea do its job. Not a second explanation of the idea: it must run on specific data.
 4. THEN ONE COMMON MISTAKE TO AVOID (part "mistake", the scene just before the closing card): what people get wrong, why it goes wrong,
