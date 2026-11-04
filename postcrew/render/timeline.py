@@ -33,11 +33,23 @@ def _key(word):
 
 
 def cue_time(label, times, after=0.0):
-    """When the voice first says (a form of) one of the label's words after `after`, or None."""
-    keys = {_key(w) for w in re.split(r"[\s/_\-:>]+", str(label or "")) if len(_key(w)) >= 2 and w.lower() not in SKIP}
-    for w, start, _end in times:
-        if start >= after and _key(w) in keys:
-            return start
+    """When the voice says one label at or after `after`, or None. A label of several words is found where its words are said
+    together, in order ("walk right" at "Walk right and...", not at the "Walk" of "Walk left"); failing that, at its rarest word in the
+    scene (the one that tells it apart); a one-word label at its first mention."""
+    keys = [_key(w) for w in re.split(r"[\s/_\-:>]+", str(label or "")) if len(_key(w)) >= 2 and w.lower() not in SKIP]
+    if not keys:
+        return None
+    seq = [(_key(w), start) for w, start, _end in times]
+    if len(keys) > 1:   # the whole label, said together (small words between are skipped)
+        said = [(k, s) for k, s in seq if k and k not in {_key(x) for x in SKIP}]
+        for i, (k, start) in enumerate(said):
+            if start >= after and said[i:i + len(keys)] and [x for x, _ in said[i:i + len(keys)]] == keys:
+                return start
+    count = {k: sum(1 for x, _ in seq if x == k) for k in set(keys)}
+    for k in sorted(dict.fromkeys(keys), key=lambda k: (count[k] == 0, count[k], -keys.index(k))):   # rarest first, a later word on a tie
+        for x, start in seq:
+            if start >= after and x == k:
+                return start
     return None
 
 

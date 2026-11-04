@@ -414,6 +414,8 @@ def script_problems(script, spec, cat, profile):
         elif sc.get("layout") == "grid":
             from . import gridviz
             problems += gridviz.problems(sc.get("grid"), i)
+            if isinstance(sc.get("grid"), dict):
+                problems += gridviz.colour_problems(sc["grid"], sc.get("narration"), i)
         elif sc.get("layout") == "codeviz":
             from . import codeviz
             code_problem = check_code(sc.get("code") or "", sc.get("language") or "")

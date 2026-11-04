@@ -38,15 +38,16 @@ export const Grid: React.FC<{s: Scene; short: boolean}> = ({s, short}) => {
         const clash = overlap.has(key(r, c));
         const found = has(cur?.found, r, c), active = has(cur?.active, r, c), out = has(cur?.out, r, c);
         const mark = cur?.marks.find((m) => m.at[0] === r && m.at[1] === c);
-        const fill = clash ? "#EF4444" : pi !== undefined ? PLUS[pi % PLUS.length] : found ? th.positive : isBlocked ? `${th.muted}33` : active ? th.accentSoft : "transparent";
-        const border = clash ? "#EF4444" : pi !== undefined ? PLUS[pi % PLUS.length] : found ? th.positive : active ? th.accent : isBlocked ? th.rule : th.rule;
+        const own = g.colors?.[ch];   // the cell's own colour when the problem names one ("G=green")
+        const fill = clash ? "#EF4444" : pi !== undefined ? PLUS[pi % PLUS.length] : found ? th.positive : active ? th.accentSoft : own ? `${own}55` : isBlocked ? `${th.muted}33` : "transparent";
+        const border = clash ? "#EF4444" : pi !== undefined ? PLUS[pi % PLUS.length] : found ? th.positive : active ? th.accent : own ? own : th.rule;
         const lit = pi !== undefined || clash || found;
         return (
           <div key={key(r, c)} style={{width: cell, height: cell, borderRadius: Math.round(cell * 0.14), position: "relative",
             background: fill, border: `${active || lit ? 4 : 2}px solid ${border}`, opacity: out ? 0.3 : 1,
             transform: lit ? `scale(${grow})` : undefined, display: "flex", alignItems: "center", justifyContent: "center",
             fontFamily: MONO, fontWeight: 700, fontSize: Math.round(cell * 0.38), color: lit ? "#fff" : isBlocked ? th.muted : th.text}}>
-            {isBlocked && !lit ? <span style={{fontSize: Math.round(cell * 0.5), opacity: 0.8}}>×</span> : ch}
+            {isBlocked && !lit && !own ? <span style={{fontSize: Math.round(cell * 0.5), opacity: 0.8}}>×</span> : ch}
             {mark && <div style={{position: "absolute", top: -Math.round(cell * 0.42), left: "50%", transform: "translateX(-50%)", whiteSpace: "nowrap",
               fontFamily: FONT, fontSize: Math.max(22, Math.round(cell * 0.24)), fontWeight: 700, color: th.accent}}>▼ {mark.name}</div>}
           </div>

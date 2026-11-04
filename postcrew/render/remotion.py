@@ -125,9 +125,11 @@ def _diagram(scene, words, carry):
 
 
 def _trace(scene, words):
-    steps, said = [], 0.0
+    steps, said = [], -1.0
     for st in scene.get("steps") or []:
-        t = _when(st.get("say"), words, said)
+        t = _when(st.get("say"), words, max(said, 0.0))
+        if t <= said:   # a step never lands on the moment of the one before it (it would never be seen): just after it
+            t = round(said + 0.9, 3)
         said = t
         ptrs = [p for p in (parse_pointer(x) for x in st.get("pointers") or []) if p]
         steps.append({"t": t, "pointers": [{"name": n, "at": i} for n, i in ptrs], "active": st.get("active") or [],

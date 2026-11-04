@@ -232,7 +232,10 @@ hop of the story, no filler, and the whole narration under {{short_max_words}} w
 THE BOARD SCENE (layout "grid"): FOR EVERY PROBLEM SET ON A GRID (a matrix, a board, a maze, rows and columns of cells, "up, down, left,
 right", "above" or "below"). A "trace" is ONE ROW of cells: it cannot show above or below, so a grid problem drawn as a trace is wrong. Set
 "grid" to {title, rows (the example board, one string per row, one character per cell, copied EXACTLY from the problem: ["GGGGGG", "GBBBGB",
-...]; 2 to 10 rows and columns), legend (["G = good", "B = bad"]), blocked (characters nothing may cover: ["B"]), steps}. Each step, in the
+...]; 2 to 10 rows and columns), legend (["G = good", "B = bad"]), colors (the colour of each character's cells, ["G=green", "B=red"]: set it whenever the
+narration names colours; never say "green cells" about a board that has none), blocked (characters nothing may cover: ["B"]), steps}.
+Each step must be said with its OWN words: "say" is copied from the sentence where it happens ("walk right", not "walk"), so two steps never
+start at the same moment. Each step, in the
 order the voice says it: say (2-3 words from the narration), active (cells looked at, "row,col"), found (answer cells), out (cells ruled
 out), marks (a labelled arrow on a cell: "centre=2,3"), pluses (plus shapes by centre and arm: "2,3,1" is the plus centred on row 2,
 column 3 with arms of 1, 5 cells; "2,3,0" is one cell), note (what the step shows: "arm 1: area 5"). The app draws the real rows and columns

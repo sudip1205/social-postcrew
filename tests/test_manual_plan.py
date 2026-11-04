@@ -296,5 +296,34 @@ class ShapeTests(unittest.TestCase):
         d = sup._diagnose(SimpleNamespace(), "quality", ["scenes redrawn"], {"redrawn": [3]}, {})
         self.assertEqual(d["target"], "text_frames")
 
+
+class TimingAndColourTests(unittest.TestCase):
+    """The Two Pluses rebuild: 'walk right' was timed at the 'Walk' of 'Walk left', so the four cells on the left never showed; and the
+    voice said 'green cells are good, red cells are bad' over a board with no green or red."""
+
+    def test_a_cue_is_found_where_its_words_are_said_together(self):
+        from postcrew.render import timeline
+        times = timeline.word_times("Walk left and you find four good cells. Walk right and the edge stops you after one.", 8)
+        second_walk = [s for w, s, _ in times if w == "Walk"][1]
+        self.assertEqual(timeline.cue_time("walk left", times), times[0][1])
+        self.assertEqual(timeline.cue_time("walk right", times), second_walk)          # not the 'Walk' of 'Walk left'
+        self.assertEqual(timeline.cue_time("edge", times), next(s for w, s, _ in times if w == "edge"))
+
+    def test_steps_never_share_a_moment(self):
+        p = gridviz.props(board_scene([step(say="walk", active=["1,1"]), step(say="walk", active=["1,2"]), step(say="walk", active=["1,3"])]),
+                          lambda say, after: 0.0)
+        self.assertEqual([s["t"] for s in p["steps"]], [0.0, 0.9, 1.8])
+
+    def test_the_voice_names_only_colours_the_board_shows(self):
+        v = board_scene([step(say="good and bad", out=["0,0"])])
+        self.assertIn("green, red", gridviz.colour_problems(v, "Green cells are good, and red cells are bad.", 2)[0])
+        coloured = dict(v, colors=["G=green", "B=red"])
+        self.assertEqual(gridviz.colour_problems(coloured, "Green cells are good, and red cells are bad.", 2), [])
+        self.assertEqual(gridviz.props(coloured, lambda s, a: 0.0)["colors"], {"G": "#22C55E", "B": "#EF4444"})
+        two = board_scene([step(pluses=["1,1,1", "3,4,1"])])
+        self.assertEqual(gridviz.colour_problems(two, "The blue plus and the orange plus.", 3), [])
+        self.assertIn("grid.colors are", gridviz.problems(dict(v, colors=["G=greenish"]), 2)[0])
+
+
 if __name__ == "__main__":
     unittest.main()
