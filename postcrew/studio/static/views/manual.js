@@ -2,7 +2,7 @@
    and make it now (YouTube: as a Short or a Long video). The scheduled runs are never started from the other pages. Real data only (/api/manual). */
 "use strict";
 
-const MAN = { items: [], topic: "", q: "", sort: "trend", fmt: {}, open: new Set(), busy: null, running: false, formats: false, def: "short", poll: null };
+const MAN = { readOpen: new Set(), shown: "", items: [], topic: "", q: "", sort: "trend", fmt: {}, open: new Set(), busy: null, running: false, formats: false, def: "short", poll: null };
 
 const manSort = {
   trend: (a, b) => ((b.research?.trend_score ?? -1) - (a.research?.trend_score ?? -1)) || a.title.localeCompare(b.title),
@@ -53,6 +53,10 @@ function manCard(i) {
 function manDraw() {
   const list = $("#man-list"); if (!list) return;
   const shown = manShown();
+  // the list is reloaded every few seconds: redraw only when something changed, so what you opened or are reading stays put
+  const sig = JSON.stringify([shown, MAN.busy, MAN.running, MAN.fmt, [...MAN.open], MAN.items.length]);
+  if (sig === MAN.shown && list.children.length) return;
+  MAN.shown = sig;
   list.innerHTML = (shown.length ? shown.map(manCard).join("") : "") + `<div class="border-2 border-dashed border-slate-200 rounded-2xl p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${shown.length ? "" : "bg-white"}">
     <div class="flex items-center gap-4"><div class="w-12 h-12 rounded-xl bg-white border border-slate-200 text-violet-600 flex items-center justify-center shadow-sm">${icon("inventory_2", "text-2xl")}</div>
       <div><h3 class="font-headline font-bold text-sm text-slate-900">${MAN.items.length ? "That is every plan waiting" : "No plans waiting"}</h3>
@@ -62,6 +66,7 @@ function manDraw() {
   list.querySelectorAll("[data-fmt]").forEach(b => b.onclick = () => { MAN.fmt[b.dataset.id] = b.dataset.fmt; manDraw(); });
   list.querySelectorAll("[data-more]").forEach(b => b.onclick = () => { MAN.open.has(b.dataset.more) ? MAN.open.delete(b.dataset.more) : MAN.open.add(b.dataset.more); manDraw(); });
   list.querySelectorAll("[data-run]").forEach(b => b.onclick = () => manRun(b.dataset.run));
+  list.querySelectorAll("[data-mreadbox]").forEach(d => d.ontoggle = () => { d.open ? MAN.readOpen.add(d.dataset.mreadbox) : MAN.readOpen.delete(d.dataset.mreadbox); });
   list.querySelectorAll("[data-medit]").forEach(b => b.onclick = () => manFill(MAN.items.find(x => x.id === b.dataset.medit)));
   list.querySelectorAll("[data-mread]").forEach(b => b.onclick = async () => { b.disabled = true;
     try { await post("/api/manual/plan/read", { platform: S.platform, id: b.dataset.mread }); toast("The Reader is reading your files"); } catch (e) { toast(e.message, true); } manLoad(); });
@@ -127,7 +132,7 @@ function manSource(i) {
         <button type="button" data-mfdel="${esc(i.id)}|${esc(f.file)}" title="Remove this file" class="text-slate-400 hover:text-rose-600">${icon("close", "text-[13px]")}</button></span>`).join("")}
       ${s.state !== "reading" ? `<button type="button" data-mread="${i.id}" class="inline-flex items-center gap-1 text-[11px] font-bold text-violet-600 hover:text-violet-800">${icon("auto_stories", "text-[14px]")}<span>${s.state === "done" ? "Read again" : "Read files"}</span></button>` : ""}</div>
     ${s.state === "failed" ? `<p class="text-[11px] text-rose-700">${esc(s.error || "")}</p>` : ""}
-    ${s.state === "done" ? `<details class="text-xs text-slate-700"><summary class="cursor-pointer font-semibold text-slate-800">${esc(st.title || "The problem")} · ${(st.examples || []).length} examples · ${(st.figures || []).length} figures${(st.unclear || []).length ? ` · <span class="text-amber-700">${st.unclear.length} unclear</span>` : ""}</summary>
+    ${s.state === "done" ? `<details class="text-xs text-slate-700" data-mreadbox="${i.id}" ${MAN.readOpen.has(i.id) ? "open" : ""}><summary class="cursor-pointer font-semibold text-slate-800">${esc(st.title || "The problem")} · ${(st.examples || []).length} examples · ${(st.figures || []).length} figures${(st.unclear || []).length ? ` · <span class="text-amber-700">${st.unclear.length} unclear</span>` : ""}</summary>
       <p class="mt-2 whitespace-pre-line">${esc(st.statement || "")}</p>
       ${st.input_output ? `<p class="mt-1"><span class="font-semibold">Input / output:</span> ${esc(st.input_output)}</p>` : ""}
       ${(st.examples || []).map((e, n) => `<p class="mt-1 font-mono text-[11px]">Example ${n + 1}: ${esc(e.input)} → ${esc(e.output)}</p>`).join("")}
@@ -209,6 +214,7 @@ async function manSave(run) {
 
 function renderManual() {
   const view = $("#view"), a = appOf(S.platform);
+  MAN.shown = "";   // a fresh page: draw the list
   view.innerHTML = `<main class="space-y-6" data-active-view="manual">
     <div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
       <div>
