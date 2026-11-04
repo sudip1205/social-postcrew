@@ -327,3 +327,28 @@ class TimingAndColourTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ClosingCardTest(unittest.TestCase):
+    def test_closing_is_drawn_with_icon_buttons(self):
+        from postcrew.render import hyperframes
+        self.assertEqual(hyperframes.engine_for({"layout": "statement", "part": "closing"}), "remotion")
+        self.assertEqual(hyperframes.engine_for({"layout": "statement", "closing": True}), "remotion")
+        self.assertEqual(hyperframes.engine_for({"layout": "statement"}), "hyperframes")
+
+    def test_trailing_silence_is_not_a_sentence_pause(self):
+        from unittest import mock
+        from postcrew.render import timeline
+        err = ("  Duration: 00:00:06.77, start: 0.000000, bitrate: 48 kb/s\n"
+               "[silencedetect] silence_start: 1.68975\n[silencedetect] silence_end: 1.97383 | silence_duration: 0.28\n"
+               "[silencedetect] silence_start: 3.23629\n[silencedetect] silence_end: 3.57358 | silence_duration: 0.33\n"
+               "[silencedetect] silence_start: 6.42413\n[silencedetect] silence_end: 6.768 | silence_duration: 0.34\n")
+        with mock.patch("shutil.which", return_value="/usr/bin/ffmpeg"), \
+                mock.patch("subprocess.run", return_value=mock.Mock(stderr=err)):
+            quiet = timeline._silences("v.mp3", "-35dB", 0.18)
+        self.assertEqual(quiet[-1][1], float("inf"))
+        n = "If this was useful, please like, comment and subscribe. And if you liked it, share it with someone who would find it helpful."
+        words, ok = timeline.calibrate(timeline.word_times(n, 7.4), 7.4, quiet)
+        self.assertTrue(ok)
+        sub = next(s for w, s, _e in words if w.startswith("subscribe"))
+        self.assertLess(sub, 3.3)   # said before the pause at 3.24 s, not stretched towards the end

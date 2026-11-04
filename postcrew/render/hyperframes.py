@@ -21,6 +21,8 @@ LAYOUTS = ("title", "statement")   # the scenes HyperFrames draws
 
 def engine_for(scene):
     """Which engine draws a scene: 'hyperframes' for words on their own, 'remotion' for everything with data."""
+    if scene.get("closing") or scene.get("part") == "closing":   # the closing card is icon buttons (thumb, bubble, bell): Remotion draws them
+        return "remotion"
     return "hyperframes" if scene.get("layout") in LAYOUTS and not scene.get("clip") else "remotion"   # a scene with a clipart is drawn by Remotion
 
 

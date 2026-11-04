@@ -133,7 +133,10 @@ def _silences(path, noise, min_s):
                             "-f", "null", "-"], capture_output=True, text=True, timeout=120)
     except (OSError, subprocess.SubprocessError):
         return []
-    out, start = [], None
+    out, start, dur = [], None, None
+    m = re.search(r"Duration: (\d+):(\d+):([\d.]+)", r.stderr)
+    if m:
+        dur = int(m.group(1)) * 3600 + int(m.group(2)) * 60 + float(m.group(3))
     for ln in r.stderr.splitlines():
         m = re.search(r"silence_start: (-?[\d.]+)", ln)
         if m:
@@ -144,6 +147,8 @@ def _silences(path, noise, min_s):
             start = None
     if start is not None:   # quiet until the end of the file
         out.append((start, float("inf")))
+    if out and dur and out[-1][1] != float("inf") and out[-1][1] >= dur - 0.05:   # the voice's closing silence, not a pause between sentences
+        out[-1] = (out[-1][0], float("inf"))
     return out
 
 
