@@ -134,14 +134,14 @@ class FakeRunner:
         self.calls = []
 
     def __call__(self, cmd, **kw):
-        self.calls.append(cmd[0])
+        self.calls.append(cmd)
         if cmd[0] == "pdftotext":
             return SimpleNamespace(stdout="Two Sum\nGiven nums and target, return indices.\nExample: nums = [2,7,11,15], target = 9 -> [0,1]",
                                    returncode=0)
+        if cmd[0] == "pdfinfo":   # one tall page: a full-page screenshot of a web page
+            return SimpleNamespace(stdout="Pages:          1\nPage    1 size: 612 x 1600 pts\n", returncode=0)
         from pathlib import Path
-        prefix = Path(cmd[-1])
-        for n in (1, 2):
-            (prefix.parent / f"{prefix.name}-{n}.png").write_bytes(b"png")
+        Path(cmd[-1] + ".png").write_bytes(b"png")
         return SimpleNamespace(stdout="", returncode=0)
 
 
@@ -172,7 +172,10 @@ class AttachmentTests(unittest.TestCase):
             agent, prompt, images = llm.calls[0]
             self.assertEqual(agent, "reader")
             self.assertIn("return indices", prompt)                          # the PDF's exact text
-            self.assertEqual(len(images), 3)                                  # two PDF pages and the image
+            self.assertEqual(len(images), 5)                     # the tall page in 4 overlapping sharp strips, and the image
+            strips = [c for c in runner.calls if c[0] == "pdftoppm"]
+            self.assertEqual([c[c.index("-y") + 1] for c in strips], ["0", "1380", "2760", "4140"])
+            self.assertIn("220", strips[0])
             item = next(u for u in monthly.unassigned(ws, "youtube") if u["id"] == i["id"])
             e = monthly._entry(item, "assigned-short", "short", "youtube")
             ctx = SimpleNamespace(outputs={"topic": {"owner_plan": e["owner_plan"]}})
@@ -201,6 +204,54 @@ class AttachmentTests(unittest.TestCase):
             with self.assertRaises(ValueError) as e:
                 Studio(ws, 0).manual_run({"platform": "youtube", "id": i["id"], "format": "short"})
             self.assertIn("not read yet", str(e.exception))
+
+
+
+# ---------- a real 2-D board ----------
+from postcrew import gridviz
+from postcrew.agents.script import grid_problem_check
+
+BOARD = ["BGBBGB", "GGGGGG", "BGBBGB", "GGGGGG", "BGBBGB", "BGBBGB"]   # HackerRank Two Pluses, sample 1
+
+
+def board_scene(steps):
+    return {"title": "Two pluses", "rows": BOARD, "legend": ["G = good", "B = bad"], "blocked": ["B"], "steps": steps}
+
+
+def step(**kw):
+    return {"say": "", "active": [], "found": [], "out": [], "marks": [], "pluses": [], "note": "", **kw}
+
+
+class GridTests(unittest.TestCase):
+    def test_a_plus_is_drawn_whole_and_a_wrong_one_is_refused(self):
+        self.assertEqual(sorted(gridviz.plus_cells(1, 1, 1)), [(0, 1), (1, 0), (1, 1), (1, 2), (2, 1)])
+        ok = board_scene([step(say="first plus", pluses=["1,1,1"], marks=["centre=1,1"], note="arm 1: area 5"),
+                          step(say="second plus", pluses=["1,1,1", "3,4,1"], note="5 x 5 = 25")])
+        self.assertEqual(gridviz.problems(ok, 3), [])
+        bad = board_scene([step(pluses=["1,2,1"])])                       # its top cell (0,2) is B
+        self.assertIn("covers cell 0,2, which is 'B'", gridviz.problems(bad, 3)[0])
+        off = board_scene([step(pluses=["0,1,1"])])                       # its arm leaves the board
+        self.assertIn("runs off the 6x6 board", gridviz.problems(off, 3)[0])
+        ragged = dict(board_scene([step()]), rows=["GGG", "GG"])
+        self.assertIn("same length", gridviz.problems(ragged, 3)[0])
+
+    def test_the_board_is_timed_to_the_voice(self):
+        words = {"first plus": 1.0, "second plus": 4.0}
+        p = gridviz.props(board_scene([step(say="first plus", pluses=["1,1,1"]), step(say="second plus", pluses=["1,1,1", "3,4,1"])]),
+                          lambda say, after: words.get(say, after))
+        self.assertEqual([s["t"] for s in p["steps"]], [1.0, 4.0])
+        self.assertEqual(p["steps"][1]["pluses"][1], {"label": "area 5", "cells": [[3, 4], [2, 4], [4, 4], [3, 3], [3, 5]]})
+        self.assertEqual(p["blocked"], ["B"])
+
+    def test_a_grid_problem_drawn_on_a_strip_is_sent_back(self):
+        ctx = SimpleNamespace(outputs={"topic": {"topic": "Two Pluses", "angle": "",
+                                                 "owner_plan": {"statement": "Given a grid of size n x m, each cell is good or bad."}}})
+        strip = {"scenes": [{"layout": "trace", "cells": list("GGBGG")}] * 3}
+        self.assertIn("set on a grid", grid_problem_check(ctx, strip)[0])
+        board = {"scenes": [{"layout": "grid"}, {"layout": "grid"}]}
+        self.assertEqual(grid_problem_check(ctx, board), [])
+        one_d = SimpleNamespace(outputs={"topic": {"topic": "Two Sum", "angle": "find two numbers in an array"}})
+        self.assertEqual(grid_problem_check(one_d, strip), [])
 
 
 if __name__ == "__main__":

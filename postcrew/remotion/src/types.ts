@@ -5,10 +5,14 @@ export type Edge = {from: number; to: number; label: string; t: number; n?: numb
 export type Step = {
   t: number; pointers: {name: string; at: number}[]; active: number[]; out: number[]; found: number[]; note: string; memo: string[];
 };
+/** a real 2-D board (postcrew/gridviz.py): rows of characters, and steps that light cells, mark them and draw plus shapes. */
+export type GridStep = {t: number; active: number[][]; found: number[][]; out: number[][]; marks: {name: string; at: number[]}[];
+  pluses: {label: string; cells: number[][]}[]; note: string};
+export type GridViz = {title: string; rows: string[]; legend: string[]; blocked: string[]; steps: GridStep[]};
 export type Scene = {
-  layout: "title" | "statement" | "points" | "code" | "diagram" | "flow" | "trace" | "stat" | "codeviz" | "paths";
+  layout: "title" | "statement" | "points" | "code" | "diagram" | "flow" | "trace" | "stat" | "codeviz" | "paths" | "grid";
   title: string; items: string[]; code: string; language: string; seconds: number; captions: Caption[];
-  nodes?: Box[]; edges?: Edge[]; cells?: string[]; steps?: Step[]; cues?: number[]; closing?: boolean; key?: number; clip?: Svg; viz?: Viz; paths?: PathsViz; buttons?: {label: string; kind: string; svg?: Svg | null}[];
+  nodes?: Box[]; edges?: Edge[]; cells?: string[]; steps?: Step[]; cues?: number[]; closing?: boolean; key?: number; clip?: Svg; viz?: Viz; paths?: PathsViz; grid?: GridViz; buttons?: {label: string; kind: string; svg?: Svg | null}[];
 };
 /** The colours of a look: defined in postcrew/render/looks.py and sent with every render. */
 export type Theme = {

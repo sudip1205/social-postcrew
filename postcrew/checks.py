@@ -172,7 +172,7 @@ def text_problems(text, cat, profile, first_comment=""):
 YOUTUBE_TITLE_MAX, YOUTUBE_DESC_MAX, YOUTUBE_TAGS_MAX = 100, 5000, 500
 from . import speech  # noqa: E402
 
-SCENE_LAYOUTS = ("title", "statement", "points", "code", "diagram", "trace", "flow", "stat", "codeviz", "paths")
+SCENE_LAYOUTS = ("title", "statement", "points", "code", "diagram", "trace", "flow", "stat", "codeviz", "paths", "grid")
 
 
 SENTENCE_MAX = 30
@@ -221,7 +221,7 @@ def split_long_scenes(scenes, spec):
     out = []
     for sc in scenes:
         words = (sc.get("narration") or "").split()
-        if sc.get("part") == "closing" or sc.get("layout") in ("codeviz", "paths") or len(words) <= cap_words + int(4 * float(spec.get("wps") or 2.5)):   # a code walk-through keeps its one picture
+        if sc.get("part") == "closing" or sc.get("layout") in ("codeviz", "paths", "grid") or len(words) <= cap_words + int(4 * float(spec.get("wps") or 2.5)):   # a code walk-through keeps its one picture
             out.append(sc)
             continue
         sentences = re.findall(r"[^.!?]+[.!?]+\s*|[^.!?]+$", sc["narration"])
@@ -289,7 +289,7 @@ def storyboard_problems(scenes, spec):
     for i, sc in enumerate(scenes, 1):
         words = len((sc.get("narration") or "").split())
         secs = words / float(spec.get("wps") or 2.5)
-        if sc.get("part") != "closing" and secs > cap + 4 and not spec.get("artist") and sc.get("layout") not in ("codeviz", "paths"):   # with the Storyboard Artist a long scene is split for it
+        if sc.get("part") != "closing" and secs > cap + 4 and not spec.get("artist") and sc.get("layout") not in ("codeviz", "paths", "grid"):   # with the Storyboard Artist a long scene is split for it
             problems.append(f"scene {i}: about {secs:.0f} seconds on one picture while the voice talks: split it into scenes of at most "
                             f"{cap} seconds ({int(cap * float(spec.get('wps') or 2.5))} words), each showing the part being said")
         layout = sc.get("layout")
@@ -310,7 +310,7 @@ def storyboard_problems(scenes, spec):
             unsaid = [it for it in sc.get("items") or [] if not _says(sc.get("narration"), it)]
             if unsaid and len(unsaid) * 2 > len(sc.get("items") or []):   # a point may be worded differently, but most must be said
                 problems.append(f"scene {i}: the point '{unsaid[0]}' is on screen but the voice never says it: say each point as it appears")
-    if spec.get("artist") and len(scenes) >= 6 and not any(sc.get("layout") in ("code", "trace", "codeviz") for sc in scenes):   # a Remotion video: this channel builds and solves
+    if spec.get("artist") and len(scenes) >= 6 and not any(sc.get("layout") in ("code", "trace", "codeviz", "grid") for sc in scenes):   # a Remotion video: this channel builds and solves
         problems.append("the video builds or solves nothing on screen: add a 'code' scene (an editor window, with the output of running it in its terminal "
                         "lines) or, for an algorithm, a 'trace' scene and its code. This channel teaches by building")
     body = [(i, sc) for i, sc in enumerate(scenes, 1) if sc.get("part") not in ("intro", "closing") and not (i == 1 and not sc.get("part"))]
@@ -356,10 +356,10 @@ def structure_problems(scenes):
     seen = [sc for sc in scenes if sc.get("part") == "visual"]
     if len(seen) == 1:
         problems.append("the 'visual' part needs at least two pictures, growing: the smallest case first (2 steps), then a bigger one (3 steps), then another, so the viewer sees the pattern appear")
-    if seen and any(sc.get("layout") not in ("paths", "diagram", "flow", "trace", "stat") for sc in seen):
+    if seen and any(sc.get("layout") not in ("paths", "grid", "diagram", "flow", "trace", "stat") for sc in seen):
         problems.append("every 'visual' scene is a drawing, not words or code: a 'paths' staircase, a 'diagram', a 'flow', a 'trace' or a 'stat'")
     concl = [sc for sc in scenes if sc.get("part") == "conclusion"]
-    if concl and not any(sc.get("layout") in ("points", "trace", "diagram", "flow", "stat", "paths") for sc in concl):
+    if concl and not any(sc.get("layout") in ("points", "trace", "diagram", "flow", "stat", "paths", "grid") for sc in concl):
         problems.append("the 'conclusion' scene shows the pattern the pictures revealed (points, a trace of the numbers, a diagram), not only a sentence")
     first_code = next((i for i, sc in enumerate(scenes) if sc.get("layout") in ("code", "codeviz")), None)
     first_end = next((i for i, sc in enumerate(scenes) if sc.get("part") == "conclusion"), None)
@@ -369,7 +369,7 @@ def structure_problems(scenes):
     if ways and not any(sc.get("layout") in ("diagram", "flow", "points") for sc in ways):   # the ways are laid out side by side, not only said
         problems.append("the 'approaches' scene must show the ways on screen: a 'diagram' or 'flow' with one box for each way (Plain recursion, Memo, Table), or 'points' listing them")
     mistakes = [sc for sc in scenes if sc.get("part") == "mistake"]
-    if mistakes and not any(sc.get("layout") in ("diagram", "flow", "code", "trace", "codeviz") for sc in mistakes):   # the mistake is shown, not only said
+    if mistakes and not any(sc.get("layout") in ("diagram", "flow", "code", "trace", "codeviz", "grid") for sc in mistakes):   # the mistake is shown, not only said
         if True:
             problems.append("the common mistake scene must be a picture, not words: a 'flow' or 'diagram' showing the wrong path and then "
                             "the fix, or a 'code' scene with the wrong line and the right one (layout diagram, flow, code or trace)")
@@ -411,6 +411,9 @@ def script_problems(script, spec, cat, profile):
             problems += pathviz.problems(sc.get("paths"), i)
             if len((sc.get("narration") or "").split()) < 12:
                 problems.append(f"scene {i}: a 'paths' scene narrates the staircase as it is climbed: at least 12 words")
+        elif sc.get("layout") == "grid":
+            from . import gridviz
+            problems += gridviz.problems(sc.get("grid"), i)
         elif sc.get("layout") == "codeviz":
             from . import codeviz
             code_problem = check_code(sc.get("code") or "", sc.get("language") or "")

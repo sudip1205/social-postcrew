@@ -207,7 +207,8 @@ EVERY VIDEO FOLLOWS THIS ARC (checked by the app; a script that skips a part is 
    work it out in front of the viewer ("one step: only one way. Two steps: let's see... two ways."). Then ONE BIGGER CASE AT A TIME (two steps, three steps, four steps,
    five steps), each its own drawing with the real answer counted on screen, so the viewer SEES the pattern appear before you name it. Speak simple everyday words
    a ten-year-old follows: no terms such as recursion, memoization, dynamic programming, complexity or algorithm in this part. Every visual scene is a real drawing:
-   "paths" (a staircase with an arrow for every way up: use it for any "how many ways" problem), "diagram" or "flow" (boxes and arrows that grow), "trace" (cells
+   "paths" (a staircase with an arrow for every way up: use it for any "how many ways" problem), "grid" (a real board of rows and columns:
+   use it for EVERY problem set on a grid or matrix), "diagram" or "flow" (boxes and arrows that grow), "trace" (cells
    with a pointer moving) or "stat". Never words only, never code here.
 4. "conclusion": one or two scenes. WHAT THE PICTURES SHOWED: state the pattern in plain words ("each answer is the two before it added together: 1, 2, 3, 5, 8")
    and show it (a "trace" of the numbers with its note, or "points", or a "diagram"). Only now introduce the technical names, one at a time, each tied to what the viewer
@@ -227,6 +228,17 @@ technical term, before the problem has been stated with its example, the idea ha
 who is handed code first is lost. Pictures first, as to a child; code and technical terms second.
 KEEP A SHORT SHORT: with this arc a Short has about 11 to 14 scenes, each of 12 to 28 words (the staircase cases about 12 to 20 words each, said as they play). One scene for each
 hop of the story, no filler, and the whole narration under {{short_max_words}} words. Cut the example or the recap before you cut a picture.
+
+THE BOARD SCENE (layout "grid"): FOR EVERY PROBLEM SET ON A GRID (a matrix, a board, a maze, rows and columns of cells, "up, down, left,
+right", "above" or "below"). A "trace" is ONE ROW of cells: it cannot show above or below, so a grid problem drawn as a trace is wrong. Set
+"grid" to {title, rows (the example board, one string per row, one character per cell, copied EXACTLY from the problem: ["GGGGGG", "GBBBGB",
+...]; 2 to 10 rows and columns), legend (["G = good", "B = bad"]), blocked (characters nothing may cover: ["B"]), steps}. Each step, in the
+order the voice says it: say (2-3 words from the narration), active (cells looked at, "row,col"), found (answer cells), out (cells ruled
+out), marks (a labelled arrow on a cell: "centre=2,3"), pluses (plus shapes by centre and arm: "2,3,1" is the plus centred on row 2,
+column 3 with arms of 1, 5 cells; "2,3,0" is one cell), note (what the step shows: "arm 1: area 5"). The app draws the real rows and columns
+with their numbers, every cell of a plus, each plus in its own colour, and cells two pluses share in red; it refuses a plus that leaves the
+board or covers a blocked cell, so the picture is always true. Use grid scenes for the problem's example, every step of the idea and the
+worked example, and the mistake (two pluses overlapping, shown in red). Say "up" or "above" only when the board shows it.
 
 THE STAIRCASE SCENE (layout "paths", one scene per case). Set "paths" to {kind "stairs", title, n (1 to 6 steps), moves (the hops allowed: [1, 2] is one or two steps at a
 time)}. The app finds EVERY way up and draws each one: a little figure hops from step to step along an arrow while "WAYS" counts up and each way is written ("1 + 2").

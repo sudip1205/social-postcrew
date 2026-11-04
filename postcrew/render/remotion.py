@@ -10,7 +10,7 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from .. import codeviz, pathviz
+from .. import codeviz, gridviz, pathviz
 from . import iconlib, looks, timeline, video
 from .scenes import FORMATS, edge_marks, node_extra, parse_edge, parse_pointer, split_node
 from .video import FPS, VideoError
@@ -157,6 +157,8 @@ def build_props(scenes, fmt, audio, look=None):
     for i, sc in enumerate(scenes):
         if sc.get("layout") == "paths" and isinstance(sc.get("paths"), dict) and not pathviz.problems(sc["paths"], i + 1):
             lengths[i] = max(lengths[i], pathviz.min_seconds(sc["paths"]))
+        if sc.get("layout") == "grid" and isinstance(sc.get("grid"), dict) and not gridviz.problems(sc["grid"], i + 1):
+            lengths[i] = max(lengths[i], gridviz.min_seconds(sc["grid"]))
     out, carry = [], {"nodes": []}
     for i, (sc, ln) in enumerate(zip(scenes, lengths)):
         a = audio[i] if isinstance(audio, (list, tuple)) else None
@@ -176,6 +178,10 @@ def build_props(scenes, fmt, audio, look=None):
             item["viz"] = codeviz.props(sc["viz"], ln)
         if layout == "paths" and isinstance(sc.get("paths"), dict):   # a staircase and every way up it (postcrew/pathviz.py)
             item["paths"] = pathviz.props(sc["paths"], ln)
+        if layout == "grid" and isinstance(sc.get("grid"), dict) and not gridviz.problems(sc["grid"], i + 1):   # a real 2-D board (postcrew/gridviz.py)
+            item["grid"] = gridviz.props(sc["grid"], lambda say, after, w=words: _when(say, w, after))
+        elif layout == "grid":   # a board that does not check out is never drawn as a strip: its heading alone
+            item["layout"] = "statement"
         if layout == "stat":
             item["cues"] = [_when(sc.get("on_screen"), words)]
         if sc.get("clip") and iconlib.svg(sc["clip"]):   # a clipart beside a words scene

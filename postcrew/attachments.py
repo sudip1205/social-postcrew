@@ -20,6 +20,7 @@ from .llm import LLMError, make_backend
 AGENT = "reader"
 EXT = {".pdf": "pdf", ".png": "image", ".jpg": "image", ".jpeg": "image", ".webp": "image", ".gif": "image"}
 MAX_MB, MAX_FILES, MAX_PAGES = 25, 6, 12
+DPI, STRIP_PX, OVERLAP_PX, MAX_STRIPS = 220, 1500, 120, 24
 SCHEMA = {
     "type": "object",
     "properties": {
@@ -41,6 +42,9 @@ SYSTEM = """You read the material a creator attached to a video plan: pages of a
 and images. It is usually an algorithm or coding problem. Write down the problem exactly as the material states it, complete, so a script
 writer and an animator who never see the files can teach it faithfully.
 
+- The pictures are the pages in order, a tall page cut into overlapping strips from top to bottom (the strips overlap a little: do not
+  read a line twice). Read the small print: sample inputs (copy every row of a grid exactly, character by character), constraints.
+- A sample drawn as a coloured picture (a grid of coloured squares with a key) is data too: read it cell by cell with its key.
 - Copy words, numbers, names, input and output formats, examples and constraints exactly. Never solve, improve or invent: if a value is not
   in the material, it is not in your answer. The pulled-out text is exact where it exists; use the pictures for what text cannot carry
   (figures, tables, formulas, handwriting, a scanned page) and to check the text's order.
@@ -140,13 +144,41 @@ def pdf_parts(path, out_dir, runner=subprocess.run, max_pages=MAX_PAGES):
             pass
     if shutil.which("pdftoppm") or runner is not subprocess.run:
         out_dir.mkdir(parents=True, exist_ok=True)
-        prefix = out_dir / Path(path).stem
-        try:
-            runner(["pdftoppm", "-png", "-r", "110", "-l", str(max_pages), str(path), str(prefix)], capture_output=True, timeout=300)
-        except (OSError, subprocess.SubprocessError):
-            pass
-        pages = sorted(out_dir.glob(f"{Path(path).stem}-*.png"))[:max_pages]
+        stem = Path(path).stem
+        # A page is drawn sharp (DPI) and, when tall (a full-page screenshot of a web page), cut into overlapping strips: one shrunken picture
+        # of a tall page leaves its small print (the sample input, a constraint) unreadable to the model.
+        for n, (w_pt, h_pt) in enumerate(page_sizes(path, runner)[:max_pages], 1):
+            w_px, h_px = int(w_pt / 72 * DPI), int(h_pt / 72 * DPI)
+            y, k = 0, 0
+            while y < h_px and len(pages) < MAX_STRIPS:
+                k += 1
+                out = out_dir / f"{stem}-p{n:02d}-{k:02d}"
+                try:
+                    runner(["pdftoppm", "-png", "-r", str(DPI), "-f", str(n), "-l", str(n), "-x", "0", "-y", str(y), "-W", str(w_px),
+                            "-H", str(min(STRIP_PX, h_px - y)), "-singlefile", str(path), str(out)], capture_output=True, timeout=120)
+                except (OSError, subprocess.SubprocessError):
+                    break
+                if Path(f"{out}.png").exists():
+                    pages.append(Path(f"{out}.png"))
+                if y + STRIP_PX >= h_px:
+                    break
+                y += STRIP_PX - OVERLAP_PX
     return text, pages
+
+
+def page_sizes(path, runner=subprocess.run):
+    """[(width, height) in points] of every page (pdfinfo); a letter page when it cannot tell."""
+    try:
+        r = runner(["pdfinfo", "-f", "1", "-l", str(MAX_PAGES), str(path)], capture_output=True, text=True, timeout=60)
+        sizes = [(float(a), float(b)) for a, b in re.findall(r"Page\s+\d+\s+size:\s+([\d.]+)\s+x\s+([\d.]+)", r.stdout or "")]
+        if not sizes:
+            m = re.search(r"Pages:\s+(\d+)", r.stdout or "")
+            one = re.search(r"Page size:\s+([\d.]+)\s+x\s+([\d.]+)", r.stdout or "")
+            if m and one:
+                sizes = [(float(one.group(1)), float(one.group(2)))] * int(m.group(1))
+        return sizes or [(612.0, 792.0)]
+    except (OSError, subprocess.SubprocessError):
+        return [(612.0, 792.0)]
 
 
 def read(ws, platform, item_id, llm=None, runner=subprocess.run, log=print):
@@ -171,7 +203,7 @@ def read(ws, platform, item_id, llm=None, runner=subprocess.run, log=print):
                 texts.append(f"--- {f['name']}: could not be opened (is it password-protected?) ---")
         else:
             images.append(p)
-    images = images[:MAX_PAGES + MAX_FILES]
+    images = images[:MAX_STRIPS + MAX_FILES]
     cfg = ws.config()
     if llm is None:
         if cfg["llm"]["backend"] == "demo":

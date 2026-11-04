@@ -12,6 +12,7 @@ For every scene except the closing card, decide:
 4. BEATS: what appears, in the order the voice names it, one beat every 2-4 seconds. A scene with nothing new for longer than the house
    style allows is a still picture: give it more beats or a different layout.
 5. LAYOUT: the layout that draws it best: diagram or flow for things that connect, send or store; trace for an algorithm on an array;
+   grid for ANY problem on a grid, matrix or board (it draws real rows and columns; a trace is one row and cannot show above or below);
    codeviz for recursion or a table filling; code for a program and its output; stat for a real figure; points only for a short list;
    title or statement only for the opening or a single strong line.
 6. PATTERN: use a pattern offered for the scene when it fits, by name.

@@ -9,10 +9,11 @@ A script the owner supplies (assets.py) skips the drafting; it is parsed, comple
 like any other.
 """
 import json
+import re
 
 from .. import assets as assets_mod
 from .. import brief as briefmod
-from .. import codeviz, pathviz, platforms
+from .. import codeviz, gridviz, pathviz, platforms
 from .. import checks as checks_mod
 from ..checks import PARTS, repeat_problem, script_problems
 from . import team
@@ -38,7 +39,7 @@ STEP = {
 SCENE = {
     "type": "object",
     "properties": {
-        "layout": {"type": "string", "enum": ["title", "statement", "points", "code", "diagram", "trace", "flow", "stat", "codeviz", "paths"]},
+        "layout": {"type": "string", "enum": ["title", "statement", "points", "code", "diagram", "trace", "flow", "stat", "codeviz", "paths", "grid"]},
         "part": {"type": "string", "enum": list(PARTS),
                  "description": "which part of the video this scene is: intro (a short opening), problem (what is asked, with an example input and answer), visual (the idea drawn as to a child: the smallest case first, then bigger ones), conclusion (the pattern the pictures showed), approaches (the ways it can be solved, compared, no code yet), idea (the chosen solution), example (worked example with code), mistake (a common mistake to avoid), closing (the like, comment, share card)"},
         "narration": {"type": "string", "description": "what the voice says; spoken sentences, no markdown"},
@@ -55,6 +56,7 @@ SCENE = {
                   "description": "trace: what happens to the data, one entry per move, in the order the voice says it"},
         "viz": codeviz.VIZ,
         "paths": pathviz.PATHS,
+        "grid": gridviz.GRID,
         "seconds": {"type": "number"},
     },
     "required": ["layout", "part", "narration", "on_screen", "items", "code", "language", "nodes", "edges", "cells", "steps", "seconds"],   # viz: only a codeviz scene has one
@@ -72,6 +74,24 @@ SCHEMA = {
     "additionalProperties": False,
 }
 
+GRID_WORDS = re.compile(r"\b(grid|matrix|board|maze|rows? and columns?|n\s*[x×]\s*m|2-?d array|two-dimensional|island|chessboard|cell \(i,\s*j\))\b", re.I)
+
+
+def grid_problem_check(ctx, out):
+    """A problem set on a grid must be drawn on a real board ("grid" scenes), never on a one-row trace that cannot show above or below."""
+    plan = (ctx.outputs.get("topic") or {}).get("owner_plan") or {}
+    topic = ctx.outputs.get("topic") or {}
+    text = " ".join([plan.get("statement", ""), plan.get("context", ""), topic.get("topic", ""), topic.get("angle", "")])
+    if not GRID_WORDS.search(text):
+        return []
+    scenes = out.get("scenes") or []
+    grids = [s for s in scenes if s.get("layout") == "grid"]
+    if len(grids) >= 2:
+        return []
+    return [f"this problem is set on a grid (rows and columns), so it must be DRAWN on one: use 'grid' scenes (at least two: the example board, "
+            f"then the idea step by step on it; also the mistake). You have {len(grids)}. A 'trace' is a single row and cannot show above or below"]
+
+
 FORMAT_RULES = {
     "short": "A vertical 9:16 Short (up to 3 minutes): a short opening, the problem with an example, the ways it can be solved, then the chosen solution built up scene by scene with its code.",
     "long": "A 16:9 video: open with a short introduction (about 15 seconds), state the problem, lay out the ways to solve it, then one idea per scene (about 4-12 scenes per ten minutes), "
@@ -85,7 +105,7 @@ def script_revision_block(ctx, guidance, prev=None):
     if not (guidance and prev and prev.get("scenes")):
         return ""
     keep = {k: prev.get(k) for k in ("title", "description", "tags", "thumbnail_text")}
-    keep["scenes"] = [{k: sc.get(k) for k in ("layout", "part", "narration", "on_screen", "items", "code", "language", "nodes", "edges", "cells", "steps", "viz", "paths") if sc.get(k) not in (None, "", [])}
+    keep["scenes"] = [{k: sc.get(k) for k in ("layout", "part", "narration", "on_screen", "items", "code", "language", "nodes", "edges", "cells", "steps", "viz", "paths", "grid") if sc.get(k) not in (None, "", [])}
                       for sc in prev["scenes"]]
     return ("\n\nYOUR PREVIOUS SCRIPT was sent back. REVISE it: keep every scene that is fine exactly as it is, and change only what the points below require "
             "(the picture fields of a scene you do not touch stay as they are). Do not add new claims while fixing.\n<previous_script>\n"
@@ -183,6 +203,7 @@ class ScriptWriter(WriterAgent):
                                 f"Short (3 minutes at most). Cut it or make a long video")
             return problems
         problems = script_problems(out, spec, ctx.cat, ctx.profile)
+        problems += grid_problem_check(ctx, out)
         dup = repeat_problem("", out.get("text", ""), ctx.recent(60))
         if dup:
             problems.append(dup)

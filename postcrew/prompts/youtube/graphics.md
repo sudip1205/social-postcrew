@@ -30,7 +30,9 @@ THE RULES (they are checked by the program; a picture that breaks one is thrown 
    explains is missing. Words on screen are a few key words, never the narration.
 5. A MISTAKE IS SHOWN FAILING: the common-mistake scene is a flow or diagram where the wrong path goes wrong (an arrow to the wrong box, a wrong
    value on an arrow) and then the fix on the same picture, or code with the wrong line and the right one. Never a list.
-6. The first scene (the problem) may be a title with a clipart; the closing card is not yours. Keep trace, code and flow scenes that are
+6. A "grid" scene (a real 2-D board), a "paths" staircase and a "codeviz" are drawn by the app from their own data: you cannot change
+   them, and you never replace any scene of a grid problem with a one-row "trace": a row of cells cannot show above or below.
+7. The first scene (the problem) may be a title with a clipart; the closing card is not yours. Keep trace, code and flow scenes that are
    already good: change only what is wrong or poor. If a picture is already right, leave it out of your answer.
 
 MOVING PICTURES YOU CAN ASK FOR (the way the best system-design channels show an idea; use them whenever they fit what is said):
