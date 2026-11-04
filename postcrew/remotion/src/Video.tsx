@@ -184,13 +184,15 @@ const Code: React.FC<{s: Scene; short: boolean}> = ({s, short}) => {
   const lines = s.code.replace(/\s+$/, "").split("\n");
   const typeEnd = Math.max(1.2, s.seconds * (s.items?.length ? 0.55 : 0.8));
   const shown = interpolate(t, [0.5, typeEnd], [0, lines.length], {extrapolateLeft: "clamp", extrapolateRight: "clamp"});
-  const size = Math.min(short ? 46 : 34, ((short ? 780 : 1380) / Math.max(12, ...lines.map((l) => l.length))) * 1.65);
+  // readable on a phone first: never under 38 px on a Short (a long line wraps, its indent kept) rather than shrinking the whole file
+  const size = Math.max(short ? 38 : 28, Math.min(short ? 50 : 36, ((short ? 780 : 1380) / Math.max(12, ...lines.map((l) => l.length))) * 1.65));
   const file = /\.\w{1,5}$/.test(s.title) ? s.title : `main.${EXT[(s.language || "").toLowerCase()] ?? "txt"}`;
   const cur = Math.min(lines.length - 1, Math.floor(shown)), done = shown >= lines.length, caret = Math.floor(t * 2.4) % 2 === 0;
   const out = s.items ?? [], termStart = typeEnd + 0.4;
   return (
     <>
       <Heading text={s.title} short={short} />
+      <div style={{flex: 1, display: "flex", flexDirection: "column", justifyContent: "center"}}>
       <div style={{border: `2px solid ${th.rule}`, borderRadius: 16, overflow: "hidden", background: th.surface}}>
         <div style={{height: 52, display: "flex", alignItems: "center", gap: 10, padding: "0 20px", background: th.accentSoft, borderBottom: `2px solid ${th.rule}`}}>
           {[0, 1, 2].map((i) => <span key={i} style={{width: 14, height: 14, borderRadius: 14, background: th.muted, opacity: 0.6}} />)}
@@ -201,10 +203,10 @@ const Code: React.FC<{s: Scene; short: boolean}> = ({s, short}) => {
           {lines.map((l, i) => {
             const a = Math.max(0, Math.min(1, shown - i)), active = i === cur && !done;
             return (
-              <div key={i} style={{display: "flex", gap: 26, whiteSpace: "pre", opacity: ease(a), background: active ? th.accentSoft : "transparent", margin: "0 -14px", padding: "0 14px", borderRadius: 6,
+              <div key={i} style={{display: "flex", gap: 22, whiteSpace: "pre-wrap", wordBreak: "break-word", opacity: ease(a), background: active ? th.accentSoft : "transparent", margin: "0 -14px", padding: "0 14px", borderRadius: 6,
                 transform: `translateY(${(1 - ease(a)) * 10}px)`}}>
                 <span style={{color: th.muted, minWidth: 34, textAlign: "right", opacity: 0.8}}>{i + 1}</span>
-                <span><Colored line={l} />{active && caret && <span style={{display: "inline-block", width: size * 0.5, height: size * 1.05, background: th.accent, marginLeft: 3, verticalAlign: "text-bottom"}} />}</span>
+                <span style={{flex: 1, minWidth: 0}}><Colored line={l} />{active && caret && <span style={{display: "inline-block", width: size * 0.5, height: size * 1.05, background: th.accent, marginLeft: 3, verticalAlign: "text-bottom"}} />}</span>
               </div>
             );
           })}
@@ -218,6 +220,7 @@ const Code: React.FC<{s: Scene; short: boolean}> = ({s, short}) => {
             })}
           </div>
         )}
+      </div>
       </div>
     </>
   );
@@ -402,39 +405,64 @@ const EdgeView: React.FC<{n: number; e: Edge; pos: P[]; bw: number; bh: number; 
   );
 };
 
+/** A walk through an array: big cells that fill the width (a long array wraps into two rows on a Short), the step's note and its counters as
+ *  big tiles ("count = 2" -> a COUNT tile reading 2), all centred in the frame so nothing is a thin strip at the top. */
 const Trace: React.FC<{s: Scene; short: boolean}> = ({s, short}) => {
   const th = useTheme(), {t} = useT();
   const cells = s.cells ?? [], steps = s.steps ?? [];
   const cur: Step | undefined = [...steps].reverse().find((st) => st.t <= t);
-  const cw = Math.min(short ? 176 : 160, (short ? 888 : 1620) / Math.max(1, cells.length) - 18);
+  const n = Math.max(1, cells.length);
+  const perRow = short && n > 6 ? Math.ceil(n / 2) : n;
+  const rows = Array.from({length: Math.ceil(n / perRow)}, (_, r) => cells.slice(r * perRow, r * perRow + perRow).map((c, k) => ({c, i: r * perRow + k})));
+  const gap = short ? 18 : 16;
+  const cw = Math.floor(Math.min(short ? 190 : 170, ((short ? 888 : 1620) - gap * (perRow - 1)) / perRow));
   const p = useProgress(0.4, 1.0);
-  const look = (i: number) => cur?.found.includes(i) ? {border: th.positive, fill: `${th.positive}22`, op: 1}
+  const since = cur ? t - cur.t : 0;
+  const pop = interpolate(since, [0, 0.3], [0, 1], {extrapolateLeft: "clamp", extrapolateRight: "clamp"});
+  const look = (i: number) => cur?.found.includes(i) ? {border: th.positive, fill: `${th.positive}33`, op: 1}
     : cur?.active.includes(i) ? {border: th.accent, fill: th.accentSoft, op: 1}
-    : cur?.out.includes(i) ? {border: th.rule, fill: "transparent", op: 0.4} : {border: th.text, fill: th.surface, op: 1};
+    : cur?.out.includes(i) ? {border: th.rule, fill: "transparent", op: 0.35} : {border: th.text, fill: th.surface, op: 1};
+  const tiles = (cur?.memo ?? []).map((m) => {
+    const k = m.match(/^\s*([^=:]{1,24}?)\s*[=:]\s*(.{1,14})$/);
+    return k ? {name: k[1], value: k[2]} : {name: "", value: m};
+  });
   return (
     <>
       <Heading text={s.title} short={short} />
-      <div style={{display: "flex", justifyContent: "center", gap: 16, marginTop: short ? 50 : 16, opacity: p}}>
-        {cells.map((c, i) => {
-          const l = look(i);
-          return (
-            <div key={i} style={{width: cw, opacity: l.op}}>
-              <div style={{height: cw * 0.95, border: `${l.border === th.text ? 2.5 : 4}px solid ${l.border}`, borderRadius: 12, background: l.fill, display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: cw * 0.36, fontWeight: 700, fontFamily: MONO}}>{c}</div>
-              <div style={{textAlign: "center", color: th.muted, fontSize: 24, fontFamily: MONO, marginTop: 10}}>{i}</div>
-              <div style={{textAlign: "center", color: th.accent, fontWeight: 700, fontSize: 28, fontFamily: MONO, minHeight: 84}}>
-                {(cur?.pointers ?? []).filter((q) => q.at === i).map((q) => <div key={q.name}>▲ {q.name}</div>)}
-              </div>
+      <div style={{flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", gap: short ? 56 : 30}}>
+        <div style={{display: "flex", flexDirection: "column", gap: short ? 26 : 12, alignItems: "center", opacity: p}}>
+          {rows.map((row, r) => (
+            <div key={r} style={{display: "flex", gap}}>
+              {row.map(({c, i}) => {
+                const l = look(i), lit = l.border !== th.text && l.op === 1;
+                return (
+                  <div key={i} style={{width: cw, opacity: l.op}}>
+                    <div style={{height: cw, border: `${lit ? 6 : 3}px solid ${l.border}`, borderRadius: Math.round(cw * 0.12), background: l.fill, display: "flex",
+                      alignItems: "center", justifyContent: "center", fontSize: Math.round(cw * (String(c).length > 3 ? 0.3 : 0.46)), fontWeight: 700, fontFamily: MONO,
+                      transform: lit ? `scale(${0.94 + 0.06 * pop})` : undefined}}>{c}</div>
+                    <div style={{textAlign: "center", color: th.muted, fontSize: short ? 28 : 24, fontFamily: MONO, marginTop: 8}}>{i}</div>
+                    <div style={{textAlign: "center", color: th.accent, fontWeight: 700, fontSize: short ? 32 : 28, fontFamily: MONO, minHeight: short ? 40 : 34}}>
+                      {(cur?.pointers ?? []).filter((q) => q.at === i).map((q) => <div key={q.name}>▲ {q.name}</div>)}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-          );
-        })}
-      </div>
-      {cur?.note && <div style={{textAlign: "center", fontSize: short ? 56 : 38, fontWeight: 600, letterSpacing: -0.8, marginTop: 36}}>{cur.note}</div>}
-      {!!cur?.memo.length && (
-        <div style={{display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap", marginTop: 30, fontFamily: MONO, fontSize: short ? 32 : 28}}>
-          {cur.memo.map((m) => <span key={m} style={{border: `2px solid ${th.rule}`, borderRadius: 10, padding: "8px 18px"}}>{m}</span>)}
+          ))}
         </div>
-      )}
+        {cur?.note && <div style={{textAlign: "center", fontSize: short ? 66 : 44, fontWeight: 700, letterSpacing: -1, lineHeight: 1.15, opacity: pop}}>{cur.note}</div>}
+        {tiles.length > 0 && (
+          <div style={{display: "flex", gap: short ? 24 : 20, justifyContent: "center", flexWrap: "wrap"}}>
+            {tiles.map((m, k) => (
+              <div key={k} style={{minWidth: short ? 230 : 190, padding: short ? "18px 28px" : "12px 22px", borderRadius: 18, border: `3px solid ${th.rule}`,
+                background: th.surface, textAlign: "center"}}>
+                {m.name && <div style={{fontSize: short ? 30 : 24, color: th.muted, fontFamily: MONO, textTransform: "uppercase", letterSpacing: 1.5}}>{m.name}</div>}
+                <div style={{fontSize: m.name ? (short ? 76 : 56) : (short ? 40 : 32), fontWeight: 700, fontFamily: MONO, color: th.text}}>{m.value}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </>
   );
 };
