@@ -134,4 +134,6 @@ No Stitch screen exists for either view. Both are derived from the shell, design
   Skipped, You replied), the comment text, an editable reply and the Queue's own small Approve-green "Send reply" / outlined "Skip" buttons.
   Answered and skipped comments fold into a native <details>. A missing LinkedIn permission shows as an amber notice with the lock icon.
 - "Retry comment" in the Published table is the table's small outlined button style.
+- Credentials > "Comment emails" is a copy of the Gmail notifications card (sectionHead, numbered steps, two-column fields, Save + Test
+  buttons, hint) with the forum icon and violet tile. The Comments card shows the mailbox in a violet notice (rose when sign-in fails).
 

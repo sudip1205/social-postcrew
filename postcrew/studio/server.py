@@ -460,7 +460,8 @@ class Studio:
     def save_credentials(self, body):
         allowed = {"linkedin_client_id", "linkedin_client_secret", "gmail_address", "gmail_app_password", "email_to",
                    "telegram_bot_token", "telegram_chat_id", "anthropic_api_key", "openai_api_key", "llm_api_key",
-                   "youtube_client_id", "youtube_client_secret", "elevenlabs_api_key"}
+                   "youtube_client_id", "youtube_client_secret", "elevenlabs_api_key",
+                   "comments_mail_address", "comments_mail_password", "comments_mail_server"}
         changes = {k: (v.strip() if isinstance(v, str) else v) for k, v in body.items() if k in allowed}
         if any(k not in allowed for k in body):
             raise ValueError(f"only these can be set here: {sorted(allowed)}")
@@ -476,11 +477,21 @@ class Studio:
                              "(Google Cloud > APIs & Services > Credentials)")
         if "youtube_client_id" in changes or "youtube_client_secret" in changes:   # new app: the old connection is void
             changes.setdefault("youtube_refresh_token", None)
-        for k in ("gmail_address", "email_to"):
+        if changes.get("comments_mail_server") and not re.fullmatch(r"[A-Za-z0-9.-]+\.[A-Za-z]{2,}", changes["comments_mail_server"]):
+            raise ValueError("the mail server should be a host name, e.g. imap.mail.me.com")
+        for k in ("gmail_address", "email_to", "comments_mail_address"):
             if changes.get(k) and not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", changes[k]):
                 raise ValueError(f"{k} should be an email address")
         self.ws.update_secrets(**{k: v for k, v in changes.items()})
         return self.credentials()
+
+    def test_mail(self):
+        """Sign in to the comment mailbox and count LinkedIn's emails. Read-only."""
+        from .. import mailbox
+        try:
+            return mailbox.test(self.ws.secrets())
+        except mailbox.MailError as e:
+            return {"ok": False, "message": str(e)}
 
     def test_email(self):
         """Send one email now, whether or not email notifications are switched on, and report the result."""
@@ -894,6 +905,7 @@ def make_handler(studio):
                     ("POST", "/api/notifications/test"): lambda: notify_mod.notify(
                         ws, "Test notification", "If you can read this, notifications work.", level="info"),
                     ("POST", "/api/notifications/test-email"): lambda: studio.test_email(),
+                    ("POST", "/api/credentials/test-mail"): lambda: studio.test_mail(),
                     ("POST", "/api/pause"): lambda: self.pause(),
                 }
                 fn = routes.get((method, p))

@@ -170,8 +170,11 @@ function qComments(en) {
   if (!en) return "";
   const a = en.access || {}, st = en.settings || {}, rows = en.comments || [];
   const open = rows.filter(r => r.status === "drafted" || r.status === "failed"), done = rows.filter(r => !open.includes(r)).slice(0, 10);
-  const banner = a.ok === false
-    ? `<div class="flex items-start gap-2 p-3 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-800">${icon("lock", "text-[16px] text-amber-600")}<span>${esc(a.message)}</span></div>` : "";
+  const m = en.mail || {}, viaMail = m.ok === true;
+  const notice = (ic, text, tone) => `<div class="flex items-start gap-2 p-3 rounded-lg text-xs ${tone}">${icon(ic, "text-[16px]")}<span>${esc(text)}</span></div>`;
+  const banner = m.ok === false ? notice("mail", m.message, "bg-rose-50 border border-rose-200 text-rose-800")
+    : viaMail ? notice("mail", `Reading LinkedIn's comment emails in ${m.address}.`, "bg-violet-50 border border-violet-200 text-violet-800")
+    : a.ok === false ? notice("lock", a.message, "bg-amber-50 border border-amber-200 text-amber-800") : "";
   const row = r => { const [k, w] = EN_STATE[r.status] || ["idle", r.status];
     const editable = r.status === "drafted" || r.status === "failed";
     return `<div class="border border-slate-200 rounded-lg p-3 flex flex-col gap-2" data-en="${esc(r.urn)}">
@@ -189,7 +192,7 @@ function qComments(en) {
       <p class="text-sm text-slate-500 mt-0.5">The ${tip("Replier", "Reads the comments on your posts from the last " + (st.lookback_days || 7) + " days and writes the reply you would write to each, from the post and the comment. Spam and abuse are skipped.")} answers comments on your recent posts: ${esc(EN_MODE[st.replies] || st.replies)} (change it in config: engage.replies).${en.checked_at ? " Last checked " + esc(fmtTime(en.checked_at)) + "." : ""}</p></div>
       ${button("secondary", "forum", "Check comments now", `id="en-check" type="button"`)}</div>
     ${banner}
-    ${open.length ? `<div class="flex flex-col gap-3">${open.map(row).join("")}</div>` : a.ok === false ? "" : emptyState("forum", "No comments waiting for a reply.")}
+    ${open.length ? `<div class="flex flex-col gap-3">${open.map(row).join("")}</div>` : a.ok === false && !viaMail ? "" : emptyState("forum", "No comments waiting for a reply.")}
     ${done.length ? `<details class="text-sm"><summary class="cursor-pointer text-xs font-semibold text-slate-600">Answered and skipped (${done.length})</summary><div class="flex flex-col gap-2 mt-2">${done.map(row).join("")}</div></details>` : ""}</section>`;
 }
 

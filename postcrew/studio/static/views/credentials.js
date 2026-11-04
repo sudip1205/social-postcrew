@@ -102,6 +102,16 @@ async function renderCredentials() {
     <div class="flex items-center gap-3 flex-wrap mt-4">${button("secondary", "save", "Save Gmail", 'id="save-gm"')}${button("secondary", "forward_to_inbox", "Send a test email", 'id="test-gm"')}${result("gm-result")}</div>
     ${hint("Turn on Gmail email in Settings &gt; Notifications after saving.")}</div>`);
 
+  const mailbox = card(`<div class="p-6">${sectionHead("forum", "Comment emails (for replies)", "LinkedIn does not give apps the comments on a personal profile, so the Replier reads LinkedIn's \"commented on your post\" emails.", "violet")}
+    <ol class="list-decimal pl-5 mt-4 space-y-1 text-xs text-slate-600"><li>iCloud: at ${a("https://account.apple.com", "account.apple.com")} open Sign-In and Security &gt; App-Specific Passwords and create one named "Postcrew". Never use your Apple ID password.</li>
+      <li>Gmail and others: an app password from the mail provider. The server is filled in for iCloud, Gmail, Outlook and Yahoo addresses.</li>
+      <li>The inbox is opened read-only: nothing is marked read, moved or deleted, and only mail from LinkedIn about comments is read.</li></ol>
+    <div class="grid gap-3 md:grid-cols-2 mt-4">${field("Email address LinkedIn writes to", set(s.comments_mail_address), `<input class="${CRED_INPUT}" id="mb-addr" type="email" value="${esc(s.comments_mail_address || "")}" placeholder="you@icloud.com">`)}
+      ${field("App-specific password", set(s.comments_mail_password), `<input class="${CRED_INPUT}" id="mb-pass" type="password" placeholder="${s.comments_mail_password ? "•••••••• (saved)" : "xxxx-xxxx-xxxx-xxxx"}" autocomplete="new-password">`)}
+      ${field("Mail server (optional)", set(s.comments_mail_server), `<input class="${CRED_INPUT}" id="mb-server" value="${esc(s.comments_mail_server || "")}" placeholder="worked out from the address (iCloud: imap.mail.me.com)">`)}</div>
+    <div class="flex items-center gap-3 flex-wrap mt-4">${button("secondary", "save", "Save mailbox", 'id="save-mb"')}${button("secondary", "bolt", "Test sign-in", 'id="test-mb"')}${result("mb-result")}</div>
+    ${hint("Keep LinkedIn's comment email notifications on (LinkedIn &gt; Settings &gt; Notifications &gt; Email). Replies wait on the Queue page's Comments card.")}</div>`);
+
   const telegram = card(`<div class="p-6">${sectionHead("chat", "Telegram notifications (optional)", "Get alerts in a Telegram chat.", "sky")}
     <div class="grid gap-3 md:grid-cols-2 mt-4">${field("Bot token", set(s.telegram_bot_token), `<input class="${CRED_INPUT}" id="tg-token" type="password" placeholder="${s.telegram_bot_token ? "•••••••• (saved)" : "from @BotFather"}" autocomplete="new-password">`)}
       ${field("Chat id", set(s.telegram_chat_id), `<input class="${CRED_INPUT}" id="tg-chat" value="${esc(s.telegram_chat_id || "")}">`)}</div>
@@ -114,7 +124,7 @@ async function renderCredentials() {
       <p class="text-xs text-slate-500 mt-1">Stored only in <span class="${CRED_MONO}">workspace/secrets.json</span> (readable by you only). The browser can set them but never read them back.</p></div>
     <div><h2 class="font-headline font-bold text-lg text-slate-900 mb-3">Connected apps</h2><div class="grid gap-4 lg:grid-cols-2 items-start">${linkedin}${youtube}</div></div>
     <div><h2 class="font-headline font-bold text-lg text-slate-900 mb-3">Voice</h2><div class="grid gap-4 lg:grid-cols-2 items-start">${eleven}</div></div>
-    <div class="grid gap-6 lg:grid-cols-2 items-start">${ai}<div class="space-y-6">${gmail}${telegram}</div></div></div>`;
+    <div class="grid gap-6 lg:grid-cols-2 items-start">${ai}<div class="space-y-6">${mailbox}${gmail}${telegram}</div></div></div>`;
 
   const save = (body, msg) => api("/api/credentials", { method: "PUT", body }).then(() => { toast(msg); renderCredentials(); }).catch(e => toast(e.message, true));
   $("#check").onclick = async () => { $("#check").disabled = true; try { await post("/api/credentials/check"); toast("Checked"); } catch (e) { toast(e.message, true); } renderCredentials(); refreshOverview(); };
@@ -141,6 +151,9 @@ async function renderCredentials() {
     const r = await post("/api/notifications/test-email").catch(e => ({ ok: false, error: e.message }));
     $("#gm-result").textContent = r.ok ? `Sent to ${r.to}. Check the inbox (and spam).` : `Failed: ${r.error}`; b.disabled = false;
   };
+  $("#save-mb").onclick = () => { const body = { comments_mail_address: $("#mb-addr").value.trim(), comments_mail_server: $("#mb-server").value.trim() }; if ($("#mb-pass").value) body.comments_mail_password = $("#mb-pass").value.trim(); save(body, "Mailbox saved"); };
+  $("#test-mb").onclick = async () => { const b = $("#test-mb"); b.disabled = true; $("#mb-result").textContent = "Signing in...";
+    const r = await post("/api/credentials/test-mail").catch(e => ({ ok: false, message: e.message })); $("#mb-result").textContent = r.message; b.disabled = false; };
   $("#save-tg").onclick = () => { const body = { telegram_chat_id: $("#tg-chat").value.trim() }; if ($("#tg-token").value) body.telegram_bot_token = $("#tg-token").value.trim(); save(body, "Telegram saved"); };
   const saveKey = (k, v) => api("/api/credentials", { method: "PUT", body: { [k]: v } }).then(async () => {
     toast(v ? "Key saved" : "Key removed"); await post("/api/credentials/check"); renderCredentials(); refreshOverview(); }).catch(e => toast(e.message, true));

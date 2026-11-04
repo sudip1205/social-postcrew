@@ -366,7 +366,8 @@ class Workspace:
         """What the browser may see: whether each secret is set, never its value (except harmless ids)."""
         s = self.secrets()
         visible = {"linkedin_client_id", "linkedin_token_expires_at", "linkedin_name", "gmail_address", "email_to",
-                   "telegram_chat_id", "youtube_client_id", "youtube_channel_title"}
+                   "telegram_chat_id", "youtube_client_id", "youtube_channel_title",
+                   "comments_mail_address", "comments_mail_server"}
         return {k: (s[k] if k in visible else bool(s[k])) if k in s else None for k in SECRET_KEYS}
 
     # ---------- queue & history ----------

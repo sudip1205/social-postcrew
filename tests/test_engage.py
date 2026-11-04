@@ -127,7 +127,7 @@ class ReplierTests(unittest.TestCase):
                                         comment(3, "Thanks all!", actor=ME)]
             llm = FakeLLM()
             res = engage.check(ws, client_factory=FakeLI, llm=llm)
-            self.assertEqual(res, {"new": 2, "sent": 0, "drafted": 1, "skipped": 1})
+            self.assertEqual(res, {"new": 2, "sent": 0, "drafted": 1, "skipped": 1, "source": "api"})
             rows = engage.load(ws)["comments"]
             self.assertEqual(rows[comment(1, "")["urn"]]["status"], "drafted")
             self.assertEqual(rows[comment(2, "")["urn"]]["status"], "skipped")
@@ -201,6 +201,118 @@ class ReplierTests(unittest.TestCase):
             cfg["engage"]["replies"] = "off"
             ws.save_config(cfg)
             self.assertFalse(engage.due(ws, datetime.now(timezone.utc) + timedelta(hours=2)))
+
+
+# ---------- comment emails (iCloud and any IMAP mailbox) ----------
+from email.message import EmailMessage
+
+from postcrew import mailbox
+
+
+def linkedin_mail(subject, comment_text, link, post_opening="Pick 4-bit for memory.", sender="LinkedIn <notifications-noreply@linkedin.com>",
+                  mid="<m1@linkedin.com>"):
+    m = EmailMessage()
+    m["From"], m["Subject"], m["Message-ID"], m["Date"] = sender, subject, mid, "Tue, 03 Nov 2026 18:00:00 +0000"
+    m.set_content(f"{subject}\n\n{post_opening}\n\n{comment_text}\n\nReply: {link}\n\nUnsubscribe")
+    m.add_alternative(f"<p>{subject}</p><p>{post_opening}</p><p>{comment_text}</p><a href=\"{link}\">Reply</a>", subtype="html")
+    return m.as_bytes()
+
+
+LINK = ("https://www.linkedin.com/comm/feed/update/urn:li:ugcPost:1?commentUrn=urn%3Ali%3Acomment%3A%28ugcPost%3A1%2C77%29"
+        "&dashCommentUrn=x&lipi=urn%3Ali%3Apage%3Aemail")
+
+
+class FakeIMAP:
+    mails = []
+    calls = []
+
+    def __init__(self, host, port, timeout=0):
+        FakeIMAP.calls.append(("connect", host))
+
+    def login(self, user, pw):
+        if pw == "wrong":
+            import imaplib
+            raise imaplib.IMAP4.error("AUTHENTICATIONFAILED")
+
+    def select(self, box, readonly=False):
+        FakeIMAP.calls.append(("select", box, readonly))
+        return "OK", [b"1"]
+
+    def uid(self, cmd, *args):
+        FakeIMAP.calls.append((cmd, *args))
+        if cmd == "SEARCH":
+            return "OK", [b" ".join(str(i + 1).encode() for i in range(len(FakeIMAP.mails)))]
+        if cmd == "FETCH":
+            assert args[1] == "(BODY.PEEK[])"       # never marks a mail read
+            return "OK", [(b"1 (BODY[] {1})", FakeIMAP.mails[int(args[0]) - 1]), b")"]
+        raise AssertionError(cmd)
+
+    def logout(self):
+        pass
+
+
+class MailTests(unittest.TestCase):
+    def setUp(self):
+        FakeIMAP.mails, FakeIMAP.calls = [], []
+        FakeLI.comments_by, FakeLI.sent, FakeLI.deny = {}, [], True    # the API refuses: only the emails can tell
+
+    def ws(self, ws):
+        ReplierTests.ws_with_post(None, ws)
+        ws.update_secrets(comments_mail_address="me@icloud.com", comments_mail_password="abcd-efgh-ijkl-mnop")
+
+    def test_an_icloud_address_uses_apples_server_and_a_wrong_password_says_what_to_use(self):
+        self.assertEqual(mailbox.settings({"comments_mail_address": "me@icloud.com", "comments_mail_password": "x"})["server"],
+                         "imap.mail.me.com")
+        with self.assertRaises(mailbox.MailError) as e:
+            mailbox.test({"comments_mail_address": "me@icloud.com", "comments_mail_password": "wrong"}, imap=FakeIMAP)
+        self.assertIn("app-specific password", str(e.exception))
+        with self.assertRaises(mailbox.MailError):
+            mailbox.settings({"comments_mail_address": "me@mydomain.dev", "comments_mail_password": "x"})   # custom domain: say the server
+
+    def test_a_comment_email_is_read_into_its_comment_and_post(self):
+        import email as em
+        c = mailbox.parse(em.message_from_bytes(linkedin_mail("Ana Diaz commented on your post", "Does 8-bit keep accuracy?", LINK),
+                                                policy=em.policy.default))
+        self.assertEqual(c["comment_urn"], "urn:li:comment:(urn:li:ugcPost:1,77)")
+        self.assertEqual(c["thread_urn"], "urn:li:ugcPost:1")
+        self.assertEqual(c["author"], "Ana Diaz")
+        self.assertIn("Does 8-bit keep accuracy?", c["body"])
+        for other in ("Ana Diaz commented on a post", "You appeared in 9 searches this week"):
+            self.assertIsNone(mailbox.parse(em.message_from_bytes(linkedin_mail(other, "x", LINK), policy=em.policy.default)))
+        self.assertIsNone(mailbox.parse(em.message_from_bytes(linkedin_mail("Ana commented on your post", "x", LINK, sender="x@evil.com"),
+                                                              policy=em.policy.default)))
+
+    def test_the_replier_answers_comments_from_the_emails_and_replies_under_the_comment(self):
+        with TempWorkspace() as ws:
+            self.ws(ws)
+            FakeIMAP.mails = [linkedin_mail("Ana Diaz commented on your post", "Does 8-bit keep accuracy?", LINK),
+                              linkedin_mail("Ben replied to your comment", "crypto gains here", LINK.replace("%2C77", "%2C78"), mid="<m2@x>")]
+
+            class MailLLM(FakeLLM):
+                def call(self, agent_id, system, prompt, schema, **kw):
+                    res = super().call(agent_id, system, prompt, schema, **kw)
+                    for r in res.data["replies"]:
+                        r["comment_text"] = "crypto gains here" if r["skip"] else "Does 8-bit keep accuracy?"
+                    return res
+            llm = MailLLM()
+            res = engage.check(ws, client_factory=FakeLI, llm=llm, imap=FakeIMAP)
+            self.assertEqual((res["source"], res["drafted"], res["skipped"]), ("email", 1, 1))
+            self.assertIn(("select", "INBOX", True), FakeIMAP.calls)                  # read-only
+            self.assertIn("find the comment itself", llm.prompts[0][2])
+            urn = "urn:li:comment:(urn:li:ugcPost:1,77)"
+            row = engage.load(ws)["comments"][urn]
+            self.assertEqual((row["text"], row["post_id"], row["source"], row["author"]), ("Does 8-bit keep accuracy?", "p1", "email", "Ana Diaz"))
+            self.assertEqual(engage.check(ws, client_factory=FakeLI, llm=llm, imap=FakeIMAP)["new"], 0)   # each email once
+            engage.send(ws, urn, client_factory=FakeLI)
+            self.assertEqual(FakeLI.sent[-1]["parent"], urn)
+            self.assertEqual(FakeLI.sent[-1]["post"], POST)
+
+    def test_an_email_without_the_post_id_is_matched_by_the_posts_opening(self):
+        posts = [{"id": "p1", "urn": POST, "text": "Pick 4-bit for memory when the model barely fits and accuracy can drop a little."},
+                 {"id": "p2", "urn": "urn:li:ugcPost:2", "text": "Kafka consumer groups split partitions across members of a group."}]
+        m = {"thread_urn": "urn:li:activity:999", "body": "Ana commented. Kafka consumer groups split partitions across members... Nice"}
+        self.assertEqual(engage.match_post(m, posts)["id"], "p2")
+        self.assertIsNone(engage.match_post({"thread_urn": None, "body": "unrelated"}, posts))
 
 
 if __name__ == "__main__":

@@ -259,7 +259,7 @@ SECRET_KEYS = ["linkedin_client_id", "linkedin_client_secret", "linkedin_access_
                "linkedin_person_urn", "linkedin_name", "gmail_address", "gmail_app_password", "email_to",
                "telegram_bot_token", "telegram_chat_id", "anthropic_api_key", "openai_api_key", "llm_api_key",
                "youtube_client_id", "youtube_client_secret", "youtube_refresh_token", "youtube_channel_title",
-               "elevenlabs_api_key"]
+               "elevenlabs_api_key", "comments_mail_address", "comments_mail_password", "comments_mail_server"]
 
 
 # Four YouTube topics to copy from. They are NOT part of the default settings: YouTube starts with no topics, and only the
