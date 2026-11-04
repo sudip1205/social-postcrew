@@ -13,7 +13,7 @@ const manShown = () => MAN.items.filter(i => (!MAN.topic || i.topic === MAN.topi
   .sort(manSort[MAN.sort] || manSort.trend);
 
 function manCard(i) {
-  const fmt = MAN.fmt[i.id] || MAN.def, busy = MAN.busy === i.id, open = MAN.open.has(i.id), r = i.research;
+  const fmt = MAN.fmt[i.id] || i.format || MAN.def, busy = MAN.busy === i.id, open = MAN.open.has(i.id), r = i.research;
   const segBtn = (v, ic, label) => `<button type="button" data-fmt="${v}" data-id="${i.id}" class="flex items-center gap-1 px-3 py-1 rounded-lg ${fmt === v ? "bg-white text-slate-900 shadow-sm border border-slate-200/70 font-bold" : "text-slate-500 hover:text-slate-900 font-medium transition-colors"}">${icon(ic, `text-[15px] ${fmt === v ? "text-red-600" : "text-slate-400"}`)}<span>${label}</span></button>`;
   const dis = busy || MAN.running;
   return `<div class="bg-white rounded-2xl ${busy ? "border-2 border-violet-300 ring-4 ring-violet-50" : "border-2 border-slate-200 hover:border-violet-300"} transition-all shadow-sm relative overflow-hidden group" data-plan="${i.id}">
@@ -26,7 +26,11 @@ function manCard(i) {
             <span class="text-xs text-slate-400 font-mono">${esc(i.month || "")}</span>
           </div>
           <h2 class="text-lg font-bold text-slate-900 group-hover:text-violet-700 transition-colors leading-snug">${esc(i.title)}</h2>
-          <p class="text-xs text-slate-600 leading-relaxed font-medium"><span class="font-bold text-slate-700">Angle:</span> ${esc(i.angle)}</p>
+          ${i.manual ? `${i.context ? `<p class="text-xs text-slate-600 leading-relaxed font-medium whitespace-pre-line"><span class="font-bold text-slate-700">Details:</span> ${esc(i.context)}</p>` : ""}
+            ${i.how ? `<p class="text-xs text-slate-600 leading-relaxed font-medium whitespace-pre-line"><span class="font-bold text-slate-700">How to make it:</span> ${esc(i.how)}</p>` : ""}
+            <div class="flex items-center gap-3 pt-1"><button type="button" data-medit="${i.id}" class="inline-flex items-center gap-1 text-xs font-bold text-violet-600 hover:text-violet-800">${icon("edit", "text-[15px]")}<span>Edit</span></button>
+              <button type="button" data-mdel="${i.id}" class="inline-flex items-center gap-1 text-xs font-bold text-rose-600 hover:text-rose-800">${icon("delete", "text-[15px]")}<span>Remove</span></button></div>`
+          : `<p class="text-xs text-slate-600 leading-relaxed font-medium"><span class="font-bold text-slate-700">Angle:</span> ${esc(i.angle)}</p>`}
           ${researchChips(r, "pt-1")}
           ${r && !r.unavailable ? `<div class="pt-1"><button type="button" data-more="${i.id}" class="inline-flex items-center gap-1 text-xs font-bold text-violet-600 hover:text-violet-800 transition-colors">${icon(open ? "expand_less" : "expand_more", "text-[16px]")}<span>Research details</span></button></div>` : ""}
         </div>
@@ -57,6 +61,12 @@ function manDraw() {
   list.querySelectorAll("[data-fmt]").forEach(b => b.onclick = () => { MAN.fmt[b.dataset.id] = b.dataset.fmt; manDraw(); });
   list.querySelectorAll("[data-more]").forEach(b => b.onclick = () => { MAN.open.has(b.dataset.more) ? MAN.open.delete(b.dataset.more) : MAN.open.add(b.dataset.more); manDraw(); });
   list.querySelectorAll("[data-run]").forEach(b => b.onclick = () => manRun(b.dataset.run));
+  list.querySelectorAll("[data-medit]").forEach(b => b.onclick = () => manFill(MAN.items.find(x => x.id === b.dataset.medit)));
+  list.querySelectorAll("[data-mdel]").forEach(b => b.onclick = async () => {
+    if (!confirm("Remove this plan of yours?")) return;
+    try { await post("/api/manual/plan/remove", { platform: S.platform, id: b.dataset.mdel }); toast("Plan removed"); } catch (e) { toast(e.message, true); }
+    manLoad();
+  });
   const st = $("#man-status");
   if (st) st.innerHTML = MAN.running
     ? `<span class="relative flex h-2 w-2"><span class="relative inline-flex rounded-full h-2 w-2 bg-violet-500"></span></span><span>Crew busy</span><span class="text-violet-600 font-normal">· a run is in progress</span>`
@@ -66,7 +76,7 @@ function manDraw() {
 
 async function manRun(id) {
   const it = MAN.items.find(x => x.id === id); if (!it) return;
-  const fmt = MAN.formats ? (MAN.fmt[id] || MAN.def) : null;
+  const fmt = MAN.formats ? (MAN.fmt[id] || it.format || MAN.def) : null;
   if (!confirm(`Make "${it.title}" now${fmt ? ` as a ${fmt === "long" ? "Long" : "Short"} video` : ""}? The crew writes it, then it follows your approval setting (it may be published).`)) return;
   MAN.busy = id; manDraw();
   try {
@@ -91,6 +101,60 @@ async function manLoad() {
 }
 const manLoadView = () => { const bar = $("#man-topics"); if (bar) bar.querySelectorAll("[data-topic]").forEach(b => { const on = b.dataset.topic === MAN.topic; b.className = `px-3 py-1.5 rounded-xl whitespace-nowrap transition-colors ${on ? "bg-violet-600 text-white font-bold shadow-sm hover:bg-violet-700" : "bg-slate-100 hover:bg-slate-200/80 text-slate-700 font-medium border border-slate-200/60"}`; }); manDraw(); };
 
+// ---------- your own plan (no Stitch zone: the card and field styles of this page, see design/DEVIATIONS.md) ----------
+const MAN_FIELD = "w-full px-3 py-2 bg-slate-50 hover:bg-slate-100/80 focus:bg-white text-sm rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-all placeholder:text-slate-400";
+const manLabel = (text, inner, sub = "") => `<label class="flex flex-col gap-1.5"><span class="text-xs font-bold text-slate-700">${text}</span>${inner}${sub ? `<span class="text-[11px] text-slate-400">${sub}</span>` : ""}</label>`;
+
+function manForm() {
+  const yt = S.platform !== "linkedin";
+  return `<details id="mp" class="bg-white rounded-2xl border-2 border-slate-200 shadow-sm group/mp" ${MAN.formOpen ? "open" : ""}>
+    <summary class="p-5 flex items-center gap-4 cursor-pointer list-none">
+      <div class="w-11 h-11 rounded-xl bg-violet-50 border border-violet-100 text-violet-600 flex items-center justify-center">${icon("edit_note", "text-2xl")}</div>
+      <div class="flex-1"><h2 class="font-headline font-bold text-base text-slate-900" id="mp-title">Add your own plan</h2>
+        <p class="text-xs text-slate-500">Your topic, what it must cover and how you want ${yt ? "the video" : "the post"} made. Every agent that writes, directs and draws it reads your plan, and it wins over their usual way.</p></div>
+      ${icon("expand_more", "text-slate-400 group-open/mp:rotate-180 transition-transform")}</summary>
+    <div class="px-5 pb-5 grid gap-4 md:grid-cols-2">
+      <input type="hidden" id="mp-id">
+      <div class="md:col-span-2">${manLabel("Topic", `<input id="mp-topic" maxlength="150" class="${MAN_FIELD}" placeholder="${yt ? "e.g. Dijkstra's algorithm on a city map" : "e.g. Why our Kafka consumers fell behind"}">`)}</div>
+      ${manLabel("Details", `<textarea id="mp-details" rows="6" maxlength="3000" class="${MAN_FIELD}" placeholder="What it must cover: the problem, the key ideas in order, the example to use, facts or numbers to include, what to leave out."></textarea>`)}
+      ${manLabel(yt ? "How I want the video made" : "How I want it written", `<textarea id="mp-how" rows="6" maxlength="3000" class="${MAN_FIELD}" placeholder="${yt ? "Style, structure and pictures: e.g. start with the map, animate each step of the search, show the code beside it, one running example, calm teacher voice, end with the common mistake." : "Structure and voice: e.g. open with the incident, three short lessons, end with a question."}"></textarea>`)}
+      ${manLabel("What the viewer should take away (optional)", `<input id="mp-takeaway" maxlength="400" class="${MAN_FIELD}" placeholder="e.g. Can trace Dijkstra by hand and knows when it fails">`)}
+      ${manLabel("Tone (optional)", `<input id="mp-tone" maxlength="300" class="${MAN_FIELD}" placeholder="e.g. playful, exam-focused, story-led">`)}
+      ${manLabel("References (optional)", `<input id="mp-refs" class="${MAN_FIELD}" placeholder="https://... (links, separated by spaces)">`, "Pages the researcher reads first.")}
+      ${yt ? manLabel("Format", `<select id="mp-format" class="${MAN_FIELD}"><option value="short">Short (vertical, up to 3 minutes)</option><option value="long">Long (16:9)</option></select>`) : "<div></div>"}
+      <div class="md:col-span-2 flex flex-wrap items-center justify-end gap-2.5 pt-1">
+        <button type="button" id="mp-clear" class="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50">${icon("close", "text-[16px] text-slate-500")}<span>Clear</span></button>
+        <button type="button" id="mp-save" class="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl bg-white border border-violet-200 text-violet-700 hover:bg-violet-50">${icon("save", "text-[16px]")}<span>Save plan</span></button>
+        <button type="button" id="mp-run" class="px-5 py-2.5 bg-violet-600 hover:bg-violet-700 text-white font-bold text-sm rounded-xl flex items-center gap-2 shadow-sm disabled:opacity-60">${icon("play_arrow", "text-[18px]")}<span>Save and run now</span></button></div>
+    </div></details>`;
+}
+
+function manFill(i) {
+  const f = $("#mp"); if (!f) return;
+  f.open = MAN.formOpen = true;
+  $("#mp-id").value = i?.id || ""; $("#mp-topic").value = i?.title || ""; $("#mp-details").value = i?.context || ""; $("#mp-how").value = i?.how || "";
+  $("#mp-takeaway").value = i?.takeaway || ""; $("#mp-tone").value = i?.tone || ""; $("#mp-refs").value = (i?.references || []).join(" ");
+  if ($("#mp-format")) $("#mp-format").value = i?.format || MAN.def;
+  $("#mp-title").textContent = i ? "Change your plan" : "Add your own plan";
+  if (i) f.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+async function manSave(run) {
+  const body = { platform: S.platform, id: $("#mp-id").value || undefined, title: $("#mp-topic").value.trim(), details: $("#mp-details").value,
+    how: $("#mp-how").value, takeaway: $("#mp-takeaway").value, tone: $("#mp-tone").value, references: $("#mp-refs").value.split(/\s+/).filter(Boolean),
+    ...($("#mp-format") ? { format: $("#mp-format").value } : {}), run };
+  if (!body.title) { $("#mp-topic").focus(); return; }
+  if (run && !confirm(`Make "${body.title}" now? The crew writes it, then it follows your approval setting (it may be published).`)) return;
+  const b = $(run ? "#mp-run" : "#mp-save"); b.disabled = true;
+  try {
+    const r = await post("/api/manual/plan", body);
+    manFill(null); MAN.formOpen = false; $("#mp").open = false;
+    if (run) { S.runId = r.run_id; toast("Crew started on your plan"); location.hash = "workflow"; refreshOverview(); return; }
+    toast("Plan saved: it waits below until you run it");
+  } catch (e) { toast(e.message, true); }
+  b.disabled = false; manLoad();
+}
+
 function renderManual() {
   const view = $("#view"), a = appOf(S.platform);
   view.innerHTML = `<main class="space-y-6" data-active-view="manual">
@@ -105,6 +169,7 @@ function renderManual() {
         <div id="man-status" class="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-semibold shadow-sm"></div>
       </div>
     </div>
+    ${manForm()}
     <div class="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
       <div class="relative flex-1 max-w-md">${icon("search", "absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-[20px]")}
         <input id="man-q" type="text" placeholder="Search plans..." class="w-full pl-10 pr-4 py-2 bg-slate-50 hover:bg-slate-100/80 focus:bg-white text-sm rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-all placeholder:text-slate-400 font-medium"/></div>
@@ -117,6 +182,8 @@ function renderManual() {
     </div>
     <div id="man-list" class="space-y-4">${emptyState("progress_activity", "Loading the plans")}</div>
   </main>`;
+  $("#mp").ontoggle = () => { MAN.formOpen = $("#mp").open; };
+  $("#mp-save").onclick = () => manSave(false); $("#mp-run").onclick = () => manSave(true); $("#mp-clear").onclick = () => manFill(null);
   $("#man-q").oninput = e => { MAN.q = e.target.value; manDraw(); };
   $("#man-sort").value = MAN.sort; $("#man-sort").onchange = e => { MAN.sort = e.target.value; manDraw(); };
   manLoad();

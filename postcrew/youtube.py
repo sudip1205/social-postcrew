@@ -13,7 +13,11 @@ AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 TOKEN_URL = "https://oauth2.googleapis.com/token"
 API = "https://www.googleapis.com/youtube/v3"
 UPLOAD_API = "https://www.googleapis.com/upload/youtube/v3"
-SCOPE = "https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly"
+# yt-analytics.readonly: watch time, average view duration and subscribers per video (the Analytics page). A connection made before it
+# was asked for still uploads and shows views, likes and comments; reconnecting adds the rest.
+SCOPE = ("https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly "
+         "https://www.googleapis.com/auth/yt-analytics.readonly")
+ANALYTICS_API = "https://youtubeanalytics.googleapis.com/v2/reports"
 CHUNK = 8 * 1024 * 1024
 QUOTA_REASONS = ("quotaexceeded", "dailylimitexceeded", "uploadlimitexceeded", "ratelimitexceeded")
 RECONNECT = "reconnect YouTube in Credentials"
@@ -57,6 +61,23 @@ def _map_error(code, raw):
     if code in (400, 404, 422):
         return YouTubeError(f"YouTube rejected the request: {msg}", "invalid", code)
     return YouTubeError(f"YouTube HTTP {code}: {msg}", "failed", code)
+
+
+def _int(v):
+    try:
+        return int(v)
+    except (TypeError, ValueError):
+        return None
+
+
+def _duration(iso):
+    """ISO 8601 (PT1M5S) -> seconds."""
+    import re
+    m = re.fullmatch(r"P(?:(\d+)D)?T?(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?", iso or "")
+    if not m:
+        return None
+    d, h, mi, s = (int(x or 0) for x in m.groups())
+    return d * 86400 + h * 3600 + mi * 60 + s
 
 
 def _raw(opener, method, url, headers=None, data=None, timeout=300):
@@ -131,6 +152,57 @@ class YouTube:
         if not items:
             raise YouTubeError("this Google account has no YouTube channel", "invalid")
         return {"id": items[0].get("id", ""), "title": (items[0].get("snippet") or {}).get("title", "")}
+
+    # ---------- analytics ----------
+    def channel_stats(self):
+        """The connected channel: {id, title, subscribers, views, videos, uploads (playlist id)}."""
+        _, _, body = _send(self.opener, "GET", f"{API}/channels?part=snippet,statistics,contentDetails&mine=true", self._auth(), timeout=30)
+        items = _parse(body).get("items") or []
+        if not items:
+            raise YouTubeError("this Google account has no YouTube channel", "invalid")
+        c, st = items[0], items[0].get("statistics") or {}
+        return {"id": c.get("id", ""), "title": (c.get("snippet") or {}).get("title", ""),
+                "subscribers": None if st.get("hiddenSubscriberCount") else _int(st.get("subscriberCount")),
+                "views": _int(st.get("viewCount")), "videos": _int(st.get("videoCount")),
+                "uploads": ((c.get("contentDetails") or {}).get("relatedPlaylists") or {}).get("uploads", "")}
+
+    def uploads(self, playlist, limit=200):
+        """The ids of the channel's videos, newest first."""
+        ids, token = [], ""
+        while len(ids) < limit:
+            q = urllib.parse.urlencode({"part": "contentDetails", "playlistId": playlist, "maxResults": 50, **({"pageToken": token} if token else {})})
+            _, _, body = _send(self.opener, "GET", f"{API}/playlistItems?{q}", self._auth(), timeout=30)
+            d = _parse(body)
+            ids += [(i.get("contentDetails") or {}).get("videoId") for i in d.get("items") or []]
+            token = d.get("nextPageToken")
+            if not token:
+                break
+        return [i for i in ids if i][:limit]
+
+    def videos(self, ids):
+        """Title, publish time, length, privacy and the public counts of each video: [{id, title, published_at, seconds, views, likes,
+        comments, privacy, thumbnail}]."""
+        out = []
+        for n in range(0, len(ids), 50):
+            q = urllib.parse.urlencode({"part": "snippet,statistics,contentDetails,status", "id": ",".join(ids[n:n + 50])})
+            _, _, body = _send(self.opener, "GET", f"{API}/videos?{q}", self._auth(), timeout=30)
+            for v in _parse(body).get("items") or []:
+                sn, st = v.get("snippet") or {}, v.get("statistics") or {}
+                out.append({"id": v.get("id"), "title": sn.get("title", ""), "published_at": sn.get("publishedAt"),
+                            "seconds": _duration((v.get("contentDetails") or {}).get("duration", "")),
+                            "views": _int(st.get("viewCount")), "likes": _int(st.get("likeCount")), "comments": _int(st.get("commentCount")),
+                            "privacy": (v.get("status") or {}).get("privacyStatus", ""),
+                            "thumbnail": ((sn.get("thumbnails") or {}).get("medium") or {}).get("url", "")})
+        return out
+
+    def report(self, start, end, metrics, dimensions="", sort="", filters="", limit=200):
+        """A YouTube Analytics report for the channel: [{column: value}]. Needs yt-analytics.readonly (kind "auth" when missing)."""
+        q = {"ids": "channel==MINE", "startDate": start, "endDate": end, "metrics": metrics, "maxResults": limit}
+        q.update({k: v for k, v in (("dimensions", dimensions), ("sort", sort), ("filters", filters)) if v})
+        _, _, body = _send(self.opener, "GET", f"{ANALYTICS_API}?{urllib.parse.urlencode(q)}", self._auth(), timeout=60)
+        d = _parse(body)
+        cols = [h.get("name") for h in d.get("columnHeaders") or []]
+        return [dict(zip(cols, row)) for row in d.get("rows") or []]
 
     def upload(self, path, title, description, tags, category_id="28", privacy="private", publish_at=None,
                made_for_kids=False, progress=None):

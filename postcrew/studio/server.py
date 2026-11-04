@@ -33,7 +33,7 @@ from ..agents.frames import HyperFramesAgent, RemotionAgent, RemotionFramesAgent
 from ..agents.hooks import HooksAgent
 from ..agents.graphics import GraphicsAgent
 from ..agents.video_review import VideoReviewAgent
-from .. import engage, rewards
+from .. import engage, rewards, yt_analytics
 from ..agents.direction import CreativeDirectorAgent
 from ..agents.quality import QualityDirectorAgent
 from ..agents.voice import VoiceAgent
@@ -274,6 +274,24 @@ class Studio:
         info = monthly.run_plan(self.ws, platform, str(body.get("id") or ""), fmt, today)
         run = self.start_run({"platform": platform, "date": info["date"], "category": info["category"], **({"format": fmt} if fmt else {})})
         return dict(run, plan=info["item"]["title"])
+
+    def manual_plan(self, body):
+        """Add (or change) a plan you wrote yourself; with run: true, make it now."""
+        platform, _cfg = self._view(body.get("platform"))
+        fmt = body.get("format") if platform != platforms.LINKEDIN else None
+        refs = body.get("references") or []
+        if isinstance(refs, str):
+            refs = refs.split()
+        item = monthly.add_manual(self.ws, platform, body.get("title"), body.get("details", ""), body.get("how", ""), fmt,
+                                  body.get("takeaway", ""), body.get("tone", ""), refs, item_id=body.get("id") or None)
+        if body.get("run"):
+            return dict(self.manual_run({"platform": platform, "id": item["id"], **({"format": fmt} if fmt else {})}), item=item)
+        return {"item": item, **self.manual(platform)}
+
+    def manual_plan_remove(self, body):
+        platform = self._view(body.get("platform"))[0]
+        monthly.remove_manual(self.ws, platform, str(body.get("id") or ""))
+        return self.manual(platform)
 
     def plan_unassign(self, body):
         platform = self._view(body.get("platform"))[0]
@@ -876,6 +894,9 @@ def make_handler(studio):
                     ("POST", "/api/youtube/finish"): lambda: studio.youtube_finish(self.body()),
                     ("GET", "/api/plan/job"): lambda: studio.plan_job(q.get("platform")),
                     ("POST", "/api/manual/run"): lambda: studio.manual_run(self.body()),
+                    ("GET", "/api/youtube/analytics"): lambda: yt_analytics.overview(ws, refresh=q.get("refresh") == "1"),
+                    ("POST", "/api/manual/plan"): lambda: studio.manual_plan(self.body()),
+                    ("POST", "/api/manual/plan/remove"): lambda: studio.manual_plan_remove(self.body()),
                     ("POST", "/api/plan/assign"): lambda: studio.plan_assign(self.body()),
                     ("POST", "/api/plan/unassign"): lambda: studio.plan_unassign(self.body()),
                     ("GET", "/api/agents"): lambda: studio.agents(),

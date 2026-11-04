@@ -64,3 +64,4 @@ video_library
 view_agenda
 visibility
 block
+monitoring

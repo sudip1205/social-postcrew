@@ -373,8 +373,8 @@ def clear_plans(ws, platform=LINKEDIN):
         for month, meta in list(pool["months"].items()):
             keep = []
             for i in meta["items"]:
-                if status_of(i, posted) == "written":
-                    keep.append(i)
+                if status_of(i, posted) == "written" or (i.get("manual") and status_of(i, posted) != "published"):
+                    keep.append(i)   # your own plans are never cleared by Generate plan
                     kept += 1
                     continue
                 removed += 1
@@ -403,7 +403,7 @@ def prune_stale_topics(ws, platform=LINKEDIN):
         for month, meta in list(pool["months"].items()):
             keep = []
             for i in meta["items"]:
-                if i["topic"].lower() in topics or status_of(i, posted) in ("written", "published"):
+                if i["topic"].lower() in topics or i.get("manual") or status_of(i, posted) in ("written", "published"):
                     keep.append(i)
                     continue
                 gone += 1
@@ -517,10 +517,17 @@ def _entry(item, cat, fmt, platform):
                                     "example_kind": "scenario", "generated": ["context", "example", "takeaway"]})
     except briefmod.BriefError:
         pass
+    if item.get("manual"):   # your own plan: your words, as written, and how you want it made
+        try:
+            brief = briefmod.normalize({"context": item.get("context", ""), **({"tone": item["tone"]} if item.get("tone") else {})})
+        except briefmod.BriefError:
+            brief = {}
     entry = {"category": cat, "topic": item["title"], "angle": item["angle"], "search_queries": item["search_queries"],
              "source": "manual", "plan_id": item["id"], "rejected": []}
     if brief:
         entry["brief"] = brief
+    if item.get("how") or item.get("manual"):
+        entry["owner_plan"] = {k: item.get(k, "") for k in ("title", "context", "how", "references") if item.get(k)}
     if platform != LINKEDIN:
         entry["format"] = fmt
         if item.get("research") and not item["research"].get("unavailable"):
@@ -625,7 +632,7 @@ def auto_assign(ws, platform, month=None, today=None, rng=None):
             if d >= today and d.isoformat() not in busy and not post_for(ws, d, platform)]
     by_topic = {}
     for i in pool["months"].get(month, {}).get("items", []):
-        if status_of(i, posted) == "unassigned":
+        if status_of(i, posted) == "unassigned" and not i.get("manual"):   # your own plans wait for you on Manual run
             by_topic.setdefault(i["topic"], []).append(i)
     for rows in by_topic.values():
         rng.shuffle(rows)
@@ -647,6 +654,60 @@ def auto_assign(ws, platform, month=None, today=None, rng=None):
         except ValueError:
             continue
     return {"assigned": len(done), "days": done}
+
+
+# ---------- your own plans (Manual run > Add your own plan) ----------
+MANUAL_TOPIC = "Your own plans"
+MANUAL_LIMITS = {"title": 150, "context": 3000, "how": 3000, "takeaway": 400, "tone": 300}
+
+
+def add_manual(ws, platform, title, details="", how="", fmt=None, takeaway="", tone="", references=(), item_id=None, today=None):
+    """A plan you write yourself: the topic, what it should cover and how you want it made. It waits on Manual run (never put on a day
+    by itself, never cleared by Generate plan) until you run it. item_id: change one of yours. Returns the plan."""
+    title = " ".join(str(title or "").split())
+    if len(title) < 4:
+        raise ValueError("give the plan a topic (a few words at least)")
+    vals = {"title": title, "context": str(details or "").strip(), "how": str(how or "").strip(), "takeaway": str(takeaway or "").strip(),
+            "tone": str(tone or "").strip()}
+    for k, lim in MANUAL_LIMITS.items():
+        if len(vals[k]) > lim:
+            raise ValueError(f"{k}: keep it under {lim} characters")
+    refs = [str(r).strip() for r in (references or []) if str(r).strip()][:8]
+    if any(not re.match(r"https?://\S+$", r) for r in refs):
+        raise ValueError("references must be links (https://...)")
+    if platform != LINKEDIN and fmt not in (None, "short", "long"):
+        raise ValueError("format must be short or long")
+    first = re.split(r"(?<=[.!?])\s", vals["context"])[0] if vals["context"] else ""
+    with _lock:
+        pool = load(ws, platform)
+        if item_id:
+            item = _item(pool, item_id)
+            if not item.get("manual"):
+                raise ValueError("only your own plans can be changed here")
+        else:
+            month = month_key(today or date.today())
+            m = pool["months"].setdefault(month, {"generated_at": None, "topics": [], "items": []})
+            item = {"id": uuid.uuid4().hex[:8], "topic": MANUAL_TOPIC, "manual": True, "assigned": None,
+                    "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
+            m["items"].append(item)
+        item.update(vals, angle=(first or title)[:400], example=item.get("example", ""), search_queries=[title], references=refs,
+                    **({"format": fmt} if fmt else {}))
+        ws.save_state(_name(platform), pool)
+    return item
+
+
+def remove_manual(ws, platform, item_id):
+    with _lock:
+        pool = load(ws, platform)
+        item = _item(pool, item_id)
+        if not item.get("manual"):
+            raise ValueError("only your own plans can be removed here")
+        if item.get("assigned"):
+            raise ValueError("this plan is already being made: remove it from its day on the Plan page first")
+        for meta in pool["months"].values():
+            meta["items"] = [i for i in meta["items"] if i["id"] != item_id]
+        ws.save_state(_name(platform), pool)
+    return {"removed": item_id}
 
 
 def unassigned(ws, platform=LINKEDIN):

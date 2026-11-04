@@ -149,7 +149,7 @@ class Agent:
             kw["images"] = [str(p) for p in images]
         if member and member.get("model"):
             kw["model"] = member["model"]
-        system += self._record_block(ctx, aid, member)
+        system += self._record_block(ctx, aid, member) + owner_plan_block(ctx, aid)
         try:
             res = ctx.llm.call(aid, system, prompt, schema, tools=tools, cwd=str(ctx.run.dir), **kw)
         except LLMError as e:
@@ -162,6 +162,30 @@ class Agent:
                                       f"(${res.cost_usd:.4f}, {res.turns} turns)",
                       {"cost_usd": res.cost_usd, "model": res.model, "turns": res.turns, "member": kw.get("member")})
         return res.data
+
+
+OWNER_PLAN_READERS = ("research", "writer", "editor", "reviewer", "direction", "graphics", "media", "quality", "video_review", "explainroo")
+
+
+def owner_plan_block(ctx, agent_id):
+    """A plan you wrote yourself (Manual run > Add your own plan): your topic, details and how you want it made, for every agent that
+    shapes the work. Your directions win over the defaults, never over the hard rules (length, facts, the checks)."""
+    try:
+        p = (ctx.outputs.get("topic") or {}).get("owner_plan")
+    except Exception:
+        return ""
+    if not p or agent_id not in OWNER_PLAN_READERS:
+        return ""
+    lines = ["\n\nTHE OWNER WROTE THIS PLAN THEMSELVES. Follow it: where it differs from the usual way, the owner's plan wins (the hard "
+             "rules, length limits and fact checks still apply). Never contradict it, and judge the work by it.",
+             f"Topic: {p.get('title', '')}"]
+    if p.get("context"):
+        lines.append(f"What it must cover (the owner's details):\n{p['context']}")
+    if p.get("how"):
+        lines.append(f"How the owner wants it made (style, structure, pictures, examples, tone):\n{p['how']}")
+    if p.get("references"):
+        lines.append("The owner's references (read them if you can browse): " + ", ".join(p["references"]))
+    return "\n".join(lines)
 
 
 def length_note(ctx):

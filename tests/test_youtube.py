@@ -87,7 +87,8 @@ class YouTubeTests(unittest.TestCase):
         u = urllib.parse.urlparse(youtube.auth_url("cid", "http://localhost/cb", "st"))
         q = urllib.parse.parse_qs(u.query)
         self.assertEqual(u.netloc + u.path, "accounts.google.com/o/oauth2/v2/auth")
-        self.assertEqual(q["scope"], ["https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly"])
+        self.assertEqual(q["scope"], ["https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly "
+                                      "https://www.googleapis.com/auth/yt-analytics.readonly"])
         self.assertEqual((q["access_type"], q["prompt"], q["response_type"], q["state"]),
                          (["offline"], ["consent"], ["code"], ["st"]))
 

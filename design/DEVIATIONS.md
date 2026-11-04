@@ -137,3 +137,12 @@ No Stitch screen exists for either view. Both are derived from the shell, design
 - Credentials > "Comment emails" is a copy of the Gmail notifications card (sectionHead, numbered steps, two-column fields, Save + Test
   buttons, hint) with the forum icon and violet tile. The Comments card shows the mailbox in a violet notice (rose when sign-in fails).
 
+## Manual run > Add your own plan (no Stitch zone)
+- A collapsible card above the filter bar, in the plan cards' style (rounded-2xl, border-2, violet icon tile); fields use the page's
+  search-field classes; buttons are the page's Run now (primary) and its outlined secondary buttons. Your plan cards show Details and
+  "How to make it" instead of Angle, plus Edit / Remove links.
+
+## Analytics (no Stitch screen)
+- Header copies the Queue's (breadcrumb, headline, sub line, Refresh). Four Overview stat cards (ovStat). Daily views: one series, violet
+  bars from the baseline with 2px gaps and a hover title per day. The video table reuses the Published table's styles, sortable headers.
+

@@ -75,6 +75,8 @@ class TopicAgent(Agent):
                "search_queries": e.get("search_queries", []), "planned": e.get("source", "planner")}
         if e.get("algo") in tracers.TRACERS:
             return dict(out, algo=e["algo"])
+        if e.get("owner_plan"):   # a plan you wrote yourself: every agent that shapes the post or video reads it (base.owner_plan_block)
+            out["owner_plan"] = e["owner_plan"]
         brief = self._brief(ctx, e, out)
         if brief:
             out["brief"] = brief
