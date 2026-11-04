@@ -179,6 +179,9 @@ def owner_plan_block(ctx, agent_id):
     lines = ["\n\nTHE OWNER WROTE THIS PLAN THEMSELVES. Follow it: where it differs from the usual way, the owner's plan wins (the hard "
              "rules, length limits and fact checks still apply). Never contradict it, and judge the work by it.",
              f"Topic: {p.get('title', '')}"]
+    if p.get("statement"):
+        lines.append("THE PROBLEM, read from the files the owner attached (" + ", ".join(p.get("files") or []) + "). Teach exactly this "
+                     "problem: its words, numbers, examples and constraints as given, and redraw its figures faithfully:\n" + p["statement"])
     if p.get("context"):
         lines.append(f"What it must cover (the owner's details):\n{p['context']}")
     if p.get("how"):

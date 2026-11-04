@@ -47,6 +47,7 @@ def build(ws, client_factory=YouTube, today=None, days=28):
     today = today or date.today()
     ch = yt.channel_stats()
     vids = yt.videos(yt.uploads(ch["uploads"])) if ch["uploads"] else []
+    vids = [v for v in vids if v.get("privacy") == "public"]   # private and unlisted videos are left out
     mine = crew_made(ws)
     for v in vids:
         v["crew"] = mine.get(v["id"])

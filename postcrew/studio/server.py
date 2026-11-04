@@ -33,7 +33,7 @@ from ..agents.frames import HyperFramesAgent, RemotionAgent, RemotionFramesAgent
 from ..agents.hooks import HooksAgent
 from ..agents.graphics import GraphicsAgent
 from ..agents.video_review import VideoReviewAgent
-from .. import engage, rewards, yt_analytics
+from .. import attachments, engage, rewards, yt_analytics
 from ..agents.direction import CreativeDirectorAgent
 from ..agents.quality import QualityDirectorAgent
 from ..agents.voice import VoiceAgent
@@ -271,6 +271,14 @@ class Studio:
             raise ValueError("a crew run is already in progress")
         today = crew.local_now(cfg).date()
         fmt = body.get("format") if platform != platforms.LINKEDIN else None
+        try:
+            src = monthly._item(monthly.load(self.ws, platform), str(body.get("id") or "")).get("source") or {}
+        except ValueError:
+            src = {}
+        if src.get("files") and src.get("state") != "done":
+            raise ValueError({"reading": "the Reader is still reading your files: run it when it says Read",
+                              "failed": f"your files could not be read ({src.get('error')}): read them again or remove them"}
+                             .get(src.get("state"), "your files are not read yet: click Read files first"))
         info = monthly.run_plan(self.ws, platform, str(body.get("id") or ""), fmt, today)
         run = self.start_run({"platform": platform, "date": info["date"], "category": info["category"], **({"format": fmt} if fmt else {})})
         return dict(run, plan=info["item"]["title"])
@@ -287,6 +295,17 @@ class Studio:
         if body.get("run"):
             return dict(self.manual_run({"platform": platform, "id": item["id"], **({"format": fmt} if fmt else {})}), item=item)
         return {"item": item, **self.manual(platform)}
+
+    def manual_plan_read(self, body):
+        """Have the Reader read the plan's files (in the background: a PDF of several pages takes a minute or two)."""
+        platform = self._view(body.get("platform"))[0]
+        started = attachments.read_in_background(self.ws, platform, str(body.get("id") or ""))
+        return {"started": started, **self.manual(platform)}
+
+    def manual_plan_file_remove(self, body):
+        platform = self._view(body.get("platform"))[0]
+        attachments.remove_file(self.ws, platform, str(body.get("id") or ""), str(body.get("file") or ""))
+        return self.manual(platform)
 
     def manual_plan_remove(self, body):
         platform = self._view(body.get("platform"))[0]
@@ -866,6 +885,9 @@ def make_handler(studio):
                                                                   self.rfile, n))
                 if method == "GET" and p.startswith("/motion-media/"):   # a reference's frames, contact sheets and video
                     return self.media(ws.root / "motion" / "references" / p[len("/motion-media/"):], ws.root / "motion" / "references")
+                if p == "/api/manual/plan/attach" and method == "POST":   # a PDF or image for your own plan (raw body)
+                    return self.send(200, {"source": attachments.save_upload(ws, studio._view(q.get("platform"))[0], q.get("id", ""), q.get("name", ""),
+                                                                              self.rfile, int(self.headers.get("Content-Length") or 0))})
                 if p == "/api/motion/references/upload" and method == "POST":
                     return self.send(200, studio.motion.upload(q, self.rfile, int(self.headers.get("Content-Length") or 0)))
                 m = re.match(r"^/api/motion/references/([a-z0-9-]+)/(analyze|approve|reject|delete)$", p)
@@ -897,6 +919,8 @@ def make_handler(studio):
                     ("GET", "/api/youtube/analytics"): lambda: yt_analytics.overview(ws, refresh=q.get("refresh") == "1"),
                     ("POST", "/api/manual/plan"): lambda: studio.manual_plan(self.body()),
                     ("POST", "/api/manual/plan/remove"): lambda: studio.manual_plan_remove(self.body()),
+                    ("POST", "/api/manual/plan/read"): lambda: studio.manual_plan_read(self.body()),
+                    ("POST", "/api/manual/plan/file-remove"): lambda: studio.manual_plan_file_remove(self.body()),
                     ("POST", "/api/plan/assign"): lambda: studio.plan_assign(self.body()),
                     ("POST", "/api/plan/unassign"): lambda: studio.plan_unassign(self.body()),
                     ("GET", "/api/agents"): lambda: studio.agents(),

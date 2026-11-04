@@ -28,6 +28,7 @@ function manCard(i) {
           <h2 class="text-lg font-bold text-slate-900 group-hover:text-violet-700 transition-colors leading-snug">${esc(i.title)}</h2>
           ${i.manual ? `${i.context ? `<p class="text-xs text-slate-600 leading-relaxed font-medium whitespace-pre-line"><span class="font-bold text-slate-700">Details:</span> ${esc(i.context)}</p>` : ""}
             ${i.how ? `<p class="text-xs text-slate-600 leading-relaxed font-medium whitespace-pre-line"><span class="font-bold text-slate-700">How to make it:</span> ${esc(i.how)}</p>` : ""}
+            ${manSource(i)}
             <div class="flex items-center gap-3 pt-1"><button type="button" data-medit="${i.id}" class="inline-flex items-center gap-1 text-xs font-bold text-violet-600 hover:text-violet-800">${icon("edit", "text-[15px]")}<span>Edit</span></button>
               <button type="button" data-mdel="${i.id}" class="inline-flex items-center gap-1 text-xs font-bold text-rose-600 hover:text-rose-800">${icon("delete", "text-[15px]")}<span>Remove</span></button></div>`
           : `<p class="text-xs text-slate-600 leading-relaxed font-medium"><span class="font-bold text-slate-700">Angle:</span> ${esc(i.angle)}</p>`}
@@ -62,6 +63,10 @@ function manDraw() {
   list.querySelectorAll("[data-more]").forEach(b => b.onclick = () => { MAN.open.has(b.dataset.more) ? MAN.open.delete(b.dataset.more) : MAN.open.add(b.dataset.more); manDraw(); });
   list.querySelectorAll("[data-run]").forEach(b => b.onclick = () => manRun(b.dataset.run));
   list.querySelectorAll("[data-medit]").forEach(b => b.onclick = () => manFill(MAN.items.find(x => x.id === b.dataset.medit)));
+  list.querySelectorAll("[data-mread]").forEach(b => b.onclick = async () => { b.disabled = true;
+    try { await post("/api/manual/plan/read", { platform: S.platform, id: b.dataset.mread }); toast("The Reader is reading your files"); } catch (e) { toast(e.message, true); } manLoad(); });
+  list.querySelectorAll("[data-mfdel]").forEach(b => b.onclick = async () => { const [id, file] = b.dataset.mfdel.split("|");
+    try { await post("/api/manual/plan/file-remove", { platform: S.platform, id, file }); } catch (e) { toast(e.message, true); } manLoad(); });
   list.querySelectorAll("[data-mdel]").forEach(b => b.onclick = async () => {
     if (!confirm("Remove this plan of yours?")) return;
     try { await post("/api/manual/plan/remove", { platform: S.platform, id: b.dataset.mdel }); toast("Plan removed"); } catch (e) { toast(e.message, true); }
@@ -89,6 +94,12 @@ async function manLoad() {
   try {
     const d = await api(`/api/manual?platform=${S.platform}`);
     Object.assign(MAN, { items: d.items, formats: d.formats, def: d.default_format || "short", running: d.running });
+    const wait = MAN.runAfterRead && d.items.find(x => x.id === MAN.runAfterRead);
+    if (wait && ["done", "failed"].includes(wait.source?.state)) {
+      MAN.runAfterRead = null;
+      if (wait.source.state === "failed") toast(`Your files could not be read: ${wait.source.error || ""}`, true);
+      else { try { const g = await post("/api/manual/run", { platform: S.platform, id: wait.id, ...(MAN.formats ? { format: wait.format || MAN.def } : {}) }); S.runId = g.run_id; toast("Files read: the crew started on your plan"); location.hash = "workflow"; refreshOverview(); return; } catch (e) { toast(e.message, true); } }
+    }
     const topics = [...new Set(d.items.map(i => i.topic))];
     if (MAN.topic && !topics.includes(MAN.topic)) MAN.topic = "";
     const bar = $("#man-topics");
@@ -104,6 +115,26 @@ const manLoadView = () => { const bar = $("#man-topics"); if (bar) bar.querySele
 // ---------- your own plan (no Stitch zone: the card and field styles of this page, see design/DEVIATIONS.md) ----------
 const MAN_FIELD = "w-full px-3 py-2 bg-slate-50 hover:bg-slate-100/80 focus:bg-white text-sm rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-all placeholder:text-slate-400";
 const manLabel = (text, inner, sub = "") => `<label class="flex flex-col gap-1.5"><span class="text-xs font-bold text-slate-700">${text}</span>${inner}${sub ? `<span class="text-[11px] text-slate-400">${sub}</span>` : ""}</label>`;
+
+const MAN_READ = { new: ["idle", "Not read yet"], reading: ["running", "Reading the files"], done: ["passed", "Read"], failed: ["failed", "Could not read"] };
+
+function manSource(i) {
+  const s = i.source; if (!s?.files?.length) return "";
+  const [k, w] = MAN_READ[s.state] || MAN_READ.new, st = s.statement || {};
+  return `<div class="rounded-xl border border-slate-200 bg-slate-50/60 p-3 flex flex-col gap-2">
+    <div class="flex flex-wrap items-center gap-2">${chip(k, w, "sm")}
+      ${s.files.map(f => `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-white border border-slate-200 text-[11px] font-medium text-slate-700">${icon(f.kind === "pdf" ? "picture_as_pdf" : "image", "text-[14px] text-slate-500")}${esc(f.name)}
+        <button type="button" data-mfdel="${esc(i.id)}|${esc(f.file)}" title="Remove this file" class="text-slate-400 hover:text-rose-600">${icon("close", "text-[13px]")}</button></span>`).join("")}
+      ${s.state !== "reading" ? `<button type="button" data-mread="${i.id}" class="inline-flex items-center gap-1 text-[11px] font-bold text-violet-600 hover:text-violet-800">${icon("auto_stories", "text-[14px]")}<span>${s.state === "done" ? "Read again" : "Read files"}</span></button>` : ""}</div>
+    ${s.state === "failed" ? `<p class="text-[11px] text-rose-700">${esc(s.error || "")}</p>` : ""}
+    ${s.state === "done" ? `<details class="text-xs text-slate-700"><summary class="cursor-pointer font-semibold text-slate-800">${esc(st.title || "The problem")} · ${(st.examples || []).length} examples · ${(st.figures || []).length} figures${(st.unclear || []).length ? ` · <span class="text-amber-700">${st.unclear.length} unclear</span>` : ""}</summary>
+      <p class="mt-2 whitespace-pre-line">${esc(st.statement || "")}</p>
+      ${st.input_output ? `<p class="mt-1"><span class="font-semibold">Input / output:</span> ${esc(st.input_output)}</p>` : ""}
+      ${(st.examples || []).map((e, n) => `<p class="mt-1 font-mono text-[11px]">Example ${n + 1}: ${esc(e.input)} → ${esc(e.output)}</p>`).join("")}
+      ${(st.constraints || []).length ? `<p class="mt-1"><span class="font-semibold">Constraints:</span> ${esc(st.constraints.join("; "))}</p>` : ""}
+      ${(st.figures || []).map((f, n) => `<p class="mt-1"><span class="font-semibold">Figure ${n + 1}:</span> ${esc(f)}</p>`).join("")}
+      ${(st.unclear || []).length ? `<p class="mt-1 text-amber-700"><span class="font-semibold">Could not read:</span> ${esc(st.unclear.join("; "))}</p>` : ""}</details>` : ""}</div>`;
+}
 
 function manForm() {
   const yt = S.platform !== "linkedin";
@@ -121,6 +152,13 @@ function manForm() {
       ${manLabel("What the viewer should take away (optional)", `<input id="mp-takeaway" maxlength="400" class="${MAN_FIELD}" placeholder="e.g. Can trace Dijkstra by hand and knows when it fails">`)}
       ${manLabel("Tone (optional)", `<input id="mp-tone" maxlength="300" class="${MAN_FIELD}" placeholder="e.g. playful, exam-focused, story-led">`)}
       ${manLabel("References (optional)", `<input id="mp-refs" class="${MAN_FIELD}" placeholder="https://... (links, separated by spaces)">`, "Pages the researcher reads first.")}
+      <div class="md:col-span-2 flex flex-col gap-1.5"><span class="text-xs font-bold text-slate-700">Problem files (optional)</span>
+        <label class="border-2 border-dashed border-slate-200 hover:border-violet-300 rounded-xl p-4 flex items-center gap-3 cursor-pointer bg-slate-50/60 transition-colors">
+          <div class="w-10 h-10 rounded-lg bg-white border border-slate-200 text-violet-600 flex items-center justify-center shadow-sm">${icon("upload_file", "text-xl")}</div>
+          <div class="flex-1 min-w-0"><span class="text-sm font-semibold text-slate-800" id="mp-files-label">Attach a PDF or images of the problem</span>
+            <span class="block text-[11px] text-slate-400">PDF, PNG, JPG or WebP · up to 6 files, 25 MB each. The Reader reads the text and looks at every page and figure, and the crew teaches exactly that problem.</span></div>
+          <input id="mp-files" type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,application/pdf,image/*" class="hidden"></label>
+        <div id="mp-have" class="flex flex-wrap gap-2"></div></div>
       ${yt ? manLabel("Format", `<select id="mp-format" class="${MAN_FIELD}"><option value="short">Short (vertical, up to 3 minutes)</option><option value="long">Long (16:9)</option></select>`) : "<div></div>"}
       <div class="md:col-span-2 flex flex-wrap items-center justify-end gap-2.5 pt-1">
         <button type="button" id="mp-clear" class="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50">${icon("close", "text-[16px] text-slate-500")}<span>Clear</span></button>
@@ -136,6 +174,8 @@ function manFill(i) {
   $("#mp-takeaway").value = i?.takeaway || ""; $("#mp-tone").value = i?.tone || ""; $("#mp-refs").value = (i?.references || []).join(" ");
   if ($("#mp-format")) $("#mp-format").value = i?.format || MAN.def;
   $("#mp-title").textContent = i ? "Change your plan" : "Add your own plan";
+  $("#mp-files").value = ""; $("#mp-files-label").textContent = "Attach a PDF or images of the problem";
+  $("#mp-have").innerHTML = ((i?.source?.files) || []).map(f => `<span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-white border border-slate-200 text-[11px] font-medium text-slate-700">${icon(f.kind === "pdf" ? "picture_as_pdf" : "image", "text-[14px] text-slate-500")}${esc(f.name)}</span>`).join("");
   if (i) f.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
@@ -146,11 +186,23 @@ async function manSave(run) {
   if (!body.title) { $("#mp-topic").focus(); return; }
   if (run && !confirm(`Make "${body.title}" now? The crew writes it, then it follows your approval setting (it may be published).`)) return;
   const b = $(run ? "#mp-run" : "#mp-save"); b.disabled = true;
+  const files = [...($("#mp-files").files || [])];
   try {
-    const r = await post("/api/manual/plan", body);
+    const r = await post("/api/manual/plan", { ...body, run: run && !files.length && !(MAN.items.find(x => x.id === body.id)?.source?.files?.length) });
+    const id = r.item.id;
+    for (const f of files) {
+      toast(`Uploading ${f.name}...`);
+      const u = await fetch(`/api/manual/plan/attach?${new URLSearchParams({ platform: S.platform, id, name: f.name })}`, { method: "POST", headers: { "X-Postcrew": "1", "Content-Type": "application/octet-stream" }, body: f });
+      const j = await u.json().catch(() => ({})); if (!u.ok) throw new Error(j.error || `Upload failed (${u.status})`);
+    }
     manFill(null); MAN.formOpen = false; $("#mp").open = false;
-    if (run) { S.runId = r.run_id; toast("Crew started on your plan"); location.hash = "workflow"; refreshOverview(); return; }
-    toast("Plan saved: it waits below until you run it");
+    if (r.run_id) { S.runId = r.run_id; toast("Crew started on your plan"); location.hash = "workflow"; refreshOverview(); return; }
+    const src = files.length ? (await post("/api/manual/plan/read", { platform: S.platform, id }), "reading") : (MAN.items.find(x => x.id === id)?.source?.state);
+    if (run && (files.length || src === "new")) {
+      if (!files.length) await post("/api/manual/plan/read", { platform: S.platform, id });
+      MAN.runAfterRead = id; toast("Reading your files: the crew starts as soon as the Reader is done");
+    } else if (run) { const g = await post("/api/manual/run", { platform: S.platform, id, ...(body.format ? { format: body.format } : {}) }); S.runId = g.run_id; toast("Crew started on your plan"); location.hash = "workflow"; refreshOverview(); return; }
+    else toast(files.length ? "Plan saved: the Reader is reading your files" : "Plan saved: it waits below until you run it");
   } catch (e) { toast(e.message, true); }
   b.disabled = false; manLoad();
 }
@@ -183,11 +235,12 @@ function renderManual() {
     <div id="man-list" class="space-y-4">${emptyState("progress_activity", "Loading the plans")}</div>
   </main>`;
   $("#mp").ontoggle = () => { MAN.formOpen = $("#mp").open; };
+  $("#mp-files").onchange = e => { const n = e.target.files.length; $("#mp-files-label").textContent = n ? [...e.target.files].map(f => f.name).join(", ") : "Attach a PDF or images of the problem"; };
   $("#mp-save").onclick = () => manSave(false); $("#mp-run").onclick = () => manSave(true); $("#mp-clear").onclick = () => manFill(null);
   $("#man-q").oninput = e => { MAN.q = e.target.value; manDraw(); };
   $("#man-sort").value = MAN.sort; $("#man-sort").onchange = e => { MAN.sort = e.target.value; manDraw(); };
   manLoad();
-  clearInterval(MAN.poll); MAN.poll = setInterval(() => { if (S.tab !== "manual") clearInterval(MAN.poll); else if (!MAN.busy) manLoad(); }, 8000);
+  clearInterval(MAN.poll); MAN.poll = setInterval(() => { if (S.tab !== "manual") clearInterval(MAN.poll); else if (!MAN.busy) manLoad(); }, 5000);
 }
 
 VIEWS.manual = renderManual;

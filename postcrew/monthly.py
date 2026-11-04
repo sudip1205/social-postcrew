@@ -528,6 +528,11 @@ def _entry(item, cat, fmt, platform):
         entry["brief"] = brief
     if item.get("how") or item.get("manual"):
         entry["owner_plan"] = {k: item.get(k, "") for k in ("title", "context", "how", "references") if item.get(k)}
+        src = item.get("source") or {}
+        if src.get("statement"):   # the problem read from the PDFs and images you attached (attachments.py)
+            from .attachments import statement_text
+            entry["owner_plan"]["statement"] = statement_text(src["statement"])
+            entry["owner_plan"]["files"] = [f["name"] for f in src.get("files") or []]
     if platform != LINKEDIN:
         entry["format"] = fmt
         if item.get("research") and not item["research"].get("unavailable"):
@@ -707,6 +712,9 @@ def remove_manual(ws, platform, item_id):
         for meta in pool["months"].values():
             meta["items"] = [i for i in meta["items"] if i["id"] != item_id]
         ws.save_state(_name(platform), pool)
+    import shutil
+    from pathlib import Path
+    shutil.rmtree(Path(ws.root) / "plans" / platform / item_id, ignore_errors=True)   # its attached files
     return {"removed": item_id}
 
 

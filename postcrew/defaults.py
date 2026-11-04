@@ -5,7 +5,7 @@ Secrets (LinkedIn app, tokens, Telegram) never live here; they go to workspace/s
 """
 
 AGENT_IDS = ["planner", "topic", "research", "writer", "reviewer", "media", "editor", "formatter", "publisher", "supervisor", "credentials", "video_review", "explainroo", "graphics",
-             "direction", "quality", "motion", "replier"]
+             "direction", "quality", "motion", "replier", "reader"]
 
 DEFAULT_CONFIG = {
     "version": 1,
@@ -143,7 +143,8 @@ DEFAULT_CONFIG = {
             "motion": {"model": "sonnet", "timeout_s": 900, "max_budget_usd": 1.0},      # Motion Studio: reference analysis, house style
             "explainroo": {"model": "sonnet", "timeout_s": 900, "max_budget_usd": 2.0},   # writes the pictures of an explainroo video
             "supervisor": {"model": "haiku", "timeout_s": 180, "max_budget_usd": 0.2},
-            "replier": {"model": "sonnet", "timeout_s": 300, "max_budget_usd": 0.3},   # answers the comments on your LinkedIn posts
+            "replier": {"model": "sonnet", "timeout_s": 300, "max_budget_usd": 0.3},
+            "reader": {"model": "sonnet", "timeout_s": 600, "max_budget_usd": 0.6},   # reads the PDFs and images you attach to your own plan   # answers the comments on your LinkedIn posts
         },
     },
     "pipeline": {

@@ -10,6 +10,7 @@ assignment
 auto_awesome
 auto_fix_high
 auto_schedule
+auto_stories
 autorenew
 bar_chart
 bedtime
@@ -117,6 +118,7 @@ payments
 pending
 person_add
 photo_camera
+picture_as_pdf
 play_arrow
 play_circle
 progress_activity
@@ -161,6 +163,7 @@ travel_explore
 trending_up
 tune
 undo
+upload_file
 verified
 verified_user
 video_call

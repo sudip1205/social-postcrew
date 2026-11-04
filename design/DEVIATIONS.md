@@ -145,4 +145,6 @@ No Stitch screen exists for either view. Both are derived from the shell, design
 ## Analytics (no Stitch screen)
 - Header copies the Queue's (breadcrumb, headline, sub line, Refresh). Four Overview stat cards (ovStat). Daily views: one series, violet
   bars from the baseline with 2px gaps and a hover title per day. The video table reuses the Published table's styles, sortable headers.
+- "Problem files" in Add your own plan copies the dashed drop zone of upload-your-own-youtube.html (icon tile, title, limits line). A plan
+  card's files sit in a light inner box with a `chip()` for the Reader's state, file pills with a remove x, and a <details> of what was read.
 

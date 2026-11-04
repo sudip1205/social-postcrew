@@ -38,7 +38,6 @@ function anTable(videos, deep) {
       <td class="py-2.5 pr-3"><div class="flex items-start gap-3">${v.thumbnail ? `<img src="${esc(v.thumbnail)}" alt="" class="w-24 rounded-md border border-slate-200 shrink-0" loading="lazy">` : ""}
         <div class="min-w-0"><a href="https://youtu.be/${esc(v.id)}" target="_blank" rel="noopener" class="font-semibold text-slate-900 hover:text-violet-700">${esc(v.title)}</a>
         <div class="flex flex-wrap items-center gap-1.5 mt-1 text-[11px] text-slate-500"><span>${esc(anDate(v.published_at))}</span><span>·</span><span>${v.format === "long" ? "Long" : "Short"} ${anSecs(v.seconds)}</span>
-          ${v.privacy && v.privacy !== "public" ? chip("idle", v.privacy, "sm") : ""}
           ${v.crew ? `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-violet-50 border border-violet-200 text-violet-700 font-semibold">${icon("smart_toy", "text-[13px]")}Made by the crew</span>` : ""}
           ${v.crew?.points ? `<span class="${ptsCls}">${v.crew.points > 0 ? "+" : ""}${v.crew.points} pts</span>` : ""}</div></div></div></td>
       <td class="py-2.5 pr-3 text-right font-semibold text-slate-900 tabular-nums">${anNum(v.views)}</td>
@@ -50,7 +49,7 @@ function anTable(videos, deep) {
       <td class="py-2.5 pr-3 text-right text-slate-700 tabular-nums">${a.subscribersGained != null ? "+" + a.subscribersGained : "-"}</td>
       <td class="py-2.5 text-right text-slate-700 tabular-nums">${a.shares ?? "-"}</td>` : ""}</tr>`; }).join("");
   return `<section class="bg-white rounded-xl border border-slate-200 shadow-sm p-6 flex flex-col gap-4">
-    <div class="flex flex-wrap items-center justify-between gap-3"><div><h2 class="font-headline font-bold text-lg text-slate-900">Every video on the channel</h2>
+    <div class="flex flex-wrap items-center justify-between gap-3"><div><h2 class="font-headline font-bold text-lg text-slate-900">Every public video on the channel</h2>
       <p class="text-sm text-slate-500 mt-0.5">Click a column to sort. ${deep ? tip("Watched", "Average share of the video people watched: the best sign of whether a video holds viewers.") + " is the share of each video people watch on average." : ""}</p></div>
       <label class="inline-flex items-center gap-2 text-xs font-medium text-slate-700"><input type="checkbox" id="an-only" ${AN.only ? "checked" : ""} class="rounded border-slate-300 text-violet-600 focus:ring-violet-500">Only the crew's videos</label></div>
     ${list.length ? `<div class="overflow-x-auto"><table class="w-full text-sm text-left"><thead class="text-xs text-slate-500 uppercase tracking-wider"><tr>
@@ -67,7 +66,7 @@ async function renderAnalytics(refresh = false) {
   const head = `<div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-5"><div>
       <div class="flex items-center gap-2 text-xs font-medium text-slate-500 mb-1"><span>Production Studio</span>${icon("chevron_right", "text-[14px]")}<span class="text-violet-600 font-semibold">Analytics</span></div>
       <h1 class="font-headline font-bold text-2xl text-slate-900 tracking-tight flex items-center gap-3">${appBadge("youtube")}<span>${esc(d.channel?.title || "YouTube")} analytics</span></h1>
-      <p class="text-sm text-slate-600 mt-1">Every video on the channel Postcrew uploads to.${d.fetched_at ? " Updated " + esc(fmtTime(d.fetched_at)) + "." : ""}</p></div>
+      <p class="text-sm text-slate-600 mt-1">Every public video on the channel Postcrew uploads to (private and unlisted ones are left out).${d.fetched_at ? " Updated " + esc(fmtTime(d.fetched_at)) + "." : ""}</p></div>
       ${button("secondary", "refresh", "Refresh", `id="an-refresh" type="button"`)}</div>`;
   if (!d.connected) { view.innerHTML = `<div class="flex flex-col gap-6">${head}${card(`<div class="p-6">${emptyState("link_off", d.message)}</div>`)}</div>`; wireAn(); return; }
   const s = d.summary || {}, ch = d.channel || {}, an = d.analytics || {}, deep = an.ok !== false && (d.videos || []).some(v => v.analytics);
