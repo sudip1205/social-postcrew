@@ -105,6 +105,8 @@ class Agent:
                 "name": p.get("name", "") or "the account owner"}
         if "{{rubric}}" in text:  # the scoring guide the Writer writes to and the Editor scores by
             base["rubric"] = self._prompt_file(ctx, "rubric").read_text().strip()
+        if "{{length_note}}" in text:   # YouTube Editor: how much room a Short has left, so its fixes swap words instead of adding them
+            base["length_note"] = length_note(ctx)
         if "{{script_style}}" in text:   # YouTube: the script style learned from your approved reference videos (Motion Studio)
             from ..motion.library import Library
             try:
@@ -146,6 +148,25 @@ class Agent:
                                       f"(${res.cost_usd:.4f}, {res.turns} turns)",
                       {"cost_usd": res.cost_usd, "model": res.model, "turns": res.turns, "member": kw.get("member")})
         return res.data
+
+
+def length_note(ctx):
+    """For the Editor of a Short: the words now, the most a Short holds, and the rule for fixes when there is little room."""
+    try:
+        if ctx.video.get("format") != "short":
+            return ""
+    except Exception:
+        return ""
+    from ..checks import short_max_words
+    words = len(((ctx.outputs.get("writer") or {}).get("text") or "").split())
+    cap = short_max_words()
+    room = cap - words
+    if room >= 60:
+        return f"- WORD ROOM: this Short has {words} words of narration; it may have up to {cap}. Your fixes may add words."
+    return (f"- WORD ROOM: this Short has {words} words of narration and may have at most {cap}: only {max(room, 0)} words of room. "
+            f"Every fix that adds words must also say exactly which sentence to cut or shorten so the total does not grow beyond {cap} "
+            f"(\"replace X with Y\" of about the same length, not \"add\"). A fix that would push the script over the limit is sent back "
+            f"by the length check and wastes a round.")
 
 
 class Feedback(list):

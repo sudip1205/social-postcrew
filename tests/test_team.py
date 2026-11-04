@@ -155,6 +155,21 @@ class TeamTests(unittest.TestCase):
             self.assertEqual((maya["stats"]["editor_failed"], maya["stats"]["editor_passed"]), (0, 1))
             self.assertTrue(maya["recent"][-1]["good"])        # the revision passed: the last word counts
 
+    def test_the_editors_exact_fixes_are_made_by_the_chosen_writer_alone(self, _):
+        with TempWorkspace() as ws:
+            team_ws(ws, research_n=1, writer_n=2, pre_review=True)
+            llm = ScriptedLLM(base_script(editor=[review(60, fixes=["hook: replace the first line with X"]), review()],
+                                          reviewer=[review(90)]))
+            res = run_crew(ws, TUESDAY, llm=llm, fetch=fake_fetch())
+            self.assertTrue(res["ok"], res)
+            calls = [c for c in llm.calls if c["agent"] in ("writer", "reviewer")]
+            first_editor = next(i for i, c in enumerate(llm.calls) if c["agent"] == "editor")
+            after = [c for c in llm.calls[first_editor + 1:] if c["agent"] in ("writer", "reviewer")]
+            before = [c for c in calls if c not in after]
+            self.assertEqual(len({c["member"] for c in before if c["agent"] == "writer"}), 2)   # both wrote the first draft
+            chosen = json.loads((ws.runs_dir / res["run_id"] / "writer.json").read_text())["author"]
+            self.assertEqual([(c["agent"], c["member"]) for c in after], [("writer", chosen)])  # one revision, no pre-review or polish
+
     def test_stale_story_goes_back_to_the_topic_scout_and_is_not_the_researchers_fault(self, _):
         with TempWorkspace() as ws:
             team_ws(ws, research_n=1, writer_n=1, pre_review=False)

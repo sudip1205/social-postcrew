@@ -192,6 +192,16 @@ def needed_visual(spec, cat):
 
 
 SHORT_LIMIT_S = 175   # YouTube: a Short is 3 minutes at most (a little margin)
+
+
+def platforms_wps():
+    from . import platforms
+    return platforms.SPOKEN_WPS
+
+
+def short_max_words():
+    """The most words a Short's narration may have: 3 minutes (with a margin) at the speed a finished video really goes."""
+    return int(SHORT_LIMIT_S * platforms_wps())
 MAX_PLAIN = 0.34      # at most about a third of the scenes may be words only; the rest are diagrams, flows, code or traces
 MAX_SCENE_S = {"short": 11, "long": 16}   # the longest a scene (one picture) may run, in seconds of narration
 PLAIN_LAYOUTS = ("title", "statement", "points")   # words only: a code walk-through or a trace may run several scenes
@@ -380,9 +390,10 @@ def script_problems(script, spec, cat, profile):
     # No limit on how long the writer takes: the topic decides. Only what cannot work: too little to teach, and a Short over YouTube's 3 minutes.
     if words < 40:
         problems.append(f"the narration is only {words} words: too little to teach anything. Explain the idea properly")
-    if spec["format"] == "short" and words / wps > SHORT_LIMIT_S:
-        problems.append(f"the narration runs about {words / wps:.0f} seconds: YouTube allows a Short of 3 minutes at most. Cut the least "
-                        f"important points, or make this a long video")
+    if spec["format"] == "short" and words > short_max_words():
+        problems.append(f"the narration is {words} words, about {words / platforms_wps():.0f} seconds once voiced: a Short holds at most "
+                        f"{short_max_words()} words (3 minutes). Cut at least {words - short_max_words()} words from the least important "
+                        f"sentences, keeping every required part")
     mn, mx = (3 if spec["format"] == "short" else 4), 80
     if not mn <= len(scenes) <= mx:
         problems.append(f"{len(scenes)} scenes: a {spec['format']} video needs {mn}-{mx}, a new picture every few seconds")

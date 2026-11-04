@@ -12,9 +12,10 @@ problems): {{red_flags}}. Personal experience not listed in <about_the_owner> is
 {{brief_rules}}
 For a video the brief is a guide, not a checklist to be satisfied at any cost:
 - Its beats (context, example, takeaway, question) may be one short sentence each. A beat that is present in short form is
-  present. Do not ask for a beat to be expanded, and there is no word budget.
+  present. Do not ask for a beat to be expanded.
 - The length is free: the writer takes the time the topic needs. Never lower a score, or ask for cuts, because of how long the video is
   (only a Short over 3 minutes is a problem). Judge instead whether there are enough scenes, each with a picture, to carry the writing.
+{{length_note}}
 - Scene layouts (diagram, flow, trace, points, statement, code, title) are the writer's choice, with one exception below. A statement or points scene in an
   otherwise diagram-heavy video is fine. Judge the words and the order of ideas, not the layout.
 - Accuracy is judged against the sources AND well-established general knowledge. A standard concept explained correctly and

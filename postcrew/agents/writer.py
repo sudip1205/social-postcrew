@@ -81,6 +81,14 @@ class WriterAgent(Agent):
     def run(self, ctx, guidance):
         tcfg, pl = ctx.cfg["team"], ctx.cfg["pipeline"]
         members = team.active(ctx.ws, "writer", tcfg["writer"])
+        # The Editor sent back exact edits: the writer whose draft it judged makes them. A second writer's fresh revision could be chosen
+        # instead and lose them (the Editor then rejects it for "fixes not applied"), and pre-reviewing and polishing an exact revision
+        # costs a round for nothing: the Editor reads it next anyway.
+        prev_author = (ctx.previous.get(self.id) or {}).get("author")
+        exact = bool(getattr(guidance, "exact", False) and prev_author)
+        if exact:
+            members = [m for m in members if m["id"] == prev_author] or members[:1]
+            ctx.run.event(self.id, "exact", f"{members[0]['name']} applies the Editor's exact edits to their own draft")
         with ThreadPoolExecutor(max_workers=len(members)) as pool:
             drafts = list(pool.map(lambda m: self._safe_draft(ctx, guidance, m), members))
         fatal = next((d for d in drafts if isinstance(d, AgentError) and d.fatal), None)
@@ -97,7 +105,7 @@ class WriterAgent(Agent):
             with ThreadPoolExecutor(max_workers=len(broken)) as pool:
                 list(pool.map(lambda c: self._self_fix(ctx, c, guidance, tcfg.get("self_fix_rounds", 2)), broken))
         clean = [c for c in cands if c["out"] and not c["problems"]]
-        if tcfg.get("pre_review") and clean:
+        if tcfg.get("pre_review") and clean and not exact:
             with ThreadPoolExecutor(max_workers=len(clean)) as pool:
                 for c, rv in zip(clean, pool.map(lambda c: self._pre_review(ctx, c["out"]), clean)):
                     c["review"] = rv

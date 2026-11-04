@@ -155,7 +155,7 @@ class ScriptWriter(WriterAgent):
         system = (self.prompt(ctx, format=spec["format"], target_seconds=spec["target_seconds"], min_words=lo, max_words=hi,
                               format_rules=FORMAT_RULES[spec["format"]], wps=spec.get("wps", 2.5), outro=spec.get("outro") or "(none: end with one clear next step)",
                               shorts_rule="Do not write #Shorts yourself: the app adds it to Shorts.",
-                              short_max_words=(int(checks_mod.SHORT_LIMIT_S * spec.get("wps", 2.5)) if spec["format"] == "short" else "no limit"))
+                              short_max_words=(checks_mod.short_max_words() if spec["format"] == "short" else "no limit"))
                   + team.persona_block(ctx.ws, member))
         notes = briefmod.cat_context(ctx.cat)
         if platforms.renderer_for(ctx.cfg, ctx.category) in ("blackboard", "explainer"):
@@ -202,4 +202,5 @@ class ScriptWriter(WriterAgent):
             who += f" (best of {len(out['team'])})"
         if out.get("pre_review"):
             who += f", pre-review {out['pre_review']['overall']}"
-        return f"'{out.get('title', '')[:50]}': {len(out.get('scenes', []))} scenes, {len(t.split())} words (~{len(t.split()) / 2.5:.0f}s) {who}"
+        return (f"'{out.get('title', '')[:50]}': {len(out.get('scenes', []))} scenes, {len(t.split())} words "
+                f"(~{len(t.split()) / platforms.SPOKEN_WPS:.0f}s voiced) {who}")

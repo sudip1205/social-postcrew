@@ -300,6 +300,32 @@ class TranscribeTests(unittest.TestCase):
         self.assertEqual((out["text"], out["words"]), ("hello there", 2))
 
 
+class ShortLengthTests(unittest.TestCase):
+    def test_a_short_is_limited_by_how_fast_a_video_really_goes(self):
+        from postcrew.checks import script_problems, short_max_words
+        from postcrew.platforms import SPOKEN_WPS
+        self.assertEqual(short_max_words(), int(175 * SPOKEN_WPS))
+        self.assertGreater(short_max_words(), 400)   # the lab's slow-pace Shorts run 2.9-3.5 words a second: 400 words is about 2 minutes
+
+        def length_problems(words):
+            script = {"text": " ".join(["word"] * words), "scenes": []}
+            return [p for p in script_problems(script, {"format": "short", "wps": 2.0}, {}, {}) if "Short holds" in p]
+        self.assertEqual(length_problems(360), [])            # was refused as "190 seconds" at the slow pace
+        msg = length_problems(short_max_words() + 20)
+        self.assertTrue(msg and "Cut at least 20 words" in msg[0])
+
+    def test_the_editor_is_told_the_word_room_of_a_short(self):
+        from postcrew.agents.base import length_note
+        from postcrew.checks import short_max_words
+        ctx = SimpleNamespace(video={"format": "short"}, outputs={"writer": {"text": "w " * (short_max_words() - 10)}})
+        note = length_note(ctx)
+        self.assertIn("only 10 words of room", note)
+        self.assertIn("which sentence to cut", note)
+        ctx.outputs["writer"]["text"] = "w " * 100
+        self.assertIn("may add words", length_note(ctx))
+        self.assertEqual(length_note(SimpleNamespace(video={"format": "long"}, outputs={})), "")
+
+
 class StudioApiTests(unittest.TestCase):
     def test_upload_analyse_approve_through_the_api(self):
         import io

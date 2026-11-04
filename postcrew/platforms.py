@@ -131,6 +131,10 @@ def parse_day(value):
 WORDS_PER_SECOND = 2.5   # how fast a voice-over is read: the script's word budget and every scene's timing
 PACE_WPS = {"normal": 2.5, "slow": 2.0}   # a teacher's pace leaves room for pauses and for the picture to build up
 SHORT_MAX_S = 180        # YouTube allows Shorts of up to three minutes
+# How fast a finished video really goes, pauses and scene tails included: measured on the lab's Shorts at the slow pace, 2.9-3.5 words a
+# second. Only the hard 3-minute limit of a Short uses it (with a margin); PACE_WPS stays the writing guide. The rendered video is checked
+# again against 180 s (render/video.check_video), so a script that slips through still cannot become a Short over 3 minutes.
+SPOKEN_WPS = 2.6
 SHORT_MIN_S, SHORT_TOP_S, LONG_MIN_S = 50, 100, 300   # the owner's lengths: a Short runs 50 to 100 seconds, a long video at least 5 minutes
 SHORT_DEFAULT_S, LONG_DEFAULT_S = 90, 480
 
