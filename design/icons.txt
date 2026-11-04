@@ -22,6 +22,7 @@ calendar_month
 calendar_today
 calendar_view_week
 cancel
+category
 center_focus_strong
 chat
 check

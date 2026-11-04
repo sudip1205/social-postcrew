@@ -533,6 +533,9 @@ def _entry(item, cat, fmt, platform):
             from .attachments import statement_text
             entry["owner_plan"]["statement"] = statement_text(src["statement"])
             entry["owner_plan"]["files"] = [f["name"] for f in src.get("files") or []]
+            if src["statement"].get("shape"):
+                entry["owner_plan"]["shape"] = src["statement"]["shape"]
+            entry["owner_plan"]["examples"] = src["statement"].get("examples") or []
     if platform != LINKEDIN:
         entry["format"] = fmt
         if item.get("research") and not item["research"].get("unavailable"):

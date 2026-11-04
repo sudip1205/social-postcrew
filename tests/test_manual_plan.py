@@ -209,7 +209,7 @@ class AttachmentTests(unittest.TestCase):
 
 # ---------- a real 2-D board ----------
 from postcrew import gridviz
-from postcrew.agents.script import grid_problem_check
+from postcrew import shapes
 
 BOARD = ["BGBBGB", "GGGGGG", "BGBBGB", "GGGGGG", "BGBBGB", "BGBBGB"]   # HackerRank Two Pluses, sample 1
 
@@ -247,12 +247,54 @@ class GridTests(unittest.TestCase):
         ctx = SimpleNamespace(outputs={"topic": {"topic": "Two Pluses", "angle": "",
                                                  "owner_plan": {"statement": "Given a grid of size n x m, each cell is good or bad."}}})
         strip = {"scenes": [{"layout": "trace", "cells": list("GGBGG")}] * 3}
-        self.assertIn("set on a grid", grid_problem_check(ctx, strip)[0])
+        self.assertIn("a grid (rows and columns)", shapes.scene_problems(ctx, strip)[0])
         board = {"scenes": [{"layout": "grid"}, {"layout": "grid"}]}
-        self.assertEqual(grid_problem_check(ctx, board), [])
+        self.assertEqual(shapes.scene_problems(ctx, board), [])
         one_d = SimpleNamespace(outputs={"topic": {"topic": "Two Sum", "angle": "find two numbers in an array"}})
-        self.assertEqual(grid_problem_check(one_d, strip), [])
+        self.assertEqual(shapes.scene_problems(one_d, strip), [])                  # an array drawn as a row is right
 
+
+class ShapeTests(unittest.TestCase):
+    def test_the_shape_is_named_from_the_words_when_no_reader(self):
+        for text, want in (("Number of islands in a 2D grid", "grid"), ("Lowest common ancestor in a binary tree", "tree"),
+                           ("Dijkstra shortest path", "graph"), ("Reverse a linked list", "linked_list"), ("Valid parentheses with a stack", "stack_queue"),
+                           ("Merge overlapping intervals", "intervals"), ("Climbing stairs: how many ways", "ways"),
+                           ("Longest palindromic substring", "string"), ("Two sum on a sorted array", "array"), ("CAP theorem", "other")):
+            self.assertEqual(shapes.from_words(text), want, text)
+
+    def test_a_shape_the_video_cannot_draw_stops_only_when_the_reader_named_it(self):
+        self.assertIn("cannot draw a tree yet", shapes.stop_reason("tree", "reader"))
+        self.assertEqual(shapes.stop_reason("tree", "words"), "")             # a guess from words never stops a run
+        self.assertEqual(shapes.stop_reason("grid", "reader"), "")
+        from postcrew.agents.topic import TopicAgent
+        from postcrew.agents.base import AgentError
+        ctx = SimpleNamespace(platform="youtube", category="assigned-short", cat={"media": "video", "label": "Short"},
+                              run=SimpleNamespace(event=lambda *a, **k: None))
+        e = {"topic": "Lowest common ancestor", "angle": "x", "owner_plan": {"title": "LCA", "shape": "tree", "statement": "..."}}
+        with self.assertRaises(AgentError) as err:
+            TopicAgent()._planned(ctx, e)
+        self.assertTrue(err.exception.fatal)
+
+    def test_the_video_works_the_problems_own_sample(self):
+        st = {"examples": [{"input": "6 6\nBGBBGB\nGGGGGG\nBGBBGB\nGGGGGG\nBGBBGB\nBGBBGB", "output": "25"}]}
+        ctx = SimpleNamespace(outputs={"topic": {"topic": "Two Pluses", "owner_plan": {"shape": "grid"}}})
+        made_up = {"scenes": [{"layout": "grid", "grid": {"rows": ["GGG", "GGG", "GGG"]}}]}
+        self.assertIn("BGBBGB / GGGGGG", shapes.example_problems(ctx, made_up, st)[0])
+        real = {"scenes": [{"layout": "grid", "grid": {"rows": BOARD}}]}
+        self.assertEqual(shapes.example_problems(ctx, real, st), [])
+        arr = SimpleNamespace(outputs={"topic": {"topic": "Two Sum", "owner_plan": {"shape": "array"}}})
+        st2 = {"examples": [{"input": "nums = [2,7,11,15], target = 9", "output": "[0,1]"}]}
+        self.assertIn("['2', '7', '11', '15']", shapes.example_problems(arr, {"scenes": [{"layout": "trace", "cells": ["1", "2"]}]}, st2)[0])
+        self.assertEqual(shapes.example_problems(arr, {"scenes": [{"layout": "trace", "cells": ["2", "7", "11", "15"]}]}, st2), [])
+
+    def test_a_script_wrong_for_its_problem_goes_back_to_the_writer(self):
+        from postcrew.agents.supervisor import Supervisor
+        sup = Supervisor.__new__(Supervisor)
+        sup.order = ["writer", "editor", "text_frames", "media", "quality"]
+        d = sup._diagnose(SimpleNamespace(), "quality", ["REWRITE: grid drawn as a row"], {"rewrite": "grid drawn as a row"}, {})
+        self.assertEqual((d["action"], d["target"]), ("rewind", "writer"))
+        d = sup._diagnose(SimpleNamespace(), "quality", ["scenes redrawn"], {"redrawn": [3]}, {})
+        self.assertEqual(d["target"], "text_frames")
 
 if __name__ == "__main__":
     unittest.main()

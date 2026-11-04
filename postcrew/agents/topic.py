@@ -1,5 +1,6 @@
 """Topic agent: decides what today's post is about, from the day's category and what was posted before."""
 from datetime import timedelta
+from types import SimpleNamespace
 
 from .. import brief as briefmod
 from ..checks import repeat_problem
@@ -77,6 +78,11 @@ class TopicAgent(Agent):
             return dict(out, algo=e["algo"])
         if e.get("owner_plan"):   # a plan you wrote yourself: every agent that shapes the post or video reads it (base.owner_plan_block)
             out["owner_plan"] = e["owner_plan"]
+            if getattr(ctx, "platform", "linkedin") == "youtube":   # a problem whose data the video cannot draw stops here, before anything is spent on writing
+                from .. import shapes
+                why = shapes.stop_reason(*shapes.of(SimpleNamespace(outputs={"topic": out})))
+                if why:
+                    raise AgentError(why, fatal=True)
         brief = self._brief(ctx, e, out)
         if brief:
             out["brief"] = brief

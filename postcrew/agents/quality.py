@@ -42,7 +42,11 @@ SCHEMA = {"type": "object", "properties": {
                "required": CRITERIA, "additionalProperties": False},
     "overall": {"type": "integer", "minimum": 0, "maximum": 100},
     "summary": {"type": "string"},
-    "scenes": {"type": "array", "items": FIX, "maxItems": 30}},
+    "scenes": {"type": "array", "items": FIX, "maxItems": 30},
+    "rewrite": {"type": "boolean", "description": "true only when redrawing scenes cannot fix it because the SCRIPT is wrong for its problem: the "
+                                                  "data drawn as the wrong shape (a grid as one row, a tree as a list), the example is not the "
+                                                  "problem's own, or the words describe things the pictures cannot show (above, below, left of)"},
+    "rewrite_why": {"type": "string", "description": "when rewrite: what the script must change, in one or two sentences"}},
     "required": ["scores", "overall", "summary", "scenes"], "additionalProperties": False}
 
 
@@ -162,6 +166,13 @@ class QualityDirectorAgent(Agent):
                "round": ctx.flags.get("quality_redraws", 0) + 1, "house_version": house.get("version", 0)}
         ctx.run.event(self.id, "scored", f"picture quality {score}/100" + (f": {out['summary'][:200]}" if out["summary"] else ""))
         weak = score < mc["min_score"] or errors
+        # the script itself is wrong for its problem: no redraw can fix it, so the Script Writer writes it again (once per run)
+        if weak and (review or {}).get("rewrite") and not ctx.flags.get("quality_rewrites"):
+            ctx.flags["quality_rewrites"] = 1
+            out["rewrite"] = (review.get("rewrite_why") or out["summary"])[:600]
+            ctx.run.event(self.id, "rewrite", f"picture quality {score}/100 and the script is wrong for its problem: back to the Script Writer: "
+                                              f"{out['rewrite'][:200]}", level="warning")
+            return out
         if weak and ctx.flags.get("quality_redraws", 0) < mc["max_redraws"]:
             fixes = [s for s in (review or {}).get("scenes") or [] if s.get("redraw")]
             g = GraphicsAgent()
@@ -180,7 +191,11 @@ class QualityDirectorAgent(Agent):
         return out
 
     def validate(self, ctx, out):
-        """A redraw is a send-back: the Supervisor draws the video again from the frame steps (the voice is reused)."""
+        """A redraw is a send-back: the Supervisor draws the video again from the frame steps (the voice is reused). A rewrite goes back
+        to the Script Writer."""
+        if out.get("rewrite"):
+            return [f"REWRITE: picture quality {out['score']}/100 and the script is wrong for its problem: {out['rewrite']}"] + \
+                [p for p in out.get("problems", [])][:5]
         if out.get("redrawn"):
             return [f"picture quality {out['score']}/100: scene(s) {', '.join(map(str, out['redrawn']))} redesigned; "
                     f"draw the video again"] + [p for p in out.get("problems", [])][:5]

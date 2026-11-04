@@ -121,6 +121,8 @@ const manLoadView = () => { const bar = $("#man-topics"); if (bar) bar.querySele
 const MAN_FIELD = "w-full px-3 py-2 bg-slate-50 hover:bg-slate-100/80 focus:bg-white text-sm rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-all placeholder:text-slate-400";
 const manLabel = (text, inner, sub = "") => `<label class="flex flex-col gap-1.5"><span class="text-xs font-bold text-slate-700">${text}</span>${inner}${sub ? `<span class="text-[11px] text-slate-400">${sub}</span>` : ""}</label>`;
 
+const MAN_SHAPE = { array: "an array", string: "a string", grid: "a grid of rows and columns", number_table: "a table of numbers", ways: "a staircase of ways" };
+const MAN_UNDRAWABLE = { tree: "a tree", graph: "a graph", linked_list: "a linked list", stack_queue: "a stack or queue", intervals: "intervals" };
 const MAN_READ = { new: ["idle", "Not read yet"], reading: ["running", "Reading the files"], done: ["passed", "Read"], failed: ["failed", "Could not read"] };
 
 function manSource(i) {
@@ -138,7 +140,9 @@ function manSource(i) {
       ${(st.examples || []).map((e, n) => `<p class="mt-1 font-mono text-[11px]">Example ${n + 1}: ${esc(e.input)} → ${esc(e.output)}</p>`).join("")}
       ${(st.constraints || []).length ? `<p class="mt-1"><span class="font-semibold">Constraints:</span> ${esc(st.constraints.join("; "))}</p>` : ""}
       ${(st.figures || []).map((f, n) => `<p class="mt-1"><span class="font-semibold">Figure ${n + 1}:</span> ${esc(f)}</p>`).join("")}
-      ${(st.unclear || []).length ? `<p class="mt-1 text-amber-700"><span class="font-semibold">Could not read:</span> ${esc(st.unclear.join("; "))}</p>` : ""}</details>` : ""}</div>`;
+      ${(st.unclear || []).length ? `<p class="mt-1 text-amber-700"><span class="font-semibold">Could not read:</span> ${esc(st.unclear.join("; "))}</p>` : ""}</details>` : ""}
+    ${s.state === "done" && st.shape ? (MAN_UNDRAWABLE[st.shape] ? `<p class="text-[11px] text-rose-700 flex items-center gap-1">${icon("block", "text-[14px]")}<span>Its data is ${esc(MAN_UNDRAWABLE[st.shape])}: the video cannot draw that yet, so this plan cannot run.</span></p>`
+      : st.shape !== "other" ? `<p class="text-[11px] text-slate-500 flex items-center gap-1">${icon("category", "text-[14px] text-slate-400")}<span>Drawn as ${esc(MAN_SHAPE[st.shape] || st.shape)}${st.shape_why ? ": " + esc(st.shape_why) : ""}</span></p>` : "") : ""}</div>`;
 }
 
 function manForm() {

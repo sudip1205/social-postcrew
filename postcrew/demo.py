@@ -119,7 +119,7 @@ class Demo:
             return {"title": "Two Sum", "statement": "Given an array of integers and a target, return the indices of the two numbers that add up to it.",
                     "input_output": "nums: list of ints, target: int -> [i, j]", "examples": [{"input": "nums = [2, 7, 11, 15], target = 9",
                     "output": "[0, 1]", "explanation": "2 + 7 = 9"}], "constraints": ["exactly one answer"], "figures": [],
-                    "solution_notes": "", "unclear": []}
+                    "solution_notes": "", "unclear": [], "shape": "array", "shape_why": "a list of integers"}
         if agent_id == "replier":   # one short thank-you per new comment
             ids = re.findall(r'"comment": "([^"]+)"', prompt)
             return {"replies": [{"comment": i, "reply": "Thank you for reading, glad it was useful.", "skip": False, "why": "kind words"}

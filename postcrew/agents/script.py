@@ -13,7 +13,7 @@ import re
 
 from .. import assets as assets_mod
 from .. import brief as briefmod
-from .. import codeviz, gridviz, pathviz, platforms
+from .. import codeviz, gridviz, pathviz, platforms, shapes
 from .. import checks as checks_mod
 from ..checks import PARTS, repeat_problem, script_problems
 from . import team
@@ -73,24 +73,6 @@ SCHEMA = {
     "required": ["title", "description", "tags", "thumbnail_text", "scenes"],
     "additionalProperties": False,
 }
-
-GRID_WORDS = re.compile(r"\b(grid|matrix|board|maze|rows? and columns?|n\s*[x×]\s*m|2-?d array|two-dimensional|island|chessboard|cell \(i,\s*j\))\b", re.I)
-
-
-def grid_problem_check(ctx, out):
-    """A problem set on a grid must be drawn on a real board ("grid" scenes), never on a one-row trace that cannot show above or below."""
-    plan = (ctx.outputs.get("topic") or {}).get("owner_plan") or {}
-    topic = ctx.outputs.get("topic") or {}
-    text = " ".join([plan.get("statement", ""), plan.get("context", ""), topic.get("topic", ""), topic.get("angle", "")])
-    if not GRID_WORDS.search(text):
-        return []
-    scenes = out.get("scenes") or []
-    grids = [s for s in scenes if s.get("layout") == "grid"]
-    if len(grids) >= 2:
-        return []
-    return [f"this problem is set on a grid (rows and columns), so it must be DRAWN on one: use 'grid' scenes (at least two: the example board, "
-            f"then the idea step by step on it; also the mistake). You have {len(grids)}. A 'trace' is a single row and cannot show above or below"]
-
 
 FORMAT_RULES = {
     "short": "A vertical 9:16 Short (up to 3 minutes): a short opening, the problem with an example, the ways it can be solved, then the chosen solution built up scene by scene with its code.",
@@ -203,7 +185,9 @@ class ScriptWriter(WriterAgent):
                                 f"Short (3 minutes at most). Cut it or make a long video")
             return problems
         problems = script_problems(out, spec, ctx.cat, ctx.profile)
-        problems += grid_problem_check(ctx, out)
+        problems += shapes.scene_problems(ctx, out)   # a problem's data drawn as its own shape (a grid as a grid)
+        plan = (ctx.outputs.get("topic") or {}).get("owner_plan") or {}
+        problems += shapes.example_problems(ctx, out, {"examples": plan.get("examples")} if plan.get("examples") else None)
         dup = repeat_problem("", out.get("text", ""), ctx.recent(60))
         if dup:
             problems.append(dup)

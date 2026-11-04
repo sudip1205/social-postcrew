@@ -24,3 +24,8 @@ the problem in one sentence, and when a different picture would fix it, redraw =
 cells, steps ([] when not used), clip and why. Fewer, larger things beat many small ones: at most 5 boxes, labels of 1-3 words, at most 4
 items. Never return narration: it cannot change. Code walk-through scenes (codeviz) and the closing card cannot be redrawn: report them with
 redraw = false. Confirm the measured findings on the sheets; do not report a scene that only looks empty because its picture builds up later.
+
+REWRITE: set "rewrite" true (with "rewrite_why") only when redrawing scenes cannot fix the video because the script is wrong for its
+problem: the problem's data is drawn as the wrong shape (a grid shown as one row, a tree as a list), the example is not the problem's own,
+or the narration describes what no picture of this kind can show ("above", "below", "the left child"). The Script Writer then writes it
+again. Everything else is a redraw.

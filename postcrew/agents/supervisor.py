@@ -269,6 +269,9 @@ class Supervisor:
 
     def _diagnose(self, ctx, step, problems, out, attempts):
         """Ask the supervisor model what to do. Deterministic fallback when it is unavailable."""
+        if step == "quality" and out and out.get("rewrite"):   # the script is wrong for its problem: written again, then everything after it
+            return {"action": "rewind", "target": "writer", "instructions": problems[:6],
+                    "reason": "the Quality Director found the script wrong for its problem (not a picture a redraw can fix)"}
         if step == "quality":   # the Quality Director already redesigned the weak scenes: draw the video again, the voice is kept
             first = next((s for s in ("text_frames", "data_frames", "media") if s in self.order), "media")
             return {"action": "rewind", "target": first, "instructions": problems[:6],

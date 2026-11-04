@@ -275,6 +275,11 @@ class Studio:
             src = monthly._item(monthly.load(self.ws, platform), str(body.get("id") or "")).get("source") or {}
         except ValueError:
             src = {}
+        if platform != platforms.LINKEDIN and (src.get("statement") or {}).get("shape"):
+            from .. import shapes
+            why = shapes.stop_reason(src["statement"]["shape"], "reader")
+            if why:
+                raise ValueError(why[0].upper() + why[1:])
         if src.get("files") and src.get("state") != "done":
             raise ValueError({"reading": "the Reader is still reading your files: run it when it says Read",
                               "failed": f"your files could not be read ({src.get('error')}): read them again or remove them"}

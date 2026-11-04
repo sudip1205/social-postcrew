@@ -16,6 +16,7 @@ from pathlib import Path
 
 from . import monthly
 from .llm import LLMError, make_backend
+from .shapes import LABEL, SHAPES
 
 AGENT = "reader"
 EXT = {".pdf": "pdf", ".png": "image", ".jpg": "image", ".jpeg": "image", ".webp": "image", ".gif": "image"}
@@ -35,8 +36,12 @@ SCHEMA = {
                     "description": "each figure, described so it can be redrawn: what it shows, its labels and numbers, where things are"},
         "solution_notes": {"type": "string", "description": "a solution, hints or an approach the material gives, as written (empty if none)"},
         "unclear": {"type": "array", "items": {"type": "string"}, "description": "what you could not read or is ambiguous"},
+        "shape": {"type": "string", "enum": SHAPES,
+                  "description": "the shape of the problem's data, the thing a video must draw: array, string, grid (rows and columns), "
+                                 "number_table (a DP table), ways (counting ways), tree, graph, linked_list, stack_queue, intervals, other"},
+        "shape_why": {"type": "string", "description": "one line: what in the material shows that shape"},
     },
-    "required": ["title", "statement", "input_output", "examples", "constraints", "figures", "solution_notes", "unclear"],
+    "required": ["title", "statement", "input_output", "examples", "constraints", "figures", "solution_notes", "unclear", "shape", "shape_why"],
 }
 SYSTEM = """You read the material a creator attached to a video plan: pages of a PDF (pictures of each page, plus the text pulled out of it)
 and images. It is usually an algorithm or coding problem. Write down the problem exactly as the material states it, complete, so a script
@@ -254,6 +259,8 @@ def statement_text(st):
     out = []
     if st.get("title"):
         out.append(f"Problem: {st['title']}")
+    if st.get("shape") and st["shape"] != "other":
+        out.append(f"Its data is {LABEL.get(st['shape'], st['shape'])}: draw it as that.")
     if st.get("statement"):
         out.append(st["statement"])
     if st.get("input_output"):

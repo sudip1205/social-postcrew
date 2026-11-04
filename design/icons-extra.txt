@@ -68,3 +68,4 @@ monitoring
 upload_file
 picture_as_pdf
 auto_stories
+category
