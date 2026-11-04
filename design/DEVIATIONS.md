@@ -128,3 +128,10 @@ No Stitch screen exists for either view. Both are derived from the shell, design
   native <details>.
 - House style text is shown as preformatted text (it is the exact brief the agents receive).
 
+## Queue > Comments (no Stitch screen)
+- The Comments section (LinkedIn app only) sits between the queue cards and "Published" and reuses the Published section's shell (white
+  rounded-xl card, headline + sub line). Each comment is a bordered box with a `chip()` (Reply ready, Replied, Practice run, Not sent,
+  Skipped, You replied), the comment text, an editable reply and the Queue's own small Approve-green "Send reply" / outlined "Skip" buttons.
+  Answered and skipped comments fold into a native <details>. A missing LinkedIn permission shows as an amber notice with the lock icon.
+- "Retry comment" in the Published table is the table's small outlined button style.
+

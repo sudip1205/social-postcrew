@@ -127,10 +127,10 @@ def add_first_comment(ws, post, li, owner, ev, sleep=time.sleep, waits=COMMENT_W
     return False
 
 
-def retry_comments(ws, client_factory=LinkedIn, log=print, sleep=time.sleep):
+def retry_comments(ws, client_factory=LinkedIn, log=print, sleep=time.sleep, only=None):
     """Retry first comments that failed on published posts. Returns how many were added."""
     todo = [h for h in ws.history() if h.get("comment_status") == "failed" and h.get("urn")
-            and h.get("comment_tries", 0) < COMMENT_MAX_TRIES]
+            and h.get("comment_tries", 0) < COMMENT_MAX_TRIES and (only is None or h.get("id") == only)]
     if not todo or ws.config()["publishing"]["dry_run"]:
         return 0
     s = ws.secrets()

@@ -33,7 +33,7 @@ from ..agents.frames import HyperFramesAgent, RemotionAgent, RemotionFramesAgent
 from ..agents.hooks import HooksAgent
 from ..agents.graphics import GraphicsAgent
 from ..agents.video_review import VideoReviewAgent
-from .. import rewards
+from .. import engage, rewards
 from ..agents.direction import CreativeDirectorAgent
 from ..agents.quality import QualityDirectorAgent
 from ..agents.voice import VoiceAgent
@@ -356,6 +356,39 @@ class Studio:
             raise KeyError("that entry is not in the published list")
         return {"history": self.ws.history()}
 
+    # ---------- comments on your LinkedIn posts (engage.py) ----------
+    def engage_check(self):
+        """Read and answer comments now, in the background (the Replier may take a minute)."""
+        from ..scheduler import _engage_in_background
+        started = _engage_in_background(self.ws) if self.ws.secrets().get("linkedin_access_token") else False
+        return {"started": started, **engage.overview(self.ws)}
+
+    def engage_act(self, body):
+        urn = body.get("urn") or ""
+        if body.get("action") == "skip":
+            engage.skip(self.ws, urn)
+        else:
+            row = engage.send(self.ws, urn, body.get("text"))
+            if row["status"] == "failed":
+                raise ValueError(f"LinkedIn did not take the reply: {row.get('error')}")
+        return engage.overview(self.ws)
+
+    def retry_comment(self, body):
+        """Try a published post's first comment again now (also after the three automatic tries)."""
+        from ..agents.publisher import retry_comments
+        h = next((p for p in self.ws.history() if p.get("id") == body.get("id") and p.get("urn")), None)
+        if not h or not h.get("first_comment"):
+            raise KeyError("that post has no first comment to add")
+        if h.get("comment_status") == "added":
+            return {"history": self.ws.history(), "comment_status": "added"}
+        self.ws.remove_history(lambda p: p.get("id") == h["id"] and p.get("urn") == h["urn"])
+        self.ws.add_history({**h, "comment_status": "failed", "comment_tries": 0})
+        retry_comments(self.ws, only=h["id"])
+        h = next(p for p in self.ws.history() if p.get("id") == body.get("id"))
+        if h.get("comment_status") != "added":
+            raise ValueError(f"LinkedIn did not take the first comment: {h.get('comment_error')}")
+        return {"history": self.ws.history(), "comment_status": "added"}
+
     def queue_action(self, pid, action, body):
         posts = self.ws.queue()
         post = next((p for p in posts if p["id"] == pid), None)
@@ -476,7 +509,8 @@ class Studio:
         self.oauth_states = {k: v for k, v in self.oauth_states.items()
                              if v > datetime.now(timezone.utc) - timedelta(minutes=15)}
         self.oauth_states[state] = datetime.now(timezone.utc)
-        return linkedin.authorize_url(s["linkedin_client_id"], self.redirect_uri, state)
+        return linkedin.authorize_url(s["linkedin_client_id"], self.redirect_uri, state,
+                                      (self.ws.config().get("engage") or {}).get("scopes") or ())
 
     def oauth_callback(self, q):
         if q.get("error"):
@@ -839,6 +873,10 @@ def make_handler(studio):
                     ("GET", "/api/queue"): lambda: {"queue": ws.queue(), "history": ws.history()},
                     ("POST", "/api/history"): lambda: studio.history_add(self.body()),
                     ("POST", "/api/history/remove"): lambda: studio.history_remove(self.body()),
+                    ("POST", "/api/history/retry-comment"): lambda: studio.retry_comment(self.body()),
+                    ("GET", "/api/engage"): lambda: engage.overview(ws),
+                    ("POST", "/api/engage/check"): lambda: studio.engage_check(),
+                    ("POST", "/api/engage/reply"): lambda: studio.engage_act(self.body()),
                     ("GET", "/api/config"): lambda: {"config": ws.config()},
                     ("PUT", "/api/config"): lambda: self.save_config(),
                     ("POST", "/api/config/validate"): lambda: {"errors": validate_config(self.body().get("config", {}))},

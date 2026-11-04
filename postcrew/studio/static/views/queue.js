@@ -155,13 +155,46 @@ function qHistory(history, cats) {
         <td class="py-2 pr-3 text-xs text-slate-500">${esc(cats[h.category]?.label || h.category || "")}</td>
         <td class="py-2 pr-3 text-xs font-mono text-slate-500">${h.urn ? esc(h.urn) : `<span class="text-slate-400">${h.added_by_hand ? "added by you" : h.imported ? "imported" : ""}</span>`}${
           h.comment_status === "added" ? `<div class="text-emerald-700">first comment added</div>`
-          : h.comment_status === "failed" ? `<div class="text-rose-700" title="${esc(h.comment_error || "")}">first comment failed${(h.comment_tries || 0) < 3 ? " - will retry" : " - add it by hand"}</div>` : ""}</td>
+          : h.comment_status === "failed" ? `<div class="text-rose-700" title="${esc(h.comment_error || "")}">first comment failed${(h.comment_tries || 0) < 3 ? " - will retry" : ""}</div>
+            <button class="mt-1 inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium text-slate-700 bg-white border border-slate-200 rounded hover:bg-slate-100" type="button" data-hfc="${i}">${icon("refresh", "text-[14px] text-slate-500")}<span>Retry comment</span></button>` : ""}</td>
         <td class="py-2 text-right"><button class="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium text-rose-700 bg-rose-50 border border-rose-200 rounded hover:bg-rose-100" type="button" data-hrm="${i}">${icon("delete", "text-[14px] text-rose-600")}<span>Remove</span></button></td></tr>`).join("")}</tbody></table></div>`
       : emptyState("history", "Nothing published yet.")}</section>`;
 }
 
+// Comments on your LinkedIn posts: the Replier's drafts to send, change or skip (engage.py). No Stitch screen: built from the Queue's parts.
+const EN_STATE = { drafted: ["waiting", "Reply ready"], sent: ["published", "Replied"], dry_run: ["dry_run", "Practice run"],
+  failed: ["failed", "Not sent"], skipped: ["skipped", "Skipped"], answered: ["passed", "You replied"] };
+const EN_MODE = { review: "you send each reply", auto: "replies go out on their own", off: "off" };
+
+function qComments(en) {
+  if (!en) return "";
+  const a = en.access || {}, st = en.settings || {}, rows = en.comments || [];
+  const open = rows.filter(r => r.status === "drafted" || r.status === "failed"), done = rows.filter(r => !open.includes(r)).slice(0, 10);
+  const banner = a.ok === false
+    ? `<div class="flex items-start gap-2 p-3 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-800">${icon("lock", "text-[16px] text-amber-600")}<span>${esc(a.message)}</span></div>` : "";
+  const row = r => { const [k, w] = EN_STATE[r.status] || ["idle", r.status];
+    const editable = r.status === "drafted" || r.status === "failed";
+    return `<div class="border border-slate-200 rounded-lg p-3 flex flex-col gap-2" data-en="${esc(r.urn)}">
+      <div class="flex items-center justify-between gap-2"><span class="text-[11px] text-slate-500 truncate">On <strong class="text-slate-700">${esc(r.topic || r.post_id)}</strong>${r.created ? " · " + esc(fmtTime(new Date(r.created).toISOString())) : ""}</span>${chip(k, w, "sm")}</div>
+      <p class="text-sm text-slate-800 whitespace-pre-line">${esc(r.text)}</p>
+      ${editable ? `<textarea rows="3" data-entext class="w-full px-2.5 py-1.5 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-violet-500">${esc(r.reply || "")}</textarea>
+        ${r.error ? `<p class="text-[11px] text-rose-700">${esc(r.error)}</p>` : ""}
+        <div class="flex items-center gap-2"><button class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs active:scale-95 transition-all" type="button" data-ensend>${icon("send", "text-[16px]")}<span>Send reply</span></button>
+        <button class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 font-medium text-xs" type="button" data-enskip>${icon("block", "text-[16px] text-slate-500")}<span>Skip</span></button>
+        ${r.why ? `<span class="text-[11px] text-slate-400 truncate">${esc(r.why)}</span>` : ""}</div>`
+      : r.reply ? `<p class="text-xs text-slate-600 border-l-2 border-violet-200 pl-2"><span class="font-semibold text-slate-700">Reply:</span> ${esc(r.reply)}</p>`
+      : r.why ? `<p class="text-[11px] text-slate-400">${esc(r.why)}</p>` : ""}</div>`; };
+  return `<section class="bg-white rounded-xl border border-slate-200 shadow-sm p-6 flex flex-col gap-4" id="comments">
+    <div class="flex flex-wrap items-start justify-between gap-3"><div><h2 class="font-headline font-bold text-lg text-slate-900">Comments</h2>
+      <p class="text-sm text-slate-500 mt-0.5">The ${tip("Replier", "Reads the comments on your posts from the last " + (st.lookback_days || 7) + " days and writes the reply you would write to each, from the post and the comment. Spam and abuse are skipped.")} answers comments on your recent posts: ${esc(EN_MODE[st.replies] || st.replies)} (change it in config: engage.replies).${en.checked_at ? " Last checked " + esc(fmtTime(en.checked_at)) + "." : ""}</p></div>
+      ${button("secondary", "forum", "Check comments now", `id="en-check" type="button"`)}</div>
+    ${banner}
+    ${open.length ? `<div class="flex flex-col gap-3">${open.map(row).join("")}</div>` : a.ok === false ? "" : emptyState("forum", "No comments waiting for a reply.")}
+    ${done.length ? `<details class="text-sm"><summary class="cursor-pointer text-xs font-semibold text-slate-600">Answered and skipped (${done.length})</summary><div class="flex flex-col gap-2 mt-2">${done.map(row).join("")}</div></details>` : ""}</section>`;
+}
+
 async function renderQueue() {
-  const [all, { config }] = await Promise.all([api("/api/queue"), api("/api/config")]);
+  const [all, { config }, en] = await Promise.all([api("/api/queue"), api("/api/config"), S.platform === "linkedin" ? api("/api/engage").catch(() => null) : null]);
   const queue = all.queue, history = all.history.filter(mine), cats = catsOf(config, S.platform);
   const plat = p => p.platform || "linkedin", f = Q.filter || S.platform;
   const count = fn => queue.filter(fn).length;
@@ -204,6 +237,7 @@ async function renderQueue() {
           <button class="p-1 rounded text-slate-500" type="button" disabled title="Coming soon">${icon("table_rows", "text-[18px]")}</button></div></div></div>
     <div class="space-y-6">${live.map(qCard).join("") || card(emptyState("inbox", "The queue is empty."))}</div>
     ${vetoed.length ? `<h2 class="font-headline font-bold text-lg text-slate-900">Vetoed</h2><div class="space-y-6">${vetoed.map(qCard).join("")}</div>` : ""}
+    ${qComments(en)}
     ${qHistory(history, cats)}</div>`;
 
   $("#q-refresh").onclick = renderQueue;
@@ -226,6 +260,25 @@ async function renderQueue() {
     catch (e) { toast(e.message, true); }
   };
   $("#h-topic").onkeydown = e => { if (e.key === "Enter") $("#h-add").click(); };
+  document.querySelectorAll("[data-hfc]").forEach(b => b.onclick = async () => {
+    const h = history[+b.dataset.hfc]; b.disabled = true;
+    try { await post("/api/history/retry-comment", { id: h.id }); toast("First comment added"); }
+    catch (e) { toast(e.message, true); }
+    renderQueue();
+  });
+  if ($("#en-check")) $("#en-check").onclick = async () => {
+    $("#en-check").disabled = true;
+    try { const r = await post("/api/engage/check", {}); toast(r.started ? "Checking comments: replies appear here in a minute" : "A check is already running"); setTimeout(renderQueue, 45000); }
+    catch (e) { toast(e.message, true); }
+  };
+  document.querySelectorAll("[data-en]").forEach(box => {
+    const urn = box.dataset.en, send = box.querySelector("[data-ensend]"), skip = box.querySelector("[data-enskip]");
+    if (send) send.onclick = async () => { send.disabled = true;
+      try { const r = await post("/api/engage/reply", { urn, text: box.querySelector("[data-entext]").value }); toast((r.comments.find(c => c.urn === urn) || {}).status === "dry_run" ? "Practice mode: nothing sent" : "Reply sent"); }
+      catch (e) { toast(e.message, true); }
+      renderQueue(); };
+    if (skip) skip.onclick = async () => { try { await post("/api/engage/reply", { urn, action: "skip" }); } catch (e) { toast(e.message, true); } renderQueue(); };
+  });
   document.querySelectorAll("[data-hrm]").forEach(b => b.onclick = async () => {
     const h = history[+b.dataset.hrm];
     if (!confirm(`Remove "${h.topic}" from the published list? The crew may then write about it again.${h.urn ? " The post stays published." : ""}`)) return;

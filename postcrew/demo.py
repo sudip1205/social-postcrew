@@ -115,6 +115,10 @@ class Demo:
             return {"days": [{"date": d, "topic": PLAN_TOPICS[i % len(PLAN_TOPICS)], "angle": "what to try this week",
                               "search_queries": [PLAN_TOPICS[i % len(PLAN_TOPICS)].lower()]}
                              for i, d in enumerate(days)]}
+        if agent_id == "replier":   # one short thank-you per new comment
+            ids = re.findall(r'"comment": "([^"]+)"', prompt)
+            return {"replies": [{"comment": i, "reply": "Thank you for reading, glad it was useful.", "skip": False, "why": "kind words"}
+                                for i in ids]}
         if agent_id == "supervisor":
             return {"action": "retry", "target": "writer", "instructions": ["fix the problems listed"],
                     "reason": "demo"}

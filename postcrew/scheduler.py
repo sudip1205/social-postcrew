@@ -14,7 +14,7 @@ from .cleanup import run_cleanup
 from . import monthly
 from .monthly import month_key, plan_month, topics_of
 from .agents.publisher import publish_due
-from . import platforms
+from . import engage, platforms
 from .crew import category_for, is_running, local_now, post_for, run_crew, target_date
 from .notify import notify
 from .platforms import LINKEDIN
@@ -39,7 +39,7 @@ def _call(fn, ws, arg, platform):
     return fn(ws, arg) if platform == LINKEDIN else fn(ws, arg, platform=platform)
 
 
-def tick(ws, now=None, runner=run_crew, publisher=publish_due, checker=run_check, planner=plan_month, cleaner=run_cleanup):
+def tick(ws, now=None, runner=run_crew, publisher=publish_due, checker=run_check, planner=plan_month, cleaner=run_cleanup, engager=None):
     """One scheduler step. Returns the list of things it did (for logs and tests).
     Every enabled app plans, generates and publishes on its own schedule."""
     if ws.paused():
@@ -102,7 +102,29 @@ def tick(ws, now=None, runner=run_crew, publisher=publish_due, checker=run_check
         ws.save_state("scheduler", st)
         if publisher(ws):
             did.append("publish")
+    if LINKEDIN in platforms.enabled(ws.config()) and engage.due(ws, now.astimezone(timezone.utc)):
+        if (engager or _engage_in_background)(ws):
+            did.append("comments")
     return did
+
+
+_engaging = threading.Lock()
+
+
+def _engage_in_background(ws):
+    """Read and answer comments without holding up the schedule (the Replier may take a minute). One check at a time."""
+    if not _engaging.acquire(blocking=False):
+        return False
+
+    def go():
+        try:
+            engage.check(ws)
+        except Exception:
+            traceback.print_exc()
+        finally:
+            _engaging.release()
+    threading.Thread(target=go, daemon=True, name="postcrew-comments").start()
+    return True
 
 
 class Scheduler(threading.Thread):

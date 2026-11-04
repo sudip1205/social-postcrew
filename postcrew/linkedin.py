@@ -33,9 +33,12 @@ def escape_commentary(text):
     return "".join("\\" + c if c in RESERVED else c for c in text)
 
 
-def authorize_url(client_id, redirect_uri, state):
+def authorize_url(client_id, redirect_uri, state, extra_scopes=()):
+    """extra_scopes: permissions of other LinkedIn products on your app (engage.scopes: the Community Management API's, so the crew can
+    read and answer the comments on your posts)."""
+    scope = " ".join(dict.fromkeys(SCOPE.split() + [x for x in extra_scopes if x]))
     return AUTH_URL + "?" + urllib.parse.urlencode({"response_type": "code", "client_id": client_id,
-                                                    "redirect_uri": redirect_uri, "state": state, "scope": SCOPE})
+                                                    "redirect_uri": redirect_uri, "state": state, "scope": scope})
 
 
 def exchange_code(client_id, client_secret, code, redirect_uri, opener=urllib.request.urlopen):
@@ -53,11 +56,13 @@ class LinkedIn:
     def __init__(self, token, version="202601", opener=urllib.request.urlopen, sleep=time.sleep):
         self.token, self.version, self.opener, self.sleep = token, version, opener, sleep
 
-    def request(self, method, url, *, headers=None, body=None, raw=False, auth=True):
+    def request(self, method, url, *, headers=None, body=None, raw=False, auth=True, versioned=True):
         h = {"Authorization": f"Bearer {self.token}"} if auth else {}
         if not raw:
-            h.update({"LinkedIn-Version": self.version, "X-Restli-Protocol-Version": "2.0.0"})
-        h.update(headers or {})
+            h.update({"X-Restli-Protocol-Version": "2.0.0"})
+            if versioned:
+                h["LinkedIn-Version"] = self.version
+        h.update({k: v for k, v in (headers or {}).items() if v != ""})
         data = None
         if body is not None:
             if isinstance(body, (bytes, bytearray)):
@@ -125,6 +130,42 @@ class LinkedIn:
         _, headers, _ = self.request("POST", f"{API}/rest/posts", body=body)
         return headers.get("x-restli-id") or headers.get("X-RestLi-Id")
 
-    def add_comment(self, owner, post_urn, text):
-        self.request("POST", f"{API}/rest/socialActions/{urllib.parse.quote(post_urn, safe='')}/comments",
-                     body={"actor": owner, "object": post_urn, "message": {"text": text}})
+    # ---------- comments ----------
+    # LinkedIn's versioned /rest/socialActions needs a partner product (Community Management API); the older /v2/socialActions accepts
+    # what "Share on LinkedIn" (w_member_social) grants. Each call tries the versioned one, then the older one when refused.
+    def social(self, method, urn, suffix="", body=None, query=""):
+        path = f"socialActions/{urllib.parse.quote(urn, safe='')}{suffix}{query}"
+        try:
+            return self.request(method, f"{API}/rest/{path}", body=body)
+        except LinkedInError as e:
+            if e.status not in (401, 403, 404, 426):
+                raise
+            first = e
+        try:
+            return self.request(method, f"{API}/v2/{path}", body=body, headers={"LinkedIn-Version": ""}, versioned=False)
+        except LinkedInError as e:
+            if e.status in (401, 403) and first.status in (401, 403):
+                raise LinkedInError(f"{e} (the versioned API said: {first})", e.status)
+            raise
+
+    def add_comment(self, owner, post_urn, text, parent=None):
+        """A comment on a post, or (parent: a comment's URN) a reply to that comment. Returns the new comment's URN when LinkedIn says."""
+        body = {"actor": owner, "object": post_urn, "message": {"text": text}}
+        if parent:
+            body["parentComment"] = parent
+        _, headers, data = self.social("POST", parent or post_urn, "/comments", body=body)
+        data = data if isinstance(data, dict) else {}
+        return headers.get("x-restli-id") or headers.get("X-RestLi-Id") or data.get("$URN") or data.get("commentUrn")
+
+    def comments(self, urn, count=50):
+        """The comments on a post (or the replies to a comment): [{urn, id, actor, text, created, parent}], oldest first."""
+        _, _, data = self.social("GET", urn, "/comments", query=f"?count={count}")
+        out = []
+        for c in (data or {}).get("elements") or []:
+            cid = c.get("id") or ""
+            curn = c.get("$URN") or c.get("commentUrn") or (f"urn:li:comment:({urn},{cid})" if cid else "")
+            out.append({"urn": curn, "id": cid, "actor": c.get("actor") or (c.get("created") or {}).get("actor", ""),
+                        "text": ((c.get("message") or {}).get("text") or "").strip(), "created": (c.get("created") or {}).get("time"),
+                        "parent": c.get("parentComment"), "replies": ((c.get("commentsSummary") or {}).get("aggregatedTotalComments")
+                                                                      or (c.get("commentsSummary") or {}).get("totalFirstLevelComments") or 0)})
+        return sorted(out, key=lambda c: c.get("created") or 0)

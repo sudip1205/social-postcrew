@@ -230,6 +230,14 @@ def validate_config(cfg):
             errs.append(f"platforms.{pid}: unknown platform (known: {PLATFORM_IDS})")
         elif own.get("enabled"):   # a platform that is switched off is not checked until you turn it on
             errs += validate_platform(view(cfg, pid), pre=f"platforms.{pid}.", primary=False)
+    en = cfg.get("engage") or {}
+    if en.get("replies", "review") not in ("off", "review", "auto"):
+        errs.append("engage.replies must be off, review or auto")
+    for k, lo, hi in (("lookback_days", 1, 60), ("every_minutes", 5, 1440), ("max_per_check", 1, 100)):
+        if k in en and not (isinstance(en[k], int) and lo <= en[k] <= hi):
+            errs.append(f"engage.{k} must be a whole number, {lo}-{hi}")
+    if not (isinstance(en.get("scopes", []), list) and all(isinstance(x, str) and re.fullmatch(r"[A-Za-z_]+", x) for x in en.get("scopes", []))):
+        errs.append("engage.scopes must be a list of LinkedIn permission names, e.g. [\"r_member_social\"]")
     cl = cfg.get("cleanup", {})
     if not (isinstance(cl.get("keep_days"), int) and 1 <= cl["keep_days"] <= 365):
         errs.append("cleanup.keep_days must be a whole number of days, 1-365")

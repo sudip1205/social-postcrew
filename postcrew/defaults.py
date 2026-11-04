@@ -5,7 +5,7 @@ Secrets (LinkedIn app, tokens, Telegram) never live here; they go to workspace/s
 """
 
 AGENT_IDS = ["planner", "topic", "research", "writer", "reviewer", "media", "editor", "formatter", "publisher", "supervisor", "credentials", "video_review", "explainroo", "graphics",
-             "direction", "quality", "motion"]
+             "direction", "quality", "motion", "replier"]
 
 DEFAULT_CONFIG = {
     "version": 1,
@@ -50,6 +50,10 @@ DEFAULT_CONFIG = {
         "dry_run": True,
         "linkedin_api_version": "202601",
     },
+    # Comment replies on your LinkedIn posts (engage.py). replies: "review" keeps each reply for you to send in Studio (Queue >
+    # Comments), "auto" sends it, "off" stops. Reading comments needs the Community Management API product on your LinkedIn app;
+    # scopes: the extra permissions that product lists on your app's Auth tab, asked for when you reconnect LinkedIn.
+    "engage": {"replies": "review", "lookback_days": 7, "every_minutes": 30, "max_per_check": 20, "scopes": []},
     "platforms": {
         # LinkedIn is configured by the settings above. Every other app has its own schedule, plan, topics and
         # publishing settings here, and is switched on separately.
@@ -139,6 +143,7 @@ DEFAULT_CONFIG = {
             "motion": {"model": "sonnet", "timeout_s": 900, "max_budget_usd": 1.0},      # Motion Studio: reference analysis, house style
             "explainroo": {"model": "sonnet", "timeout_s": 900, "max_budget_usd": 2.0},   # writes the pictures of an explainroo video
             "supervisor": {"model": "haiku", "timeout_s": 180, "max_budget_usd": 0.2},
+            "replier": {"model": "sonnet", "timeout_s": 300, "max_budget_usd": 0.3},   # answers the comments on your LinkedIn posts
         },
     },
     "pipeline": {
