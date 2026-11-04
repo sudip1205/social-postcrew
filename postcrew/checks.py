@@ -221,7 +221,7 @@ def split_long_scenes(scenes, spec):
     out = []
     for sc in scenes:
         words = (sc.get("narration") or "").split()
-        if sc.get("part") == "closing" or sc.get("layout") in ("codeviz", "paths", "grid") or len(words) <= cap_words + int(4 * float(spec.get("wps") or 2.5)):   # a code walk-through keeps its one picture
+        if sc.get("part") == "closing" or sc.get("layout") in ("codeviz", "paths", "grid", "trace") or len(words) <= cap_words + int(4 * float(spec.get("wps") or 2.5)):   # a code walk-through keeps its one picture
             out.append(sc)
             continue
         sentences = re.findall(r"[^.!?]+[.!?]+\s*|[^.!?]+$", sc["narration"])
@@ -289,7 +289,7 @@ def storyboard_problems(scenes, spec):
     for i, sc in enumerate(scenes, 1):
         words = len((sc.get("narration") or "").split())
         secs = words / float(spec.get("wps") or 2.5)
-        if sc.get("part") != "closing" and secs > cap + 4 and not spec.get("artist") and sc.get("layout") not in ("codeviz", "paths", "grid"):   # with the Storyboard Artist a long scene is split for it
+        if sc.get("part") != "closing" and secs > cap + 4 and not spec.get("artist") and sc.get("layout") not in ("codeviz", "paths", "grid", "trace"):   # with the Storyboard Artist a long scene is split for it
             problems.append(f"scene {i}: about {secs:.0f} seconds on one picture while the voice talks: split it into scenes of at most "
                             f"{cap} seconds ({int(cap * float(spec.get('wps') or 2.5))} words), each showing the part being said")
         layout = sc.get("layout")
@@ -380,6 +380,21 @@ def structure_problems(scenes):
     return problems
 
 
+def fidelity_problems(scenes):
+    """What the voice says is what the picture shows, step by step (postcrew/fidelity.py): counts counted on screen, true sums, the boxes it
+    names drawn, steps on cue. A trace carries its counters on from the trace before it when they show the same boxes."""
+    from . import fidelity
+    out, prev = [], None
+    for i, sc in enumerate(scenes, 1):
+        if sc.get("layout") == "trace":
+            before = fidelity.last_counters(prev) if prev is not None and prev.get("cells") == sc.get("cells") else None
+            out += [f"scene {i}: {p}" for p in fidelity.trace_problems(sc, before)]
+            prev = sc
+        elif sc.get("layout") == "grid" and isinstance(sc.get("grid"), dict):
+            out += [f"scene {i}: {p}" for p in fidelity.grid_problems(sc["grid"], sc.get("narration"))]
+    return out
+
+
 def script_problems(script, spec, cat, profile):
     """The automatic checks on a YouTube script before any reviewer sees it. spec: platforms.video_spec(...)."""
     problems = []
@@ -401,6 +416,7 @@ def script_problems(script, spec, cat, profile):
         problems += storyboard_problems(scenes, spec)
         problems += teaching_problems(scenes, spec)
     problems += structure_problems(scenes)
+    problems += fidelity_problems(scenes)
     for i, sc in enumerate(scenes, 1):
         if sc.get("layout") not in SCENE_LAYOUTS:
             problems.append(f"scene {i}: layout must be one of {SCENE_LAYOUTS}")

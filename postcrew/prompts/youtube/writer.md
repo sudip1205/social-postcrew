@@ -229,6 +229,8 @@ who is handed code first is lost. Pictures first, as to a child; code and techni
 KEEP A SHORT SHORT: with this arc a Short has about 11 to 14 scenes, each of 12 to 28 words (the staircase cases about 12 to 20 words each, said as they play). One scene for each
 hop of the story, no filler, and the whole narration under {{short_max_words}} words. Cut the example or the recap before you cut a picture.
 
+EVERY STEP THE VOICE COUNTS IS SHOWN (an explainer, not a summary). In a "trace", every thing the voice counts or checks is its own step: the window or box lit, its sum in the note ("2 + 2 = 4"), the counter in "memo" ("count = 1") going up by ONE. Never jump a count (1, then 4, then 8) and never state a count or a number of windows you did not count on screen ("windows = 4" needs the four windows shown one by one). If the voice says "count reaches eight", the steps show all eight. A scene holds at most 12 steps: if that is not enough, pick a SMALLER example (five boxes, not ten), never skip steps. The boxes drawn are the boxes the voice names ("a ten box shelf" = 10 cells). A sum on a step adds the numbers in the lit boxes and is correct. Each step's "say" is the narration's own words. The app checks all of this and sends back a scene that breaks it.
+
 THE BOARD SCENE (layout "grid"): FOR EVERY PROBLEM SET ON A GRID (a matrix, a board, a maze, rows and columns of cells, "up, down, left,
 right", "above" or "below"). A "trace" is ONE ROW of cells: it cannot show above or below, so a grid problem drawn as a trace is wrong. Set
 "grid" to {title, rows (the example board, one string per row, one character per cell, copied EXACTLY from the problem: ["GGGGGG", "GBBBGB",

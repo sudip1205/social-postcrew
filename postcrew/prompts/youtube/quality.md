@@ -25,6 +25,8 @@ cells, steps ([] when not used), clip and why. Fewer, larger things beat many sm
 items. Never return narration: it cannot change. Code walk-through scenes (codeviz) and the closing card cannot be redrawn: report them with
 redraw = false. Confirm the measured findings on the sheets; do not report a scene that only looks empty because its picture builds up later.
 
+STEP BY STEP: watch what the voice says against what the screen shows at that moment. A count, a sum or a number of windows the voice says that the screen did not show being counted, one by one, is an error ("the voice says count eight, the screen showed three windows"): redraw the trace with every step shown, on a smaller example if it needs more than 12 steps.
+
 REWRITE: set "rewrite" true (with "rewrite_why") only when redrawing scenes cannot fix the video because the script is wrong for its
 problem: the problem's data is drawn as the wrong shape (a grid shown as one row, a tree as a list), the example is not the problem's own,
 or the narration describes what no picture of this kind can show ("above", "below", "the left child"). The Script Writer then writes it
