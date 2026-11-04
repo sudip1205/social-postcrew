@@ -231,11 +231,17 @@ const Stat: React.FC<{s: Scene; short: boolean}> = ({s, short}) => {
   const shownNum = m ? (target * p).toLocaleString("en-US", {minimumFractionDigits: decimals, maximumFractionDigits: decimals}) : "";
   const [a, b] = [parseInt(s.cells?.[0] ?? "0", 10) || 0, parseInt(s.cells?.[1] ?? "0", 10) || 0], n = Math.min(b, 20);
   const lit = Math.round((a / Math.max(1, b)) * n);
+  // The number is sized from its FINAL text (not the counting one, so it never jumps) to fit the content width: "2,692,537" at the full 250 px
+  // ran off the right edge. Inter ExtraBold: a digit or letter is about 0.62 em, a comma, dot or space about 0.3 em, less the tight tracking.
+  const finalText = m ? `${m[1]}${target.toLocaleString("en-US", {minimumFractionDigits: decimals, maximumFractionDigits: decimals})}${m[3]}` : value;
+  const ems = [...finalText].reduce((w, c) => w + (/[,.\s'’]/.test(c) ? 0.3 : 0.62), 0);
+  const maxSize = short ? 250 : 230, contentWidth = short ? 1080 - 2 * 96 : 1920 - 2 * 150;
+  const numSize = Math.max(90, Math.min(maxSize, Math.floor((0.94 * contentWidth) / Math.max(1, ems - (finalText.length * 6) / maxSize))));
   return (
     <>
       <Heading text={s.title} short={short} />
       <div style={{flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", gap: short ? 40 : 26}}>
-        <div style={{fontWeight: 800, letterSpacing: -6, lineHeight: 1, color: th.highlight, fontSize: short ? 250 : 230, opacity: ease(Math.min(1, t / 0.5))}}>
+        <div style={{fontWeight: 800, letterSpacing: -6, lineHeight: 1, whiteSpace: "nowrap", color: th.highlight, fontSize: numSize, opacity: ease(Math.min(1, t / 0.5))}}>
           {m ? <>{m[1]}{shownNum}{m[3]}</> : value}
         </div>
         {caption && <div style={{fontSize: short ? 56 : 44, fontWeight: 600, color: th.text, opacity: ease(Math.max(0, Math.min(1, (t - start - 0.6) / 0.6)))}}>{caption}</div>}
