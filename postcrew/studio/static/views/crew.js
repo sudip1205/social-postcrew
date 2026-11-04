@@ -65,10 +65,34 @@ async function renderTeam() {
         <td class="py-3 px-4 text-slate-600">${(f.lessons || []).map(esc).join("<br>")}</td></tr>`).join("")}</tbody></table></div>`
     : emptyState("groups", "Nobody has been replaced.");
 
+  // Rewards (rewards.py): your Queue decisions, as points per agent, and the approved videos new ones follow
+  const rw = d.rewards || { agents: {}, exemplars: [], vetoed: [], points: { reward: 10, penalty: -10 } };
+  const memberName = id => (d.members.find(m => m.id === id) || {}).name || id;
+  const who = k => k.startsWith("writer:") ? `Writer ${memberName(k.slice(7))}` : agentName(k);
+  const ranked = Object.entries(rw.agents).sort((a, b) => b[1].points - a[1].points);
+  const PTS_TONE = { up: "text-emerald-700", down: "text-rose-700", none: "text-slate-500" };
+  const pts = n => { const tone = PTS_TONE[n > 0 ? "up" : n < 0 ? "down" : "none"];
+    return `<span class="font-mono font-bold ${tone}">${n > 0 ? "+" : ""}${n}</span>`; };
+  const rewardsHtml = `<div class="grid gap-6 lg:grid-cols-2 mt-5">
+    <div>${ranked.length ? `<ul class="divide-y divide-slate-100">${ranked.map(([k, r]) => `<li class="flex items-center gap-3 py-2">${avatar(k.split(":")[0], "w-7 h-7")}
+        <span class="flex-1 text-sm font-semibold text-slate-800">${esc(who(k))}</span>
+        <span class="text-xs text-slate-500">${r.published} published · ${r.vetoed} vetoed</span>${pts(r.points)}</li>`).join("")}</ul>`
+      : emptyState("grade", "No points yet. Approve or publish a post to reward the crew; veto one to cost them points.")}</div>
+    <div><h3 class="flex items-center gap-2 text-sm font-bold text-slate-900">${icon("video_library", "text-violet-600")}Videos the crew follows</h3>
+      ${rw.exemplars.length ? `<ul class="mt-2 divide-y divide-slate-100">${rw.exemplars.map(e => `<li class="flex items-start gap-3 py-2">
+        <div class="flex-1 min-w-0"><div class="text-sm font-semibold text-slate-800 truncate">${esc(e.topic)}</div>
+          <div class="text-xs text-slate-500">${e.scenes} scenes · ${e.words} words · ${esc(ago(e.saved_at))}</div></div>
+        ${e.following ? chip("passed", e.pinned ? "Pinned: followed" : "Followed", "sm") : e.points < 0 ? chip("failed", "Vetoed", "sm") : ""}
+        <button class="${CREW_BTN_SMALL}" data-pin="${esc(e.post)}" data-on="${e.pinned ? "" : "1"}" ${e.points < 0 ? "disabled" : ""}>${icon(e.pinned ? "close" : "grade", "text-sm")}<span>${e.pinned ? "Unpin" : "Pin as the model"}</span></button></li>`).join("")}</ul>`
+        : `<p class="text-sm text-slate-500 mt-2">None yet. Approve a video you like: its script and scenes become the model the Script Writer, Creative Director and Storyboard Artist follow.</p>`}
+      ${rw.vetoed.length ? `<h3 class="flex items-center gap-2 text-sm font-bold text-slate-900 mt-5">${icon("cancel", "text-rose-600")}Vetoed, and why</h3>
+        <ul class="mt-2 space-y-1">${rw.vetoed.map(v => `<li class="text-sm text-slate-700"><span class="font-semibold">${esc(v.topic)}</span>: ${esc(v.reason || "no reason given")}</li>`).join("")}</ul>` : ""}</div></div>`;
+
   view.innerHTML = `<div class="max-w-7xl mx-auto px-6 py-8 space-y-6">
     <div><h1 class="text-2xl font-bold font-headline text-slate-900 tracking-tight flex items-center gap-2.5">${icon("groups", "text-violet-600")}<span>Crew</span></h1>
       <p class="text-xs text-slate-500 mt-1">Every agent, its name and its job. Orion, the Supervisor, checks each step and sends work back with the reasons it failed.</p></div>
     ${card(`<div class="p-6">${sectionHead("hub", "The crew", "Who does what, grouped by team.")}${legend}${groups}</div>`)}
+    ${card(`<div class="p-6">${sectionHead("grade", "Rewards", `Your decisions in the Queue: every agent that worked on a post earns ${rw.points.reward > 0 ? "+" : ""}${rw.points.reward} when you approve or publish it and loses ${Math.abs(rw.points.penalty)} when you veto it. Each agent reads its record and your veto reasons; the writer, director and storyboard artist follow your best video.`, "amber")}${rewardsHtml}</div>`)}
     <div><h2 class="font-headline font-bold text-lg text-slate-900">Research and writing teams</h2>
       <p class="text-sm text-slate-500 mt-0.5 max-w-3xl">Several researchers and writers work on every post. Researchers' verified sources are combined; writers compete, ${d.rules.pre_review ? "every draft is pre-reviewed and the best is polished, " : ""}and only the best goes to the Editor.
       A member is replaced automatically when fewer than ${Math.round(d.rules.fire_min_success * 100)}% of their last ${d.rules.fire_window} posts were good; the new hire learns from the mistakes.</p></div>
@@ -85,6 +109,7 @@ async function renderTeam() {
     const [step, index] = b.dataset.forget.split(":"); act("/api/memory/forget", { step, index: +index }, "Forgotten");
   });
   view.querySelectorAll("[data-hire]").forEach(b => b.onclick = () => act("/api/team/hire", { role: b.dataset.hire }, "Hired"));
+  view.querySelectorAll("[data-pin]").forEach(b => b.onclick = () => act("/api/rewards/pin", { post: b.dataset.pin, on: !!b.dataset.on }, b.dataset.on ? "Pinned: every new video follows it" : "Unpinned"));
   view.querySelectorAll("[data-lesson]").forEach(b => b.onclick = () => {
     const [role, index] = b.dataset.lesson.split(":"); act("/api/team/lesson-remove", { role, index: +index }, "Lesson removed");
   });

@@ -240,6 +240,12 @@ def publish_due(ws, now=None, client_factory=LinkedIn, log=print, sleep=time.sle
             ws.save_queue([updated if q["id"] == p["id"] else q for q in ws.queue()]
                           if updated["status"] != "published" else [q for q in ws.queue() if q["id"] != p["id"]])
             results.append(updated)
+            if updated["status"] == "published":   # published on schedule without a veto: the crew earns its reward
+                from .. import rewards
+                try:
+                    rewards.record(ws, updated, "published")
+                except Exception as e:   # points must never stop publishing
+                    log(f"rewards: {e}")
             if updated["status"] in ("published", "dry_run"):
                 done.add(app)
     return results

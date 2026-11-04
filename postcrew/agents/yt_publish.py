@@ -1,6 +1,7 @@
 """YouTube publishing: queue a finished video, and upload it at its time. Same rules as LinkedIn's publisher.py:
 the approval mode decides whether it waits for you (manual), goes out at its time unless you veto it (auto_with_veto) or
 right away (immediate); with publishing.dry_run on, nothing is sent. Uploading uses the official YouTube Data API."""
+import json
 import shutil
 from datetime import datetime, timezone
 from pathlib import Path
@@ -19,6 +20,10 @@ LABEL = "YouTube"
 def enqueue_youtube(ws, cfg, run_id, day, category, outputs, review):
     """Queue the finished video. cfg: the app's view of the config. outputs: the run's accepted outputs."""
     script, video, voice = outputs["writer"], outputs["media"], outputs.get("voice") or {}
+    try:   # the scenes as they were drawn (after the Storyboard Artist and any redraw): the model a video you approve leaves (rewards.py)
+        (ws.runs_dir / run_id / "script.final.json").write_text(json.dumps(script, indent=1, default=str))
+    except OSError:
+        pass
     platform = cfg.get("platform", "youtube")
     pid = f"{day.isoformat()}-{platform}-{category}"
     plan_id = plan_id_for(ws, platform, day, category)   # a day can hold several plans, made one at a time: each post is its own
@@ -124,8 +129,26 @@ def publish_one(ws, post, client_factory=YouTube, log=print, check=check_youtube
     s = ws.secrets()
     client = client_factory(s["youtube_client_id"], s["youtube_client_secret"], s["youtube_refresh_token"])
     pub = cfg["publishing"]
+    # The channel guard: a reconnect that picked another channel (a personal one instead of the brand channel, say) must not send videos
+    # there without you knowing. The channel of the last upload is remembered; a different one stops the upload until you approve again.
     try:
-        ev("upload", f"uploading {Path(post['media']).name}")
+        channel = client.channel()
+    except YouTubeError:
+        channel = None
+    last = ws.state("youtube_channel", {}) or {}
+    if channel and last.get("id") and channel["id"] != last["id"] and post.get("channel_ok") != channel["id"]:
+        msg = (f"YouTube is now connected to the channel \"{channel['title']}\", but your videos went to \"{last.get('title')}\" until now. "
+               f"Not uploaded. To use \"{last.get('title')}\", reconnect YouTube in Credentials and pick that channel; to upload to "
+               f"\"{channel['title']}\" from now on, approve this video again in the Queue.")
+        post.update(status="awaiting_approval", error=msg, channel_switch={"from": last, "to": channel})
+        ev("channel_changed", msg, "error")
+        if run:
+            run.step("publisher", "blocked", summary="YouTube channel changed: waiting for you")
+        notify(ws, "YouTube channel changed: video not uploaded", msg, level="error", key=f"channel-{post['id']}",
+               action={"label": "Open Credentials", "tab": "credentials"})
+        return post
+    try:
+        ev("upload", f"uploading {Path(post['media']).name}" + (f" to the channel \"{channel['title']}\"" if channel else ""))
         res = client.upload(ws.root / post["media"], yt["title"], full_description(post), seo.normalize_tags(yt["tags"], yt["title"]),
                             category_id=pub.get("category_id", "28"), privacy=pub.get("visibility", "public"),
                             made_for_kids=bool(pub.get("made_for_kids", False)),
@@ -150,14 +173,17 @@ def publish_one(ws, post, client_factory=YouTube, log=print, check=check_youtube
     except YouTubeError as e:   # custom thumbnails need a verified channel: the video is up anyway
         thumb_note = f" (thumbnail not set: {e})"
         ev("thumbnail", f"the video is up, but its thumbnail was not set: {e}", "warning")
-    yt.update(video_id=res["id"], url=res["url"])
+    yt.update(video_id=res["id"], url=res["url"], **({"channel": channel["title"], "channel_id": channel["id"]} if channel else {}))
     post.update(status="published", published_at=datetime.now(timezone.utc).isoformat(timespec="seconds"), error=None)
-    ev("published", f"uploaded {res['url']}{thumb_note}")
+    post.pop("channel_switch", None)
+    if channel:
+        ws.save_state("youtube_channel", channel)
+    ev("published", f"uploaded {res['url']}" + (f" to the channel \"{channel['title']}\"" if channel else "") + thumb_note)
     if run:
         run.step("publisher", "passed", summary=f"uploaded {res['url']}")
     ws.add_history({k: post.get(k) for k in ("id", "platform", "date", "category", "topic", "text", "media", "published_at",
                                              "run_id", "youtube", "plan_id")})
-    notify(ws, "Uploaded to YouTube", f"{yt['title']} is on your channel.", level="success",
+    notify(ws, "Uploaded to YouTube", f"{yt['title']} is on your channel" + (f" \"{channel['title']}\"." if channel else "."), level="success",
            action={"label": "Open Queue", "tab": "queue"},
            details=post_details(ws, post, ("Video on YouTube", res["url"])))
     return post

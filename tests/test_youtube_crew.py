@@ -374,6 +374,30 @@ class YouTubePublishTests(unittest.TestCase):
             self.assertEqual(res[0]["status"], "failed")
         FakeYouTube.fail = None
 
+    def test_a_different_channel_stops_the_upload_until_approved_again(self, _tts, _claude):
+        FakeYouTube.uploads, FakeYouTube.fail = [], None
+        from postcrew.studio.server import Studio
+        with TempWorkspace() as ws:
+            post = self.queued(ws)
+            ws.save_state("youtube_channel", {"id": "UC-brand", "title": "Dip-to-Dive"})   # where the videos went until now
+            res = publish_due(ws, now=self.due(post), yt_factory=FakeYouTube, log=lambda m: None)
+            self.assertEqual(res[0]["status"], "awaiting_approval")
+            self.assertIn('connected to the channel "My Channel"', res[0]["error"])
+            self.assertEqual(FakeYouTube.uploads, [])                        # nothing went to the other channel
+            Studio(ws).queue_action(post["id"], "approve", {})               # you choose the new channel
+            res = publish_due(ws, now=self.due(post), yt_factory=FakeYouTube, log=lambda m: None)
+            self.assertEqual(res[0]["status"], "published")
+            self.assertEqual(res[0]["youtube"]["channel"], "My Channel")
+            self.assertEqual(ws.state("youtube_channel")["id"], "UC1")      # the new channel is remembered
+
+    def test_the_first_upload_remembers_its_channel(self, _tts, _claude):
+        FakeYouTube.uploads, FakeYouTube.fail = [], None
+        with TempWorkspace() as ws:
+            post = self.queued(ws)
+            res = publish_due(ws, now=self.due(post), yt_factory=FakeYouTube, log=lambda m: None)
+            self.assertEqual(res[0]["status"], "published")
+            self.assertEqual(ws.state("youtube_channel"), {"id": "UC1", "title": "My Channel"})
+
     def test_a_disconnected_channel_blocks_the_upload(self, _tts, _claude):
         FakeYouTube.fail = None
         with TempWorkspace() as ws:

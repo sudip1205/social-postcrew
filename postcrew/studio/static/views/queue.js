@@ -245,8 +245,14 @@ async function queueAction(id, action, btn) {
   if (action === "edit") { const yc = document.querySelector(`[data-yt="${CSS.escape(id)}"]`); return yc ? ytToggle(id, true) : editPost(id); }
   if (action === "publish_now" && !confirm("Publish this post now?")) return;
   if (action === "delete" && !confirm("Delete this post from the queue?")) return;
+  let body = {};
+  if (action === "veto") {   // the reason teaches the crew: every agent that made it loses points and reads why (rewards.py)
+    const reason = prompt("Why are you vetoing it? The crew reads this and avoids it next time (optional).");
+    if (reason === null) return;
+    body = { reason };
+  }
   btn.disabled = true;
-  try { const r = await post(`/api/queue/${encodeURIComponent(id)}/${action}`); toast(action === "publish_now" ? `Publish: ${r.status}` : "Done"); refreshOverview(); }
+  try { const r = await post(`/api/queue/${encodeURIComponent(id)}/${action}`, body); toast(action === "publish_now" ? `Publish: ${r.status}` : action === "approve" ? "Approved: the crew earns points and learns from it" : action === "veto" ? "Vetoed: the crew loses points and learns why" : "Done"); refreshOverview(); }
   catch (e) { toast(e.message, true); }
   renderQueue();
 }

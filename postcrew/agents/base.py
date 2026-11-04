@@ -127,6 +127,19 @@ class Agent:
             text = text.replace("{{" + k + "}}", str(v))
         return text
 
+    @staticmethod
+    def _record_block(ctx, agent_id, member=None):
+        """The agent's past work as the owner judged it (rewards.py): its points, what was vetoed and why, and for the agents that shape a
+        video, the outline of the video to follow. Never breaks a call."""
+        try:
+            from .. import rewards
+            fmt = ctx.video.get("format", "short") if getattr(ctx, "platform", "linkedin") == "youtube" else "short"
+            block = rewards.prompt_block(ctx.ws, agent_id, getattr(ctx, "platform", "linkedin"), fmt, getattr(ctx, "category", None),
+                                         member["id"] if member else None)
+            return f"\n\n{block}" if block else ""
+        except Exception:
+            return ""
+
     def ask(self, ctx, system, prompt, schema, tools=(), member=None, agent_id=None, images=()):
         """member: a team member dict (their model, if any, overrides the agent's). agent_id: settings to use.
         images: picture files the model looks at (the Quality Director's frames)."""
@@ -136,6 +149,7 @@ class Agent:
             kw["images"] = [str(p) for p in images]
         if member and member.get("model"):
             kw["model"] = member["model"]
+        system += self._record_block(ctx, aid, member)
         try:
             res = ctx.llm.call(aid, system, prompt, schema, tools=tools, cwd=str(ctx.run.dir), **kw)
         except LLMError as e:

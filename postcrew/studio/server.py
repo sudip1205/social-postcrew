@@ -33,6 +33,7 @@ from ..agents.frames import HyperFramesAgent, RemotionAgent, RemotionFramesAgent
 from ..agents.hooks import HooksAgent
 from ..agents.graphics import GraphicsAgent
 from ..agents.video_review import VideoReviewAgent
+from .. import rewards
 from ..agents.direction import CreativeDirectorAgent
 from ..agents.quality import QualityDirectorAgent
 from ..agents.voice import VoiceAgent
@@ -290,8 +291,19 @@ class Studio:
             v = team_mod.verdicts(m, cfg["team"]["fire_window"])
             rows.append(dict(m, working=same.index(m["id"]) < size[m["role"]], at_risk=len(v) >= 3 and
                              sum(v) / len(v) < cfg["team"]["fire_min_success"], window=v))
+        rw = rewards.load(self.ws)
+        best = rewards.best_exemplar(self.ws)
         return {"members": rows, "fired": data["fired"][::-1], "lessons": data["lessons"], "size": size,
-                "rules": {k: cfg["team"][k] for k in ("fire_window", "fire_min_success", "pre_review")}}
+                "rules": {k: cfg["team"][k] for k in ("fire_window", "fire_min_success", "pre_review")},
+                "rewards": {"agents": rw["agents"], "points": {"reward": rewards.REWARD, "penalty": rewards.PENALTY},
+                            "exemplars": [{k: e.get(k) for k in ("post", "topic", "points", "pinned", "outcome", "saved_at", "words")}
+                                          | {"scenes": len(e.get("scenes") or []), "following": bool(best and best["post"] == e["post"])}
+                                          for e in sorted(rewards.exemplars(self.ws), key=lambda e: e.get("saved_at", ""), reverse=True)],
+                            "vetoed": [dict(v, post=k) for k, v in rw["posts"].items() if v.get("delta", 0) < 0][-10:]}}
+
+    def rewards_pin(self, body):
+        rewards.pin(self.ws, str(body.get("post") or ""), bool(body.get("on", True)))
+        return self.team()
 
     def memory(self):
         return {"memory": memory_mod.load(self.ws)}
@@ -353,14 +365,22 @@ class Studio:
             if post["status"] not in ("awaiting_approval", "queued", "failed", "dry_run"):
                 raise ValueError(f"cannot approve a {post['status']} post")
             post["status"] = "approved"
+            if post.get("channel_switch"):   # approving after the channel guard stopped it: upload to the channel connected now
+                post["channel_ok"] = post["channel_switch"]["to"]["id"]
+                post["error"] = None
+            rewards.record(self.ws, post, "approved")   # every agent that made it earns points; a video becomes a model to follow
         elif action == "veto":
             post["status"] = "vetoed"
+            post["veto_reason"] = str(body.get("reason") or "").strip()[:300]
+            rewards.record(self.ws, post, "vetoed", post["veto_reason"])
         elif action == "restore":
             pcfg = platforms.view(self.ws.config(), platforms.platform_of(post))
             post["status"] = "awaiting_approval" if pcfg["publishing"]["approval"] == "manual" else "queued"
+            rewards.record(self.ws, post, "restored")
         elif action == "publish_now":
             post = publish_post(self.ws, dict(post))
             if post["status"] == "published":
+                rewards.record(self.ws, post, "published")
                 self.ws.save_queue([p for p in self.ws.queue() if p["id"] != pid])
                 return post
         elif action == "edit" and platforms.platform_of(post) == "youtube":
@@ -797,6 +817,7 @@ def make_handler(studio):
                     return self.send(200, studio.queue_action(m.group(1), m.group(2), self.body()))
                 routes = {
                     ("GET", "/api/motion"): lambda: studio.motion.state(),
+                    ("POST", "/api/rewards/pin"): lambda: studio.rewards_pin(self.body()),
                     ("POST", "/api/motion/references/url"): lambda: studio.motion.add_url(self.body()),
                     ("POST", "/api/motion/style"): lambda: studio.motion.style(self.body()),
                     ("POST", "/api/motion/feedback"): lambda: studio.motion.feedback(self.body()),
