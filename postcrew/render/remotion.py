@@ -230,8 +230,30 @@ def build_props(scenes, fmt, audio, look=None):
             item["cues"] = [_when(x, words) for x in (item["items"] if layout == "points" else [])]
         out.append(item)
     _continue_code(out)
+    _steady_diagrams(out)
     w, h = FORMATS[fmt]
     return {"format": fmt, "width": w, "height": h, "fps": FPS, "theme": looks.theme(look, fmt), "scenes": out}, lengths
+
+
+def _steady_diagrams(scenes):
+    """Diagram scenes in a row with the same boxes are one picture growing: each is laid out from ALL the run's arrows, so boxes never jump
+    between scenes (before, a scene with one arrow stacked the boxes in a column and the next put them back in a tree)."""
+    i = 0
+    while i < len(scenes):
+        j = i
+        key = lambda sc: sc.get("layout") in ("diagram", "flow") and sorted(b["label"].lower() for b in sc.get("nodes") or [])
+        while j + 1 < len(scenes) and key(scenes[i]) and key(scenes[j + 1]) == key(scenes[i]):
+            j += 1
+        if j > i:
+            pairs = []
+            for sc in scenes[i:j + 1]:
+                lab = [b["label"].lower() for b in sc["nodes"]]
+                pairs += [(lab[e["from"]], lab[e["to"]]) for e in sc.get("edges") or []]
+            pairs = list(dict.fromkeys(pairs))
+            for sc in scenes[i:j + 1]:
+                lab = [b["label"].lower() for b in sc["nodes"]]
+                sc["layout_edges"] = [{"from": lab.index(a), "to": lab.index(b), "label": "", "t": 0, "n": 0, "drop": False} for a, b in pairs]
+        i = j + 1
 
 
 def _continue_code(scenes):

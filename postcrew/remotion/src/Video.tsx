@@ -300,7 +300,7 @@ function layout(nodes: Box[], edges: Edge[], short: boolean, W: number, H: numbe
 const Diagram: React.FC<{s: Scene; short: boolean; flow: boolean}> = ({s, short, flow}) => {
   const nodes = s.nodes ?? [], edges = s.edges ?? [];
   const W = short ? 888 : 1620, H = short ? 1060 : 680;
-  const {pos, bw, bh, layered} = layout(nodes, edges, short, W, H);
+  const {pos, bw, bh, layered} = layout(nodes, s.layout_edges ?? edges, short, W, H);   // a diagram growing over several scenes keeps one layout
   const th = useTheme(), {t} = useT();
   // in a wide chain the labels sit on the arrows; when a label is wider than the gap between two boxes they go above and below the row instead
   const gap = short || nodes.length < 2 || layered ? 0 : (W - bw * nodes.length) / (nodes.length - 1);
@@ -427,7 +427,7 @@ const Trace: React.FC<{s: Scene; short: boolean}> = ({s, short}) => {
     : cur?.active.includes(i) ? {border: th.accent, fill: th.accentSoft, op: 1}
     : cur?.out.includes(i) ? {border: th.rule, fill: "transparent", op: 0.35} : {border: th.text, fill: th.surface, op: 1};
   const tiles = (cur?.memo ?? []).map((m) => {
-    const k = m.match(/^\s*([^=:]{1,24}?)\s*[=:]\s*(.{1,14})$/);
+    const k = m.match(/^\s*([^=:]{1,24}?)\s*[=:]\s*(.{1,14})$/) ?? m.match(/^\s*([A-Za-z][\w ]{0,22}?)\s+(-?\d[\d.,]*)\s*$/);
     return k ? {name: k[1], value: k[2]} : {name: "", value: m};
   });
   return (

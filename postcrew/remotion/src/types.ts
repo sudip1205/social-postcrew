@@ -12,7 +12,7 @@ export type GridViz = {title: string; rows: string[]; legend: string[]; blocked:
 export type Scene = {
   layout: "title" | "statement" | "points" | "code" | "diagram" | "flow" | "trace" | "stat" | "codeviz" | "paths" | "grid";
   title: string; items: string[]; code: string; language: string; seconds: number; captions: Caption[];
-  nodes?: Box[]; edges?: Edge[]; cells?: string[]; steps?: Step[]; cues?: number[]; closing?: boolean; typed?: boolean; key?: number; clip?: Svg; viz?: Viz; paths?: PathsViz; grid?: GridViz; buttons?: {label: string; kind: string; svg?: Svg | null}[];
+  nodes?: Box[]; edges?: Edge[]; cells?: string[]; steps?: Step[]; cues?: number[]; closing?: boolean; typed?: boolean; layout_edges?: Edge[]; key?: number; clip?: Svg; viz?: Viz; paths?: PathsViz; grid?: GridViz; buttons?: {label: string; kind: string; svg?: Svg | null}[];
 };
 /** The colours of a look: defined in postcrew/render/looks.py and sent with every render. */
 export type Theme = {

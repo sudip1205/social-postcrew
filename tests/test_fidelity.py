@@ -91,3 +91,18 @@ class PaceAndCodeTest(unittest.TestCase):
     def test_loops_and_complexity_words(self):
         self.assertEqual(fidelity.loop_depth("for i in a:\n    for j in a:\n        for k in a:\n            pass\nfor z in a:\n    pass"), 3)
         self.assertEqual([fidelity.complexities(t) for t in ("carries one number", "O(n^2)", "n cubed", "O of n log n")], [[], [2], [3], []])
+
+
+class SteadyPictureTest(unittest.TestCase):
+    def test_a_diagram_growing_over_scenes_keeps_one_layout(self):
+        from postcrew.render.remotion import _steady_diagrams, _continue_code
+        box = lambda *ls: [{"label": l} for l in ls]
+        e = lambda a, b: {"from": a, "to": b}
+        scenes = [{"layout": "diagram", "nodes": box("Array", "Brute", "Kadane"), "edges": [e(0, 1)]},
+                  {"layout": "diagram", "nodes": box("Array", "Brute", "Kadane"), "edges": [e(0, 1), e(0, 2)]},
+                  {"layout": "code", "code": "x", "items": ["$ run", "6"]}, {"layout": "code", "code": "x", "items": ["$ run", "6"]}]
+        _steady_diagrams(scenes)
+        _continue_code(scenes)
+        self.assertEqual([(x["from"], x["to"]) for x in scenes[0]["layout_edges"]], [(0, 1), (0, 2)])
+        self.assertEqual(scenes[0]["layout_edges"], scenes[1]["layout_edges"])
+        self.assertEqual((scenes[2]["items"], scenes[3].get("typed")), ([], True))
