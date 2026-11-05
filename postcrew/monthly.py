@@ -574,7 +574,8 @@ def _sync_day(ws, platform, pool, posted, iso):
     # the next plan to MAKE: a scheduled plan still to make comes before one already waiting in the Queue, so a post waiting for approval
     # (yours, or one made by hand) never stops the day's scheduled run
     todo = [i for i in live if status_of(i, posted) == "assigned" and not i.get("manual")]
-    cur = todo[0] if todo else live[0]
+    now = [i for i in live if i["assigned"].get("run_now") and status_of(i, posted) == "assigned"]   # the plan you clicked Run now on
+    cur = now[0] if now else todo[0] if todo else live[0]
     fmt = cur["assigned"].get("format")
     cat = category_for_item(ws, platform, fmt)
     want = _entry(cur, cat, fmt, platform)
@@ -775,6 +776,10 @@ def run_plan(ws, platform, item_id, fmt, today=None):
         mine = _item(pool, item_id)
         others = [i for i in _live_items(pool, posted, today.isoformat()) if i["id"] != item_id and status_of(i, posted) != "written"]
         mine["assigned"]["seq"] = min([i["assigned"].get("seq", 0) for i in others] + [mine["assigned"]["seq"]]) - 1
+        for i in _all_items(pool):   # this plan, and only it, is the one being made now (a scheduled plan still to make must not take its place)
+            if i.get("assigned"):
+                i["assigned"].pop("run_now", None)
+        mine["assigned"]["run_now"] = True
         ws.save_state(_name(platform), pool)
         _sync_day(ws, platform, pool, posted, today.isoformat())
     return {"date": today.isoformat(), "category": category_for_item(ws, platform, fmt), "item": item}

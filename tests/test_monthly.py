@@ -231,6 +231,19 @@ class MonthlyTests(unittest.TestCase):
                                publisher=noop, checker=noop, planner=noop, cleaner=noop)
             self.assertEqual(calls, [("2026-11-04", b["id"])])
 
+    def test_run_now_makes_the_plan_you_clicked_even_when_a_scheduled_plan_is_still_to_make(self):
+        # 2026-11-05: Run now on the API security plan made the day's vetoed Game Server plan again, which was back to "still to make"
+        with TempWorkspace() as ws:
+            self.ws(ws)
+            a, = self.assigned(ws, 1, "2026-11-05")
+            own = monthly.add_manual(ws, "linkedin", "How API security works", "details")
+            monthly.run_plan(ws, "linkedin", own["id"], None, today=date(2026, 11, 5))
+            self.assertEqual(planner.load_plan(ws)["2026-11-05"]["plan_id"], own["id"])
+            ws.save_queue([{"id": "p2", "date": "2026-11-05", "topic": own["title"], "platform": "linkedin", "plan_id": own["id"],
+                            "status": "awaiting_approval"}])
+            monthly.sync_all(ws, "linkedin")
+            self.assertEqual(planner.load_plan(ws)["2026-11-05"]["plan_id"], a["id"])   # once yours is made, the scheduled one is next again
+
     def test_at_most_five_plans_wait_on_one_day_and_a_written_plan_cannot_be_unassigned(self):
         with TempWorkspace() as ws:
             self.ws(ws)
