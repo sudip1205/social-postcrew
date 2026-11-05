@@ -81,12 +81,19 @@ def schema_for(platform):
     return dict(SCHEMA, properties={"plans": dict(SCHEMA["properties"]["plans"], items=item)})
 
 
-def per_topic(platform, month, topics):
-    """How many plans each topic gets. LinkedIn: a month's days spread over its topics (one post a day is all it needs). YouTube: 5-6 per topic."""
-    if platform != LINKEDIN:
-        return PER_TOPIC_YT
+def per_day(cfg):
+    """Videos (or posts) made a day: one per run time (schedule.generate_times), else one."""
+    from .scheduler import generate_times
+    return max(1, len(generate_times(cfg["schedule"])))
+
+
+def per_topic(platform, month, topics, daily=1):
+    """How many plans each topic gets. LinkedIn: a month's days spread over its topics (one post a day is all it needs). YouTube: 5-6 per
+    topic, or enough for every run of the month when it makes several videos a day (and one more each, to run by hand)."""
     first = date.fromisoformat(month + "-01")
     days = (date(first.year + (first.month == 12), first.month % 12 + 1, 1) - first).days
+    if platform != LINKEDIN:
+        return max(PER_TOPIC_YT, -(-days * daily // max(1, len(topics))) + 1) if daily > 1 else PER_TOPIC_YT
     return max(3, -(-days // max(1, len(topics))))
 
 
@@ -175,7 +182,7 @@ def view(ws, platform=LINKEDIN, month=None, today=None):
     count = lambda s: sum(1 for i in items if i["status"] == s)
     return {"platform": platform, "month": month, "items": items, "days": days,
             "topics": topics_of(cfg), "plan_topics": meta.get("topics", []), "generated_at": meta.get("generated_at"),
-            "next_plan": nxt.isoformat(), "per_topic": per_topic(platform, month, topics_of(cfg)),
+            "next_plan": nxt.isoformat(), "per_topic": per_topic(platform, month, topics_of(cfg), per_day(cfg)),
             "counts": {"plans": len(items), "assigned": count("assigned") + count("written"), "unassigned": count("unassigned"),
                        "published": count("published")},
             "max_per_day": MAX_PER_DAY, "formats": platform != LINKEDIN, "default_format": (cfg.get("video") or {}).get("format", "short")}
@@ -296,8 +303,8 @@ def _generate(ws, platform, month, llm, today, hint, progress=None):
     with _lock:
         pool = load(ws, platform)
         have = pool["months"].setdefault(month, {"generated_at": None, "topics": [], "items": []})
-        want = per_topic(platform, month, topics)
-        floor = MIN_PER_TOPIC_YT if platform != LINKEDIN else want   # a YouTube topic with 5 plans is complete; 6 is the aim
+        want = per_topic(platform, month, topics, per_day(cfg))
+        floor = max(MIN_PER_TOPIC_YT, want - 1) if platform != LINKEDIN else want   # a YouTube topic one short of the aim is complete
         todo = [(t, want - sum(1 for i in have["items"] if i["topic"] == t)) for t in topics]
         todo = [(t, n) for t, n in todo if n > 0 and want - n < floor]
         if not todo:
@@ -651,9 +658,18 @@ def auto_assign(ws, platform, month=None, today=None, rng=None):
     first = date.fromisoformat(month + "-01")
     last = date(first.year + (first.month == 12), first.month % 12 + 1, 1) - timedelta(days=1)
     pool, posted = load(ws, platform), posted_titles(ws, platform)
-    busy = {i["assigned"]["date"] for i in _live_items(pool, posted)}
-    free = [d.isoformat() for d in (first + timedelta(n) for n in range((last - first).days + 1))
-            if d >= today and d.isoformat() not in busy and not post_for(ws, d, platform)]
+    daily = per_day(platforms.view(ws.config(), platform))
+    held = {}   # what each day already holds: plans waiting on it, and posts made for it
+    for i in _live_items(pool, posted):
+        held.setdefault(i["assigned"]["date"], []).append(i["topic"])
+    mine = _mine(platform)
+    for p in ws.queue() + ws.history():
+        if mine(p) and p.get("status") not in ("vetoed", "failed") and p.get("date") and not any(
+                i.get("id") == p.get("plan_id") for i in _live_items(pool, posted)):
+            held.setdefault(p["date"], []).append(p.get("topic", ""))
+    days = [d.isoformat() for d in (first + timedelta(n) for n in range((last - first).days + 1)) if d >= today]
+    # one free slot per run still open on each day: every day's first run is filled before any day's second one
+    free = [iso for slot in range(daily) for iso in days if len(held.get(iso, [])) <= slot]
     by_topic = {}
     for i in pool["months"].get(month, {}).get("items", []):
         if status_of(i, posted) == "unassigned" and not i.get("manual"):   # your own plans wait for you on Manual run
@@ -663,17 +679,21 @@ def auto_assign(ws, platform, month=None, today=None, rng=None):
     order, done = list(by_topic), []
     rng.shuffle(order)
     waiting = sum(len(rows) for rows in by_topic.values())
-    if waiting < len(free):   # fewer plans than free days: they land on random days across the whole month, not on the first ones
-        free = sorted(rng.sample(free, waiting))
+    if waiting < len(free):   # fewer plans than free slots: they land on random days across the whole month, not on the first ones
+        pick = sorted(rng.sample(range(len(free)), waiting))
+        free = [free[k] for k in pick]
     for iso in free:
         order = [t for t in order if by_topic[t]]
         if not order:
             break
-        topic = order.pop(0)
-        order.append(topic)   # the next day takes the next topic
+        # the next topic in turn, but not one the day already has (two videos a day are on two subjects)
+        topic = next((t for t in order if t not in held.get(iso, [])), order[0])
+        order.remove(topic)
+        order.append(topic)
         item = by_topic[topic].pop()
         try:
             assign(ws, platform, item["id"], iso, today=today, auto=True)
+            held.setdefault(iso, []).append(topic)
             done.append(iso)
         except ValueError:
             continue

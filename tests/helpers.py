@@ -12,7 +12,7 @@ from postcrew.workspace import Workspace
 
 _trends.fetch = lambda url, timeout=25: ""   # tests never touch YouTube: niche research then finds nothing and the plans are written without numbers
 REAL_PER_TOPIC = _monthly.per_topic
-_monthly.per_topic = lambda platform, month, topics: 10   # most tests write ten plans per topic; the counting rules are tested with REAL_PER_TOPIC
+_monthly.per_topic = lambda platform, month, topics, daily=1: 10   # most tests write ten plans per topic; the counting rules are tested with REAL_PER_TOPIC
 
 PAGE_URL = "https://example.com/news/launch"
 PAGE = ("<html><body><h1>Acme Model 2 launch</h1><p>Acme Model 2 is available today for all developers.</p>"

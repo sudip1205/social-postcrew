@@ -627,7 +627,7 @@ class NicheAndTopicsTests(unittest.TestCase):
             cfg["topics"] = ["Breakers", "Retries"]
             ws.save_config(cfg)
             from unittest import mock
-            with mock.patch.object(monthly, "per_topic", lambda p, m, t: 5):
+            with mock.patch.object(monthly, "per_topic", lambda p, m, t, d=1: 5):
                 monthly.generate(ws, "linkedin", "2026-11", llm=ScriptedLLM({"planner": [answer(TITLES[:5]), answer(TITLES[5:10])]}), today=TODAY)
             monthly.auto_assign(ws, "linkedin", "2026-11", today=TODAY)
             before = monthly.view(ws, "linkedin", "2026-11", TODAY)
@@ -661,3 +661,65 @@ class NicheAndTopicsTests(unittest.TestCase):
         with TempWorkspace() as ws:
             self.assertEqual(monthly.prune_stale_topics(ws, "myspace"), 0)
             monthly.sync_all(ws, "myspace")                                                    # a run for an unknown app is refused later, not here
+
+
+RETRY_TITLES = ["Jitter that saves databases", "Exponential backoff math", "Retry budgets per client", "Idempotent writes first",
+                "Thundering herds at dawn", "Client token buckets", "Deadline propagation", "Hedged requests", "Poison messages",
+                "Queue redelivery limits"]
+
+
+class TwoADayTests(unittest.TestCase):
+    """Two videos a day: a run at each of schedule.generate_times, two plans placed on each day (on two topics)."""
+
+    def setUp(self):
+        self.tmp = TempWorkspace()
+        self.ws = self.tmp.__enter__()
+        cfg = self.ws.config()
+        cfg["topics"] = ["Circuit breaker pattern", "Retry storms"]
+        cfg["schedule"].update(frequency="dates", days={}, generate_times=["10:00", "17:00"])
+        self.ws.save_config(cfg)
+
+    def tearDown(self):
+        self.tmp.__exit__(None, None, None)
+
+    def test_plans_fill_two_slots_a_day_on_different_topics(self):
+        import random
+        ws = self.ws
+        llm = ScriptedLLM({"planner": [answer(TITLES[:10]), answer(RETRY_TITLES)]})
+        monthly.generate(ws, "linkedin", "2026-11", llm=llm, today=TODAY)
+        out = monthly.auto_assign(ws, "linkedin", "2026-11", today=date(2026, 11, 25), rng=random.Random(1))
+        self.assertEqual(out["assigned"], 12)   # 25th to 30th: six days, two each
+        days = monthly.view(ws, "linkedin", "2026-11", TODAY)["days"]
+        for d in ("2026-11-25", "2026-11-30"):
+            self.assertEqual(len(days[d]), 2)
+            self.assertEqual(len({x["topic"] for x in days[d]}), 2)
+
+    def test_the_scheduler_makes_one_video_at_each_time(self):
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+        import random
+        ws = self.ws
+        llm = ScriptedLLM({"planner": [answer(TITLES[:10]), answer(RETRY_TITLES)]})
+        monthly.generate(ws, "linkedin", "2026-11", llm=llm, today=TODAY)
+        monthly.auto_assign(ws, "linkedin", "2026-11", today=date(2026, 11, 29), rng=random.Random(1))
+        cfg = ws.config()
+        cfg["schedule"]["lead_days"] = 0
+        ws.save_config(cfg)
+        tz = ZoneInfo(cfg["schedule"]["timezone"])
+        made, noop = [], (lambda *a, **k: None)
+
+        def runner(w, d):   # stands in for the crew: the day's current plan is made (written into the Queue)
+            entry = planner.load_plan(w)[d.isoformat()]
+            made.append(entry["plan_id"])
+            w.save_queue(w.queue() + [{"id": f"p{len(made)}", "date": d.isoformat(), "topic": entry["topic"], "platform": "linkedin",
+                                       "plan_id": entry["plan_id"], "status": "awaiting_approval"}])
+            monthly.sync_all(w, "linkedin")
+        for hh, mm in ((9, 0), (10, 1), (10, 30), (16, 59), (17, 1), (18, 0), (22, 0)):
+            scheduler.tick(ws, datetime(2026, 11, 29, hh, mm, tzinfo=tz), runner=runner, publisher=noop, checker=noop, planner=noop, cleaner=noop)
+        self.assertEqual(len(made), 2)
+        self.assertEqual(len(set(made)), 2)
+
+    def test_youtube_writes_enough_plans_for_two_a_day(self):
+        from helpers import REAL_PER_TOPIC
+        self.assertEqual(REAL_PER_TOPIC("youtube", "2026-11", ["a"] * 6), 6)
+        self.assertEqual(REAL_PER_TOPIC("youtube", "2026-11", ["a"] * 6, 2), 11)   # 60 runs over 6 topics, plus one each to run by hand

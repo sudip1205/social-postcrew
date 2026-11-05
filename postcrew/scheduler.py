@@ -28,6 +28,12 @@ def _passed(now, hhmm):
     return (now.hour, now.minute) >= (hh, mm)
 
 
+def generate_times(sched):
+    """The day's run times: schedule.generate_times (one video each), else the single generate_time."""
+    times = [t for t in sched.get("generate_times") or [] if isinstance(t, str) and ":" in t]
+    return sorted(times) or [sched["generate_time"]]
+
+
 def _earliest(sched):
     """The first moment of the day anything can go out on this schedule."""
     return min([sched["post_time"]] + list((sched.get("day_times") or {}).values())
@@ -83,19 +89,24 @@ def tick(ws, now=None, runner=run_crew, publisher=publish_due, checker=run_check
             did.append(f"plan {month}{'' if pid == LINKEDIN else ' (' + pid + ')'}")
 
         target = target_date(pcfg, pnow)
-        if (_passed(pnow, sched["generate_time"]) and ps.get("generated_for") != target.isoformat()
-                and category_for(pcfg, target)):
-            # nothing to generate when a run is still going, or the day is done: with plans, when none of the day's scheduled plans is
-            # left to make (a post made by hand or one of your own plans dated that day does not use up the day's scheduled run);
-            # without plans, when a post for that date is already made (e.g. by a manual run)
-            iso = target.isoformat()
+        iso = target.isoformat()
+        slots = generate_times(sched)   # one run per time: "10:00" and "17:00" make two videos a day
+        made = ps.get("generated_slots") if ps.get("generated_slots", {}).get("date") == iso else {"date": iso, "times": []}
+        if ps.get("generated_for") == iso and not made["times"]:   # state from before run times: today's one run is made
+            made["times"] = slots[:1]
+        due = [t for t in slots if _passed(pnow, t) and t not in made["times"]]
+        if due and category_for(pcfg, target) and not is_running():
+            # nothing to generate when the day is done: with plans, when none of the day's scheduled plans is left to make (a post made by
+            # hand or one of your own plans dated that day does not use up a scheduled run); without plans, when a post for that date is
+            # already made (e.g. by a manual run), and then only once a day
             planned = (monthly.load_plan(ws, pid).get(iso) or {}).get("plan_id")
-            done = not monthly.scheduled_due(ws, pid, iso) if planned else bool(post_for(ws, target, pid))
-            if not done and not is_running():
-                ps["generated_for"] = target.isoformat()
+            done = not monthly.scheduled_due(ws, pid, iso) if planned else (bool(post_for(ws, target, pid)) or bool(made["times"]))
+            if not done:
+                made["times"] = made["times"] + [due[0]]
+                ps["generated_slots"], ps["generated_for"] = made, iso
                 ws.save_state(name, ps)
                 _call(runner, ws, target, pid)
-                did.append(f"generate {who}{target.isoformat()}")
+                did.append(f"generate {who}{iso} ({due[0]})")
         gates.append((pnow, _earliest(sched)))
 
     last = st.get("published_check")
