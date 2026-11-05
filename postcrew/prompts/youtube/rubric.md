@@ -35,11 +35,11 @@ accuracy
 tone    a caring professor teaching students: calm, warm, patient and encouraging, spoken, plain; contractions are fine; no hype words, no sales
         pitch, no begging for likes anywhere in the video EXCEPT the owner's required closing line (below). That line is the owner's standing
         instruction: it is never "too_promotional", never off-tone, and never a reason to lower tone or format. Judge the tone of everything else.
-        90+ sounds like a real professor who cares whether the class understands: speaks to "you" and "we", checks in at the tricky parts
-            ("Does that make sense?", "Let's go slowly here"), reassures, gives the simple version, uses the real technical names after the
+        90+ sounds like a real professor who cares whether the class understands: speaks to "you" and "we", may check in once at a tricky part
+            (optional, never filler), reassures, gives the simple version, uses the real technical names after the
             plain explanation, and has natural rhythm (a short sentence after a longer one).
         75-89 correct and calm but impersonal, like a textbook read aloud.
-        <70  clipped, robotic or note-like ("AI reading"), no address to the student, no checking in, or a lecture that never explains.
+        <70  clipped, robotic or note-like ("AI reading"), no address to the student, or a lecture that never explains.
 speakable (part of format; also a red flag: unpronounceable)
         90+ nothing in the narration needs guessing: no code, identifiers, addresses or odd symbols; numbers, maths and acronyms are in
             forms the voice can say; no lone letters; no hard-to-pronounce coined words. Any such item caps format at 70.

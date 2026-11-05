@@ -34,9 +34,9 @@ shown with its part. A script passes only if ALL of these are true, and each one
    the smallest case first, then one bigger case at a time, each drawn with its real answer, in everyday words a ten-year-old follows (no recursion, memoization, dynamic
    programming, complexity in this part), then the pattern the pictures showed, stated and shown. Fail it (and cap "clarity" at 69) if code or technical terms come before the
    conclusion, if the visual part is only words, if the cases do not grow, or if the numbers drawn are wrong (a staircase of 4 steps has 5 ways when hops are 1 or 2).
-1d. THEN THE WAYS IT CAN BE CODED (part "approaches"), AFTER the conclusion and BEFORE the solution's code: each way named and compared in plain words (what it does, what it
+1d. THEN THE WAYS (part "approaches"), AFTER the conclusion and BEFORE the solution (for an explainer: the variants or cases compared, such as B2C and B2B): each way named and compared in plain words (what it does, what it
    costs), shown side by side on screen, and which one is built first. If the video jumps straight to one solution, that is a fix and caps "clarity" at 69.
-2. THEN THE SOLUTION AND ITS CODE (part "idea"): the chosen way, explained step by step, each new term explained once.
+2. THEN THE SOLUTION (part "idea"; its code for a problem or a build, the mechanism drawn for an explainer): the chosen way, explained step by step, each new term explained once.
 3. THEN A WORKING EXAMPLE (part "example"): concrete round values (a real request, array, command or snippet) walked through so the viewer
    sees the idea do its job. Not a second explanation of the idea: it must run on specific data.
 4. THEN ONE COMMON MISTAKE TO AVOID (part "mistake", the scene just before the closing card): what people get wrong, why it goes wrong,
@@ -51,11 +51,12 @@ shown with its part. A script passes only if ALL of these are true, and each one
 9. THE PROFESSOR'S VOICE: it must NOT sound like an AI reading notes. Fail it (and ask for a rewrite of those scenes, quoting the words) if: the narration is
    clipped fragments or note-style lines; ideas are listed instead of explained; a term is used without its plain meaning; there is no running example with
    real numbers that EVERY idea is tied back to ("in our pizza shop, the load balancer is..."); a subtopic named in the title or description is only mentioned;
-   there is no check-in with the student ("Does that make sense?", "Let's go slowly") and no one-line "in short" after an idea; or there is no recap.
+   there is no one-line "in short" after an idea; or there is no recap. (A "Does that make sense?" check-in is optional: never ask for one, and filler check-ins are a fix.)
    Semicolons and colons in narration are a fix (a voice cannot pause on them). The audience is STUDENTS: warm, patient, simple.
-10. HANDS-ON: the video SOLVES one concrete problem or BUILDS one concrete thing, and the student sees it work. Fail it if it only talks about a topic, gives interview or
-    study advice, lists concepts, or has no code, config or trace running on screen (a "code" scene with output in its terminal lines, or a "trace" scene with its code).
-    The example must be what is built or solved, not a story beside the lesson.
+10. SHOWN, NOT TALKED ABOUT: a problem is solved on screen (trace and code), a build is built (code that runs), and an EXPLAINER (how something works: security,
+    auth, protocols, architecture) follows ONE real-life scenario end to end with every hop drawn (who sends what, who checks it, what is allowed or blocked).
+    An explainer needs NO code: never ask for code in one, and code invented only to fill a slot is a fix. Fail it if it only lists concepts or gives interview
+    advice. The example must be what is explained, built or solved, not a story beside the lesson.
 10b. CODE AND PICTURE: a "codeviz" scene shows the real code with a live picture of it running (a call tree or a table). It counts as the hands-on code and as the trace for item 10. Check
     that the code is correct, that the narration follows what the picture does in the order it does it, and that any call count the voice states is right (a plain tree for
     f(n) = f(n-1) + f(n-2), base 0 and 1, n = 5 has 15 calls; with a memo, 9). A codeviz scene may run 15 to 30 seconds of narration: that is not "one picture too long", the picture keeps moving.

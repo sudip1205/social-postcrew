@@ -93,7 +93,7 @@ class TheChecks(unittest.TestCase):
         scenes = [{"layout": "statement", "part": "intro", "narration": "Imagine stairs."}] + \
                  [{"layout": "codeviz", "part": "idea", "narration": "word " * 40, "viz": PLAIN, "code": REC}] + \
                  [{"layout": "statement", "part": "closing", "narration": "Bye."}] * 4
-        self.assertFalse([p for p in checks.storyboard_problems(scenes, {"format": "short", "artist": True, "wps": 2.5}) if "builds or solves nothing" in p])
+        self.assertFalse([p for p in checks.storyboard_problems(scenes, {"format": "short", "artist": True, "wps": 2.5}) if "solves nothing" in p])
 
     def test_a_long_code_walk_through_is_not_split_or_redrawn(self):
         long = {"layout": "codeviz", "part": "idea", "narration": ("Watch the tree grow now. " * 14).strip(), "viz": PLAIN, "code": REC}

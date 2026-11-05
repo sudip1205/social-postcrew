@@ -25,9 +25,9 @@ HOW A PROFESSOR TEACHES (follow this in every video):
 4. COVER THE TOPIC PROPERLY. If the title or description names several things (round robin, least connections, health checks), EACH one is
    explained with the example and its own step by step, not mentioned in a list. Do not squeeze a topic into a few clipped lines: take the
    time it needs. If it cannot be taught well in the length, teach fewer things well and say what comes next.
-5. CHECK THE CLASS. A professor looks up and asks. Use a few natural checks, each followed by the answer a moment later: "Does that make sense?",
-   "Here is the question you might be asking...", "Let's stop for a second.", "If that felt like a lot, don't worry, here is the simple version.",
-   "This is the part many students find tricky, so let's go slowly." Use them where a real student would stumble, not as decoration.
+5. ASK, DON'T FILL. One real question near the start that the video then answers ("How does the bank know it's really you?") is enough.
+   A check-in such as "Does that make sense?" or "Let's go slowly here" is OPTIONAL: use one only where a real viewer would stumble, never as
+   filler, and never more than once in a Short. Most videos need none.
 6. SAY IT BACK. After each idea, one short sentence that sums it up in the simplest words: "So, in short: round robin just takes turns." At the end
    a short recap of the 2 or 3 things to remember.
 7. SHOW A REAL MISTAKE. Say what students usually get wrong, why it goes wrong in the example, and the fix.
@@ -110,7 +110,7 @@ time and money, so fix it now. Read your finished script scene by scene and tick
  [ ] The first scene opens on a situation or question the student has met, promises what they will understand, and reassures them. Not "in this video".
  [ ] ONE running example with real numbers is introduced early, and EVERY idea is tied back to it by name ("in our pizza shop, ...").
  [ ] Every idea is explained as what, why, how (with numbers). Every subtopic named in the title or description has its own explanation. No term appears before its plain meaning.
- [ ] There are check-ins with the student ("Does that make sense?", "Let's go slowly here") and at least one real question you then answer; each idea ends with a one-line "in short".
+ [ ] There is at least one real question you then answer; each idea ends with a one-line "in short". (A "Does that make sense?" check-in is optional, at most once.)
  [ ] The scenes follow the parts in order: intro (the opening), problem (what is asked, with an example input and its answer), visual (two or more drawings, the smallest case first, then bigger ones, in everyday words), conclusion (the pattern, shown), approaches (the ways to code it, side by side, no code yet), idea (the chosen solution and its code), example (running on real values), mistake (shown as a picture, with the fix), closing. NO code and NO technical term before the conclusion. A short recap comes before the closing.
  [ ] It sounds like a person talking to a class: whole sentences of 8 to 20 words, "you", "we" and "let's", contractions, no clipped note-like lines, no lists of terms, no semicolons or colons.
  THE PICTURES
@@ -185,17 +185,16 @@ MOVING PICTURES YOU CAN ASK FOR (the way the best system-design channels show an
 - A code scene looks like an editor window: put the file name in "on_screen" ("server.py", "nginx.conf"); the lines type in one by one; put the program's OUTPUT lines in "items" (up to 5: the first is the command, such as "python server.py") and they print in a terminal panel under the code.
 - A big number: layout "stat": items = ["600 PB", "of git traffic every day"] (the number first, with its unit; an optional caption second); on_screen says what it measures; optionally cells = ["7", "10"] shows 7 of 10 icons lit and "clip" picks the icon. The number counts up on screen. Use it when a real figure is the point.
 
-THIS CHANNEL TEACHES HANDS-ON: THE VIDEO SOLVES ONE PROBLEM OR BUILDS ONE THING, LIVE. The running example is not a story beside the lesson: it IS the thing being
-built or the problem being solved, and the student watches it come together and work.
+WHAT KIND OF VIDEO THIS IS DECIDES WHETHER IT HAS CODE. The running example is not a story beside the lesson: it IS the thing being explained, built or solved.
+- AN EXPLAINER (how something works: security, auth, protocols, networks, architecture, "what is X", "how does X work"): follow ONE REAL-LIFE SCENARIO from
+  start to end ("you tap Send on a bank payment"), and draw every hop of it: who talks to whom, what is carried, who checks what, and what happens when
+  something is wrong (allowed, blocked, asked to verify again). Use diagrams and flows that grow, a few points, a stat. NO CODE IS NEEDED: show code only
+  if one short snippet makes the idea clearer than a picture (a token's contents can be a small JSON code scene). Never invent code to fill a slot.
 - A PROBLEM (an algorithm, a puzzle, "How to solve Two Sum"): state it with a concrete input and the expected answer, solve it the slow obvious way first,
-  trace it by hand on that input (a "trace" scene with moving pointers), find why it is slow, then the better way, traced again, then the code in an editor
-  window, then RUN it and show the output (the terminal lines in "items"), then a harder input that breaks it and the fix.
-- A SYSTEM or APP ("Design a chatbot", "Build single sign-on"): draw the architecture in a diagram that grows (users, the parts, the arrows), then BUILD the key
-  part in code or config scene by scene (the skeleton, then the core logic, then connecting it), RUN it and show the request flowing and the result, then
-  break one part on purpose and show the failure and the fix.
-- Every video has at least one "code" scene (an editor window; put the output of running it in "items" so the terminal prints it) or, for an algorithm, a
-  "trace" scene plus its code. Code is short, correct and runnable, built in small pieces: each scene adds a few lines, never a wall of code at once.
-- End on the working result ("and here it is running"), then the recap. Never a video that only talks ABOUT a topic, never interview advice, never a list of concepts.
+  trace it on that input, find why it is slow, then the better way, traced again, then the code in an editor window, run it and show the output.
+- A BUILD ("Build a rate limiter", "Build a chat server"): draw the architecture in a diagram that grows, then build the key part in code scene by scene,
+  run it and show the result, then break one part on purpose and show the failure and the fix. Code is short, correct and runnable.
+- Never a video that only lists concepts, never interview advice. Every idea is shown happening in the example.
 
 EVERY VIDEO FOLLOWS THIS ARC (checked by the app; a script that skips a part is sent back). Each scene has a "part":
 1. "intro": the FIRST scene (layout "title"). A short opening: the situation the viewer has met, and what they will be able to do by the end,
@@ -216,8 +215,8 @@ EVERY VIDEO FOLLOWS THIS ARC (checked by the app; a script that skips a part is 
 5. "approaches": one or two scenes. THE WAYS IT CAN BE CODED, laid out before the code: name each way in one sentence and say how it differs and what it costs (plain
    recursion tries everything, a memo remembers answers, a table builds them up from the bottom). Show them side by side on screen (a "diagram" with one box for each
    way, or "points"). Then say which one you will build first and why. No code yet.
-6. "idea": one to three scenes. NOW the SOLUTION IN CODE: the chosen way, with its technical terms, now that the viewer understands the picture. Build it from the first way
-   to the best way if the ways build on each other. This is where the code starts.
+6. "idea": one to three scenes. NOW the SOLUTION, with its technical terms, now that the viewer understands the picture (for a problem or a build, its code
+   starts here; for an explainer, the mechanism drawn: what is checked, by whom, in what order).
 7. "example": one to three scenes. A WORKING EXAMPLE with real round values that shows the idea doing its job (a trace, a flow, a code scene).
 8. "mistake": the scene(s) just before the closing card: ONE COMMON MISTAKE to avoid. SHOW it: a "flow" or "diagram" in which the wrong path
    goes wrong (a box that fails, a wrong value on an arrow), then the fix on the same picture; or a "code" scene with the wrong line and the right

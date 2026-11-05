@@ -272,7 +272,7 @@ def teaching_problems(scenes, spec):
     if len(ADDRESS.findall(text)) * 100 / words < 2:
         problems.append("it never speaks to the student: use 'you', 'we' and 'let's' (\"Let's see what happens to our pizza shop...\")")
     if "?" not in text:
-        problems.append("a professor asks the class something: add a question to the student (\"Does that make sense?\", \"Why would that happen?\") and answer it")
+        problems.append("ask the viewer one real question and answer it (\"How does the bank know it's really you?\")")
     if not any(c in text.lower() for c in TEACH_CUES):
         problems.append("there is no example: introduce one the whole video follows (\"Imagine a pizza shop with three chefs...\") and tie each idea back to it")
     for i, sc in enumerate(scenes, 1):
@@ -281,7 +281,7 @@ def teaching_problems(scenes, spec):
     return problems
 
 
-def storyboard_problems(scenes, spec):
+def storyboard_problems(scenes, spec, cat=None):
     """The picture must follow the voice: a new picture every few seconds, each one showing what is being said at that moment."""
     from .render.scenes import split_node
     cap, problems, seen = MAX_SCENE_S[spec["format"]], [], set()
@@ -310,9 +310,9 @@ def storyboard_problems(scenes, spec):
             unsaid = [it for it in sc.get("items") or [] if not _says(sc.get("narration"), it)]
             if unsaid and len(unsaid) * 2 > len(sc.get("items") or []):   # a point may be worded differently, but most must be said
                 problems.append(f"scene {i}: the point '{unsaid[0]}' is on screen but the voice never says it: say each point as it appears")
-    if spec.get("artist") and len(scenes) >= 6 and not any(sc.get("layout") in ("code", "trace", "codeviz", "grid") for sc in scenes):   # a Remotion video: this channel builds and solves
-        problems.append("the video builds or solves nothing on screen: add a 'code' scene (an editor window, with the output of running it in its terminal "
-                        "lines) or, for an algorithm, a 'trace' scene and its code. This channel teaches by building")
+    if (spec.get("artist") and len(scenes) >= 6 and needed_visual(spec, cat) == "trace"
+            and not any(sc.get("layout") in ("code", "trace", "codeviz", "grid", "run") for sc in scenes)):   # an algorithm is solved on screen; an explainer needs no code
+        problems.append("the video solves nothing on screen: an algorithm needs a 'trace' (or 'run') scene and its code")
     body = [(i, sc) for i, sc in enumerate(scenes, 1) if sc.get("part") not in ("intro", "closing") and not (i == 1 and not sc.get("part"))]
     plain = [i for i, sc in body if sc.get("layout") in ("statement", "points", "title")]
     if len(body) >= 4 and len(plain) > MAX_PLAIN * len(body) + 0.5:
@@ -333,7 +333,7 @@ PART_HELP = {"intro": "a short opening that names the situation and promises wha
              "approaches": "the different ways the problem can be solved, each named and compared in a sentence, before any solution or code",
              "idea": "the chosen solution, the idea", "example": "a worked example that shows it working",
              "mistake": "one common mistake to avoid"}
-ARC = "intro, problem, visual (small cases drawn, then bigger), conclusion (the pattern), approaches, idea (the solution and its code), example, mistake, then the closing card"
+ARC = "intro, problem, visual (small cases drawn, then bigger), conclusion (the pattern), approaches, idea (the solution: its code for a problem or a build, the mechanism drawn for an explainer), example, mistake, then the closing card"
 
 
 def structure_problems(scenes):
@@ -413,7 +413,7 @@ def script_problems(script, spec, cat, profile):
     if not mn <= len(scenes) <= mx:
         problems.append(f"{len(scenes)} scenes: a {spec['format']} video needs {mn}-{mx}, a new picture every few seconds")
     if script.get("source") != "own":   # the owner's own script is theirs: it is checked for rules, not re-storyboarded
-        problems += storyboard_problems(scenes, spec)
+        problems += storyboard_problems(scenes, spec, cat)
         problems += teaching_problems(scenes, spec)
     problems += structure_problems(scenes)
     problems += fidelity_problems(scenes)

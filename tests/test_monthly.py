@@ -612,14 +612,16 @@ class NicheAndTopicsTests(unittest.TestCase):
         self.assertNotIn("interview", " ".join(trends.SUFFIXES))
         self.assertTrue(any("build" in s for s in trends.SUFFIXES))
 
-    def test_a_remotion_video_must_build_or_solve_something_on_screen(self):
+    def test_an_algorithm_video_must_solve_on_screen_but_an_explainer_needs_no_code(self):
         from postcrew.checks import storyboard_problems
-        spec = {"format": "long", "wps": 2.5, "artist": True}
+        spec = {"format": "long", "wps": 2.5, "artist": True, "renderer": "remotion"}
+        algo, explain = {"id": "leetcode", "label": "Solve Algorithmic Problems"}, {"id": "concepts", "label": "Explain Concepts"}
         talk = [{"layout": "diagram", "part": "idea", "nodes": ["A", "B"], "narration": "a b"}] * 6
-        self.assertTrue(any("builds or solves nothing" in p for p in storyboard_problems(talk, spec)))
-        built = talk[:5] + [{"layout": "code", "part": "example", "code": "x = 1", "narration": "x"}]
-        self.assertFalse(any("builds or solves nothing" in p for p in storyboard_problems(built, spec)))
-        self.assertFalse(any("builds or solves nothing" in p for p in storyboard_problems(talk, dict(spec, artist=False))))   # other renderers are not asked
+        self.assertTrue(any("solves nothing" in p for p in storyboard_problems(talk, spec, algo)))
+        built = talk[:5] + [{"layout": "trace", "part": "example", "cells": ["1"], "narration": "x"}]
+        self.assertFalse(any("solves nothing" in p for p in storyboard_problems(built, spec, algo)))
+        self.assertFalse(any("solves nothing" in p for p in storyboard_problems(talk, spec, explain)))   # an explainer is drawn, not coded
+        self.assertFalse(any("solves nothing" in p for p in storyboard_problems(talk, dict(spec, artist=False), algo)))
 
     def test_plans_of_topics_removed_from_settings_are_dropped_with_their_days(self):
         with TempWorkspace() as ws:

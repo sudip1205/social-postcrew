@@ -579,7 +579,7 @@ class TeachingVoiceTests(unittest.TestCase):
         text = " ".join(teaching_problems(notes, self.SPEC))
         self.assertIn("clipped fragments", text)
         self.assertIn("never speaks to the student", text)
-        self.assertIn("add a question", text)
+        self.assertIn("one real question", text)
         self.assertIn("no example", text)
 
     def test_a_professor_passes(self):
