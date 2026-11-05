@@ -85,8 +85,13 @@ def tick(ws, now=None, runner=run_crew, publisher=publish_due, checker=run_check
         target = target_date(pcfg, pnow)
         if (_passed(pnow, sched["generate_time"]) and ps.get("generated_for") != target.isoformat()
                 and category_for(pcfg, target)):
-            # a post for that date already made (e.g. by a manual run) or a run still going: nothing to generate
-            if not post_for(ws, target, pid) and not is_running():
+            # nothing to generate when a run is still going, or the day is done: with plans, when none of the day's scheduled plans is
+            # left to make (a post made by hand or one of your own plans dated that day does not use up the day's scheduled run);
+            # without plans, when a post for that date is already made (e.g. by a manual run)
+            iso = target.isoformat()
+            planned = (monthly.load_plan(ws, pid).get(iso) or {}).get("plan_id")
+            done = not monthly.scheduled_due(ws, pid, iso) if planned else bool(post_for(ws, target, pid))
+            if not done and not is_running():
                 ps["generated_for"] = target.isoformat()
                 ws.save_state(name, ps)
                 _call(runner, ws, target, pid)

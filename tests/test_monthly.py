@@ -211,6 +211,26 @@ class MonthlyTests(unittest.TestCase):
                 crew.run_crew(ws, date(2026, 11, 4), llm=ScriptedLLM({}))
             self.assertEqual(seen, [b["id"]])
 
+    def test_a_post_made_by_hand_or_your_own_plan_does_not_use_up_the_days_scheduled_run(self):
+        # 2026-11-04: the REST API plan was made by hand at 00:28 and two of your own plans were run that day, so "a post for that date
+        # exists" and the scheduled run never made the day's other plan (Kadane's)
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+        with TempWorkspace() as ws:
+            self.ws(ws)
+            a, b = self.assigned(ws, 2, "2026-11-04")
+            ws.add_history({"id": "p1", "date": "2026-11-04", "topic": a["title"], "platform": "linkedin", "plan_id": a["id"], "published_at": "x"})
+            own = monthly.add_manual(ws, "linkedin", "My own topic", "details")
+            monthly.run_plan(ws, "linkedin", own["id"], None, today=date(2026, 11, 4))
+            ws.save_queue([{"id": "p2", "date": "2026-11-04", "topic": "My own topic", "platform": "linkedin", "plan_id": own["id"],
+                            "status": "awaiting_approval"}])
+            calls, noop = [], (lambda *x, **k: None)
+            tz = ZoneInfo(ws.config()["schedule"]["timezone"])
+            for hour in (19, 20):
+                scheduler.tick(ws, datetime(2026, 11, 3, hour, 5, tzinfo=tz), runner=lambda w, d: calls.append((d.isoformat(), planner.load_plan(w)[d.isoformat()]["plan_id"])),
+                               publisher=noop, checker=noop, planner=noop, cleaner=noop)
+            self.assertEqual(calls, [("2026-11-04", b["id"])])
+
     def test_at_most_five_plans_wait_on_one_day_and_a_written_plan_cannot_be_unassigned(self):
         with TempWorkspace() as ws:
             self.ws(ws)

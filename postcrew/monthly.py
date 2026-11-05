@@ -554,7 +554,10 @@ def _sync_day(ws, platform, pool, posted, iso):
             set_entry(ws, iso, None, platform)
         _set_date(ws, platform, iso, None)
         return
-    cur = live[0]
+    # the next plan to MAKE: a scheduled plan still to make comes before one already waiting in the Queue, so a post waiting for approval
+    # (yours, or one made by hand) never stops the day's scheduled run
+    todo = [i for i in live if status_of(i, posted) == "assigned" and not i.get("manual")]
+    cur = todo[0] if todo else live[0]
     fmt = cur["assigned"].get("format")
     cat = category_for_item(ws, platform, fmt)
     if not entry or entry.get("plan_id") != cur["id"] or entry.get("category") != cat:
@@ -742,6 +745,14 @@ def run_plan(ws, platform, item_id, fmt, today=None):
         ws.save_state(_name(platform), pool)
         _sync_day(ws, platform, pool, posted, today.isoformat())
     return {"date": today.isoformat(), "category": category_for_item(ws, platform, fmt), "item": item}
+
+
+def scheduled_due(ws, platform, iso):
+    """Does `iso` still have a scheduled plan to make (assigned, not written or published, not one of your own plans)? The scheduler makes it
+    whatever else is already dated that day: a post made by hand early, or your own plans run from Manual run."""
+    pool = load(ws, platform)
+    posted = posted_titles(ws, platform)
+    return any(status_of(i, posted) == "assigned" and not i.get("manual") for i in _live_items(pool, posted, iso))
 
 
 # ---------- the scheduler's job ----------
