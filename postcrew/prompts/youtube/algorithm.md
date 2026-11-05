@@ -23,6 +23,14 @@ A "run" scene:
 Also show the code itself in "code" scenes (one file per approach, named after it: brute.py, kadane.py), and the time you give each approach
 is the loop nesting of its code (a loop in a loop is n squared). Every approach you name gets its code and its run.
 
-ORDER: the problem on its example, then the simplest way run step by step and why it is slow, then the idea that fixes it, then the better
-way run step by step, then its code and complexity, then the mistake run and failing, then the recap. Name the algorithm when you reach it,
-not before.
+ORDER, and the parts it uses (the app checks it):
+  intro       the question, on the example
+  problem     what is asked, the example and its answer (no calculation steps yet)
+  visual      the SIMPLE way (brute force) RUN step by step: run scenes, the first walk-through of the video
+  conclusion  why it is slow: the repeated work the run showed (points or a diagram)
+  approaches  the ways side by side (a diagram or points), with each one's time
+  idea        the idea that fixes it, then the better way RUN step by step (run scenes), named only now
+  example     the code of each way (code scenes, one file each) and its complexity
+  mistake     the common mistake RUN and failing (a run scene of the buggy code), then the fix
+No scene before the first run may narrate a calculation on the example ("adding gives", "the larger of"): calculations are only shown by
+run scenes.

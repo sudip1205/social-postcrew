@@ -356,10 +356,10 @@ def structure_problems(scenes):
     seen = [sc for sc in scenes if sc.get("part") == "visual"]
     if len(seen) == 1:
         problems.append("the 'visual' part needs at least two pictures, growing: the smallest case first (2 steps), then a bigger one (3 steps), then another, so the viewer sees the pattern appear")
-    if seen and any(sc.get("layout") not in ("paths", "grid", "diagram", "flow", "trace", "stat") for sc in seen):
+    if seen and any(sc.get("layout") not in ("paths", "grid", "diagram", "flow", "trace", "stat", "run") for sc in seen):
         problems.append("every 'visual' scene is a drawing, not words or code: a 'paths' staircase, a 'diagram', a 'flow', a 'trace' or a 'stat'")
     concl = [sc for sc in scenes if sc.get("part") == "conclusion"]
-    if concl and not any(sc.get("layout") in ("points", "trace", "diagram", "flow", "stat", "paths", "grid") for sc in concl):
+    if concl and not any(sc.get("layout") in ("points", "trace", "diagram", "flow", "stat", "paths", "grid", "run") for sc in concl):
         problems.append("the 'conclusion' scene shows the pattern the pictures revealed (points, a trace of the numbers, a diagram), not only a sentence")
     first_code = next((i for i, sc in enumerate(scenes) if sc.get("layout") in ("code", "codeviz")), None)
     first_end = next((i for i, sc in enumerate(scenes) if sc.get("part") == "conclusion"), None)

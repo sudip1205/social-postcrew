@@ -95,6 +95,9 @@ def script_revision_block(ctx, guidance, prev=None):
             + json.dumps(keep, ensure_ascii=False, indent=1) + "\n</previous_script>")
 
 
+CALC = __import__("re").compile(r"\b(adding|add|gives|makes|plus|minus .{0,12}\bis|the larger of|the smaller of|beats|subtract\w*)\b", __import__("re").I)
+
+
 def algorithm_problems(script):
     scenes = script.get("scenes") or []
     hand = [i for i, sc in enumerate(scenes, 1) if (sc.get("layout") in ("trace", "codeviz") and (sc.get("steps") or sc.get("viz")))
@@ -105,6 +108,24 @@ def algorithm_problems(script):
                    f"and draws its real steps), never trace, grid or codeviz steps written by hand. Turn each into a run scene")
     if sum(1 for sc in scenes if sc.get("layout") == "run") < 2:
         out.append("an algorithm video needs at least two 'run' scenes: the simple way run step by step, and the better way run step by step")
+    # a calculation on the example is SHOWN, by the code running: never narrated over a diagram or words
+    calc = [i for i, sc in enumerate(scenes, 1) if sc.get("layout") not in ("run", "code", "points") and sc.get("part") != "closing"
+            and len(CALC.findall(str(sc.get("narration") or ""))) >= 2]
+    if calc:
+        out.append(f"scene(s) {', '.join(map(str, calc))} narrate calculations on the example ('adding gives', 'the larger of') over a picture that "
+                   f"does not compute them: in an algorithm video every calculation is a 'run' scene, where the app runs the code and shows it")
+    # the simple way first: the run scenes go from the most nested loops (brute force) to the fewest, the mistake aside
+    from .. import fidelity
+    runs = [(i, fidelity.loop_depth(sc.get("code"))) for i, sc in enumerate(scenes, 1) if sc.get("layout") == "run" and sc.get("part") != "mistake"]
+    if runs and runs[0][1] < max(d for _, d in runs):
+        out.append(f"the first walk-through (scene {runs[0][0]}) runs a faster way before the simple one: run the simple way (brute force, scene "
+                   f"{next(i for i, d in runs if d == max(d_ for _, d_ in runs))}) first, see why it is slow, then the idea and the better way run")
+    first_run = runs[0][0] if runs else len(scenes) + 1
+    early = [i for i, sc in enumerate(scenes[:first_run - 1], 1) if sc.get("part") in ("visual", "conclusion")]
+    if early:
+        out.append(f"scene(s) {', '.join(map(str, early))} teach the idea before any code has run: in an algorithm video the order is the problem on "
+                   f"its example, the simple way RUN step by step (its run scenes are the 'visual' part), why it is slow, then the idea, the better "
+                   f"way run, its code, the mistake run")
     return out
 
 

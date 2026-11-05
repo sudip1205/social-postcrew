@@ -78,3 +78,18 @@ class AlgoTraceTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class AlgorithmOrderTest(unittest.TestCase):
+    # the first algorithm-mode run taught Kadane with hand-drawn diagrams ("adding gives one, so we start fresh") before brute force had run
+    def test_the_simple_way_runs_first_and_calculations_are_run(self):
+        from postcrew.agents.script import algorithm_problems
+        brute = "def f(a):\n    best = a[0]\n    for i in range(len(a)):\n        for j in range(i, len(a)):\n            best = max(best, sum(a[i:j + 1]))  # step\n    return best\n"
+        fast = {"layout": "run", "part": "idea", "code": KADANE, "run": RUN}
+        slow = {"layout": "run", "part": "visual", "code": brute, "run": RUN}
+        told = {"layout": "diagram", "part": "visual", "narration": "On day two, adding gives one, so the larger of three or one is three."}
+        out = algorithm_problems({"scenes": [told, fast, slow]})
+        self.assertTrue(any("narrate calculations" in p for p in out))
+        self.assertTrue(any("runs a faster way before the simple one" in p for p in out))
+        self.assertTrue(any("teach the idea before any code has run" in p for p in out))
+        self.assertEqual(algorithm_problems({"scenes": [slow, fast]}), [])
