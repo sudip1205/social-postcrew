@@ -152,6 +152,26 @@ def _silences(path, noise, min_s):
     return out
 
 
+def _nearest_in_order(targets, gaps):
+    """Pick one gap per target, in order, so the gaps' middles are as close as possible to the targets (a small dynamic programme)."""
+    n, m = len(targets), len(gaps)
+    mid = [(a + b) / 2 for a, b in gaps]
+    INF = float("inf")
+    cost = [[INF] * (m + 1) for _ in range(n + 1)]
+    cost[0] = [0.0] * (m + 1)
+    for i in range(1, n + 1):
+        for j in range(i, m + 1):
+            cost[i][j] = min(cost[i][j - 1], cost[i - 1][j - 1] + abs(targets[i - 1] - mid[j - 1]))
+    out, i, j = [], n, m
+    while i:
+        if cost[i][j] == cost[i][j - 1] and j > i:
+            j -= 1
+        else:
+            out.append(gaps[j - 1])
+            i, j = i - 1, j - 1
+    return out[::-1]
+
+
 def calibrate(words, length, quiet, tail=0.35):
     """The estimated word times pulled onto the real voice: the pauses after sentences (which the Voice step adds) are found in
     the audio, and each sentence is stretched or squeezed between them. Returns (words, True), or (words, False) when the audio
@@ -160,14 +180,18 @@ def calibrate(words, length, quiet, tail=0.35):
     inner = [(a, b) for a, b in quiet if a > 0.3 and b < length - 0.15]
     if not ends or len(inner) < len(ends) or len(inner) > len(ends) * 2 + 1:
         return words, False
-    if len(inner) > len(ends):   # commas and breaths also leave gaps: keep the longest ones, in order
-        keep = sorted(sorted(inner, key=lambda x: x[1] - x[0], reverse=True)[:len(ends)])
-        inner = keep
     trailing = next((a for a, b in quiet if b == float("inf") or b >= length - 0.05), None)
+    if len(inner) > len(ends):   # commas and breaths also leave gaps: each sentence end takes the pause nearest where it should fall
+        guess_end = trailing or (length - tail)
+        scale = guess_end / max(0.01, words[-1][2])
+        inner = _nearest_in_order([words[i][2] * scale for i in ends], inner)
     speech_end = trailing if trailing and trailing > inner[-1][1] else max(inner[-1][1] + 0.2, length - tail)
     anchors = [(0.0, 0.0)] + [(words[i][2], b) for i, (a, b) in zip(ends, inner)] + [(words[-1][2], speech_end)]
     if any(x1 <= x0 or y1 <= y0 for (x0, y0), (x1, y1) in zip(anchors, anchors[1:])):
         return words, False
+    ratio = (anchors[-1][1] / anchors[-1][0]) if anchors[-1][0] else 1
+    if any(not 0.4 <= ((y1 - y0) / (x1 - x0)) / ratio <= 2.5 for (x0, y0), (x1, y1) in zip(anchors, anchors[1:])):
+        return words, False   # a sentence squeezed or stretched past any real speaking pace: the pauses were matched wrong, keep the estimate
 
     def warp(t):
         for (x0, y0), (x1, y1) in zip(anchors, anchors[1:]):

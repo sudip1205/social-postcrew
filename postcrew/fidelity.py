@@ -115,10 +115,95 @@ def cue_problems(scene):
 def trace_problems(scene, before=None):
     """Everything wrong with a trace scene's story against its picture ([] when the picture tells what the voice says)."""
     cells, steps = [str(c) for c in scene.get("cells") or []], scene.get("steps") or []
-    return (narration_problems(scene) + counting_problems(steps, before) + sum_problems(cells, steps) + cue_problems(scene))[:2]
+    return (narration_problems(scene) + counting_problems(steps, before) + sum_problems(cells, steps) + cue_problems(scene)
+            + pace_problems(scene))[:2]
 
 
 def grid_problems(grid, narration=""):
     """A grid scene: true sums and on-cue steps."""
     steps = (grid or {}).get("steps") or []
     return (sum_problems([], steps) + cue_problems({"narration": narration, "steps": steps}))[:2]
+
+
+# ---------- pace: a step is explained, not flashed ----------
+WORDS_PER_STEP = 6   # about 2.4 seconds of voice for each step: what is looked at, the calculation, the result
+
+
+def pace_problems(scene):
+    steps = scene.get("steps") or []
+    words = len(str(scene.get("narration") or "").split())
+    if len(steps) >= 3 and words < WORDS_PER_STEP * len(steps):
+        return [f"{len(steps)} steps in {words} words: each step flashes by in about {words / len(steps) / 2.5:.1f} seconds. Give each step its own "
+                f"sentence that says the calculation ('max of four, or minus two plus four: four'), at least {WORDS_PER_STEP} words a step "
+                f"({WORDS_PER_STEP * len(steps)} here), or show fewer steps in this scene and the rest in the next"]
+    return []
+
+
+# ---------- the code agrees with what the voice says about it ----------
+POWER = {"": 1, "squared": 2, "cubed": 3, "2": 2, "3": 3, "²": 2, "³": 3}
+COMPLEXITY = re.compile(r"\b(?-i:O)(?:\s+of\s+|\s*\(\s*)n\b\s*(?:\^?\s*(2|3)|(²|³)|\s+(squared|cubed))?(?!\s*log)|\bn\s*(²|³)|\bn\s+(squared|cubed)\b", re.I)
+WAYS = re.compile(r"\b" + NUM + r"\s+(?:different\s+)?(?:ways|approaches|solutions|methods)\b", re.I)
+FILE = re.compile(r"\b([a-z_][\w-]*)\.(?:py|js|ts|java|cpp|c|go|rb|rs|kt|swift)\b", re.I)
+
+
+def complexities(text):
+    """The powers of n a text claims, in order: 'n cubed' -> 3, 'O(n^2)' -> 2, 'O of n' -> 1."""
+    out = []
+    for m in COMPLEXITY.finditer(str(text or "")):
+        word = next((g for g in m.groups() if g), "")
+        out.append(POWER.get(word.lower(), 1))
+    return out
+
+
+def loop_depth(code):
+    """How deeply the code's loops nest (for / while lines, by indentation): 2 for a loop inside a loop."""
+    best, stack = 0, []
+    for line in str(code or "").splitlines():
+        if not line.strip() or line.strip().startswith(("#", "//")):
+            continue
+        ind = len(line) - len(line.lstrip())
+        while stack and stack[-1] >= ind:
+            stack.pop()
+        if re.match(r"\s*(for|while)\b", line):
+            stack.append(ind)
+            best = max(best, len(stack))
+    return best
+
+
+def _file(sc):
+    m = FILE.search(str(sc.get("on_screen") or "")) or FILE.search(" ".join(str(x) for x in sc.get("items") or []))
+    return m.group(1).lower() if m else ""
+
+
+def code_problems(scenes):
+    """The complexity the voice gives an approach is the complexity of the code shown for it, and when the video promises N ways and codes
+    more than one, it codes all N."""
+    out = []
+    codes = [(i, sc) for i, sc in enumerate(scenes, 1) if sc.get("layout") in ("code", "codeviz") and str(sc.get("code") or "").strip()]
+    files = {}
+    for i, sc in codes:
+        files.setdefault(_file(sc) or f"scene{i}", (i, sc))
+    for name, (i, sc) in files.items():
+        depth = loop_depth(sc["code"])
+        if not depth or not name or name.startswith("scene"):
+            continue
+        stem = re.split(r"[_\-]", name)[0]
+        for j, other in enumerate(scenes, 1):
+            texts = [str(x) for x in other.get("items") or []] + [str(e) for e in other.get("edges") or []]
+            texts += [c for c in re.split(r"[.!?;,]\s+|\b(?:and|while|but|whereas)\b", str(other.get("narration") or "")) if c and c.strip()]
+            for text in texts:
+                low = text.lower()
+                if stem in low or (j == i and not FILE.search(low)):
+                    for power in complexities(text)[:1]:
+                        if power in (1, 2, 3) and power != depth and abs(power - depth) <= 2:
+                            out.append(f"scene {j} says {stem} takes n{'' if power == 1 else '²' if power == 2 else '³'} time, but the code shown for it "
+                                       f"({name}, scene {i}) nests {depth} loop{'s' if depth > 1 else ''}: n{'' if depth == 1 else '²' if depth == 2 else '³'}. "
+                                       f"Make the words and the code agree")
+                            break
+    out = list(dict.fromkeys(out))[:2]
+    said = [number(m.group(1)) for sc in scenes for m in WAYS.finditer(str(sc.get("narration") or ""))]
+    want = max([n for n in said if n and 2 <= n <= 6] or [0])
+    if want and len(files) >= 2 and len(files) < want:
+        out.append(f"the voice promises {want} ways but code is shown for {len(files)} ({', '.join(sorted(files))}): show code for each of the {want}, "
+                   f"or say {len(files)} ways")
+    return out

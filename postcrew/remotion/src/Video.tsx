@@ -183,12 +183,12 @@ const Code: React.FC<{s: Scene; short: boolean}> = ({s, short}) => {
   const th = useTheme(), {t} = useT();
   const lines = s.code.replace(/\s+$/, "").split("\n");
   const typeEnd = Math.max(1.2, s.seconds * (s.items?.length ? 0.55 : 0.8));
-  const shown = interpolate(t, [0.5, typeEnd], [0, lines.length], {extrapolateLeft: "clamp", extrapolateRight: "clamp"});
+  const shown = s.typed ? lines.length : interpolate(t, [0.5, typeEnd], [0, lines.length], {extrapolateLeft: "clamp", extrapolateRight: "clamp"});
   // readable on a phone first: never under 38 px on a Short (a long line wraps, its indent kept) rather than shrinking the whole file
   const size = Math.max(short ? 38 : 28, Math.min(short ? 50 : 36, ((short ? 780 : 1380) / Math.max(12, ...lines.map((l) => l.length))) * 1.65));
   const file = /\.\w{1,5}$/.test(s.title) ? s.title : `main.${EXT[(s.language || "").toLowerCase()] ?? "txt"}`;
   const cur = Math.min(lines.length - 1, Math.floor(shown)), done = shown >= lines.length, caret = Math.floor(t * 2.4) % 2 === 0;
-  const out = s.items ?? [], termStart = typeEnd + 0.4;
+  const out = s.items ?? [], termStart = s.typed ? Math.max(0.8, s.seconds * 0.35) : typeEnd + 0.4;
   return (
     <>
       <Heading text={s.title} short={short} />
@@ -233,7 +233,10 @@ const Stat: React.FC<{s: Scene; short: boolean}> = ({s, short}) => {
   const m = value.match(/^([^\d]*)([\d,]*\.?\d+)(.*)$/);
   const start = s.cues?.[0] ?? 0.4, p = ease(Math.max(0, Math.min(1, (t - start) / 1.6)));
   const target = m ? parseFloat(m[2].replace(/,/g, "")) : 0, decimals = m && m[2].includes(".") ? m[2].split(".")[1].length : 0;
-  const shownNum = m ? (target * p).toLocaleString("en-US", {minimumFractionDigits: decimals, maximumFractionDigits: decimals}) : "";
+  // a small count is shown as itself when the voice says it (counting 0, 1, 2, 3 would show "0 ways" while the voice says three); a big
+  // number counts up from the moment it is said
+  const small = !!m && target <= 20 && !m[2].includes(".");
+  const shownNum = small ? m![2] : m ? (target * p).toLocaleString("en-US", {minimumFractionDigits: decimals, maximumFractionDigits: decimals}) : "";
   const [a, b] = [parseInt(s.cells?.[0] ?? "0", 10) || 0, parseInt(s.cells?.[1] ?? "0", 10) || 0], n = Math.min(b, 20);
   const lit = Math.round((a / Math.max(1, b)) * n);
   // The number is sized from its FINAL text (not the counting one, so it never jumps) to fit the content width: "2,692,537" at the full 250 px
@@ -246,7 +249,8 @@ const Stat: React.FC<{s: Scene; short: boolean}> = ({s, short}) => {
     <>
       <Heading text={s.title} short={short} />
       <div style={{flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", gap: short ? 40 : 26}}>
-        <div style={{fontWeight: 800, letterSpacing: -6, lineHeight: 1, whiteSpace: "nowrap", color: th.highlight, fontSize: numSize, opacity: ease(Math.min(1, t / 0.5))}}>
+        <div style={{fontWeight: 800, letterSpacing: -6, lineHeight: 1, whiteSpace: "nowrap", color: th.highlight, fontSize: numSize, opacity: ease(Math.max(0, Math.min(1, (t - start + 0.1) / 0.4))),
+          transform: `scale(${0.85 + 0.15 * ease(Math.max(0, Math.min(1, (t - start + 0.1) / 0.4)))})`, transformOrigin: "left center"}}>
           {m ? <>{m[1]}{shownNum}{m[3]}</> : value}
         </div>
         {caption && <div style={{fontSize: short ? 56 : 44, fontWeight: 600, color: th.text, opacity: ease(Math.max(0, Math.min(1, (t - start - 0.6) / 0.6)))}}>{caption}</div>}
@@ -382,7 +386,7 @@ const EdgeView: React.FC<{n: number; e: Edge; pos: P[]; bw: number; bh: number; 
         markerEnd={grow > 0.98 ? "url(#ah)" : undefined} />
       {grow > 0.55 && (
         <g transform={`translate(${layered ? mx + (dx < 0 ? -(lab / 2 + 14) : lab / 2 + 14) : mx} ${layered ? my : my + (short ? 0 : tight ? (lane && e.from < e.to ? bh / 2 + 40 : -(bh / 2 + 40)) : lane ? (e.from < e.to ? 50 : -50) : -38)})`} opacity={Math.min(1, (grow - 0.55) * 2.2)}>
-          <rect x={-lab / 2} y={-26} width={lab || 52} height={52} rx={26} fill={th.bg} stroke={th.rule} strokeWidth={2} />
+          <rect x={lab ? -lab / 2 : -26} y={-26} width={lab || 52} height={52} rx={26} fill={th.bg} stroke={th.rule} strokeWidth={2} />
           <circle cx={lab ? -lab / 2 + 26 : 0} cy={0} r={15} fill={th.accent} />
           <text x={lab ? -lab / 2 + 26 : 0} y={1} textAnchor="middle" dominantBaseline="central" fill={th.bg} fontSize={19} fontWeight={700} fontFamily={MONO}>{n}</text>
           {e.label && <text x={14} y={1} textAnchor="middle" dominantBaseline="central" fill={th.text} fontSize={short ? 27 : 26} fontFamily={MONO}>{e.label}</text>}

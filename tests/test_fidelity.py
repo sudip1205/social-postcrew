@@ -23,7 +23,7 @@ class FidelityTest(unittest.TestCase):
     def test_every_window_counted_passes(self):
         cells = ["2", "2", "1", "3", "2"]
         sums = [(0, 1, 4, 1), (1, 2, 3, 1), (2, 3, 4, 2), (3, 4, 5, 2)]
-        sc = {"layout": "trace", "cells": cells, "narration": "The first pair adds four, the next three, then four, then five, so the count reaches two.",
+        sc = {"layout": "trace", "cells": cells, "narration": "The first pair, two plus two, adds to four: a match. The next three, two plus one, is no match. Then four, one plus three, matches again. Then five, three plus two, does not, so the count reaches two.",
               "steps": [step(w, [a, b], [a, b] if s == 4 else [], f"{cells[a]} + {cells[b]} = {s}", [f"count = {c}"])
                         for w, (a, b, s, c) in zip(["first pair", "next three", "then four", "then five"], sums)]}
         self.assertEqual(fidelity_problems([sc]), [])
@@ -64,3 +64,30 @@ class FidelityTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PaceAndCodeTest(unittest.TestCase):
+    # the Kadane Short: five steps in one 22-word sentence at 1:59, "brute force takes n cubed" over a two-loop brute.py, three ways promised
+    # and two coded
+    def test_a_rushed_walk_through_is_sent_back(self):
+        sc = {"layout": "trace", "cells": ["-2", "1", "-3", "4", "-1"], "narration": "It starts at minus two, restarts at one, dips to minus two, restarts at four, then grows to three.",
+              "steps": [step(w) for w in ("starts at minus two", "restarts at one", "dips to minus two", "restarts at four", "grows to three")]}
+        self.assertIn("5 steps in 19 words", fidelity.pace_problems(sc)[0])
+
+    def test_complexity_said_matches_the_code(self):
+        brute = "for i in range(n):\n    total = 0\n    for j in range(i, n):\n        total += a[j]\n"
+        kadane = "for x in a:\n    cur = max(x, cur + x)\n"
+        scenes = [{"layout": "points", "narration": "Plain brute force takes n cubed time, prefix sums take n squared, and Kadane takes just O of n.", "items": []},
+                  {"layout": "code", "on_screen": "brute.py", "code": brute, "narration": "First brute force."},
+                  {"layout": "code", "on_screen": "kadane.py", "code": kadane, "narration": "Now Kadane, one pass, O of n."}]
+        out = fidelity.code_problems(scenes)
+        self.assertEqual(len(out), 1)
+        self.assertIn("says brute takes n³ time", out[0])
+        scenes[0]["narration"] = "We have three ways. Brute force takes n squared and Kadane takes O of n."
+        self.assertIn("promises 3 ways but code is shown for 2", fidelity.code_problems(scenes)[0])
+        scenes[0]["narration"] = "We have two ways. Brute force takes n squared, and Kadane carries one number in O of n."
+        self.assertEqual(fidelity.code_problems(scenes), [])
+
+    def test_loops_and_complexity_words(self):
+        self.assertEqual(fidelity.loop_depth("for i in a:\n    for j in a:\n        for k in a:\n            pass\nfor z in a:\n    pass"), 3)
+        self.assertEqual([fidelity.complexities(t) for t in ("carries one number", "O(n^2)", "n cubed", "O of n log n")], [[], [2], [3], []])

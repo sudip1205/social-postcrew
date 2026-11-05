@@ -80,6 +80,38 @@ def _when(label, words, after=0.0):
     return round(t if t is not None else after, 3)
 
 
+_ONES = "zero one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen".split()
+_TENS = "_ _ twenty thirty forty fifty sixty seventy eighty ninety".split()
+
+
+def spoken(n):
+    """12 -> 'twelve', 45 -> 'forty five', 300 -> 'three hundred' (0 to 999), else the digits."""
+    if not 0 <= n < 1000:
+        return str(n)
+    if n < 20:
+        return _ONES[n]
+    if n < 100:
+        return _TENS[n // 10] + ("" if n % 10 == 0 else " " + _ONES[n % 10])
+    return _ONES[n // 100] + " hundred" + ("" if n % 100 == 0 else " " + spoken(n % 100))
+
+
+def _stat_cue(sc, words):
+    """A big number appears when the voice says THAT number ("three ways"), not when it says the heading's words."""
+    value = str((sc.get("items") or [""])[0])
+    m = re.search(r"\d[\d,]*", value)
+    tries = []
+    if m:
+        n = int(m.group().replace(",", ""))
+        rest = value[m.end():].strip()
+        tries += [f"{spoken(n)} {rest}".strip(), spoken(n), f"{m.group()} {rest}".strip()]
+    tries += [value, sc.get("on_screen")]
+    for label in tries:
+        t = timeline.cue_time(label, words)
+        if t is not None:
+            return round(max(0.2, t - 0.2), 3)
+    return 0.4
+
+
 def _captions(words):
     out, cur = [], []
     for w in words:
@@ -185,7 +217,7 @@ def build_props(scenes, fmt, audio, look=None):
         elif layout == "grid":   # a board that does not check out is never drawn as a strip: its heading alone
             item["layout"] = "statement"
         if layout == "stat":
-            item["cues"] = [_when(sc.get("on_screen"), words)]
+            item["cues"] = [_stat_cue(sc, words)]
         if sc.get("clip") and iconlib.svg(sc["clip"]):   # a clipart beside a words scene
             item["clip"] = iconlib.svg(sc["clip"])
         if layout in ("diagram", "flow"):
@@ -197,8 +229,19 @@ def build_props(scenes, fmt, audio, look=None):
         if layout in ("points", "code"):
             item["cues"] = [_when(x, words) for x in (item["items"] if layout == "points" else [])]
         out.append(item)
+    _continue_code(out)
     w, h = FORMATS[fmt]
     return {"format": fmt, "width": w, "height": h, "fps": FPS, "theme": looks.theme(look, fmt), "scenes": out}, lengths
+
+
+def _continue_code(scenes):
+    """Code scenes in a row showing the same code are ONE editor that stays: the later ones start fully typed (no retyping the file), and the
+    terminal runs once, in the last of them."""
+    for i in range(1, len(scenes)):
+        a, b = scenes[i - 1], scenes[i]
+        if a.get("layout") == b.get("layout") == "code" and a.get("code") and a.get("code") == b.get("code"):
+            b["typed"] = True
+            a["items"] = []
 
 
 def _run(cmd, root, what, timeout=3600):

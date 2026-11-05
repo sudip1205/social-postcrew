@@ -392,7 +392,7 @@ def fidelity_problems(scenes):
             prev = sc
         elif sc.get("layout") == "grid" and isinstance(sc.get("grid"), dict):
             out += [f"scene {i}: {p}" for p in fidelity.grid_problems(sc["grid"], sc.get("narration"))]
-    return out
+    return out + fidelity.code_problems(scenes)
 
 
 def script_problems(script, spec, cat, profile):
