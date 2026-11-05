@@ -129,6 +129,8 @@ def _diagram(scene, words, carry):
     raw = [n for n in scene.get("nodes") or [] if split_node(n)[0]]
     extras = {split_node(n)[0].lower(): node_extra(n) for n in raw}
     nodes = [split_node(n) for n in raw]
+    if not {n[0].lower() for n in nodes} & {label.lower() for label, _ in carry["nodes"]}:   # a new picture, not the last one growing
+        carry = {"nodes": []}
     for label, icon in carry["nodes"]:
         if label.lower() not in [n[0].lower() for n in nodes]:
             nodes.append((label, icon))

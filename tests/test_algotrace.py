@@ -16,7 +16,7 @@ KADANE = '''def max_subarray(nums):
     return best
 '''
 RUN = {"call": "max_subarray([-2, 1, -3, 4, -1])", "kind": "array", "array": "nums", "pointers": ["i"], "window": [], "show": ["current", "best"],
-       "steps": "1-4"}
+       "steps": "2-5"}
 GOOD = ("Day two: one alone beats minus two plus one, so current is one. "
         "Day three: one minus three is minus two, best stays one. "
         "Day four: four alone beats minus two plus four, so current is four. "
@@ -27,9 +27,11 @@ class AlgoTraceTest(unittest.TestCase):
     def test_the_real_steps_and_their_calculations_are_recorded(self):
         out = algotrace.run(KADANE, RUN["call"])
         self.assertTrue(out["ok"], out)
-        self.assertEqual([(s["vars"]["i"], s["vars"]["current"], s["vars"]["best"]) for s in out["steps"]], [(1, 1, 1), (2, -2, 1), (3, 4, 4), (4, 3, 4)])
-        self.assertIn("current = max(4, -2 + 4) = 4", out["steps"][2]["notes"])
-        self.assertIn("current = max(-3, 1 - 3) = -2", out["steps"][1]["notes"])
+        self.assertTrue(out["steps"][0]["start"])   # what the loop starts from is the first step
+        self.assertEqual((out["steps"][0]["vars"]["current"], out["steps"][0]["vars"]["best"]), (-2, -2))
+        self.assertEqual([(s["vars"]["i"], s["vars"]["current"], s["vars"]["best"]) for s in out["steps"][1:]], [(1, 1, 1), (2, -2, 1), (3, 4, 4), (4, 3, 4)])
+        self.assertIn("current = max(4, -2 + 4) = 4", out["steps"][3]["notes"])
+        self.assertIn("current = max(-3, 1 - 3) = -2", out["steps"][2]["notes"])
 
     def test_a_scene_is_drawn_from_the_run(self):
         sc = {"layout": "run", "code": KADANE, "run": RUN, "narration": GOOD, "on_screen": "Kadane"}

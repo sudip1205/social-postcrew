@@ -106,3 +106,14 @@ class SteadyPictureTest(unittest.TestCase):
         self.assertEqual([(x["from"], x["to"]) for x in scenes[0]["layout_edges"]], [(0, 1), (0, 2)])
         self.assertEqual(scenes[0]["layout_edges"], scenes[1]["layout_edges"])
         self.assertEqual((scenes[2]["items"], scenes[3].get("typed")), ([], True))
+
+
+class DiagramCarryTest(unittest.TestCase):
+    def test_a_new_diagram_does_not_inherit_the_last_ones_boxes(self):
+        from postcrew.render.remotion import build_props
+        a = {"layout": "diagram", "narration": "Five numbers gave fifteen runs.", "on_screen": "Repeated work", "nodes": ["5 numbers", "15 runs"], "edges": ["5 numbers > 15 runs"]}
+        b = {"layout": "diagram", "narration": "Brute force or Kadane.", "on_screen": "Two ways", "nodes": ["Array", "Brute force", "Kadane"], "edges": ["Array > Brute force", "Array > Kadane"]}
+        c = dict(b, nodes=["Array", "Brute force", "Kadane", "Prefix"], edges=["Array > Prefix"])
+        props, _ = build_props([a, b, c], "short", None)
+        self.assertEqual([x["label"] for x in props["scenes"][1]["nodes"]], ["Array", "Brute force", "Kadane"])
+        self.assertEqual(len(props["scenes"][2]["nodes"]), 4)   # the same picture growing keeps its boxes

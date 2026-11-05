@@ -53,6 +53,11 @@ def main():
     lines = code.splitlines()
     marks = {i + 1 for i, l in enumerate(lines) if "# step" in l}
     tree = ast.parse(code)
+    heads = set()   # the loops holding the step line: the state when the outermost first starts is the start step
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.For, ast.While)) and any(node.lineno < m <= (node.end_lineno or node.lineno) for m in marks):
+            heads.add(node.lineno)
+    outer = min(heads) if heads else None
     assigns = {}
     for node in ast.walk(tree):
         if isinstance(node, (ast.Assign, ast.AugAssign, ast.AnnAssign)) and getattr(node, "value", None) is not None:
@@ -145,6 +150,10 @@ def main():
                 st["notes"].append(note)
         if prev in marks:
             steps.append({"line": prev, "fn": frame.f_code.co_name, "vars": now, "notes": st["notes"][-3:]})
+            st["notes"] = []
+        elif event == "line" and frame.f_lineno == outer and not steps and not st.get("started"):
+            st["started"] = True   # the loop is about to start: what it starts from (the first value, best so far) is the first step
+            steps.append({"line": outer, "fn": frame.f_code.co_name, "vars": now, "notes": st["notes"][-3:], "start": True})
             st["notes"] = []
         st["line"], st["before"] = (frame.f_lineno if event == "line" else None), now
         return local
@@ -239,7 +248,7 @@ def problems(scene, n):
     steps = out["steps"]
     if not steps:
         return [p + "the '# step' line never ran with that call: mark a line inside the loop"]
-    first = steps[0]["vars"]
+    first = next((st["vars"] for st in steps if not st.get("start")), steps[0]["vars"])   # the start step comes before the loop variables exist
     arr = first.get(v.get("array"))
     if v.get("kind") == "grid":
         if not (isinstance(arr, list) and 2 <= len(arr) <= 10 and all(isinstance(r, (list, str)) and len(r) == len(arr[0]) for r in arr)):
