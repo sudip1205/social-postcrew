@@ -95,3 +95,28 @@ class AlgorithmOrderTest(unittest.TestCase):
         self.assertTrue(any("runs a faster way before the simple one" in p for p in out))
         self.assertTrue(any("teach the idea before any code has run" in p for p in out))
         self.assertEqual(algorithm_problems({"scenes": [slow, fast]}), [])
+
+
+class AlgorithmTopicsTest(unittest.TestCase):
+    def test_plans_from_an_algorithmic_topic_run_their_code(self):
+        from datetime import date
+        from helpers import ScriptedLLM, TempWorkspace
+        from postcrew import monthly
+        from postcrew.agents import planner
+        with TempWorkspace() as ws:
+            cfg = ws.config()
+            cfg["platforms"]["youtube"]["topics"] = ["Solve Algorithmic Problems"]
+            cfg["platforms"]["youtube"]["algorithm_topics"] = ["Solve Algorithmic Problems"]
+            ws.save_config(cfg)
+            plans = {"plans": [{"title": f"Problem {k}", "angle": "a", "context": "c", "example": "e", "takeaway": "t", "search_queries": ["q"]}
+                               for k in range(10)]}
+            monthly.generate(ws, "youtube", "2026-11", llm=ScriptedLLM({"planner": [plans, plans]}), today=date(2026, 11, 3))
+            items = monthly.view(ws, "youtube", "2026-11", date(2026, 11, 3))["items"]
+            algo = next(i for i in items if i["topic"] == "Solve Algorithmic Problems")
+            monthly.assign(ws, "youtube", algo["id"], "2026-11-12", fmt="short", today=date(2026, 11, 3))
+            self.assertTrue(planner.load_plan(ws, "youtube")["2026-11-12"].get("algorithm"))
+            cfg = ws.config()
+            cfg["platforms"]["youtube"]["algorithm_topics"] = []
+            ws.save_config(cfg)
+            monthly.sync_all(ws, "youtube")
+            self.assertFalse(planner.load_plan(ws, "youtube")["2026-11-12"].get("algorithm"))

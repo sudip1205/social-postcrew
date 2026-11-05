@@ -545,6 +545,14 @@ def _entry(item, cat, fmt, platform):
     return entry
 
 
+def algorithm_topics(ws, platform):
+    """The app's topics whose plans are algorithm videos (config: <app>.algorithm_topics): the crew runs their code and draws its real
+    steps (algotrace.py), as the "Algorithm video" box does for your own plans."""
+    if platform == LINKEDIN:
+        return set()
+    return set((ws.config().get("platforms", {}).get(platform) or {}).get("algorithm_topics") or [])
+
+
 def _sync_day(ws, platform, pool, posted, iso):
     """Make a day's schedule and plan say what is made next there: the first plan still to make. After one is published the next one becomes
     that plan; with none left the day is taken out of the schedule. The scheduled run makes ONE post a day (the plan that is current when
@@ -562,8 +570,11 @@ def _sync_day(ws, platform, pool, posted, iso):
     cur = todo[0] if todo else live[0]
     fmt = cur["assigned"].get("format")
     cat = category_for_item(ws, platform, fmt)
-    if not entry or entry.get("plan_id") != cur["id"] or entry.get("category") != cat:
-        set_entry(ws, iso, _entry(cur, cat, fmt, platform), platform)
+    want = _entry(cur, cat, fmt, platform)
+    if platform != LINKEDIN and cur.get("topic") in algorithm_topics(ws, platform):   # a plan from an algorithmic topic: the code is run
+        want["algorithm"] = True
+    if not entry or entry.get("plan_id") != cur["id"] or entry.get("category") != cat or entry.get("algorithm") != want.get("algorithm"):
+        set_entry(ws, iso, want, platform)
     _set_date(ws, platform, iso, cat)
 
 
