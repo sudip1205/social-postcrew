@@ -172,7 +172,7 @@ def text_problems(text, cat, profile, first_comment=""):
 YOUTUBE_TITLE_MAX, YOUTUBE_DESC_MAX, YOUTUBE_TAGS_MAX = 100, 5000, 500
 from . import speech  # noqa: E402
 
-SCENE_LAYOUTS = ("title", "statement", "points", "code", "diagram", "trace", "flow", "stat", "codeviz", "paths", "grid")
+SCENE_LAYOUTS = ("title", "statement", "points", "code", "diagram", "trace", "flow", "stat", "codeviz", "paths", "grid", "run")
 
 
 SENTENCE_MAX = 30
@@ -221,7 +221,7 @@ def split_long_scenes(scenes, spec):
     out = []
     for sc in scenes:
         words = (sc.get("narration") or "").split()
-        if sc.get("part") == "closing" or sc.get("layout") in ("codeviz", "paths", "grid", "trace") or len(words) <= cap_words + int(4 * float(spec.get("wps") or 2.5)):   # a code walk-through keeps its one picture
+        if sc.get("part") == "closing" or sc.get("layout") in ("codeviz", "paths", "grid", "trace", "run") or len(words) <= cap_words + int(4 * float(spec.get("wps") or 2.5)):   # a code walk-through keeps its one picture
             out.append(sc)
             continue
         sentences = re.findall(r"[^.!?]+[.!?]+\s*|[^.!?]+$", sc["narration"])
@@ -289,7 +289,7 @@ def storyboard_problems(scenes, spec):
     for i, sc in enumerate(scenes, 1):
         words = len((sc.get("narration") or "").split())
         secs = words / float(spec.get("wps") or 2.5)
-        if sc.get("part") != "closing" and secs > cap + 4 and not spec.get("artist") and sc.get("layout") not in ("codeviz", "paths", "grid", "trace"):   # with the Storyboard Artist a long scene is split for it
+        if sc.get("part") != "closing" and secs > cap + 4 and not spec.get("artist") and sc.get("layout") not in ("codeviz", "paths", "grid", "trace", "run"):   # with the Storyboard Artist a long scene is split for it
             problems.append(f"scene {i}: about {secs:.0f} seconds on one picture while the voice talks: split it into scenes of at most "
                             f"{cap} seconds ({int(cap * float(spec.get('wps') or 2.5))} words), each showing the part being said")
         layout = sc.get("layout")
@@ -427,6 +427,9 @@ def script_problems(script, spec, cat, profile):
             problems += pathviz.problems(sc.get("paths"), i)
             if len((sc.get("narration") or "").split()) < 12:
                 problems.append(f"scene {i}: a 'paths' scene narrates the staircase as it is climbed: at least 12 words")
+        elif sc.get("layout") == "run":   # the app runs the code and draws its real steps (postcrew/algotrace.py)
+            from . import algotrace
+            problems += algotrace.problems(sc, i)
         elif sc.get("layout") == "grid":
             from . import gridviz
             problems += gridviz.problems(sc.get("grid"), i)

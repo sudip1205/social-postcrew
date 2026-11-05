@@ -83,6 +83,8 @@ class TopicAgent(Agent):
                 why = shapes.stop_reason(*shapes.of(SimpleNamespace(outputs={"topic": out})))
                 if why:
                     raise AgentError(why, fatal=True)
+        if e.get("algorithm"):   # an algorithm video: the app runs the code and draws its real steps (agents/base.algorithm_block)
+            out["algorithm"] = True
         brief = self._brief(ctx, e, out)
         if brief:
             out["brief"] = brief

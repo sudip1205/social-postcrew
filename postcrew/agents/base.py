@@ -149,7 +149,7 @@ class Agent:
             kw["images"] = [str(p) for p in images]
         if member and member.get("model"):
             kw["model"] = member["model"]
-        system += self._record_block(ctx, aid, member) + owner_plan_block(ctx, aid)
+        system += self._record_block(ctx, aid, member) + owner_plan_block(ctx, aid) + algorithm_block(ctx, aid)
         try:
             res = ctx.llm.call(aid, system, prompt, schema, tools=tools, cwd=str(ctx.run.dir), **kw)
         except LLMError as e:
@@ -165,6 +165,25 @@ class Agent:
 
 
 OWNER_PLAN_READERS = ("research", "writer", "editor", "reviewer", "direction", "graphics", "media", "quality", "video_review", "explainroo")
+
+
+ALGORITHM_READERS = ("writer", "editor", "reviewer", "direction", "graphics", "quality")
+
+
+def algorithm_mode(ctx):
+    """An algorithm video (the plan's "Algorithm video" box, or a category marked algorithm): the app runs the code and draws its real steps."""
+    try:
+        topic = ctx.outputs.get("topic") or {}
+        return bool(topic.get("algorithm") or (topic.get("owner_plan") or {}).get("algorithm") or (ctx.cat or {}).get("algorithm"))
+    except Exception:
+        return False
+
+
+def algorithm_block(ctx, agent_id):
+    if agent_id not in ALGORITHM_READERS or not algorithm_mode(ctx) or getattr(ctx, "platform", "youtube") == "linkedin":
+        return ""
+    from pathlib import Path
+    return (Path(__file__).resolve().parent.parent / "prompts" / "youtube" / "algorithm.md").read_text()
 
 
 def owner_plan_block(ctx, agent_id):

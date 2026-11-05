@@ -10,7 +10,7 @@ wrong however well it is written. So:
 import re
 
 # shape -> the layouts that draw it
-SCENES = {"array": ("trace", "codeviz"), "string": ("trace", "codeviz"), "grid": ("grid",), "number_table": ("codeviz", "grid"),
+SCENES = {"array": ("trace", "codeviz", "run"), "string": ("trace", "codeviz", "run"), "grid": ("grid", "run"), "number_table": ("codeviz", "grid", "run"),
           "ways": ("paths", "codeviz")}
 UNDRAWABLE = {"tree": "a tree", "graph": "a graph (nodes and edges)", "linked_list": "a linked list", "stack_queue": "a stack or a queue",
               "intervals": "intervals on a number line"}

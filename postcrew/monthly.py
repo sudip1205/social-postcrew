@@ -538,6 +538,8 @@ def _entry(item, cat, fmt, platform):
             entry["owner_plan"]["examples"] = src["statement"].get("examples") or []
     if platform != LINKEDIN:
         entry["format"] = fmt
+        if item.get("algorithm"):   # "Algorithm video": the app runs the code and draws its real steps (algotrace.py)
+            entry["algorithm"] = True
         if item.get("research") and not item["research"].get("unavailable"):
             entry["research"] = item["research"]   # the trending videos behind this plan: the Researcher studies them for the script
     return entry
@@ -672,7 +674,7 @@ MANUAL_TOPIC = "Your own plans"
 MANUAL_LIMITS = {"title": 150, "context": 3000, "how": 3000, "takeaway": 400, "tone": 300}
 
 
-def add_manual(ws, platform, title, details="", how="", fmt=None, takeaway="", tone="", references=(), item_id=None, today=None):
+def add_manual(ws, platform, title, details="", how="", fmt=None, takeaway="", tone="", references=(), item_id=None, today=None, algorithm=False):
     """A plan you write yourself: the topic, what it should cover and how you want it made. It waits on Manual run (never put on a day
     by itself, never cleared by Generate plan) until you run it. item_id: change one of yours. Returns the plan."""
     title = " ".join(str(title or "").split())
@@ -702,7 +704,7 @@ def add_manual(ws, platform, title, details="", how="", fmt=None, takeaway="", t
                     "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
             m["items"].append(item)
         item.update(vals, angle=(first or title)[:400], example=item.get("example", ""), search_queries=[title], references=refs,
-                    **({"format": fmt} if fmt else {}))
+                    algorithm=bool(algorithm) and platform != LINKEDIN, **({"format": fmt} if fmt else {}))
         ws.save_state(_name(platform), pool)
     return item
 

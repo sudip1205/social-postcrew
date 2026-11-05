@@ -141,6 +141,9 @@ No Stitch screen exists for either view. Both are derived from the shell, design
 - A collapsible card above the filter bar, in the plan cards' style (rounded-2xl, border-2, violet icon tile); fields use the page's
   search-field classes; buttons are the page's Run now (primary) and its outlined secondary buttons. Your plan cards show Details and
   "How to make it" instead of Angle, plus Edit / Remove links.
+- **Algorithm video** (YouTube only): a checkbox row under Format, in the inner-box style of the problem files (rounded-xl, slate-50, violet
+  focus ring as the Analytics "Only crew's videos" box), with a `tip()` explaining it. A plan made with it shows an emerald
+  "Algorithm: code is run" pill beside the topic pill.
 
 ## Analytics (no Stitch screen)
 - Header copies the Queue's (breadcrumb, headline, sub line, Refresh). Four Overview stat cards (ovStat). Daily views: one series, violet

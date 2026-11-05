@@ -413,8 +413,9 @@ const EdgeView: React.FC<{n: number; e: Edge; pos: P[]; bw: number; bh: number; 
  *  big tiles ("count = 2" -> a COUNT tile reading 2), all centred in the frame so nothing is a thin strip at the top. */
 const Trace: React.FC<{s: Scene; short: boolean}> = ({s, short}) => {
   const th = useTheme(), {t} = useT();
-  const cells = s.cells ?? [], steps = s.steps ?? [];
+  const steps = s.steps ?? [];
   const cur: Step | undefined = [...steps].reverse().find((st) => st.t <= t);
+  const cells = cur?.cells ?? s.cells ?? [];   // a run scene's array can change as the code runs (a sort, a swap)
   const n = Math.max(1, cells.length);
   const perRow = short && n > 6 ? Math.ceil(n / 2) : n;
   const rows = Array.from({length: Math.ceil(n / perRow)}, (_, r) => cells.slice(r * perRow, r * perRow + perRow).map((c, k) => ({c, i: r * perRow + k})));
@@ -454,7 +455,8 @@ const Trace: React.FC<{s: Scene; short: boolean}> = ({s, short}) => {
             </div>
           ))}
         </div>
-        {cur?.note && <div style={{textAlign: "center", fontSize: short ? 66 : 44, fontWeight: 700, letterSpacing: -1, lineHeight: 1.15, opacity: pop}}>{cur.note}</div>}
+        {cur?.note && <div style={{textAlign: "center", fontSize: cur.note.includes("\n") || cur.note.length > 28 ? (short ? 50 : 36) : (short ? 66 : 44), fontWeight: 700,
+          letterSpacing: -1, lineHeight: 1.25, whiteSpace: "pre-line", fontFamily: /[=(]/.test(cur.note) ? MONO : undefined, opacity: pop}}>{cur.note}</div>}
         {tiles.length > 0 && (
           <div style={{display: "flex", gap: short ? 24 : 20, justifyContent: "center", flexWrap: "wrap"}}>
             {tiles.map((m, k) => (

@@ -16,6 +16,7 @@ function manCard(i) {
   const fmt = MAN.fmt[i.id] || i.format || MAN.def, busy = MAN.busy === i.id, open = MAN.open.has(i.id), r = i.research;
   const segBtn = (v, ic, label) => `<button type="button" data-fmt="${v}" data-id="${i.id}" class="flex items-center gap-1 px-3 py-1 rounded-lg ${fmt === v ? "bg-white text-slate-900 shadow-sm border border-slate-200/70 font-bold" : "text-slate-500 hover:text-slate-900 font-medium transition-colors"}">${icon(ic, `text-[15px] ${fmt === v ? "text-red-600" : "text-slate-400"}`)}<span>${label}</span></button>`;
   const dis = busy || MAN.running;
+  const algoChip = i.algorithm ? `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-100" title="The crew runs the code and draws every step it really takes">${icon("terminal", "text-[14px]")}<span>Algorithm: code is run</span></span>` : "";
   return `<div class="bg-white rounded-2xl ${busy ? "border-2 border-violet-300 ring-4 ring-violet-50" : "border-2 border-slate-200 hover:border-violet-300"} transition-all shadow-sm relative overflow-hidden group" data-plan="${i.id}">
     <div class="p-6">
       <div class="flex flex-col lg:flex-row lg:items-start justify-between gap-6">
@@ -23,6 +24,7 @@ function manCard(i) {
           <div class="flex items-center gap-2 flex-wrap">
             <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-violet-50 text-violet-700 border border-violet-100"><span class="w-1.5 h-1.5 rounded-full bg-violet-600"></span>${esc(i.topic)}</span>
             ${busy ? `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-violet-100 text-violet-700 border border-violet-200">${icon("progress_activity", "text-[14px] animate-spin")}<span>Starting the crew</span></span>` : ""}
+            ${algoChip}
             <span class="text-xs text-slate-400 font-mono">${esc(i.month || "")}</span>
           </div>
           <h2 class="text-lg font-bold text-slate-900 group-hover:text-violet-700 transition-colors leading-snug">${esc(i.title)}</h2>
@@ -169,6 +171,10 @@ function manForm() {
           <input id="mp-files" type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,application/pdf,image/*" class="hidden"></label>
         <div id="mp-have" class="flex flex-wrap gap-2"></div></div>
       ${yt ? manLabel("Format", `<select id="mp-format" class="${MAN_FIELD}"><option value="short">Short (vertical, up to 3 minutes)</option><option value="long">Long (16:9)</option></select>`) : "<div></div>"}
+    ${yt ? `<label class="md:col-span-2 flex items-start gap-3 p-4 rounded-xl border border-slate-200 bg-slate-50/60 cursor-pointer hover:border-violet-300">
+      <input type="checkbox" id="mp-algo" class="mt-0.5 w-4 h-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500">
+      <span class="flex-1 min-w-0"><span class="flex items-center gap-1.5 text-sm font-semibold text-slate-800">${icon("terminal", "text-[16px] text-violet-600")}${tip("Algorithm video", "The Script Writer writes the solution code, the app runs it on the example and draws every step it really takes: the array, the pointers, the variables and each calculation. Nothing on the board is typed by hand, so no step is skipped and no number is wrong.")}</span>
+      <span class="block text-[11px] text-slate-400 mt-0.5">Tick for coding problems (arrays, strings, grids): the code is run and every step is drawn from it. Leave it off for system design and concept videos.</span></span></label>` : ""}
       <div class="md:col-span-2 flex flex-wrap items-center justify-end gap-2.5 pt-1">
         <button type="button" id="mp-clear" class="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50">${icon("close", "text-[16px] text-slate-500")}<span>Clear</span></button>
         <button type="button" id="mp-save" class="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl bg-white border border-violet-200 text-violet-700 hover:bg-violet-50">${icon("save", "text-[16px]")}<span>Save plan</span></button>
@@ -180,7 +186,7 @@ function manFill(i) {
   const f = $("#mp"); if (!f) return;
   f.open = MAN.formOpen = true;
   $("#mp-id").value = i?.id || ""; $("#mp-topic").value = i?.title || ""; $("#mp-details").value = i?.context || ""; $("#mp-how").value = i?.how || "";
-  $("#mp-takeaway").value = i?.takeaway || ""; $("#mp-tone").value = i?.tone || ""; $("#mp-refs").value = (i?.references || []).join(" ");
+  $("#mp-takeaway").value = i?.takeaway || ""; $("#mp-tone").value = i?.tone || ""; if ($("#mp-algo")) $("#mp-algo").checked = !!i?.algorithm; $("#mp-refs").value = (i?.references || []).join(" ");
   if ($("#mp-format")) $("#mp-format").value = i?.format || MAN.def;
   $("#mp-title").textContent = i ? "Change your plan" : "Add your own plan";
   $("#mp-files").value = ""; $("#mp-files-label").textContent = "Attach a PDF or images of the problem";
@@ -191,7 +197,7 @@ function manFill(i) {
 async function manSave(run) {
   const body = { platform: S.platform, id: $("#mp-id").value || undefined, title: $("#mp-topic").value.trim(), details: $("#mp-details").value,
     how: $("#mp-how").value, takeaway: $("#mp-takeaway").value, tone: $("#mp-tone").value, references: $("#mp-refs").value.split(/\s+/).filter(Boolean),
-    ...($("#mp-format") ? { format: $("#mp-format").value } : {}), run };
+    ...($("#mp-format") ? { format: $("#mp-format").value } : {}), algorithm: !!$("#mp-algo")?.checked, run };
   if (!body.title) { $("#mp-topic").focus(); return; }
   if (run && !confirm(`Make "${body.title}" now? The crew writes it, then it follows your approval setting (it may be published).`)) return;
   const b = $(run ? "#mp-run" : "#mp-save"); b.disabled = true;

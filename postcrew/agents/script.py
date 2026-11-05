@@ -13,11 +13,11 @@ import re
 
 from .. import assets as assets_mod
 from .. import brief as briefmod
-from .. import codeviz, gridviz, pathviz, platforms, shapes
+from .. import algotrace, codeviz, gridviz, pathviz, platforms, shapes
 from .. import checks as checks_mod
 from ..checks import PARTS, repeat_problem, script_problems
 from . import team
-from .base import AgentError, guidance_block, recent_block
+from .base import AgentError, algorithm_mode, guidance_block, recent_block
 from .writer import WriterAgent, research_block
 
 STEP = {
@@ -39,7 +39,7 @@ STEP = {
 SCENE = {
     "type": "object",
     "properties": {
-        "layout": {"type": "string", "enum": ["title", "statement", "points", "code", "diagram", "trace", "flow", "stat", "codeviz", "paths", "grid"]},
+        "layout": {"type": "string", "enum": ["title", "statement", "points", "code", "diagram", "trace", "flow", "stat", "codeviz", "paths", "grid", "run"]},
         "part": {"type": "string", "enum": list(PARTS),
                  "description": "which part of the video this scene is: intro (a short opening), problem (what is asked, with an example input and answer), visual (the idea drawn as to a child: the smallest case first, then bigger ones), conclusion (the pattern the pictures showed), approaches (the ways it can be solved, compared, no code yet), idea (the chosen solution), example (worked example with code), mistake (a common mistake to avoid), closing (the like, comment, share card)"},
         "narration": {"type": "string", "description": "what the voice says; spoken sentences, no markdown"},
@@ -57,6 +57,7 @@ SCENE = {
         "viz": codeviz.VIZ,
         "paths": pathviz.PATHS,
         "grid": gridviz.GRID,
+        "run": algotrace.RUN,
         "seconds": {"type": "number"},
     },
     "required": ["layout", "part", "narration", "on_screen", "items", "code", "language", "nodes", "edges", "cells", "steps", "seconds"],   # viz: only a codeviz scene has one
@@ -87,11 +88,24 @@ def script_revision_block(ctx, guidance, prev=None):
     if not (guidance and prev and prev.get("scenes")):
         return ""
     keep = {k: prev.get(k) for k in ("title", "description", "tags", "thumbnail_text")}
-    keep["scenes"] = [{k: sc.get(k) for k in ("layout", "part", "narration", "on_screen", "items", "code", "language", "nodes", "edges", "cells", "steps", "viz", "paths", "grid") if sc.get(k) not in (None, "", [])}
+    keep["scenes"] = [{k: sc.get(k) for k in ("layout", "part", "narration", "on_screen", "items", "code", "language", "nodes", "edges", "cells", "steps", "viz", "paths", "grid", "run") if sc.get(k) not in (None, "", [])}
                       for sc in prev["scenes"]]
     return ("\n\nYOUR PREVIOUS SCRIPT was sent back. REVISE it: keep every scene that is fine exactly as it is, and change only what the points below require "
             "(the picture fields of a scene you do not touch stay as they are). Do not add new claims while fixing.\n<previous_script>\n"
             + json.dumps(keep, ensure_ascii=False, indent=1) + "\n</previous_script>")
+
+
+def algorithm_problems(script):
+    scenes = script.get("scenes") or []
+    hand = [i for i, sc in enumerate(scenes, 1) if (sc.get("layout") in ("trace", "codeviz") and (sc.get("steps") or sc.get("viz")))
+            or (sc.get("layout") == "grid" and (sc.get("grid") or {}).get("steps"))]
+    out = []
+    if hand:
+        out.append(f"scene(s) {', '.join(map(str, hand))}: this is an algorithm video, so a walk-through is a 'run' scene (the app runs your code "
+                   f"and draws its real steps), never trace, grid or codeviz steps written by hand. Turn each into a run scene")
+    if sum(1 for sc in scenes if sc.get("layout") == "run") < 2:
+        out.append("an algorithm video needs at least two 'run' scenes: the simple way run step by step, and the better way run step by step")
+    return out
 
 
 def finish(script):
@@ -198,6 +212,8 @@ class ScriptWriter(WriterAgent):
             from ..checks import number_problems
             verified = [dict(s, page=research.get("_pages", {}).get(s["url"], "")) for s in research.get("verified", [])]
             problems += number_problems(out["text"] + " " + out.get("title", ""), "", verified + briefmod.supplied(ctx))
+        if algorithm_mode(ctx):   # an algorithm video: every walk-through is the code RUN, never steps typed by hand
+            problems += algorithm_problems(out)
         return problems
 
     def summary(self, out):

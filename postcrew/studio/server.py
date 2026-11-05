@@ -296,7 +296,8 @@ class Studio:
         if isinstance(refs, str):
             refs = refs.split()
         item = monthly.add_manual(self.ws, platform, body.get("title"), body.get("details", ""), body.get("how", ""), fmt,
-                                  body.get("takeaway", ""), body.get("tone", ""), refs, item_id=body.get("id") or None)
+                                  body.get("takeaway", ""), body.get("tone", ""), refs, item_id=body.get("id") or None,
+                                  algorithm=bool(body.get("algorithm")))
         if body.get("run"):
             return dict(self.manual_run({"platform": platform, "id": item["id"], **({"format": fmt} if fmt else {})}), item=item)
         return {"item": item, **self.manual(platform)}

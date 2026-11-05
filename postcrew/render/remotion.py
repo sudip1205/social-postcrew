@@ -10,7 +10,7 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from .. import codeviz, gridviz, pathviz
+from .. import algotrace, codeviz, gridviz, pathviz
 from . import iconlib, looks, timeline, video
 from .scenes import FORMATS, edge_marks, node_extra, parse_edge, parse_pointer, split_node
 from .video import FPS, VideoError
@@ -216,6 +216,11 @@ def build_props(scenes, fmt, audio, look=None):
             item["grid"] = gridviz.props(sc["grid"], lambda say, after, w=words: _when(say, w, after))
         elif layout == "grid":   # a board that does not check out is never drawn as a strip: its heading alone
             item["layout"] = "statement"
+        if layout == "run":   # the code was RUN: its real steps, each as its sentence is said (postcrew/algotrace.py)
+            if isinstance(sc.get("run"), dict) and not algotrace.problems(sc, i + 1):
+                item.update(algotrace.props(sc, words))
+            else:
+                item["layout"] = "statement"
         if layout == "stat":
             item["cues"] = [_stat_cue(sc, words)]
         if sc.get("clip") and iconlib.svg(sc["clip"]):   # a clipart beside a words scene

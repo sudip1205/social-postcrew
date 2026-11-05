@@ -3,7 +3,7 @@ export type Svg = {body: string; w: number; h: number; color: boolean};   // an 
 export type Box = {label: string; icon: string; t: number; svg?: Svg | null; state?: "" | "ok" | "busy" | "down"; count?: number | null};
 export type Edge = {from: number; to: number; label: string; t: number; n?: number; drop?: boolean};
 export type Step = {
-  t: number; pointers: {name: string; at: number}[]; active: number[]; out: number[]; found: number[]; note: string; memo: string[];
+  t: number; pointers: {name: string; at: number}[]; active: number[]; out: number[]; found: number[]; note: string; memo: string[]; cells?: string[];
 };
 /** a real 2-D board (postcrew/gridviz.py): rows of characters, and steps that light cells, mark them and draw plus shapes. */
 export type GridStep = {t: number; active: number[][]; found: number[][]; out: number[][]; marks: {name: string; at: number[]}[];
