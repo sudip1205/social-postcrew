@@ -161,3 +161,14 @@ class RemotionTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ClockTest(unittest.TestCase):
+    def test_a_clock_of_thirteen_is_drawn_as_a_clock_with_where_the_number_lands(self):
+        # 2026-11-06 Diffie-Hellman: "a clock of thirteen" was three boxes in a column and never showed 32 going round twice to land on 6
+        from postcrew.render.remotion import _clock
+        boxes = [{"t": 0.0}, {"t": 0.5}, {"t": 4.7}]
+        c = _clock({"on_screen": "A clock of thirteen"}, ["Number 32", "Clock of 13", "Lands on 6"], boxes,
+                   [{"label": "goes round", "t": 0.5}, {"label": "wraps twice", "t": 4.7}])
+        self.assertEqual((c["n"], c["value"], c["lands"]), (13, 32, 6))
+        self.assertIsNone(_clock({}, ["Alice", "Bob"], boxes[:2], []))

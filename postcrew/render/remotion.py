@@ -155,7 +155,33 @@ def _diagram(scene, words, carry):
         if bx["t"] is None:
             bx["t"] = _when(names[i], words)
     carry["nodes"] = [(b["label"], b["icon"]) for b in boxes]
-    return {"nodes": boxes, "edges": edges}
+    out = {"nodes": boxes, "edges": edges}
+    clock = _clock(scene, names, boxes, edges)
+    if clock:
+        out["clock"] = clock
+    return out
+
+
+def _clock(scene, names, boxes, edges):
+    """A 'clock of 13' diagram is drawn as a real clock face (2026-11-06 Diffie-Hellman: it was three boxes in a column and never showed the laps):
+    13 marks, and a hand that goes round once per lap from 0 to the number and stops on where it lands (32 -> 2 laps, lands on 6).
+    Only when a box names the clock; the number is the largest other number on the boxes or arrows, checked against where it lands."""
+    text = " ".join(names + [e["label"] for e in edges] + [str(scene.get("on_screen") or "")])
+    m = re.search(r"\bclock\b(?:\s+of)?\s+(\d{1,2})\b|\b(\d{1,2})[- ]hour clock\b|\bclock of (\w+)", text, re.I)
+    if not m:
+        return None
+    word = (m.group(3) or "").lower()
+    n = int(m.group(1) or m.group(2) or 0) or {"five": 5, "seven": 7, "eleven": 11, "twelve": 12, "thirteen": 13, "seventeen": 17,
+                                                "nineteen": 19, "twenty-three": 23}.get(word, 0)
+    if not 2 <= n <= 24:
+        return None
+    nums = [int(x) for x in re.findall(r"(?<![\w^.])(\d{1,4})(?![\w^.])", text)]
+    big = [x for x in nums if x >= n and x != n]
+    value = max(big) if big else None
+    t = min([b["t"] for b in boxes] + [e["t"] for e in edges] or [0.0])
+    later = sorted({b["t"] for b in boxes} | {e["t"] for e in edges})
+    start = later[1] if len(later) > 1 else t + 0.6
+    return {"n": n, "value": value, "lands": value % n if value is not None else None, "t": round(start, 3)}
 
 
 def _trace(scene, words):

@@ -274,7 +274,33 @@ const Stat: React.FC<{s: Scene; short: boolean}> = ({s, short}) => {
 type P = {x: number; y: number};
 /** Where each box goes. A plain chain (each box passes to one next box) keeps the single row (wide) or column (vertical). Anything else, like a load balancer
  *  handing requests to several servers, is laid out in layers: who sends is above, who receives is below, so no arrow crosses a box. */
-function layout(nodes: Box[], edges: Edge[], short: boolean, W: number, H: number) {
+/** Who only listens (an eavesdropper, or the open network the two talk over). */
+const LISTENER = /\b(eve|eavesdropper|attacker|listener|spy|snoop|network|internet|wire|open|public channel|wi-?fi)\b/i;
+
+/** Two parties and one listener (Alice, Bob and Eve): Alice on the left, Bob on the right, the wire between them, and Eve ABOVE the wire
+ *  tapping it. Drawn as a chain they were a column with Eve between them, so she looked like a relay (2026-11-06 Diffie-Hellman). Not for a
+ *  scene that is about someone in the middle: there the chain is the truth. Returns the listener's index and the two parties, or null. */
+function party(nodes: Box[], edges: Edge[], title: string) {
+  if (nodes.length !== 3 || /middle|mitm|intercept|relay|forward|proxy/i.test(title)) return null;
+  const who = nodes.map((b, i) => (LISTENER.test(b.label) ? i : -1)).filter((i) => i >= 0);
+  if (who.length !== 1) return null;
+  const tap = who[0], ends = [0, 1, 2].filter((i) => i !== tap);
+  // the sender is on the left: the party an arrow leaves first
+  const first = [...edges].sort((a, b) => a.t - b.t).map((e) => e.from).find((i) => i !== tap);
+  if (first === ends[1]) ends.reverse();
+  return {tap, left: ends[0], right: ends[1]};
+}
+
+function layout(nodes: Box[], edges: Edge[], short: boolean, W: number, H: number, title = "") {
+  const pt = party(nodes, edges, title);
+  if (pt) {
+    const bw = short ? 300 : 400, bh = short ? 220 : 190;
+    const pos: P[] = Array(3).fill(null).map(() => ({x: 0, y: 0}));
+    pos[pt.left] = {x: bw / 2, y: H * 0.6};
+    pos[pt.right] = {x: W - bw / 2, y: H * 0.6};
+    pos[pt.tap] = {x: W / 2, y: H * 0.14};
+    return {pos, bw, bh, layered: false, party: pt};
+  }
   const n = nodes.length, pairs = new Set(edges.map((e) => `${e.from}>${e.to}`));
   const fwd = edges.filter((e) => !(e.from > e.to && pairs.has(`${e.to}>${e.from}`)));   // a reply goes back along its request: it is not a new step
   const out: number[] = Array(n).fill(0), inn: number[] = Array(n).fill(0);
@@ -285,7 +311,7 @@ function layout(nodes: Box[], edges: Edge[], short: boolean, W: number, H: numbe
     const bw = short ? 640 : Math.max(190, Math.min(340, (W - 112 * (n - 1)) / Math.max(1, n))), bh = short ? 150 : (hasIcon ? 190 : 150);
     const pos: P[] = nodes.map((_, i) => short ? {x: W / 2, y: bh / 2 + (i * (H - bh)) / Math.max(1, n - 1 || 1)} : {x: bw / 2 + (i * (W - bw)) / Math.max(1, n - 1 || 1), y: H / 2});
     if (n === 1) pos[0] = {x: W / 2, y: H / 2};
-    return {pos, bw, bh, layered: false};
+    return {pos, bw, bh, layered: false, party: null};
   }
   const depth: number[] = Array(n).fill(0);
   for (let it = 0; it < n; it++) fwd.forEach((e) => { if (depth[e.to] < depth[e.from] + 1) depth[e.to] = depth[e.from] + 1; });
@@ -294,14 +320,16 @@ function layout(nodes: Box[], edges: Edge[], short: boolean, W: number, H: numbe
   const bh = Math.min(short ? 150 : (hasIcon ? 190 : 150), (H - (rows - 1) * (short ? 100 : 112)) / rows);
   const pos: P[] = Array(n).fill(null).map(() => ({x: 0, y: 0}));
   perRow.forEach((row, r) => row.forEach((i, j) => { pos[i] = {x: ((j + 0.5) * W) / row.length, y: rows === 1 ? H / 2 : bh / 2 + (r * (H - bh)) / (rows - 1)}; }));
-  return {pos, bw, bh, layered: true};
+  return {pos, bw, bh, layered: true, party: null};
 }
 
 const Diagram: React.FC<{s: Scene; short: boolean; flow: boolean}> = ({s, short, flow}) => {
   const nodes = s.nodes ?? [], edges = s.edges ?? [];
-  const W = short ? 888 : 1620, H = short ? 1060 : 680;
-  const {pos, bw, bh, layered} = layout(nodes, s.layout_edges ?? edges, short, W, H);   // a diagram growing over several scenes keeps one layout
+  const W = short ? 888 : 1620, H = short ? 1150 : 680;
   const th = useTheme(), {t} = useT();
+  if (s.clock) return <><Heading text={s.title} short={short} /><Clock c={s.clock} short={short} /></>;
+  const {pos, bw, bh, layered, party: pt} = layout(nodes, s.layout_edges ?? edges, short, W, H, s.title);   // a diagram growing over several scenes keeps one layout
+  if (pt) return <><Heading text={s.title} short={short} /><Party s={s} short={short} W={W} H={H} pos={pos} bw={bw} bh={bh} pt={pt} /></>;
   // in a wide chain the labels sit on the arrows; when a label is wider than the gap between two boxes they go above and below the row instead
   const gap = short || nodes.length < 2 || layered ? 0 : (W - bw * nodes.length) / (nodes.length - 1);
   const tight = !short && !layered && edges.some((e) => e.label.length * 16 + 70 > gap - 16);
@@ -318,6 +346,99 @@ const Diagram: React.FC<{s: Scene; short: boolean; flow: boolean}> = ({s, short,
           active={flow && edges.some((e) => (e.from === i || e.to === i) && t >= e.t && t < e.t + 1.6)} />)}
       </svg>
     </>
+  );
+};
+
+/** Alice and Bob side by side, the wire between them carrying what they send, and the listener above it with a dashed tap down to the wire:
+ *  whatever crosses the wire, she gets a copy. Each arrow's label is said where it is drawn (the wire's labels stack above and below it). */
+const Party: React.FC<{s: Scene; short: boolean; W: number; H: number; pos: P[]; bw: number; bh: number; pt: {tap: number; left: number; right: number}}> =
+  ({s, short, W, H, pos, bw, bh, pt}) => {
+    const th = useTheme(), {t} = useT();
+    const nodes = s.nodes ?? [], edges = [...(s.edges ?? [])].sort((a, b) => a.t - b.t);
+    const L = pos[pt.left], R = pos[pt.right], E = pos[pt.tap];
+    const wy = L.y, x1 = L.x + bw / 2 + 10, x2 = R.x - bw / 2 - 10, mid = (x1 + x2) / 2;
+    const t0 = edges.length ? edges[0].t : Math.min(...nodes.map((b) => b.t));
+    const wire = interpolate(t, [t0, t0 + 0.9], [0, 1], {extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: ease});
+    const tapAt = edges.find((e) => e.from === pt.tap || e.to === pt.tap)?.t ?? nodes[pt.tap].t;
+    const tap = interpolate(t, [tapAt, tapAt + 0.9], [0, 1], {extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: ease});
+    const fs = short ? 36 : 28;
+    // labels: what goes over the wire stacks under it (one per arrow, in the order said), what the listener gets sits beside the tap
+    const onWire = edges.filter((e) => e.from !== pt.tap && e.to !== pt.tap), toTap = edges.filter((e) => e.from === pt.tap || e.to === pt.tap);
+    const pill = (e: Edge, k: number, x: number, y: number, anchor: "middle" | "start") => {
+      const p = interpolate(t, [e.t, e.t + 0.6], [0, 1], {extrapolateLeft: "clamp", extrapolateRight: "clamp"});
+      if (!e.label || t < e.t) return null;
+      const w = e.label.length * fs * 0.62 + 40;
+      const bx = anchor === "middle" ? x - w / 2 : x;
+      return (
+        <g key={k} opacity={p}>
+          <rect x={bx} y={y - fs * 0.9} width={w} height={fs * 1.8} rx={fs * 0.9} fill={th.bg} stroke={th.accent} strokeWidth={2} />
+          <text x={bx + w / 2} y={y + 1} textAnchor="middle" dominantBaseline="central" fill={th.text} fontSize={fs} fontFamily={MONO}>{e.label}</text>
+        </g>
+      );
+    };
+    const labels = onWire.length ? onWire : toTap.slice(0, 1);
+    const tapLabels = onWire.length ? toTap : toTap.slice(1);
+    // a packet runs along the wire for each arrow over it, and up the tap for what the listener copies
+    const packets = edges.map((e, k) => {
+      const pk = interpolate(t, [e.t + 0.3, e.t + 1.5], [0, 1], {extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: ease});
+      if (t < e.t + 0.3 || pk >= 1) return null;
+      const toListener = e.to === pt.tap || e.from === pt.tap, fromRight = e.from === pt.right || e.to === pt.left;
+      const cx = toListener ? mid : fromRight ? x2 - (x2 - x1) * pk : x1 + (x2 - x1) * pk;
+      const cy = toListener ? wy - (wy - E.y - bh / 2) * pk : wy;
+      return <rect key={k} x={cx - 14} y={cy - 14} width={28} height={28} rx={6} fill={toListener ? th.highlight : th.accent} />;
+    });
+    return (
+      <svg width={W} height={H} style={{overflow: "visible"}}>
+        <line x1={x1} y1={wy} x2={x1 + (x2 - x1) * wire} y2={wy} stroke={th.accent} strokeWidth={5} strokeLinecap="round" />
+        <line x1={mid} y1={wy - 12} x2={mid} y2={wy - 12 - (wy - 12 - (E.y + bh / 2 + 8)) * tap} stroke={th.highlight} strokeWidth={4} strokeDasharray="10 10" strokeLinecap="round" />
+        {tap > 0.9 && <circle cx={mid} cy={wy} r={12} fill={th.highlight} />}
+        {labels.map((e, k) => pill(e, k, W / 2, wy + bh / 2 + 70 + k * (fs * 2.2), "middle"))}
+        {tapLabels.map((e, k) => pill(e, 10 + k, mid + 30, (E.y + bh / 2 + wy) / 2 + k * (fs * 2.2), "start"))}
+        {packets}
+        {nodes.map((n, i) => <NodeView key={i} n={n} at={pos[i]} bw={bw} bh={bh} short={short} active={false} />)}
+      </svg>
+    );
+  };
+
+/** Wrapping on a clock: n marks round a face, and a hand that goes round once per lap from 0 to the number, then stops where it lands. The
+ *  laps are counted under the face (32 on a clock of 13: two full laps, then 6 more, lands on 6). */
+const Clock: React.FC<{c: {n: number; value: number | null; lands: number | null; t: number}; short: boolean}> = ({c, short}) => {
+  const th = useTheme(), {t} = useT();
+  const size = short ? 760 : 560, r = size / 2 - (short ? 70 : 56), cx = size / 2, cy = size / 2;
+  const appear = useProgress(0.1, 0.9);
+  const steps = c.value ?? 0, dur = Math.min(4.5, 1.2 + steps * 0.08);
+  const p = c.value == null ? 0 : interpolate(t, [c.t, c.t + dur], [0, 1], {extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: ease});
+  const now = Math.round(steps * p), laps = Math.floor(now / c.n), at = now % c.n, done = c.value != null && p >= 1;
+  const ang = (k: number) => (k / c.n) * 2 * Math.PI - Math.PI / 2;
+  const hand = ang(steps * p);
+  const fs = short ? 44 : 34;
+  return (
+    <div style={{flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: short ? 36 : 20, opacity: appear}}>
+      <svg width={size} height={size}>
+        <circle cx={cx} cy={cy} r={r + (short ? 44 : 36)} fill={th.surface} stroke={th.text} strokeWidth={3} />
+        {Array.from({length: c.n}).map((_, k) => {
+          const on = done && k === c.lands, here = c.value != null && t >= c.t && k === at;
+          return (
+            <g key={k}>
+              {on && <circle cx={cx + r * Math.cos(ang(k))} cy={cy + r * Math.sin(ang(k))} r={fs * 0.95} fill={th.highlight} />}
+              <text x={cx + r * Math.cos(ang(k))} y={cy + r * Math.sin(ang(k)) + 1} textAnchor="middle" dominantBaseline="central"
+                fill={on ? th.bg : here ? th.accent : th.text} fontSize={fs} fontWeight={on || here ? 800 : 600} fontFamily={MONO}>{k}</text>
+            </g>
+          );
+        })}
+        {c.value != null && t >= c.t && (
+          <line x1={cx} y1={cy} x2={cx + (r - fs) * Math.cos(hand)} y2={cy + (r - fs) * Math.sin(hand)} stroke={th.accent} strokeWidth={8} strokeLinecap="round" />
+        )}
+        <circle cx={cx} cy={cy} r={14} fill={th.accent} />
+      </svg>
+      {c.value != null && t >= c.t && (
+        <div style={{fontFamily: MONO, fontSize: short ? 50 : 38, color: th.text, textAlign: "center", lineHeight: 1.35}}>
+          <div>count {now} of {c.value}</div>
+          <div>{laps} {laps === 1 ? "lap" : "laps"} of {c.n} + {at}</div>
+          {done && <div style={{color: th.highlight, fontWeight: 800}}>{c.value} lands on {c.lands}</div>}
+        </div>
+      )}
+    </div>
   );
 };
 
@@ -379,17 +500,17 @@ const EdgeView: React.FC<{n: number; e: Edge; pos: P[]; bw: number; bh: number; 
   const mx = x1 + (x2 - x1) * lt, my = y1 + (y2 - y1) * lt;
   const count = e.n ?? 1, dropped = !!e.drop;   // a flow always sends one packet; a diagram sends them only when the script says so (x4, or ! for a drop)
   const sends = flow || count > 1 || dropped;
-  const lab = e.label ? e.label.length * (short ? 17 : 16) + 70 : 0;
+  const lab = e.label ? e.label.length * (short ? 23 : 16) + 80 : 0;
   return (
     <g>
       <line x1={x1} y1={y1} x2={px} y2={py} stroke={e.drop ? th.highlight : th.accent} strokeWidth={4} strokeLinecap="round" strokeDasharray={e.drop ? "10 9" : e.from > e.to ? "3 12" : undefined}
         markerEnd={grow > 0.98 ? "url(#ah)" : undefined} />
       {grow > 0.55 && (
         <g transform={`translate(${layered ? mx + (dx < 0 ? -(lab / 2 + 14) : lab / 2 + 14) : mx} ${layered ? my : my + (short ? 0 : tight ? (lane && e.from < e.to ? bh / 2 + 40 : -(bh / 2 + 40)) : lane ? (e.from < e.to ? 50 : -50) : -38)})`} opacity={Math.min(1, (grow - 0.55) * 2.2)}>
-          <rect x={lab ? -lab / 2 : -26} y={-26} width={lab || 52} height={52} rx={26} fill={th.bg} stroke={th.rule} strokeWidth={2} />
-          <circle cx={lab ? -lab / 2 + 26 : 0} cy={0} r={15} fill={th.accent} />
-          <text x={lab ? -lab / 2 + 26 : 0} y={1} textAnchor="middle" dominantBaseline="central" fill={th.bg} fontSize={19} fontWeight={700} fontFamily={MONO}>{n}</text>
-          {e.label && <text x={14} y={1} textAnchor="middle" dominantBaseline="central" fill={th.text} fontSize={short ? 27 : 26} fontFamily={MONO}>{e.label}</text>}
+          <rect x={lab ? -lab / 2 : -30} y={short ? -32 : -26} width={lab || 60} height={short ? 64 : 52} rx={short ? 32 : 26} fill={th.bg} stroke={th.rule} strokeWidth={2} />
+          <circle cx={lab ? -lab / 2 + (short ? 32 : 26) : 0} cy={0} r={short ? 19 : 15} fill={th.accent} />
+          <text x={lab ? -lab / 2 + (short ? 32 : 26) : 0} y={1} textAnchor="middle" dominantBaseline="central" fill={th.bg} fontSize={short ? 24 : 19} fontWeight={700} fontFamily={MONO}>{n}</text>
+          {e.label && <text x={short ? 18 : 14} y={1} textAnchor="middle" dominantBaseline="central" fill={th.text} fontSize={short ? 36 : 26} fontFamily={MONO}>{e.label}</text>}
         </g>
       )}
       {sends && Array.from({length: count}).map((_, k) => {

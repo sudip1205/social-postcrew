@@ -30,4 +30,5 @@ STEP BY STEP: watch what the voice says against what the screen shows at that mo
 REWRITE: set "rewrite" true (with "rewrite_why") only when redrawing scenes cannot fix the video because the script is wrong for its
 problem: the problem's data is drawn as the wrong shape (a grid shown as one row, a tree as a list), the example is not the problem's own,
 or the narration describes what no picture of this kind can show ("above", "below", "the left child"). The Script Writer then writes it
-again. Everything else is a redraw.
+again. Everything else is a redraw: where boxes sit, how big the labels are, empty space, a missing picture of a step or a picture that
+does not match the voice are all drawing problems, never a rewrite.

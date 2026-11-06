@@ -167,7 +167,10 @@ class QualityDirectorAgent(Agent):
         ctx.run.event(self.id, "scored", f"picture quality {score}/100" + (f": {out['summary'][:200]}" if out["summary"] else ""))
         weak = score < mc["min_score"] or errors
         # the script itself is wrong for its problem: no redraw can fix it, so the Script Writer writes it again (once per run)
-        if weak and (review or {}).get("rewrite") and not ctx.flags.get("quality_rewrites"):
+        # never for a script the owner approved (a re-run that kept it): on 2026-11-06 the kept Diffie-Hellman script was sent back for how its
+        # boxes were laid out, rewritten, and the run failed; a drawing problem is a redraw, and what still looks weak waits for the owner
+        owner_ok = (ctx.outputs.get("editor") or {}).get("approved_by") == "owner"
+        if weak and (review or {}).get("rewrite") and not ctx.flags.get("quality_rewrites") and not owner_ok:
             ctx.flags["quality_rewrites"] = 1
             out["rewrite"] = (review.get("rewrite_why") or out["summary"])[:600]
             ctx.run.event(self.id, "rewrite", f"picture quality {score}/100 and the script is wrong for its problem: back to the Script Writer: "

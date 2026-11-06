@@ -13,6 +13,7 @@ export type Scene = {
   layout: "title" | "statement" | "points" | "code" | "diagram" | "flow" | "trace" | "stat" | "codeviz" | "paths" | "grid";
   title: string; items: string[]; code: string; language: string; seconds: number; captions: Caption[];
   nodes?: Box[]; edges?: Edge[]; cells?: string[]; steps?: Step[]; cues?: number[]; closing?: boolean; typed?: boolean; layout_edges?: Edge[]; key?: number; clip?: Svg; viz?: Viz; paths?: PathsViz; grid?: GridViz; buttons?: {label: string; kind: string; svg?: Svg | null}[];
+  clock?: {n: number; value: number | null; lands: number | null; t: number};
 };
 /** The colours of a look: defined in postcrew/render/looks.py and sent with every render. */
 export type Theme = {
