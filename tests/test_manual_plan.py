@@ -376,3 +376,50 @@ class RerunTest(unittest.TestCase):
                 for bad in ("2026-11-06-170009", "../x", "nope"):
                     with self.assertRaises(ValueError):
                         studio.rerun({"run_id": bad})
+
+    def test_a_rerun_can_keep_the_script_the_editor_nearly_passed(self):
+        # 2026-11-06 Diffie-Hellman: four Editor rounds rose 68, 72, 74, 78 and the run stopped at the limit; the owner approved the script
+        import json
+        from unittest import mock
+        from postcrew.studio.server import Studio
+        with TempWorkspace() as ws:
+            d = ws.runs_dir / "2026-11-06-154708"
+            d.mkdir(parents=True)
+            (d / "status.json").write_text(json.dumps({"state": "failed", "steps": {"writer": {"state": "passed"}},
+                                                       "meta": {"platform": "youtube", "date": "2026-11-06", "category": "c"}}))
+            for name, data in (("topic", {"topic": "DH"}), ("research", {"facts": []}), ("writer", {"scenes": [1]}),
+                               ("editor.rejected.2", {"overall": 72}), ("editor.rejected.10", {"overall": 78, "fixes": ["x"]})):
+                (d / f"{name}.json").write_text(json.dumps(data))
+            studio = Studio(ws, 0)
+            with mock.patch.object(Studio, "start_run", return_value={"run_id": "new"}) as start:
+                studio.rerun({"run_id": "2026-11-06-154708", "keep_script": True})
+            go = start.call_args[0][0]
+            self.assertEqual(set(go["kept"]), {"topic", "research", "writer", "editor"})
+            self.assertEqual(go["kept"]["editor"]["overall"], 78)   # the last round, not the first
+            self.assertTrue(go["kept"]["editor"]["passed"])
+            self.assertEqual(go["kept"]["editor"]["fixes"], [])
+            self.assertEqual(go["kept_from"], "run 2026-11-06-154708")
+
+    def test_kept_steps_are_not_run_again(self):
+        from postcrew.agents.supervisor import Supervisor
+        from postcrew.agents.base import Agent
+        calls = []
+
+        class Step(Agent):
+            def __init__(self, sid):
+                self.id, self.title = sid, sid
+
+            def run(self, ctx, guidance):
+                calls.append(self.id)
+                return {"ok": True}
+
+            def validate(self, ctx, out):
+                return []
+        with TempWorkspace() as ws:
+            from postcrew.agents.base import RunContext
+            from postcrew.runlog import RunLog
+            ctx = RunContext(ws=ws, cfg=ws.config(), day=date(2026, 11, 6), category="dev-tip", run=RunLog(ws.runs_dir / "t", "t"),
+                             llm=None, options={"kept": {"topic": {"topic": "DH"}}, "kept_from": "run r"})
+            Supervisor([Step("topic"), Step("b")]).run(ctx)
+        self.assertEqual(calls, ["b"])
+        self.assertEqual(ctx.outputs["topic"], {"topic": "DH"})

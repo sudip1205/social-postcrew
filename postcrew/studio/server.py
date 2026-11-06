@@ -150,6 +150,8 @@ class Studio:
             options["format"] = body["format"]
         if body.get("target_seconds"):
             options["target_seconds"] = int(body["target_seconds"])
+        if body.get("kept"):   # only from rerun(), never from the request itself
+            options["kept"], options["kept_from"] = body["kept"], body["kept_from"]
         run_id = self.ws.new_run_id(day)
         outcome = {}
 
@@ -277,7 +279,27 @@ class Studio:
         if st.get("state") not in ("failed", "stopped", "interrupted"):
             raise ValueError("only a run that failed can be run again")
         meta = st.get("meta") or {}
-        return self.start_run({"platform": meta.get("platform") or "linkedin", "date": meta.get("date"), "category": meta.get("category")})
+        go = {"platform": meta.get("platform") or "linkedin", "date": meta.get("date"), "category": meta.get("category")}
+        if body.get("keep_script"):
+            go["kept"], go["kept_from"] = self._kept_script(path.parent, st), f"run {run_id}"
+        return self.start_run(go)
+
+    @staticmethod
+    def _kept_script(rundir, st):
+        """Keep a failed run's topic, research and script (the owner approves the script the Editor last scored): the new run starts
+        at the step after the Editor, so a script the Editor nearly passed is not paid for again."""
+        if (st.get("steps") or {}).get("writer", {}).get("state") != "passed" or not (rundir / "writer.json").exists():
+            raise ValueError("that run has no finished script to keep")
+        kept = {s: json.loads((rundir / f"{s}.json").read_text()) for s in ("credentials", "topic", "research", "writer")
+                if (rundir / f"{s}.json").exists()}
+        if not {"topic", "writer"} <= set(kept):
+            raise ValueError("that run has no finished script to keep")
+        reviews = sorted(rundir.glob("editor.rejected.*.json"), key=lambda p: int(p.stem.rsplit(".", 1)[1]))
+        last = json.loads(reviews[-1].read_text()) if reviews else {}
+        kept["editor"] = dict(last, passed=True, fixes=[], approved_by="owner",
+                              reasons=f"approved by the owner after the Editor's last score of {last.get('overall', '?')}. "
+                                      + str(last.get("reasons") or ""))
+        return kept
 
     def manual_run(self, body):
         """Run one plan now (Short or Long for YouTube): the crew starts at once for today, with this plan."""
@@ -946,7 +968,7 @@ def make_handler(studio):
                     ("POST", "/api/plan/unassign"): lambda: studio.plan_unassign(self.body()),
                     ("GET", "/api/agents"): lambda: studio.agents(),
                     ("GET", "/api/runs"): lambda: {"runs": crew.list_runs(ws)},
-                    ("POST", "/api/runs"): lambda: studio.start_run(self.body()),
+                    ("POST", "/api/runs"): lambda: studio.start_run({k: v for k, v in self.body().items() if k not in ("kept", "kept_from")}),
                     ("POST", "/api/runs/rerun"): lambda: studio.rerun(self.body()),
                     ("GET", "/api/queue"): lambda: {"queue": ws.queue(), "history": ws.history()},
                     ("POST", "/api/history"): lambda: studio.history_add(self.body()),

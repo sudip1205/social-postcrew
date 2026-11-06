@@ -115,9 +115,19 @@ class Supervisor:
         total, i = 0, 0
         run.event("supervisor", "start", f"crew run for {ctx.day.isoformat()} - {ctx.cat['label']}",
                   {"category": ctx.category, "date": ctx.day.isoformat(), "dry_run": ctx.dry_run})
+        kept = dict((ctx.options or {}).get("kept") or {})   # steps finished in an earlier run, used once (a rewind redoes them)
         while i < len(self.order):
             step = self.order[i]
             agent = self.by_id[step]
+            if step in kept:
+                out = kept.pop(step)
+                ctx.outputs[step] = out
+                run.artifact(step, {k: v for k, v in out.items() if not k.startswith("_")})
+                why = (ctx.options or {}).get("kept_from", "an earlier run")
+                run.step(step, "passed", summary=f"kept from {why}", errors=[])
+                run.event(step, "passed", f"kept from {why}")
+                i += 1
+                continue
             if step not in ctx.outputs and not agent.applies(ctx):
                 run.step(step, "skipped", summary="not needed for this category")
                 run.event(step, "skipped", "not needed for this category")
