@@ -222,7 +222,20 @@ def _camel(w):
     return re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", w)
 
 
+def _no_lone_a(said):
+    """'A P I' -> 'A-P-I': a spelled acronym that starts with A has its letters joined, or the voice reads the A as the word 'a' (Kokoro
+    said "a PI" for A P I, "our eye" for A I and "a WS" for A W S; joined, it says each letter)."""
+    parts = str(said).split(" ")
+    if len(parts) >= 2 and parts[0] == "A" and all(re.fullmatch(r"[A-Z](?:'?s)?", t) for t in parts[1:]):
+        return "-".join(parts).replace("Is", "I's") if parts[-1] == "Is" else "-".join(parts)
+    return said
+
+
 def _word(w):
+    return _no_lone_a(_word_said(w))
+
+
+def _word_said(w):
     if w in SAID or w.lower() in SAID and not w.islower() and not w.istitle():
         return SAID.get(w, SAID.get(w.lower(), w))
     if w.lower() in ("kubectl", "nginx", "sudo", "chmod", "regex", "sqlite", "postgres", "postgresql", "mysql", "nosql", "apigee",

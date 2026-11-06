@@ -293,7 +293,7 @@ class HumanVoiceTests(unittest.TestCase):
     def test_nothing_is_left_for_the_voice_to_guess(self):
         out = voice.prepare("Move UP the list. The API is NOT slow, and TCP uses LOAD balancing.", pace="normal")
         self.assertIn("Move up the list", out)
-        self.assertIn("The A P I is not slow", out)
+        self.assertIn("The A-P-I is not slow", out)
         self.assertIn("T C P", out)
         self.assertIn("load balancing", out)
 

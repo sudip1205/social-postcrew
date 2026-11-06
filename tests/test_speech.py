@@ -18,7 +18,7 @@ class SpeakableTests(unittest.TestCase):
 
     def test_acronyms_and_tool_names_are_said_the_way_people_say_them(self):
         out = speech.speakable("kubectl, nginx, SQL, JSON, OAuth2 and the API over HTTPS")
-        self.assertEqual(out, "cube control, engine X, sequel, jason, oh auth two and the A P I over H T T P S")
+        self.assertEqual(out, "cube control, engine X, sequel, jason, oh auth two and the A-P-I over H T T P S")
         self.assertEqual(speech.speakable("The LOAD is NOT high."), "The load is not high.")
         self.assertEqual(speech.speakable("An XYZ thing."), "An X Y Z thing.")
 
@@ -56,3 +56,15 @@ class ProblemTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class LoneATest(unittest.TestCase):
+    def test_an_acronym_spelled_from_a_is_joined_so_the_a_is_not_read_as_a_word(self):
+        # 2026-11-05 "MCP vs API": Kokoro said "a PI" for A P I and "our eye" for A I
+        from postcrew.speech import speakable
+        out = speakable("The API calls an AI model on AWS, and two APIs")
+        for said in ("A-P-I", "A-I", "A-W-S"):
+            self.assertIn(said, out)
+        self.assertNotIn("A P I", out)
+        self.assertIn("M C P", speakable("MCP"))   # other acronyms are still spelled with spaces
+
