@@ -30,8 +30,8 @@ shown with its part. A script passes only if ALL of these are true, and each one
 1b. THEN THE PROBLEM, STATED PROPERLY (part "problem"): exactly what is asked, in plain words, with a small real example (the input and the answer it must
    give) and what makes it hard. A viewer who has never seen the problem must be able to say what it asks. If the solution or code appears before this, or the
    problem is only hinted at, that is a fix and caps "clarity" at 69.
-1c. THEN THE IDEA EXPLAINED WITH PICTURES, AS TO A CHILD (part "visual", at least two drawings) and its CONCLUSION (part "conclusion"), BEFORE any code or technical term:
-   the smallest case first, then one bigger case at a time, each drawn with its real answer, in everyday words a ten-year-old follows (no recursion, memoization, dynamic
+1c. THEN THE IDEA EXPLAINED WITH PICTURES, IN PLAIN WORDS (part "visual", at least two drawings) and its CONCLUSION (part "conclusion"), BEFORE any code or technical term:
+   the smallest case first, then one bigger case at a time, each drawn with its real answer, in plain words an intelligent adult outside the field follows, never childish (no recursion, memoization, dynamic
    programming, complexity in this part), then the pattern the pictures showed, stated and shown. Fail it (and cap "clarity" at 69) if code or technical terms come before the
    conclusion, if the visual part is only words, if the cases do not grow, or if the numbers drawn are wrong (a staircase of 4 steps has 5 ways when hops are 1 or 2).
 1d. THEN THE WAYS (part "approaches"), AFTER the conclusion and BEFORE the solution (for an explainer: the variants or cases compared, such as B2C and B2B): each way named and compared in plain words (what it does, what it
@@ -55,7 +55,9 @@ shown with its part. A script passes only if ALL of these are true, and each one
    Semicolons and colons in narration are a fix (a voice cannot pause on them). The audience is STUDENTS: warm, patient, simple.
 10. SHOWN, NOT TALKED ABOUT: a problem is solved on screen (trace and code), a build is built (code that runs), and an EXPLAINER (how something works: security,
     auth, protocols, architecture) follows ONE real-life scenario end to end with every hop drawn (who sends what, who checks it, what is allowed or blocked).
-    An explainer needs NO code: never ask for code in one, and code invented only to fill a slot is a fix. Fail it if it only lists concepts or gives interview
+    An explainer (anything that is not an algorithm or a coding solution) has NO code scenes: never ask for code in one, and a code scene in
+    one is a fix (replace it with a diagram of that step). Each step of the mechanism is its own diagram or flow with a box for each party and value;
+    several steps squeezed into one picture or one sentence is a fix. It explains in detail for adults: shallow, childish or talking down is a fix. Fail it if it only lists concepts or gives interview
     advice. The example must be what is explained, built or solved, not a story beside the lesson.
 10b. CODE AND PICTURE: a "codeviz" scene shows the real code with a live picture of it running (a call tree or a table). It counts as the hands-on code and as the trace for item 10. Check
     that the code is correct, that the narration follows what the picture does in the order it does it, and that any call count the voice states is right (a plain tree for

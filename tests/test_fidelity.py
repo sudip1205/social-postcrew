@@ -117,3 +117,29 @@ class DiagramCarryTest(unittest.TestCase):
         props, _ = build_props([a, b, c], "short", None)
         self.assertEqual([x["label"] for x in props["scenes"][1]["nodes"]], ["Array", "Brute force", "Kadane"])
         self.assertEqual(len(props["scenes"][2]["nodes"]), 4)   # the same picture growing keeps its boxes
+
+
+class WorkedNumbersTest(unittest.TestCase):
+    """2026-11-06, Diffie-Hellman: "2^5 = 32 = 6" on an arrow and "216 mod 13 = 8" in one trace step; the viewer paused three times."""
+
+    def test_a_calculation_typed_on_a_picture_must_be_run(self):
+        from postcrew.checks import worked_numbers_problems as w
+        self.assertTrue(w([{"layout": "diagram", "edges": ["Secret > Public: 2^5 = 32 = 6"], "narration": "Bob keeps a secret five."}]))
+        self.assertTrue(w([{"layout": "trace", "cells": ["216", "8"], "steps": [{"note": "216 mod 13 = 8"}], "narration": "It wraps."}]))
+        self.assertTrue(w([{"layout": "diagram", "narration": "Raising two to the fifth gives thirty two, which wraps around to six."}]))
+        fine = [{"layout": "points", "items": ["Public: 13, 2, 8, 6"], "narration": "Eve sees thirteen, two, eight and six."},
+                {"layout": "stat", "items": ["2048 bits"], "narration": "Real keys use a prime of at least 2048 bits."},
+                {"layout": "run", "narration": "Two times sixteen is thirty two, which wraps around the clock."}]
+        self.assertEqual(w(fine), [])
+
+    def test_a_run_shows_each_wrap_as_mod_and_its_list_may_start_with_one_value(self):
+        from postcrew import algotrace
+        code = ("def public_number(g, secret, p):\n    x = 1\n    powers = [1]\n    for turn in range(secret):\n        x = x * g\n"
+                "        x = x % p   # step\n        powers.append(x)\n    return x\n")
+        notes = [n for st in algotrace.run(code, "public_number(2, 5, 13)")["steps"] for n in st.get("notes") or []]
+        self.assertIn("x = 8 * 2 = 16", notes)
+        self.assertIn("x = 16 mod 13 = 3", notes)
+        sc = {"layout": "run", "code": code, "narration": " ".join(["Each step is said in one full sentence here."] * 6),
+              "run": {"call": "public_number(2, 5, 13)", "kind": "array", "array": "powers", "pointers": [], "window": [],
+                      "show": ["x"], "steps": "1-6"}}
+        self.assertEqual(algotrace.problems(sc, 1), [])

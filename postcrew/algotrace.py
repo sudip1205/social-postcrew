@@ -27,7 +27,7 @@ TIMEOUT_S = 10
 
 RUN = {
     "type": "object",
-    "description": "a `run` scene only (algorithm videos): the app RUNS the scene's code on the example and draws every step it really takes",
+    "description": "a `run` scene only (an algorithm, or any calculation worked out on the example): the app RUNS the scene's code on the example and draws every step it really takes",
     "properties": {
         "call": {"type": "string", "description": "the call that runs the code on the example, exactly: 'max_subarray([-2, 1, -3, 4, -1])'"},
         "kind": {"type": "string", "enum": ["array", "grid"], "description": "array: one row of cells (a list or a string). grid: a board (a list of rows)"},
@@ -123,6 +123,7 @@ def main():
             if not isinstance(new, (int, float, str, bool)):
                 return ""
             rhs = rhs.replace("+ -", "- ").replace("- -", "+ ")
+            rhs = rhs.replace(" % ", " mod ")   # said "mod" on screen: "x = 32 mod 13 = 6"
             text = f"{name} = {rhs}"
             return text if rhs == repr(new) else f"{text} = {new!r}"
         except Exception:
@@ -255,8 +256,8 @@ def problems(scene, n):
             return [p + f"'{v.get('array')}' must be the board: a list of 2 to 10 rows of equal length, at the '# step' line"]
         if any(len(str(c)) > 1 for r in arr for c in r):
             return [p + "a grid draws one character per cell: use kind 'array' for a board of numbers, or single-character cells"]
-    elif not (isinstance(arr, (list, str)) and 2 <= len(arr) <= 10):
-        return [p + f"'{v.get('array')}' must be the list (or string) of 2 to 10 values drawn as cells; at the '# step' line it is {arr!r}. "
+    elif not (isinstance(arr, (list, str)) and 1 <= len(arr) <= 10):   # a list of results may start with one value and grow
+        return [p + f"'{v.get('array')}' must be the list (or string) of 1 to 10 values drawn as cells; at the '# step' line it is {arr!r}. "
                     f"Use a smaller example"]
     for key in ("pointers", "window"):
         bad = [x for x in v.get(key) or [] if not isinstance(first.get(x), int)]

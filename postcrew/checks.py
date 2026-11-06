@@ -328,7 +328,7 @@ STOP_WORDS = set("that this with from have they them then than what when where w
 PARTS = ("intro", "problem", "visual", "conclusion", "approaches", "idea", "example", "mistake", "closing")
 PART_HELP = {"intro": "a short opening that names the situation and promises what the viewer will understand",
              "problem": "the problem stated properly: what is asked, with a small real example (the input, and the answer it should give)",
-             "visual": "the idea explained with pictures, as to a child: the smallest case first, then one bigger case at a time, each drawn (no code and no technical terms yet)",
+             "visual": "the idea explained with pictures, in plain words: the smallest case first, then one bigger case at a time, each drawn (no code and no technical terms yet)",
              "conclusion": "what the pictures showed: the pattern or rule, stated in plain words and shown as a picture",
              "approaches": "the different ways the problem can be solved, each named and compared in a sentence, before any solution or code",
              "idea": "the chosen solution, the idea", "example": "a worked example that shows it working",
@@ -364,7 +364,7 @@ def structure_problems(scenes):
     first_code = next((i for i, sc in enumerate(scenes) if sc.get("layout") in ("code", "codeviz")), None)
     first_end = next((i for i, sc in enumerate(scenes) if sc.get("part") == "conclusion"), None)
     if first_code is not None and first_end is not None and first_code < first_end:
-        problems.append("no code before the conclusion: first explain it with pictures, as to a child, state the pattern, and only then show the code and the technical terms")
+        problems.append("no code before the conclusion: first explain it with pictures, in plain words, state the pattern, and only then show the code and the technical terms")
     ways = [sc for sc in scenes if sc.get("part") == "approaches"]
     if ways and not any(sc.get("layout") in ("diagram", "flow", "points") for sc in ways):   # the ways are laid out side by side, not only said
         problems.append("the 'approaches' scene must show the ways on screen: a 'diagram' or 'flow' with one box for each way (Plain recursion, Memo, Table), or 'points' listing them")
@@ -378,6 +378,31 @@ def structure_problems(scenes):
     elif "mistake" in parts and parts[-2:-1] != ["mistake"]:
         problems.append("the scene just before the closing card must be the common mistake to avoid")
     return problems
+
+
+EQUATION = re.compile(r"-?\d+\s*(?:\^|\*\*|\*|×|\bx\b|\+|−|-|/|÷|%|\bmod\b)\s*-?\d+(?:\s*(?:\^|\*\*|\*|×|\bx\b|\+|−|-|/|÷|%|\bmod\b)\s*-?\d+)*\s*=\s*-?\d+", re.I)
+SPOKEN_CALC = re.compile(r"\b(?:rais(?:es|ing|e)\b.{0,30}\b(?:to|power)|to the (?:power|second|third|fourth|fifth|sixth|seventh)|squared|cubed|multipl(?:y|ies|ied|ying)|"
+                         r"wraps?(?: around)?|modulo|\bmod\b|remainder|divided by|times (?:\w+ )?(?:is|gives|makes|equals))", re.I)
+
+
+def worked_numbers_problems(scenes):
+    """A calculation worked out on the example is a 'run' scene (the app runs it and draws every operation): never an answer typed on an
+    arrow, a trace step or a stat. 2026-11-06, Diffie-Hellman: "2^5 = 32 = 6" on an arrow and "216 mod 13 = 8" in one step left the
+    viewer pausing three times to see where the numbers came from."""
+    out = []
+    for i, sc in enumerate(scenes, 1):
+        if sc.get("layout") in ("run", "code", "codeviz") or sc.get("part") == "closing":
+            continue
+        shown = [str(x) for k in ("edges", "nodes", "items", "cells") for x in sc.get(k) or []] + [str(sc.get("on_screen") or "")]
+        shown += [str(st.get(k) or "") for st in sc.get("steps") or [] for k in ("note", "label")] + [str(m) for st in sc.get("steps") or [] for m in st.get("memo") or []]
+        eq = next((m.group(0) for t in shown for m in [EQUATION.search(t)] if m), None)
+        said = SPOKEN_CALC.findall(str(sc.get("narration") or ""))
+        if eq or len(said) >= 2:
+            what = f"'{eq}' on screen" if eq else f"the voice works it out ('{said[0]}', '{said[1]}')"
+            out.append(f"scene {i} works out numbers on the example in a '{sc.get('layout')}' ({what}): make it a 'run' scene. Write the few lines "
+                       f"of code that do the calculation, one operation per line, keep the results in a growing list, mark '# step', and say one "
+                       f"sentence per step, so every multiply, wrap and result is drawn as it is said")
+    return out[:3]
 
 
 def fidelity_problems(scenes):
@@ -415,6 +440,7 @@ def script_problems(script, spec, cat, profile):
     if script.get("source") != "own":   # the owner's own script is theirs: it is checked for rules, not re-storyboarded
         problems += storyboard_problems(scenes, spec, cat)
         problems += teaching_problems(scenes, spec)
+        problems += worked_numbers_problems(scenes)
     problems += structure_problems(scenes)
     problems += fidelity_problems(scenes)
     for i, sc in enumerate(scenes, 1):

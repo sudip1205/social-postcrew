@@ -180,10 +180,11 @@ def algorithm_mode(ctx):
 
 
 def algorithm_block(ctx, agent_id):
-    if agent_id not in ALGORITHM_READERS or not algorithm_mode(ctx) or getattr(ctx, "platform", "youtube") == "linkedin":
+    if agent_id not in ALGORITHM_READERS or getattr(ctx, "platform", "youtube") == "linkedin":
         return ""
     from pathlib import Path
-    return (Path(__file__).resolve().parent.parent / "prompts" / "youtube" / "algorithm.md").read_text()
+    # an algorithm video gets the whole algorithm arc; every other video gets the run scene for the numbers it works out (numbers.md)
+    return (Path(__file__).resolve().parent.parent / "prompts" / "youtube" / ("algorithm.md" if algorithm_mode(ctx) else "numbers.md")).read_text()
 
 
 def owner_plan_block(ctx, agent_id):

@@ -186,10 +186,14 @@ MOVING PICTURES YOU CAN ASK FOR (the way the best system-design channels show an
 - A big number: layout "stat": items = ["600 PB", "of git traffic every day"] (the number first, with its unit; an optional caption second); on_screen says what it measures; optionally cells = ["7", "10"] shows 7 of 10 icons lit and "clip" picks the icon. The number counts up on screen. Use it when a real figure is the point.
 
 WHAT KIND OF VIDEO THIS IS DECIDES WHETHER IT HAS CODE. The running example is not a story beside the lesson: it IS the thing being explained, built or solved.
-- AN EXPLAINER (how something works: security, auth, protocols, networks, architecture, "what is X", "how does X work"): follow ONE REAL-LIFE SCENARIO from
-  start to end ("you tap Send on a bank payment"), and draw every hop of it: who talks to whom, what is carried, who checks what, and what happens when
-  something is wrong (allowed, blocked, asked to verify again). Use diagrams and flows that grow, a few points, a stat. NO CODE IS NEEDED: show code only
-  if one short snippet makes the idea clearer than a picture (a token's contents can be a small JSON code scene). Never invent code to fill a slot.
+- AN EXPLAINER (how something works: security, cryptography, auth, protocols, networks, architecture, "what is X", "how does X work"). This is
+  every video that is not an algorithm or a coding solution, even when its title mentions a language or a library. It has NO CODE SCENES.
+  Explain the topic properly and in detail: what it is, why it exists, how it works step by step, what it protects against and where it
+  stops working. Follow ONE REAL-LIFE SCENARIO from start to end ("you tap Send on a bank payment", "your browser opens a bank site"), and
+  draw every step of the mechanism as its OWN diagram or flow scene: a box for each party and each value (Alice, Bob, Eve, the public
+  number, the secret, the shared key), an arrow for each thing sent, the picture growing one box or arrow at a time as the voice says it.
+  Never squeeze several steps into one picture or one sentence. Any arithmetic on the example is a "run" scene (below), never typed on an
+  arrow. Points and a stat are for summing up, not for explaining.
 - A PROBLEM (an algorithm, a puzzle, "How to solve Two Sum"): state it with a concrete input and the expected answer, solve it the slow obvious way first,
   trace it on that input, find why it is slow, then the better way, traced again, then the code in an editor window, run it and show the output.
 - A BUILD ("Build a rate limiter", "Build a chat server"): draw the architecture in a diagram that grows, then build the key part in code scene by scene,
@@ -202,10 +206,9 @@ EVERY VIDEO FOLLOWS THIS ARC (checked by the app; a script that skips a part is 
 2. "problem": one or two scenes. STATE THE PROBLEM PROPERLY before any solution: exactly what is being asked, in plain words, with ONE small real example
    (the input, and the answer it must give: "five stairs, one or two steps at a time: how many different ways to reach the top? The answer is eight"),
    and what makes it hard. A viewer who has never seen the problem must be able to say what it asks after this part.
-3. "visual": TWO TO FIVE scenes. EXPLAIN THE IDEA WITH PICTURES, AS TO A CHILD, BEFORE ANY CODE AND ANY TECHNICAL WORD. Start with the SMALLEST case, draw it, and
+3. "visual": TWO TO FIVE scenes. EXPLAIN THE IDEA WITH PICTURES, IN PLAIN WORDS, BEFORE ANY CODE AND ANY TECHNICAL WORD. Start with the SMALLEST case, draw it, and
    work it out in front of the viewer ("one step: only one way. Two steps: let's see... two ways."). Then ONE BIGGER CASE AT A TIME (two steps, three steps, four steps,
-   five steps), each its own drawing with the real answer counted on screen, so the viewer SEES the pattern appear before you name it. Speak simple everyday words
-   a ten-year-old follows: no terms such as recursion, memoization, dynamic programming, complexity or algorithm in this part. Every visual scene is a real drawing:
+   five steps), each its own drawing with the real answer counted on screen, so the viewer SEES the pattern appear before you name it. Speak plain words an intelligent adult outside the field follows (never childish, never talking down): no terms such as recursion, memoization, dynamic programming, complexity or algorithm in this part. Every visual scene is a real drawing:
    "paths" (a staircase with an arrow for every way up: use it for any "how many ways" problem), "grid" (a real board of rows and columns:
    use it for EVERY problem set on a grid or matrix), "diagram" or "flow" (boxes and arrows that grow), "trace" (cells
    with a pointer moving) or "stat". Never words only, never code here.
@@ -224,7 +227,7 @@ EVERY VIDEO FOLLOWS THIS ARC (checked by the app; a script that skips a part is 
 9. "closing": the last scene only (below).
 The scenes appear in this order and no other. In a Short each part is one or two scenes (the visual part two or more), still all nine. NEVER jump to the code, or use a
 technical term, before the problem has been stated with its example, the idea has been drawn from small cases to bigger ones, and the pattern has been stated: a viewer
-who is handed code first is lost. Pictures first, as to a child; code and technical terms second.
+who is handed code first is lost. Pictures first, in plain words; code and technical terms second.
 KEEP A SHORT SHORT: with this arc a Short has about 11 to 14 scenes, each of 12 to 28 words (the staircase cases about 12 to 20 words each, said as they play). One scene for each
 hop of the story, no filler, and the whole narration under {{short_max_words}} words. Cut the example or the recap before you cut a picture.
 

@@ -41,7 +41,7 @@ SCENE = {
     "properties": {
         "layout": {"type": "string", "enum": ["title", "statement", "points", "code", "diagram", "trace", "flow", "stat", "codeviz", "paths", "grid", "run"]},
         "part": {"type": "string", "enum": list(PARTS),
-                 "description": "which part of the video this scene is: intro (a short opening), problem (what is asked, with an example input and answer), visual (the idea drawn as to a child: the smallest case first, then bigger ones), conclusion (the pattern the pictures showed), approaches (the ways it can be solved, compared, no code yet), idea (the chosen solution), example (worked example with code), mistake (a common mistake to avoid), closing (the like, comment, share card)"},
+                 "description": "which part of the video this scene is: intro (a short opening), problem (what is asked, with an example input and answer), visual (the idea drawn in plain words: the smallest case or first step first, then the next), conclusion (the pattern the pictures showed), approaches (the ways it can be solved, compared, no code yet), idea (the chosen solution), example (worked example: code only for an algorithm or a coding solution), mistake (a common mistake to avoid), closing (the like, comment, share card)"},
         "narration": {"type": "string", "description": "what the voice says; spoken sentences, no markdown"},
         "on_screen": {"type": "string", "description": "the key words shown big (or the heading above the points)"},
         "items": {"type": "array", "items": {"type": "string"}, "maxItems": 5},

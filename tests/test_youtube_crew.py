@@ -484,9 +484,9 @@ class VideoArcTests(unittest.TestCase):
         jump = structure_problems(self.arc(("intro", "idea", "problem", "visual", "visual", "conclusion", "approaches", "idea", "example", "mistake", "closing")))
         self.assertTrue(any("out of order" in m and "BEFORE the solution" in m for m in jump))   # the solution first, the problem after
 
-    def test_the_idea_is_drawn_for_a_child_before_the_code(self):
+    def test_the_idea_is_drawn_in_plain_words_before_the_code(self):
         from postcrew.checks import structure_problems
-        self.assertTrue(any("part 'visual'" in m and "as to a child" in m for m in structure_problems(self.without("visual"))))
+        self.assertTrue(any("part 'visual'" in m and "in plain words" in m for m in structure_problems(self.without("visual"))))
         self.assertTrue(any("part 'conclusion'" in m for m in structure_problems(self.without("conclusion"))))
         one = structure_problems(self.arc(("intro", "problem", "visual", "conclusion", "approaches", "idea", "example", "mistake", "closing")))
         self.assertTrue(any("at least two pictures" in m for m in one))           # the cases must grow
