@@ -397,7 +397,8 @@ def synthesize_local(text, cfg, out_path, api_key="", opener=None):
 
 
 def cached_local(root, text, cfg, api_key="", opener=None):
-    key = hashlib.sha1(json.dumps(["local", cfg.get("base_url"), cfg.get("model"), cfg.get("voice_id"), cfg.get("speed"), text],
+    # keyed by what is SAID, not what is written: a better respelling ("A-P-I") must record the scene again, not reuse the old take
+    key = hashlib.sha1(json.dumps(["local", cfg.get("base_url"), cfg.get("model"), cfg.get("voice_id"), cfg.get("speed"), speakable(text)],
                                   ensure_ascii=False).encode()).hexdigest()
     out = Path(root) / "cache" / "voice" / f"{key}.mp3"
     if not out.exists():

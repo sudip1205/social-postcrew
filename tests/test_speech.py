@@ -68,3 +68,17 @@ class LoneATest(unittest.TestCase):
         self.assertNotIn("A P I", out)
         self.assertIn("M C P", speakable("MCP"))   # other acronyms are still spelled with spaces
 
+    def test_the_voice_servers_cache_is_keyed_by_what_is_said(self):
+        import tempfile
+        from unittest import mock
+        from postcrew import voice
+        with tempfile.TemporaryDirectory() as root, mock.patch.object(voice, "synthesize_local", side_effect=lambda t, c, out, *a: out.write_bytes(b"x")) as syn, \
+                mock.patch.object(voice, "audio_seconds", return_value=1.0), mock.patch.object(voice, "speakable", side_effect=lambda t: t + "|v1"):
+            (__import__("pathlib").Path(root) / "cache" / "voice").mkdir(parents=True)
+            voice.cached_local(root, "The API", {"model": "kokoro"})
+            voice.cached_local(root, "The API", {"model": "kokoro"})
+            self.assertEqual(syn.call_count, 1)
+            with mock.patch.object(voice, "speakable", side_effect=lambda t: t + "|v2"):   # the way a word is said changed: record again
+                voice.cached_local(root, "The API", {"model": "kokoro"})
+            self.assertEqual(syn.call_count, 2)
+
