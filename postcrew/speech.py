@@ -201,6 +201,7 @@ def speakable(text):
     s = re.sub(r"\s?[\[\]{}<>|\\^~]\s?", " ", s)
     s = re.sub(r"\s?\(\s?", ", ", s)
     s = re.sub(r"\s?\)\s?", ", ", s)
+    s = re.sub(r"(?<![\w'’.-])([b-hj-mo-z])(?![\w'’-]|\.\w)", lambda m: m.group(1).upper(), s)   # a lone letter used as a name ('a prime called p') is said as the letter
     s = re.sub(r"\b[A-Za-z][A-Za-z0-9]*\b", lambda m: _word(m.group(0)), s)
     s = re.sub(r"\b\d[\d,]*(?:\.\d+)?\b", lambda m: number(m.group(0)), s)
     s = re.sub(r"[^\w\s.,;:!?'\"\-]", " ", s)   # anything still left (emoji, stray symbols) is not read

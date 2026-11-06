@@ -68,6 +68,12 @@ class LoneATest(unittest.TestCase):
         self.assertNotIn("A P I", out)
         self.assertIn("M C P", speakable("MCP"))   # other acronyms are still spelled with spaces
 
+    def test_a_lone_letter_used_as_a_name_is_said_as_the_letter(self):
+        # 2026-11-06 Diffie-Hellman: the Editor asked for "a prime called p", then failed the script for the lone "p"
+        from postcrew.speech import speakable
+        self.assertEqual(speakable("a prime called p, and a base called g."), "a prime called P, and a base called G.")
+        self.assertEqual(speakable("I don't know, e.g. this, the old a"), "I don't know, e.g. this, the old a")
+
     def test_the_voice_servers_cache_is_keyed_by_what_is_said(self):
         import tempfile
         from unittest import mock

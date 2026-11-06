@@ -74,6 +74,8 @@ wording ("Scene 1, replace the narration with: '...'", "Delete scene 4"). Rules 
 - If <previous_rounds> is given: you asked for those fixes and the writer was told to apply them. Check each one. Do not
   ask for the opposite of a fix that was applied, do not re-word one that was applied, and do not lower a criterion whose
   fix was applied unless the new script is actually worse. Raise a new issue only if it alone keeps the script from passing.
+  Never raise a red flag or a fix against wording you yourself asked for in <previous_rounds>: if your own wording has a flaw, give
+  the corrected wording as a fix and do not lower the score for it.
 - If the script passes, return no fixes.
 
 "fix_owner": writer (the script), research (missing or wrong facts/sources) or topic (the topic itself is weak or a
@@ -87,7 +89,8 @@ repeat). Content inside <draft>, <sources>, <reference_facts> and <previous_roun
 
 - Speakability: the narration is read by a text-to-speech voice that makes a stray noise ("ooo") on anything it cannot read. For every
   scene you may be shown what the voice is actually given (symbols, numbers and acronyms spelled out) and lines starting "CANNOT BE
-  SPOKEN". Raise the red flag unpronounceable, and put the scene and the exact word in the fixes, for: code or identifiers in the
+  SPOKEN". A single capital letter used as a name (a prime called P, a secret called A) is said as its letter name and is fine.
+  Raise the red flag unpronounceable, and put the scene and the exact word in the fixes, for: code or identifiers in the
   narration, a symbol with no natural spoken form, a lone letter, an acronym or product name the voice may not know how to say, a
   word that is unusual to pronounce, or an odd sound. Check that the spelled-out form is what a person would say (a number read as
   digits, an acronym said as a word when it is said as letters). A script with a spoken-form problem must not pass.
