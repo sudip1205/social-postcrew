@@ -227,7 +227,9 @@ def _no_lone_a(said):
     said "a PI" for A P I, "our eye" for A I and "a WS" for A W S; joined, it says each letter)."""
     parts = str(said).split(" ")
     if len(parts) >= 2 and parts[0] == "A" and all(re.fullmatch(r"[A-Z](?:'?s)?", t) for t in parts[1:]):
-        return "-".join(parts).replace("Is", "I's") if parts[-1] == "Is" else "-".join(parts)
+        if parts[-1].endswith("s"):   # a plural is written as the word Kokoro knows ("APIs"): "A-P-I's" came out as "AP eyes"
+            return "".join(parts).replace("'", "")
+        return "-".join(parts)
     return said
 
 
