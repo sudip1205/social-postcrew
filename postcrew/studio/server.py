@@ -264,6 +264,21 @@ class Studio:
         return {"platform": platform, "items": monthly.unassigned(self.ws, platform), "formats": platform != platforms.LINKEDIN,
                 "default_format": (cfg.get("video") or {}).get("format", "short"), "running": crew.is_running()}
 
+    def rerun(self, body):
+        """Run a failed run again: the same app, date and topic (the day's plan, which a failed run never used up). A new run, so the
+        failed one stays as it was for its log."""
+        run_id = str(body.get("run_id") or "")
+        if not re.fullmatch(r"[\w-]+", run_id):
+            raise ValueError("unknown run")
+        path = self.ws.runs_dir / run_id / "status.json"
+        if not path.exists():
+            raise ValueError(f"no run {run_id}")
+        st = json.loads(path.read_text())
+        if st.get("state") not in ("failed", "stopped", "interrupted"):
+            raise ValueError("only a run that failed can be run again")
+        meta = st.get("meta") or {}
+        return self.start_run({"platform": meta.get("platform") or "linkedin", "date": meta.get("date"), "category": meta.get("category")})
+
     def manual_run(self, body):
         """Run one plan now (Short or Long for YouTube): the crew starts at once for today, with this plan."""
         platform, cfg = self._view(body.get("platform"))
@@ -932,6 +947,7 @@ def make_handler(studio):
                     ("GET", "/api/agents"): lambda: studio.agents(),
                     ("GET", "/api/runs"): lambda: {"runs": crew.list_runs(ws)},
                     ("POST", "/api/runs"): lambda: studio.start_run(self.body()),
+                    ("POST", "/api/runs/rerun"): lambda: studio.rerun(self.body()),
                     ("GET", "/api/queue"): lambda: {"queue": ws.queue(), "history": ws.history()},
                     ("POST", "/api/history"): lambda: studio.history_add(self.body()),
                     ("POST", "/api/history/remove"): lambda: studio.history_remove(self.body()),

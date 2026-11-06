@@ -149,7 +149,7 @@ DEFAULT_CONFIG = {
     },
     "pipeline": {
         "max_attempts_per_step": 4,     # tries per agent before the supervisor gives up on it
-        "max_total_attempts": 16,       # tries across the whole run (rewinds included)
+        "max_total_attempts": 16,       # retries across the whole run (a step's first try is free; rewinds count)
         "max_run_budget_usd": 5.0,      # hard stop for one post
         "review_runs": 3,               # the editor reviews this many times and keeps the worst score
         "min_overall": 80,

@@ -69,7 +69,8 @@ No Stitch screen exists for either view. Both are derived from the shell, design
 
 ### workflow
 # Workflow deviations
-- Pause run, Stop, Re-run, Override and force pass, Inspect prompt diff, Adjust threshold: kept, disabled ("Coming soon"); no backend yet.
+- Pause run, Stop, Override and force pass, Inspect prompt diff, Adjust threshold: kept, disabled ("Coming soon"); no backend yet.
+- Re-run: works for a run that failed (starts a new run for the same app, date and topic, then opens it); disabled with a reason on any other run.
 - Stitch's YouTube sample nodes (Aegis/Nova/ElevenLabs, scenes, "Iteration 2") replaced by the real steps of the selected run; voice/video nodes appear when the run has those steps.
 - "Avg latency" pill replaced by "n of m steps done"; "Accuracy threshold" metric replaced by Tokens; no budget bar unless config.pipeline.max_run_budget_usd is set.
 - "Editor's exact fixes" is the list of instructions the supervisor sent back to the selected agent (from run memory), not editor-only.

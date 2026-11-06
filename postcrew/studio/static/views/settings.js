@@ -281,7 +281,7 @@ const settingsView = (() => {
           field("Minimum score on any single criterion", "rule", inp("pipeline.min_subscore", c.pipeline.min_subscore, "number", 'min="0" max="100"'), "The weakest criterion must clear this too."),
           field("Reviews per post (worst counts)", "reviews", inp("pipeline.review_runs", c.pipeline.review_runs, "number", 'min="1" max="5"'), "1 to 5 reviews; the lowest score counts."),
           field("Tries per agent", "replay", inp("pipeline.max_attempts_per_step", c.pipeline.max_attempts_per_step, "number", 'min="1" max="10"'), "How often one agent may retry a step."),
-          field("Tries per post (all agents)", "repeat", inp("pipeline.max_total_attempts", c.pipeline.max_total_attempts, "number", 'min="1" max="40"'), "A cap across every agent for one post."),
+          field("Retries per post (all agents)", "repeat", inp("pipeline.max_total_attempts", c.pipeline.max_total_attempts, "number", 'min="1" max="40"'), "A cap on retries across every agent for one post (each agent's first try is not counted)."),
           field("Max $ per post", "payments", inp("pipeline.max_run_budget_usd", c.pipeline.max_run_budget_usd, "number", 'step="0.5" min="0.5" max="100"'), "The run stops when its cost reaches this."))}</div>
       <div class="${CARD}">${head("groups", "violet", "Team", "How many agents work on each post, and when a member is replaced.")}
         ${g(3, field("Researchers per post", "search", inp("team.research", c.team.research, "number", 'min="1" max="4"'), "1 to 4."), field("Writers per post", "edit_note", inp("team.writer", c.team.writer, "number", 'min="1" max="4"'), "1 to 4."),

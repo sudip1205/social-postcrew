@@ -352,3 +352,27 @@ class ClosingCardTest(unittest.TestCase):
         self.assertTrue(ok)
         sub = next(s for w, s, _e in words if w.startswith("subscribe"))
         self.assertLess(sub, 3.3)   # said before the pause at 3.24 s, not stretched towards the end
+
+
+class RerunTest(unittest.TestCase):
+    """A scheduled run that failed can be run again from the Workflow (2026-11-06: the 10:00 YouTube run failed and there was no way to)."""
+
+    def test_a_failed_run_starts_again_with_the_same_app_date_and_topic(self):
+        import json
+        from unittest import mock
+        from postcrew.studio.server import Studio
+        with TempWorkspace() as ws:
+            def make(run_id, state):
+                d = ws.runs_dir / run_id
+                d.mkdir(parents=True)
+                (d / "status.json").write_text(json.dumps({"state": state, "meta": {"platform": "youtube", "date": "2026-11-06",
+                                                                                    "category": "assigned-short"}}))
+            make("2026-11-06-100018", "failed")
+            make("2026-11-06-170009", "succeeded")
+            studio = Studio(ws, 0)
+            with mock.patch.object(Studio, "start_run", return_value={"run_id": "new"}) as start:
+                self.assertEqual(studio.rerun({"run_id": "2026-11-06-100018"}), {"run_id": "new"})
+                start.assert_called_once_with({"platform": "youtube", "date": "2026-11-06", "category": "assigned-short"})
+                for bad in ("2026-11-06-170009", "../x", "nope"):
+                    with self.assertRaises(ValueError):
+                        studio.rerun({"run_id": bad})

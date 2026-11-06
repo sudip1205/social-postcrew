@@ -204,6 +204,21 @@ class CrewTests(unittest.TestCase):
             notes = ws.state("notifications")["items"]
             self.assertTrue(any("No post for" in n["title"] for n in notes))
 
+    def test_the_run_cap_counts_retries_not_first_tries(self, _):
+        # 2026-11-06 10:00: the YouTube run's 12 first tries plus 4 retries used the 16 "attempts", so the Quality Director's redraw never ran
+        with TempWorkspace() as ws:
+            cfg = ws.config()
+            cfg["pipeline"]["max_total_attempts"] = 2
+            ws.save_config(cfg)
+            llm = ScriptedLLM(self.script(editor=[review(60, fixes=["Replace line 1 with: 'Acme Model 2: $0.10'"])] + [review()]))
+            res = run_crew(ws, TUESDAY, llm=llm, fetch=fake_fetch(), dry_run=True)
+            self.assertTrue(res["ok"], res)   # every step's first try and one rewind fit in 2 retries
+            cfg["pipeline"]["max_total_attempts"] = 1
+            ws.save_config(cfg)
+            res = run_crew(ws, TUESDAY, llm=ScriptedLLM(self.script(writer=[writer("Too short.")])), fetch=fake_fetch())
+            self.assertFalse(res["ok"])
+            self.assertIn("retries", res["reason"])
+
     def test_budget_limit_stops_the_run(self, _):
         with TempWorkspace() as ws:
             cfg = ws.config()

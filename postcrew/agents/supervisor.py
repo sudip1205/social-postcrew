@@ -124,7 +124,8 @@ class Supervisor:
                 i += 1
                 continue
             attempts[step] += 1
-            total += 1
+            if attempts[step] > 1:   # the cap counts RETRIES: a YouTube run has 12 steps, so counting first tries left 4 retries in all, and the
+                total += 1           # Quality Director's redraw (2026-11-06, Diffie-Hellman) was never drawn
             run.step(step, "running", attempts=attempts[step], max_attempts=ctx.cfg["pipeline"]["max_attempts_per_step"])
             run.event(step, "started", f"{agent.title}: attempt {attempts[step]}",
                       {"guidance": guidance[step]} if guidance[step] else None)
@@ -262,7 +263,7 @@ class Supervisor:
         if attempts[step] >= pl["max_attempts_per_step"]:
             return f"{self.by_id[step].title} failed {attempts[step]} times"
         if total >= pl["max_total_attempts"]:
-            return f"the run used all {pl['max_total_attempts']} attempts"
+            return f"the run used all {pl['max_total_attempts']} retries"
         if ctx.run.cost >= pl["max_run_budget_usd"]:
             return f"the run reached its ${pl['max_run_budget_usd']:.2f} budget"
         return None

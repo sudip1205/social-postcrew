@@ -140,7 +140,7 @@ function drawHead() {
       <div class="flex items-center gap-2">
         <button disabled title="Coming soon" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-semibold transition-colors active:scale-95 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">${icon("pause", "text-[16px] text-slate-600")}<span>Pause run</span></button>
         <button disabled title="Coming soon" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-semibold transition-colors active:scale-95 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">${icon("stop", "text-[16px] text-red-600")}<span>Stop</span></button>
-        <button disabled title="Coming soon" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-colors active:scale-95 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">${icon("replay", "text-[16px] text-slate-600")}<span>Re-run</span></button>
+        <button id="wf-rerun" ${run === "failed" ? `title="Run it again: same app, date and topic (a new run; this one keeps its log)"` : `disabled title="Only a run that failed can be run again"`} class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-colors active:scale-95 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">${icon("replay", "text-[16px] text-slate-600")}<span>Re-run</span></button>
       </div>
     </div>
     <div class="lg:col-span-5 bg-white rounded-xl border border-slate-200 p-4 shadow-sm flex flex-col justify-between gap-2.5">
@@ -156,7 +156,14 @@ function drawHead() {
         </div>
       </div>
     </div>`;
-  wfSet($("#wf-head"), html);
+  if (wfSet($("#wf-head"), html) && $("#wf-rerun")) $("#wf-rerun").onclick = async ev => {
+    const btn = ev.currentTarget; btn.disabled = true;
+    try {
+      const r = await post("/api/runs/rerun", { run_id: S.runId });
+      toast("Running it again");
+      S.runId = r.run_id; S.selected = null; WF.graphKey = ""; renderWorkflow();
+    } catch (e) { toast(e.message, true); btn.disabled = false; }
+  };
   const clock = $("#wf-head [data-el]"); if (clock) clock.textContent = wfElapsed(st);   // only the clock ticks
 }
 
