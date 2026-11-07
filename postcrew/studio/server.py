@@ -437,6 +437,28 @@ class Studio:
         return {"history": self.ws.history()}
 
     # ---------- comments on your LinkedIn posts (engage.py) ----------
+    # ---------- missed schedule items ----------
+    def missed(self):
+        from .. import scheduler
+        return {"items": [dict(m, app=platforms.label(m["platform"])) for m in scheduler.missed(self.ws)], "running": crew.is_running(),
+                "paused": self.ws.paused()}
+
+    def missed_run(self, body):
+        """Make missed posts: body {"all": true} or {"platform", "date"}. The scheduler makes them one at a time, oldest first."""
+        from .. import scheduler
+        items = scheduler.missed(self.ws) if body.get("all") else [{"platform": body.get("platform"), "date": body.get("date")}]
+        added = scheduler.queue_missed(self.ws, items)
+        if not added:
+            raise ValueError("nothing to catch up: the post was made meanwhile, or it is already waiting to run")
+        return dict(self.missed(), added=added)
+
+    def missed_dismiss(self, body):
+        from .. import scheduler
+        if not body.get("platform") or not body.get("date"):
+            raise ValueError("platform and date are needed")
+        scheduler.dismiss_missed(self.ws, body["platform"], body["date"])
+        return self.missed()
+
     def engage_check(self):
         """Read and answer comments now, in the background (the Replier may take a minute)."""
         from ..scheduler import _engage_in_background
@@ -970,6 +992,9 @@ def make_handler(studio):
                     ("GET", "/api/runs"): lambda: {"runs": crew.list_runs(ws)},
                     ("POST", "/api/runs"): lambda: studio.start_run({k: v for k, v in self.body().items() if k not in ("kept", "kept_from")}),
                     ("POST", "/api/runs/rerun"): lambda: studio.rerun(self.body()),
+                    ("GET", "/api/missed"): lambda: studio.missed(),
+                    ("POST", "/api/missed/run"): lambda: studio.missed_run(self.body()),
+                    ("POST", "/api/missed/dismiss"): lambda: studio.missed_dismiss(self.body()),
                     ("GET", "/api/queue"): lambda: {"queue": ws.queue(), "history": ws.history()},
                     ("POST", "/api/history"): lambda: studio.history_add(self.body()),
                     ("POST", "/api/history/remove"): lambda: studio.history_remove(self.body()),

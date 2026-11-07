@@ -6,7 +6,7 @@ If you prefer cron/systemd, use the CLI instead: `postcrew run`, `postcrew publi
 import threading
 import time
 import traceback
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 from .agents.credentials import run_check
@@ -109,6 +109,11 @@ def tick(ws, now=None, runner=run_crew, publisher=publish_due, checker=run_check
                 did.append(f"generate {who}{iso} ({due[0]})")
         gates.append((pnow, _earliest(sched)))
 
+    if not any(d.startswith("generate") for d in did) and not is_running():
+        ran = _catch_up(ws, runner)
+        if ran:
+            did.append(ran)
+
     last = st.get("published_check")
     utc = now.astimezone(timezone.utc)
     if any(_passed(pnow, t) for pnow, t in gates) and (
@@ -122,6 +127,89 @@ def tick(ws, now=None, runner=run_crew, publisher=publish_due, checker=run_check
         if (engager or _engage_in_background)(ws):
             did.append("comments")
     return did
+
+
+# ---------- missed items: scheduled posts that were never made (the Studio was off, or the run failed) ----------
+MISSED_DAYS = 7   # how far back a missed post is still offered
+
+
+def _day_done(ws, pid, iso):
+    """The same test the scheduler uses: nothing left to make for this date."""
+    planned = (monthly.load_plan(ws, pid).get(iso) or {}).get("plan_id")
+    return not monthly.scheduled_due(ws, pid, iso) if planned else bool(post_for(ws, iso, pid))
+
+
+def missed(ws, now=None, days=MISSED_DAYS):
+    """The scheduled posts of the last `days` days whose generate time has passed and that were never made, oldest first.
+    The scheduler's own date (today + lead days) is not missed: it is still being worked on. Dismissed dates are left out;
+    dates waiting in the catch-up list say so ("queued")."""
+    cfg = ws.config()
+    st = ws.state("scheduler", {})
+    dismissed = {(d.get("platform"), d.get("date")) for d in st.get("missed_dismissed") or []}
+    queued = {(d.get("platform"), d.get("date")) for d in st.get("catch_up") or []}
+    out = []
+    for pid in platforms.enabled(cfg):
+        pcfg = platforms.view(cfg, pid)
+        sched = pcfg["schedule"]
+        pnow = (now or local_now(cfg)).astimezone(ZoneInfo(sched["timezone"]))
+        target = target_date(pcfg, pnow)
+        day = pnow.date() - timedelta(days=days)
+        while day < target:
+            iso = day.isoformat()
+            cat = category_for(pcfg, day)
+            if cat and (pid, iso) not in dismissed and not _day_done(ws, pid, iso):
+                out.append({"platform": pid, "date": iso, "category": cat,
+                            "label": pcfg["categories"].get(cat, {}).get("label", cat), "queued": (pid, iso) in queued})
+            day += timedelta(days=1)
+    return sorted(out, key=lambda m: (m["date"], m["platform"]))
+
+
+def queue_missed(ws, items, now=None):
+    """Put missed posts on the catch-up list; the scheduler makes them one at a time, oldest first. Returns how many were added."""
+    open_ = {(m["platform"], m["date"]) for m in missed(ws, now)}
+    st = ws.state("scheduler", {})
+    cu = list(st.get("catch_up") or [])
+    have = {(c["platform"], c["date"]) for c in cu}
+    added = 0
+    for it in items:
+        key = (it.get("platform"), it.get("date"))
+        if key in open_ and key not in have:
+            cu.append({"platform": key[0], "date": key[1]})
+            have.add(key)
+            added += 1
+    st["catch_up"] = sorted(cu, key=lambda c: c["date"])
+    ws.save_state("scheduler", st)
+    return added
+
+
+def dismiss_missed(ws, platform, iso):
+    """Stop offering a missed post (and take it off the catch-up list)."""
+    st = ws.state("scheduler", {})
+    cutoff = (date.today() - timedelta(days=MISSED_DAYS + 7)).isoformat()   # old dismissals have nothing left to hide
+    keep = [d for d in st.get("missed_dismissed") or [] if d.get("date", "") >= cutoff and (d.get("platform"), d.get("date")) != (platform, iso)]
+    st["missed_dismissed"] = keep + [{"platform": platform, "date": iso}]
+    st["catch_up"] = [c for c in st.get("catch_up") or [] if (c["platform"], c["date"]) != (platform, iso)]
+    ws.save_state("scheduler", st)
+
+
+def _catch_up(ws, runner):
+    """Make the oldest post on the catch-up list (one per tick, never while another run is going). Skips what was made meanwhile."""
+    st = ws.state("scheduler", {})
+    cu = list(st.get("catch_up") or [])
+    while cu:
+        job = cu.pop(0)
+        st["catch_up"] = cu
+        ws.save_state("scheduler", st)
+        pid, iso = job["platform"], job["date"]
+        if pid not in platforms.enabled(ws.config()):
+            continue
+        pcfg = platforms.view(ws.config(), pid)
+        day = date.fromisoformat(iso)
+        if not category_for(pcfg, day) or _day_done(ws, pid, iso):
+            continue
+        _call(runner, ws, day, pid)
+        return f"catch up {'' if pid == LINKEDIN else pid + ' '}{iso}"
+    return None
 
 
 _engaging = threading.Lock()

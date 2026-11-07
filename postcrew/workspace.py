@@ -331,13 +331,9 @@ class Workspace:
     # ---------- config ----------
     def config(self):
         raw = read_json(self.root / "config.json", {})
-        cfg = normalize_categories(deep_merge(DEFAULT_CONFIG, raw))
-        # a config from before the monthly plan: nothing posts on weekdays any more, only on the dates you assign a plan to
-        for pid, section, mine in (("linkedin", cfg, raw), *((p, o, (raw.get("platforms") or {}).get(p) or {})
-                                                            for p, o in (cfg.get("platforms") or {}).items() if p != "linkedin")):
-            if raw and mine and "topics" not in mine and mine.get("schedule", {}).get("frequency", "weekly") == "weekly":
-                section["schedule"]["frequency"] = "dates"
-        return cfg
+        # A config from before the monthly plan keeps its weekday schedule. (It used to be switched to "dates", but an app with no topics
+        # then never gets a month plan, so nothing was scheduled at all and the crew silently stopped.)
+        return normalize_categories(deep_merge(DEFAULT_CONFIG, raw))
 
     def save_config(self, cfg):
         errs = validate_config(cfg)

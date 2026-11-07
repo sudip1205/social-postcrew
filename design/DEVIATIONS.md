@@ -31,6 +31,7 @@ No Stitch screen exists for either view. Both are derived from the shell, design
 - Coming up: next 7 calendar days from `upcoming`; days without a schedule are Rest cards. "All slots backed by Fact-Checking" omitted (not data). Summary shows only the current app.
 - Run rows: Retry is disabled ("Coming soon", no retry API). Failed rows show Retry plus none other; running/other rows get Inspect log. Sub-line shows date/rehearsal/result, not model names. Footer shows the sum of listed runs' cost, not a billing-cycle total.
 - Filter and Export CSV disabled ("Coming soon"). Sync Pipelines re-fetches data; Run now scrolls to the Run card.
+- **Missed posts banner (not in Stitch):** an amber card under the header lists scheduled dates of the last 7 days that were never made (Studio off, run failed), with Run / Skip per row and Run all. Built from the page's own section, chip and button classes.
 
 ### plan
 # Plan deviations (Content Plan > Monthly Editorial Board)

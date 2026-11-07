@@ -62,6 +62,7 @@ expand_less
 expand_more
 explore
 fact_check
+fast_forward
 favorite
 feed
 file_upload

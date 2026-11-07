@@ -70,3 +70,5 @@ picture_as_pdf
 auto_stories
 category
 terminal
+event_busy
+fast_forward

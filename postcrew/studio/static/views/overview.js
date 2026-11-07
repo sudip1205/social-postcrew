@@ -77,6 +77,41 @@ function ovBindRuns() {
   document.querySelectorAll("#ov-runs button[data-run]").forEach(b => b.onclick = () => { S.runId = b.dataset.run; location.hash = "workflow"; });
 }
 
+// Missed: scheduled posts that were never made (the Studio was off, or the run failed). Every app, newest last.
+function ovMissed(m) {
+  const items = m?.items || [];
+  if (!items.length) return "";
+  const waiting = items.filter(x => x.queued).length, open = items.length - waiting;
+  const row = x => `<li class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 py-2">
+      <div class="flex items-center gap-2 min-w-0">${appBadge(x.platform)}<span class="text-xs font-bold text-slate-700 whitespace-nowrap">${esc(OV_DAY(x.date))}</span><span class="text-xs text-slate-600 truncate" title="${esc(x.label)}">${esc(x.label)}</span></div>
+      <div class="flex items-center gap-2 shrink-0">${x.queued
+        ? chip("queued", "Waiting to run", "sm")
+        : `<button class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-violet-100 hover:bg-violet-200 text-violet-800 text-xs font-semibold transition-colors" data-miss-run="${esc(x.platform)}|${esc(x.date)}">${icon("play_arrow", "text-sm")}<span>Run</span></button>`}
+        <button class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-colors" data-miss-skip="${esc(x.platform)}|${esc(x.date)}">${icon("close", "text-sm")}<span>Skip</span></button>
+      </div></li>`;
+  return `<section id="ov-missed" class="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-2">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div class="flex items-start gap-2">
+        <div class="w-7 h-7 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">${icon("event_busy", "text-base")}</div>
+        <div><h2 class="text-sm font-bold font-headline text-slate-900">${items.length} scheduled ${items.length === 1 ? "post was" : "posts were"} missed</h2>
+          <p class="text-xs text-slate-600 mt-0.5">${tip("Missed", "A scheduled date whose crew run never happened in the last 7 days: the Studio was off, or the run failed.")} posts are made one at a time, oldest first, and published as soon as they are ready${m.paused ? ". Resume the schedule to run them" : ""}.</p></div>
+      </div>
+      ${open > 1 ? `<button id="ov-miss-all" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-violet-600 hover:bg-violet-700 text-white transition-colors shrink-0">${icon("fast_forward", "text-sm")}<span>Run all ${open}</span></button>` : ""}
+    </div>
+    <ul class="divide-y divide-amber-200/70">${items.map(row).join("")}</ul>
+  </section>`;
+}
+
+function ovBindMissed() {
+  const act = async (path, body, msg) => {
+    try { await post(path, body); if (msg) toast(msg); renderOverview(); } catch (e) { toast(e.message || String(e), true); }
+  };
+  const split = v => { const [platform, date] = v.split("|"); return { platform, date }; };
+  document.querySelectorAll("#ov-missed [data-miss-run]").forEach(b => b.onclick = () => act("/api/missed/run", split(b.dataset.missRun), "Queued: the scheduler starts it within a minute"));
+  document.querySelectorAll("#ov-missed [data-miss-skip]").forEach(b => b.onclick = () => act("/api/missed/dismiss", split(b.dataset.missSkip)));
+  const all = $("#ov-miss-all"); if (all) all.onclick = () => act("/api/missed/run", { all: true }, "Queued: the scheduler makes them one at a time");
+}
+
 let ovTimer = null;
 async function ovPoll() {
   clearTimeout(ovTimer);
@@ -92,7 +127,8 @@ async function ovPoll() {
 async function renderOverview() {
   await refreshOverview();
   const o = S.overview; if (!o) return;
-  const [{ runs: allRuns }, { queue: allQueue }, cfgRes] = await Promise.all([api("/api/runs"), api("/api/queue"), api("/api/config")]);
+  const [{ runs: allRuns }, { queue: allQueue }, cfgRes, missedRes] = await Promise.all([api("/api/runs"), api("/api/queue"), api("/api/config"),
+    api("/api/missed").catch(() => null)]);
   const cfg = cfgRes.config, app = S.platform, a = appOf(app);
   const runs = allRuns.filter(r => (r.meta?.platform || "linkedin") === app), queue = allQueue.filter(mine);
   const li = o.credentials?.linkedin || {}, isLi = app === "linkedin";
@@ -124,6 +160,8 @@ async function renderOverview() {
         <button id="pause" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors">${icon(o.paused ? "play_arrow" : "pause", "text-xs")}<span>${o.paused ? "Resume schedule" : "Pause schedule"}</span></button>
       </div>
     </div>
+
+    ${ovMissed(missedRes)}
 
     <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       ${ovStat("schedule", "amber", next ? chip(next.status, null, "sm") : chip("idle", "Nothing queued", "sm"), "Next post",
@@ -175,7 +213,7 @@ async function renderOverview() {
 
   $("#ov-sync").onclick = () => renderOverview();
   $("#pause").onclick = async () => { await post("/api/pause", { paused: !o.paused }); renderOverview(); };
-  ovBindRuns();
+  ovBindRuns(); ovBindMissed();
   if (runs.some(r => ["running", "retrying", "working"].includes(r.state))) { clearTimeout(ovTimer); ovTimer = setTimeout(ovPoll, 4000); }
 }
 
