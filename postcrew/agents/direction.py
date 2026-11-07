@@ -15,7 +15,7 @@ from .. import platforms
 from ..motion import library as lib
 from .base import Agent, AgentError
 
-LAYOUTS = ["title", "statement", "points", "code", "diagram", "trace", "flow", "stat", "codeviz", "paths", "grid", "run"]
+LAYOUTS = ["title", "statement", "points", "code", "diagram", "trace", "flow", "stat", "codeviz", "paths", "grid", "graph", "run"]
 WORDS = ("title", "statement", "points")
 PART_PURPOSE = {"problem": "hook", "approaches": "setup", "visual": "explanation", "conclusion": "summary", "idea": "explanation",
                 "example": "example", "mistake": "reveal", "closing": "cta"}

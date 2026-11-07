@@ -10,7 +10,7 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from .. import algotrace, codeviz, gridviz, pathviz
+from .. import algotrace, codeviz, graphviz, gridviz, pathviz
 from . import iconlib, looks, timeline, video
 from .scenes import FORMATS, edge_marks, node_extra, parse_edge, parse_pointer, split_node
 from .video import FPS, VideoError
@@ -221,6 +221,8 @@ def build_props(scenes, fmt, audio, look=None):
             lengths[i] = max(lengths[i], pathviz.min_seconds(sc["paths"]))
         if sc.get("layout") == "grid" and isinstance(sc.get("grid"), dict) and not gridviz.problems(sc["grid"], i + 1):
             lengths[i] = max(lengths[i], gridviz.min_seconds(sc["grid"]))
+        if sc.get("layout") == "graph" and isinstance(sc.get("graph"), dict) and not graphviz.problems(sc["graph"], i + 1):
+            lengths[i] = max(lengths[i], graphviz.min_seconds(sc["graph"]))
     out, carry = [], {"nodes": []}
     for i, (sc, ln) in enumerate(zip(scenes, lengths)):
         a = audio[i] if isinstance(audio, (list, tuple)) else None
@@ -243,6 +245,10 @@ def build_props(scenes, fmt, audio, look=None):
         if layout == "grid" and isinstance(sc.get("grid"), dict) and not gridviz.problems(sc["grid"], i + 1):   # a real 2-D board (postcrew/gridviz.py)
             item["grid"] = gridviz.props(sc["grid"], lambda say, after, w=words: _when(say, w, after))
         elif layout == "grid":   # a board that does not check out is never drawn as a strip: its heading alone
+            item["layout"] = "statement"
+        if layout == "graph" and isinstance(sc.get("graph"), dict) and not graphviz.problems(sc["graph"], i + 1):   # real nodes and edges (postcrew/graphviz.py)
+            item["graph"] = graphviz.props(sc["graph"], lambda say, after, w=words: _when(say, w, after))
+        elif layout == "graph":   # a graph that does not check out is never drawn wrong: its heading alone
             item["layout"] = "statement"
         if layout == "run":   # the code was RUN: its real steps, each as its sentence is said (postcrew/algotrace.py)
             if isinstance(sc.get("run"), dict) and not algotrace.problems(sc, i + 1):

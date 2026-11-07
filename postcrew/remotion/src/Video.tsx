@@ -7,6 +7,7 @@ import {Colored, EXT} from "./code";
 import {CodeViz} from "./CodeViz";
 import {Stairs} from "./Stairs";
 import {Grid} from "./Grid";
+import {Graph} from "./Graph";
 
 /*
  * The scenes follow postcrew/remotion/STYLE.md: a flat page, one accent colour, thin rules, slow eased reveals (never a bounce), the
@@ -102,6 +103,7 @@ const Body: React.FC<{p: VideoProps; s: Scene}> = ({p, s}) => {
     case "codeviz": return <CodeViz s={s} short={short} />;
     case "paths": return <Stairs s={s} short={short} />;
     case "grid": return s.grid ? <Grid s={s} short={short} /> : <Statement text={s.title} short={short} keyAt={s.key} />;
+    case "graph": return s.graph ? <Graph s={s} short={short} /> : <Statement text={s.title} short={short} keyAt={s.key} />;
     case "diagram":
     case "flow": return <Diagram s={s} short={short} flow={s.layout === "flow"} />;
     case "trace": return <Trace s={s} short={short} />;

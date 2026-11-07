@@ -123,8 +123,8 @@ const manLoadView = () => { const bar = $("#man-topics"); if (bar) bar.querySele
 const MAN_FIELD = "w-full px-3 py-2 bg-slate-50 hover:bg-slate-100/80 focus:bg-white text-sm rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-all placeholder:text-slate-400";
 const manLabel = (text, inner, sub = "") => `<label class="flex flex-col gap-1.5"><span class="text-xs font-bold text-slate-700">${text}</span>${inner}${sub ? `<span class="text-[11px] text-slate-400">${sub}</span>` : ""}</label>`;
 
-const MAN_SHAPE = { array: "an array", string: "a string", grid: "a grid of rows and columns", number_table: "a table of numbers", ways: "a staircase of ways" };
-const MAN_UNDRAWABLE = { tree: "a tree", graph: "a graph", linked_list: "a linked list", stack_queue: "a stack or queue", intervals: "intervals" };
+const MAN_SHAPE = { array: "an array", string: "a string", grid: "a grid of rows and columns", number_table: "a table of numbers", ways: "a staircase of ways", graph: "a graph of nodes and edges" };
+const MAN_UNDRAWABLE = { tree: "a tree", linked_list: "a linked list", stack_queue: "a stack or queue", intervals: "intervals" };
 const MAN_READ = { new: ["idle", "Not read yet"], reading: ["running", "Reading the files"], done: ["passed", "Read"], failed: ["failed", "Could not read"] };
 
 function manSource(i) {

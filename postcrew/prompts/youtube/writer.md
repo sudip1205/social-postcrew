@@ -210,7 +210,7 @@ EVERY VIDEO FOLLOWS THIS ARC (checked by the app; a script that skips a part is 
    work it out in front of the viewer ("one step: only one way. Two steps: let's see... two ways."). Then ONE BIGGER CASE AT A TIME (two steps, three steps, four steps,
    five steps), each its own drawing with the real answer counted on screen, so the viewer SEES the pattern appear before you name it. Speak plain words an intelligent adult outside the field follows (never childish, never talking down): no terms such as recursion, memoization, dynamic programming, complexity or algorithm in this part. Every visual scene is a real drawing:
    "paths" (a staircase with an arrow for every way up: use it for any "how many ways" problem), "grid" (a real board of rows and columns:
-   use it for EVERY problem set on a grid or matrix), "diagram" or "flow" (boxes and arrows that grow), "trace" (cells
+   use it for EVERY problem set on a grid or matrix), "graph" (real nodes joined by edges: use it for EVERY graph problem), "diagram" or "flow" (boxes and arrows that grow), "trace" (cells
    with a pointer moving) or "stat". Never words only, never code here.
 4. "conclusion": one or two scenes. WHAT THE PICTURES SHOWED: state the pattern in plain words ("each answer is the two before it added together: 1, 2, 3, 5, 8")
    and show it (a "trace" of the numbers with its note, or "points", or a "diagram"). Only now introduce the technical names, one at a time, each tied to what the viewer
@@ -250,6 +250,19 @@ column 3 with arms of 1, 5 cells; "2,3,0" is one cell), note (what the step show
 with their numbers, every cell of a plus, each plus in its own colour, and cells two pluses share in red; it refuses a plus that leaves the
 board or covers a blocked cell, so the picture is always true. Use grid scenes for the problem's example, every step of the idea and the
 worked example, and the mistake (two pluses overlapping, shown in red). Say "up" or "above" only when the board shows it.
+
+THE GRAPH SCENE (layout "graph"): FOR EVERY PROBLEM WHOSE DATA IS NODES JOINED BY EDGES (a network, cities and roads, courses and their
+prerequisites, friends of friends, BFS, DFS, shortest path, Dijkstra, topological order, cycles, connected components, union-find). A "trace"
+is one row and a "diagram" is a picture of an idea: neither is the problem's graph, so a graph problem drawn as either is wrong. Set "graph" to
+{title, nodes (the example's nodes, 2 to 12 short names of 1 to 4 letters or digits, copied EXACTLY from the problem: ["A", "B", "C"] or
+["0", "1", "2"]; the first is where the walk starts), edges (copied EXACTLY: "A-B", or "A-B:4" with its weight; every edge weighted or none),
+directed (true when an edge goes one way only: then "A-B" is from A to B), steps}. The app places the nodes itself so you never give positions.
+Each step, in the order the voice says it: say (2-3 words copied from the sentence where it happens, so two steps never start together),
+current (the node being worked on now), visited (every node already done so far, not just the new one), frontier (the nodes waiting, in order:
+the queue of a BFS, the stack of a DFS), found (the answer: the path found, the target), out (nodes ruled out), edges (the edges lit now, "A-B"
+as listed: the edge followed, or the path so far), labels (a short value under a node: "B=4" for a distance, "C=2" for an order), note (what
+the step shows: "queue: C, D"). The app refuses an edge or a step that names a node the graph does not have, so the picture is always true. Use
+graph scenes for the problem's example, every step of the idea and the worked example, and the mistake (a node visited twice, shown).
 
 THE STAIRCASE SCENE (layout "paths", one scene per case). Set "paths" to {kind "stairs", title, n (1 to 6 steps), moves (the hops allowed: [1, 2] is one or two steps at a
 time)}. The app finds EVERY way up and draws each one: a little figure hops from step to step along an arrow while "WAYS" counts up and each way is written ("1 + 2").

@@ -9,10 +9,15 @@ export type Step = {
 export type GridStep = {t: number; active: number[][]; found: number[][]; out: number[][]; marks: {name: string; at: number[]}[];
   pluses: {label: string; cells: number[][]}[]; note: string};
 export type GridViz = {title: string; rows: string[]; legend: string[]; blocked: string[]; colors?: Record<string, string>; steps: GridStep[]};
+/** a real graph (postcrew/graphviz.py): nodes placed by the app (x, y in 0..1), edges, and steps that walk them. */
+export type GraphStep = {t: number; current: string[]; visited: string[]; frontier: string[]; found: string[]; out: string[]; edges: number[];
+  labels: Record<string, string>; note: string};
+export type GraphViz = {title: string; directed: boolean; nodes: {name: string; x: number; y: number}[]; edges: {a: string; b: string; w: number | null}[];
+  steps: GraphStep[]};
 export type Scene = {
-  layout: "title" | "statement" | "points" | "code" | "diagram" | "flow" | "trace" | "stat" | "codeviz" | "paths" | "grid";
+  layout: "title" | "statement" | "points" | "code" | "diagram" | "flow" | "trace" | "stat" | "codeviz" | "paths" | "grid" | "graph";
   title: string; items: string[]; code: string; language: string; seconds: number; captions: Caption[];
-  nodes?: Box[]; edges?: Edge[]; cells?: string[]; steps?: Step[]; cues?: number[]; closing?: boolean; typed?: boolean; layout_edges?: Edge[]; key?: number; clip?: Svg; viz?: Viz; paths?: PathsViz; grid?: GridViz; buttons?: {label: string; kind: string; svg?: Svg | null}[];
+  nodes?: Box[]; edges?: Edge[]; cells?: string[]; steps?: Step[]; cues?: number[]; closing?: boolean; typed?: boolean; layout_edges?: Edge[]; key?: number; clip?: Svg; viz?: Viz; paths?: PathsViz; grid?: GridViz; graph?: GraphViz; buttons?: {label: string; kind: string; svg?: Svg | null}[];
   clock?: {n: number; value: number | null; lands: number | null; t: number};
 };
 /** The colours of a look: defined in postcrew/render/looks.py and sent with every render. */

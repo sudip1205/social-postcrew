@@ -11,11 +11,11 @@ import re
 
 # shape -> the layouts that draw it
 SCENES = {"array": ("trace", "codeviz", "run"), "string": ("trace", "codeviz", "run"), "grid": ("grid", "run"), "number_table": ("codeviz", "grid", "run"),
-          "ways": ("paths", "codeviz")}
-UNDRAWABLE = {"tree": "a tree", "graph": "a graph (nodes and edges)", "linked_list": "a linked list", "stack_queue": "a stack or a queue",
+          "ways": ("paths", "codeviz"), "graph": ("graph",)}
+UNDRAWABLE = {"tree": "a tree", "linked_list": "a linked list", "stack_queue": "a stack or a queue",
               "intervals": "intervals on a number line"}
 SHAPES = list(SCENES) + list(UNDRAWABLE) + ["other"]
-LABEL = {"array": "an array (one row of values)", "string": "a string", "grid": "a grid (rows and columns)",
+LABEL = {"graph": "a graph (nodes and edges)", "array": "an array (one row of values)", "string": "a string", "grid": "a grid (rows and columns)",
          "number_table": "a table of numbers (a DP table)", "ways": "counting ways (a staircase)", "other": "no particular data", **UNDRAWABLE}
 
 # the words that give a shape away, strongest first (the first match wins)

@@ -125,6 +125,12 @@ def grid_problems(grid, narration=""):
     return (sum_problems([], steps) + cue_problems({"narration": narration, "steps": steps}))[:2]
 
 
+def graph_problems(graph, narration=""):
+    """A graph scene: on-cue steps (its nodes and edges are checked by graphviz.problems)."""
+    steps = (graph or {}).get("steps") or []
+    return cue_problems({"narration": narration, "steps": steps})[:2]
+
+
 # ---------- pace: a step is explained, not flashed ----------
 WORDS_PER_STEP = 6   # about 2.4 seconds of voice for each step: what is looked at, the calculation, the result
 
