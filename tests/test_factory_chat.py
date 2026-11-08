@@ -87,6 +87,14 @@ class FactoryChatTests(unittest.TestCase):
             self.assertEqual(len(ws.queue()), 1)
             with self.assertRaises(ValueError):
                 factory_chat.queue_video(ws, "../etc", "2030-01-05")
+            (root / "out" / "gil-explained-hyperframes.jpg").write_bytes(b"jpg")
+            (root / "out" / "gil-explained.srt").write_text("1")
+            (root / "out" / "gil-explained-two-hyperframes.mp4").write_bytes(b"other episode")
+            factory_chat.delete_video(ws, "gil-explained")
+            self.assertEqual(sorted(f.name for f in (root / "out").iterdir()), ["gil-explained-two-hyperframes.mp4"])   # only this episode's files
+            self.assertTrue((ep / "youtube.json").exists())                                                              # its script stays
+            with self.assertRaises(ValueError):
+                factory_chat.delete_video(ws, "gil-explained")
 
 
 if __name__ == "__main__":

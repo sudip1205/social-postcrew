@@ -21,16 +21,21 @@ function fcBubble(m) {
 
 function fcVideo(v) {
   const today = OV_ISO(new Date());
-  return `<div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-    <video class="w-full aspect-[9/16] bg-slate-900" controls preload="none" ${v.thumb ? `poster="/factory-out/${encodeURIComponent(v.thumb)}"` : ""} src="/factory-out/${encodeURIComponent(v.file)}"></video>
-    <div class="p-3 space-y-2">
-      <div class="text-xs font-semibold text-slate-900 line-clamp-2" title="${esc(v.title)}">${esc(v.title)}</div>
+  return `<li class="py-3 flex gap-3">
+    <button class="relative shrink-0 w-16 h-28 rounded-lg overflow-hidden bg-slate-900 group" data-fc-play="${esc(v.file)}" title="Watch">
+      ${v.thumb ? `<img class="w-full h-full object-cover" src="/factory-out/${encodeURIComponent(v.thumb)}" alt="">` : ""}
+      <span class="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/10 text-white">${icon("play_arrow", "text-2xl")}</span>
+    </button>
+    <div class="min-w-0 flex-1 flex flex-col gap-1.5">
+      <div class="text-sm font-semibold text-slate-900 line-clamp-2" title="${esc(v.title)}">${esc(v.title)}</div>
       <div class="text-[11px] text-slate-500">${esc(ago(v.made))} · ${v.mb} MB</div>
-      ${v.has_meta ? `<div class="flex items-center gap-1.5">
-        <input type="date" class="flex-1 min-w-0 text-xs border border-slate-300 rounded-md px-2 py-1" value="${today}" min="${today}" data-fc-date="${esc(v.slug)}">
-        <button class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-violet-100 hover:bg-violet-200 text-violet-800 text-xs font-semibold" data-fc-queue="${esc(v.slug)}">${icon("playlist_add", "text-sm")}<span>Queue</span></button></div>`
-        : `<div class="text-[11px] text-slate-400">${tip("No youtube.json", "Ask Claude to write the title, description and tags for this episode, then it can be queued.")}</div>`}
-    </div></div>`;
+      <div class="flex flex-wrap items-center gap-1.5 mt-auto">
+        ${v.has_meta ? `<input type="date" class="text-xs border border-slate-300 rounded-md px-2 py-1" value="${today}" min="${today}" data-fc-date="${esc(v.slug)}">
+          <button class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold" data-fc-queue="${esc(v.slug)}">${icon("playlist_add", "text-sm")}<span>Move to Queue</span></button>`
+          : `<span class="text-[11px] text-amber-700">${tip("No youtube.json", "Ask Claude to write the title, description and tags for this episode; then it can be queued.")}</span>`}
+        <button class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 text-xs font-semibold" data-fc-delete="${esc(v.slug)}" data-fc-title="${esc(v.title)}">${icon("delete", "text-sm")}<span>Delete</span></button>
+      </div>
+    </div></li>`;
 }
 
 function fcMessages(d) {
@@ -49,11 +54,18 @@ function fcDraw(d) {
   $("#fc-send").disabled = d.busy;
   $("#fc-stop").classList.toggle("hidden", !d.busy);
   $("#fc-videos").innerHTML = (d.videos || []).length ? d.videos.map(fcVideo).join("") : emptyState("movie", "No videos yet. Ask Claude for a Short.");
+  document.querySelectorAll("[data-fc-play]").forEach(b => b.onclick = () => {
+    const dlg = $("#fc-player"); dlg.querySelector("video").src = `/factory-out/${encodeURIComponent(b.dataset.fcPlay)}`; dlg.showModal(); dlg.querySelector("video").play();
+  });
+  document.querySelectorAll("[data-fc-delete]").forEach(b => b.onclick = async () => {
+    if (!confirm(`Delete the video "${b.dataset.fcTitle}"? Its script stays, so Claude can make it again.`)) return;
+    try { fcDraw(await post("/api/factory/delete", { slug: b.dataset.fcDelete })); toast("Video deleted"); } catch (e) { toast(e.message, true); }
+  });
   $("#fc-skill").innerHTML = (d.skill || []).map(f => `<li class="flex items-center justify-between gap-2 py-1"><span class="font-mono text-[11px] text-slate-700 truncate">${esc(f.path)}</span><span class="text-[11px] text-slate-400 whitespace-nowrap">${esc(ago(f.changed))}</span></li>`).join("");
   document.querySelectorAll("[data-fc-example]").forEach(b => b.onclick = () => { $("#fc-text").value = b.dataset.fcExample; $("#fc-text").focus(); });
   document.querySelectorAll("[data-fc-queue]").forEach(b => b.onclick = async () => {
     const slug = b.dataset.fcQueue, date = document.querySelector(`[data-fc-date="${CSS.escape(slug)}"]`).value;
-    try { await post("/api/factory/queue", { slug, date }); toast("Queued for YouTube: approve or schedule it in the Queue"); } catch (e) { toast(e.message, true); }
+    try { await post("/api/factory/queue", { slug, date }); toast(`Moved to the Queue for ${date}: approve it there`); } catch (e) { toast(e.message, true); }
   });
 }
 
@@ -100,7 +112,7 @@ async function renderFactory() {
         <section class="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-3">
           <div class="flex items-center gap-2"><div class="w-7 h-7 rounded-lg bg-rose-100 text-rose-700 flex items-center justify-center">${icon("movie", "text-base")}</div>
             <h2 class="text-lg font-bold font-headline text-slate-900">Videos</h2></div>
-          <div id="fc-videos" class="grid grid-cols-2 gap-3 max-h-[60vh] overflow-y-auto"></div>
+          <ul id="fc-videos" class="divide-y divide-slate-100"></ul>
         </section>
         <section class="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-2">
           <div class="flex items-center gap-2"><div class="w-7 h-7 rounded-lg bg-sky-100 text-sky-700 flex items-center justify-center">${icon("school", "text-base")}</div>
@@ -109,7 +121,11 @@ async function renderFactory() {
           <ul id="fc-skill" class="divide-y divide-slate-100"></ul>
         </section>
       </aside>
-    </div>`;
+    </div>
+    <dialog id="fc-player" class="rounded-xl p-0 bg-black backdrop:bg-black/70">
+      <video class="max-h-[85vh] aspect-[9/16]" controls></video>
+      <form method="dialog" class="absolute top-2 right-2"><button class="w-8 h-8 rounded-full bg-white/90 text-slate-800 flex items-center justify-center">${icon("close", "text-base")}</button></form>
+    </dialog>`;
   const send = async () => {
     const text = $("#fc-text").value.trim(); if (!text) return;
     try { fcDraw(await post("/api/factory/send", { text })); $("#fc-text").value = ""; fcPoll(); } catch (e) { toast(e.message, true); }
@@ -118,6 +134,7 @@ async function renderFactory() {
   $("#fc-text").onkeydown = e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } };
   $("#fc-stop").onclick = async () => { try { fcDraw(await post("/api/factory/stop")); } catch (e) { toast(e.message, true); } };
   $("#fc-new").onclick = async () => { try { fcDraw(await post("/api/factory/reset")); } catch (e) { toast(e.message, true); } };
+  $("#fc-player").addEventListener("close", () => { const v = $("#fc-player video"); v.pause(); v.removeAttribute("src"); v.load(); });
   fcDraw(d);
   fcPoll();
 }

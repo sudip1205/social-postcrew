@@ -195,6 +195,20 @@ def _set_session(ws, sid):
             _save(ws, st)
 
 
+def delete_video(ws, slug):
+    """Delete an episode's rendered files from out/ (video, thumbnail, captions). The episode's script stays, so it can be made again."""
+    if not re.fullmatch(r"[a-z0-9][a-z0-9-]{1,80}", str(slug or "")):
+        raise ValueError("unknown episode")
+    root = factory_dir(_cfg(ws))
+    out = root / "out"
+    gone = [f for f in out.glob(f"{slug}*") if re.fullmatch(re.escape(slug) + r"(-(hyperframes|remotion))?\.(mp4|jpg|srt)", f.name)]
+    if not gone:
+        raise ValueError("that video is already gone")
+    for f in gone:
+        f.unlink()
+    return view(ws)
+
+
 def queue_video(ws, slug, day):
     """Put a video made in the chat into the YouTube Queue for `day`, like a crew run's video (approval and schedule apply)."""
     from datetime import date as date_cls

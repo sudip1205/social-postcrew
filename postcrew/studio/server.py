@@ -1001,6 +1001,7 @@ def make_handler(studio):
                     ("POST", "/api/factory/send"): lambda: factory_chat.send(ws, self.body().get("text")),
                     ("POST", "/api/factory/stop"): lambda: factory_chat.stop(ws),
                     ("POST", "/api/factory/reset"): lambda: factory_chat.reset(ws),
+                    ("POST", "/api/factory/delete"): lambda: factory_chat.delete_video(ws, self.body().get("slug")),
                     ("POST", "/api/factory/queue"): lambda: factory_chat.queue_video(ws, self.body().get("slug"), self.body().get("date")),
                     ("POST", "/api/missed/run"): lambda: studio.missed_run(self.body()),
                     ("POST", "/api/missed/dismiss"): lambda: studio.missed_dismiss(self.body()),
