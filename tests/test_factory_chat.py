@@ -121,3 +121,57 @@ class FactoryChatTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class FactoryHttpTests(unittest.TestCase):
+    """Over real HTTP: Move to Queue once hung forever (its route read the request body twice)."""
+
+    def setUp(self):
+        import threading
+        from http.server import ThreadingHTTPServer
+        from postcrew.studio.server import Studio, make_handler
+        self.tw = TempWorkspace()
+        self.ws = self.tw.__enter__()
+        studio = Studio(self.ws, 0)
+        handler = make_handler(studio)
+        handler.log_message = lambda *a: None
+        self.httpd = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+        studio.port = self.httpd.server_address[1]
+        self.base = f"http://127.0.0.1:{studio.port}"
+        threading.Thread(target=self.httpd.serve_forever, daemon=True).start()
+
+    def tearDown(self):
+        self.httpd.shutdown()
+        self.httpd.server_close()
+        self.tw.__exit__()
+
+    def post(self, path, body):
+        import urllib.error
+        import urllib.request
+        r = urllib.request.Request(self.base + path, data=json.dumps(body).encode(), method="POST",
+                                   headers={"Content-Type": "application/json", "X-Postcrew": "1"})
+        try:
+            with urllib.request.urlopen(r, timeout=10) as resp:
+                return resp.status, json.loads(resp.read())
+        except urllib.error.HTTPError as e:
+            with e:
+                return e.code, json.loads(e.read())
+
+    def test_move_to_queue_answers_and_uses_the_details_you_checked(self):
+        with fake_factory(self.ws) as (root, _calls):
+            ep = root / "episodes" / "zoom-sfu"
+            ep.mkdir(parents=True)
+            (ep / "youtube.json").write_text(json.dumps({"title": "Old title", "description": "Old", "tags": ["a"], "categoryId": "28"}))
+            (root / "out").mkdir()
+            (root / "out" / "zoom-sfu-hyperframes.mp4").write_bytes(b"mp4")
+            code, out = self.post("/api/factory/queue", {"slug": "zoom-sfu", "date": "2030-01-05", "title": "SFU vs MCU in 60 seconds",
+                                                         "description": "How Zoom mixes video.", "tags": "webrtc, video calls, sfu"})
+            self.assertEqual(code, 200, out)
+            yt = out["post"]["youtube"]
+            self.assertEqual((yt["title"], yt["description"], yt["tags"]), ("SFU vs MCU in 60 seconds", "How Zoom mixes video.",
+                                                                              ["webrtc", "video calls", "sfu"]))
+            saved = json.loads((ep / "youtube.json").read_text())
+            self.assertEqual((saved["title"], saved["categoryId"]), ("SFU vs MCU in 60 seconds", "28"))   # saved back, other keys kept
+            code, out = self.post("/api/factory/queue", {"slug": "zoom-sfu", "date": "2030-01-05", "title": ""})
+            self.assertEqual(code, 400)
+            self.assertIn("title", out["error"])

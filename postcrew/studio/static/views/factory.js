@@ -9,6 +9,7 @@ const FC_EXAMPLES = [
   ["What changed", "Which rules did we add to the skill this week? List them."],
 ];
 let fcTimer = null, fcSeen = -1;
+const FC_OPEN = new Set();   // videos whose details are open (kept open across refreshes)
 
 function fcBubble(m) {
   const t = esc(m.text);
@@ -35,6 +36,17 @@ function fcVideo(v) {
           : `<span class="text-[11px] text-amber-700">${tip("No youtube.json", "Ask Claude to write the title, description and tags for this episode; then it can be queued.")}</span>`}
         <button class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 text-xs font-semibold" data-fc-delete="${esc(v.slug)}" data-fc-title="${esc(v.title)}">${icon("delete", "text-sm")}<span>Delete</span></button>
       </div>
+      ${v.has_meta ? `<details class="group" data-fc-meta="${esc(v.slug)}" ${FC_OPEN.has(v.slug) ? "open" : ""}>
+        <summary class="cursor-pointer text-[11px] font-semibold text-violet-700 flex items-center gap-1 select-none">${icon("edit_note", "text-sm")}<span>YouTube details: title, description, tags</span></summary>
+        <div class="mt-2 space-y-2">
+          <label class="block"><span class="text-[11px] font-semibold text-slate-600">Title <span class="font-normal text-slate-400" data-fc-count="title">${v.yt_title.length}/100</span></span>
+            <input class="mt-0.5 w-full text-xs border border-slate-300 rounded-md px-2 py-1" maxlength="100" data-fc-field="title" value="${esc(v.yt_title)}"></label>
+          <label class="block"><span class="text-[11px] font-semibold text-slate-600">Description</span>
+            <textarea rows="5" class="mt-0.5 w-full text-xs border border-slate-300 rounded-md px-2 py-1 resize-y" maxlength="5000" data-fc-field="description">${esc(v.description)}</textarea></label>
+          <label class="block"><span class="text-[11px] font-semibold text-slate-600">Tags <span class="font-normal text-slate-400">(comma separated)</span></span>
+            <input class="mt-0.5 w-full text-xs border border-slate-300 rounded-md px-2 py-1" data-fc-field="tags" value="${esc(v.tags.join(", "))}"></label>
+          <p class="text-[11px] text-slate-400">Saved to the episode's youtube.json when you move it to the Queue; you can still change them in the Queue before it is published.</p>
+        </div></details>` : ""}
     </div></li>`;
 }
 
@@ -53,7 +65,12 @@ function fcDraw(d) {
   if ((d.messages || []).length !== fcSeen) { $("#fc-log").scrollTop = $("#fc-log").scrollHeight; fcSeen = (d.messages || []).length; }
   $("#fc-send").disabled = d.busy;
   $("#fc-stop").classList.toggle("hidden", !d.busy);
+  if (document.activeElement?.closest?.("#fc-videos")) return;   // never redraw the list while you are typing in it
   $("#fc-videos").innerHTML = (d.videos || []).length ? d.videos.map(fcVideo).join("") : emptyState("movie", "No videos yet. Ask Claude for a Short.");
+  document.querySelectorAll("[data-fc-meta]").forEach(dt => {
+    dt.ontoggle = () => dt.open ? FC_OPEN.add(dt.dataset.fcMeta) : FC_OPEN.delete(dt.dataset.fcMeta);
+    const t = dt.querySelector('[data-fc-field="title"]'); t.oninput = () => dt.querySelector('[data-fc-count="title"]').textContent = `${t.value.length}/100`;
+  });
   document.querySelectorAll("[data-fc-play]").forEach(b => b.onclick = () => {
     const dlg = $("#fc-player"); dlg.querySelector("video").src = `/factory-out/${encodeURIComponent(b.dataset.fcPlay)}`; dlg.showModal(); dlg.querySelector("video").play();
   });
@@ -72,7 +89,11 @@ function fcDraw(d) {
   document.querySelectorAll("[data-fc-example]").forEach(b => b.onclick = () => { $("#fc-text").value = b.dataset.fcExample; $("#fc-text").focus(); });
   document.querySelectorAll("[data-fc-queue]").forEach(b => b.onclick = async () => {
     const slug = b.dataset.fcQueue, date = document.querySelector(`[data-fc-date="${CSS.escape(slug)}"]`).value;
-    try { await post("/api/factory/queue", { slug, date }); toast(`Moved to the Queue for ${date}: approve it there`); } catch (e) { toast(e.message, true); }
+    const box = document.querySelector(`[data-fc-meta="${CSS.escape(slug)}"]`), body = { slug, date };
+    if (box) box.querySelectorAll("[data-fc-field]").forEach(f => body[f.dataset.fcField] = f.value);
+    b.disabled = true;
+    try { await post("/api/factory/queue", body); toast(`Moved to the Queue for ${date}: approve it there`); } catch (e) { toast(e.message, true); }
+    finally { b.disabled = false; }
   });
 }
 

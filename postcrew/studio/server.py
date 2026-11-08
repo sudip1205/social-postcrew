@@ -812,10 +812,13 @@ def make_handler(studio):
             return False, None
 
         def body(self):
-            n = int(self.headers.get("Content-Length") or 0)
-            if n > 2_000_000:
-                raise ValueError("request too large")
-            return json.loads(self.rfile.read(n) or b"{}")
+            """The request's JSON, read once (a second read would wait forever for bytes already read)."""
+            if not hasattr(self, "_body"):
+                n = int(self.headers.get("Content-Length") or 0)
+                if n > 2_000_000:
+                    raise ValueError("request too large")
+                self._body = json.loads(self.rfile.read(n) or b"{}")
+            return self._body
 
         def file(self, path, root):
             path = Path(path).resolve()
@@ -1003,7 +1006,8 @@ def make_handler(studio):
                     ("POST", "/api/factory/reset"): lambda: factory_chat.reset(ws),
                     ("GET", "/api/factory/plan"): lambda: factory_chat.plan_prompt(ws, q.get("id")),
                     ("POST", "/api/factory/delete"): lambda: factory_chat.delete_video(ws, self.body().get("slug")),
-                    ("POST", "/api/factory/queue"): lambda: factory_chat.queue_video(ws, self.body().get("slug"), self.body().get("date")),
+                    ("POST", "/api/factory/queue"): lambda: factory_chat.queue_video(ws, **{k: v for k, v in self.body().items()
+                                                                                          if k in ("slug", "date", "title", "description", "tags")}),
                     ("POST", "/api/missed/run"): lambda: studio.missed_run(self.body()),
                     ("POST", "/api/missed/dismiss"): lambda: studio.missed_dismiss(self.body()),
                     ("GET", "/api/queue"): lambda: {"queue": ws.queue(), "history": ws.history()},

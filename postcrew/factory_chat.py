@@ -128,6 +128,7 @@ def videos(ws, n=24):
         except (OSError, ValueError):
             pass
         rows.append({"file": f.name, "slug": slug, "title": meta.get("title") or slug, "mb": round(f.stat().st_size / 1e6, 1),
+                     "yt_title": meta.get("title") or "", "description": meta.get("description") or "", "tags": meta.get("tags") or [],
                      "made": datetime.fromtimestamp(f.stat().st_mtime, timezone.utc).isoformat(timespec="seconds"),
                      "has_meta": bool(meta), "thumb": f.with_suffix(".jpg").name if f.with_suffix(".jpg").exists() else None})
     return rows
@@ -250,8 +251,10 @@ def delete_video(ws, slug):
     return view(ws)
 
 
-def queue_video(ws, slug, day):
-    """Put a video made in the chat into the YouTube Queue for `day`, like a crew run's video (approval and schedule apply)."""
+def queue_video(ws, slug, date=None, title=None, description=None, tags=None):
+    """Put a video made in the chat into the YouTube Queue for `date`, like a crew run's video (approval and schedule apply). title,
+    description and tags: as you checked them on the Factory page (saved back to the episode's youtube.json); else youtube.json's own."""
+    day = date
     from datetime import date as date_cls
     from .agents.yt_publish import enqueue_youtube
     from . import platforms
@@ -264,6 +267,25 @@ def queue_video(ws, slug, day):
         meta = json.loads((ep / "youtube.json").read_text())
     except (OSError, ValueError):
         raise ValueError("this episode has no youtube.json (title, description, tags): ask Claude in the chat to write it")
+    if title is not None or description is not None or tags is not None:
+        if isinstance(tags, str):
+            tags = [t.strip() for t in tags.split(",")]
+        edits = {k: v for k, v in (("title", str(title or "").strip() if title is not None else None),
+                                   ("description", str(description or "").strip() if description is not None else None),
+                                   ("tags", [str(t).strip() for t in tags if str(t).strip()] if tags is not None else None)) if v is not None}
+        meta.update(edits)
+        (ep / "youtube.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2) + "\n")
+    problems = []
+    if not meta.get("title") or len(meta["title"]) > 100:
+        problems.append("a title of 1 to 100 characters")
+    if len(meta.get("description") or "") > 5000:
+        problems.append("a description under 5,000 characters")
+    if re.search(r"[<>]", (meta.get("title") or "") + (meta.get("description") or "")):
+        problems.append("no < or > in the title or description (YouTube refuses them)")
+    if sum(len(t) + (2 if " " in t else 0) for t in meta.get("tags") or []) + max(0, len(meta.get("tags") or []) - 1) > 500:
+        problems.append("tags of 500 characters in all")
+    if problems:
+        raise ValueError("YouTube needs " + "; ".join(problems))
     video = next((root / "out" / f"{slug}-{e}.mp4" for e in ("hyperframes", "remotion") if (root / "out" / f"{slug}-{e}.mp4").exists()), None)
     if not video:
         raise ValueError("this episode has no rendered video yet")
