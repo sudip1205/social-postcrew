@@ -208,117 +208,6 @@ class AssetTests(unittest.TestCase):
             self.assertEqual(assets.find(ws, "youtube", d), {})
 
 
-@unittest.skipUnless(HAVE_FFMPEG, "ffmpeg not installed")
-@mock.patch.object(cred_mod, "check_claude", return_value=CLAUDE_OK)
-@mock.patch.object(voice, "cached_synthesize", side_effect=fake_tts)
-class YouTubeCrewTests(unittest.TestCase):
-    def llm(self, **over):
-        s = {"topic": [topic("Default arguments", ())], "writer": [script()], "editor": [review()]}
-        s.update(over)
-        return ScriptedLLM(s)
-
-    def run_short(self, ws, llm=None, **kw):
-        return run_crew(ws, DAY, "short-tip", llm=llm or self.llm(), platform="youtube", **kw)
-
-    def test_a_short_is_made_reviewed_voiced_rendered_and_queued(self, _tts, _claude):
-        with TempWorkspace() as ws:
-            youtube_ws(ws)
-            llm = self.llm()
-            res = self.run_short(ws, llm)
-            self.assertTrue(res["ok"], res)
-            steps = json.loads((ws.runs_dir / res["run_id"] / "status.json").read_text())["steps"]
-            self.assertEqual({k: v["state"] for k, v in steps.items()},
-                             {**{s: "passed" for s in ("credentials", "topic", "research", "writer", "editor", "voice", "media",
-                                                      "hooks", "quality", "publisher")}, "video_review": "skipped", "graphics": "skipped",
-                              "direction": "skipped"})   # slides videos: no second review, no icons, no visual plan; the picture is still watched
-            self.assertEqual(llm.agents_called().count("editor"), 3)      # reviewed like any post
-            post = ws.queue()[0]
-            self.assertEqual((post["platform"], post["status"], post["id"]), ("youtube", "awaiting_approval",
-                                                                             "2026-11-03-youtube-short-tip"))
-            yt = post["youtube"]
-            self.assertEqual((yt["format"], yt["voice"], yt["source"]["voice"]), ("short", "Rachel", "crew"))
-            info = video_mod.probe(ws.root / post["media"])
-            self.assertEqual((info["width"], info["height"]), (1080, 1920))
-            self.assertTrue(info["has_audio"])
-            self.assertTrue((ws.root / post["poster_image"]).stat().st_size > 1000)   # the thumbnail
-            self.assertTrue(post["scheduled_at"].startswith("2026-11-03T23:00"))      # 17:00 Chicago (CST after the clocks change)
-
-    def test_the_voice_is_only_made_after_the_editor_passes(self, tts, _claude):
-        with TempWorkspace() as ws:
-            youtube_ws(ws)
-            llm = self.llm(editor=[review(60, owner="writer", fixes=["Scene 1: shorten the hook"]), review()],
-                           supervisor=[{"action": "rewind", "target": "writer", "instructions": ["fix"], "reason": "weak"}],
-                           writer=[script(), script(words_per_scene=30)])
-            res = self.run_short(ws, llm)
-            self.assertTrue(res["ok"], res)
-            self.assertEqual(llm.agents_called().count("writer"), 2)
-            self.assertEqual(tts.call_count, 5)       # one clip per scene, once: nothing was spent on the rejected script
-
-    def test_rehearsal_spends_no_voice_characters_and_queues_nothing(self, tts, _claude):
-        with TempWorkspace() as ws:
-            youtube_ws(ws)
-            res = self.run_short(ws, dry_run=True)
-            self.assertTrue(res["ok"], res)
-            tts.assert_not_called()
-            self.assertEqual(ws.queue(), [])
-
-    def test_a_script_that_breaks_the_rules_is_sent_back_before_any_review(self, _tts, _claude):
-        with TempWorkspace() as ws:
-            youtube_ws(ws)
-            bad = script(words_per_scene=60)          # 300 words for a 75 s Short
-            llm = self.llm(writer=[bad, script()])
-            res = self.run_short(ws, llm)
-            self.assertTrue(res["ok"], res)
-            self.assertEqual(llm.agents_called().count("writer"), 2)
-
-    def test_missing_elevenlabs_key_stops_with_a_clear_reason(self, _tts, _claude):
-        with TempWorkspace() as ws:
-            youtube_ws(ws)
-            ws.update_secrets(elevenlabs_api_key="")
-            res = self.run_short(ws)
-            self.assertFalse(res["ok"])
-            self.assertIn("ElevenLabs", " ".join(res["problems"]))
-
-    def test_the_owners_own_script_and_voice_skip_those_steps(self, tts, _claude):
-        with TempWorkspace() as ws:
-            youtube_ws(ws)
-            body = "\n\n".join(narration(20, f"mine{i}") for i in range(5)).encode()
-            assets.save_stream(ws, "youtube", DAY.isoformat(), "script", "s.txt", io.BytesIO(body), len(body))
-            wav = ws.root / "own.mp3"
-            subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-f", "lavfi", "-i", "sine=duration=12", "-q:a", "9", str(wav)],
-                           check=True)
-            data = wav.read_bytes()
-            assets.save_stream(ws, "youtube", DAY.isoformat(), "voice", "v.mp3", io.BytesIO(data), len(data))
-            llm = self.llm(writer=[])
-            res = self.run_short(ws, llm)
-            self.assertTrue(res["ok"], res)
-            self.assertNotIn("writer", llm.agents_called())     # no drafting: the script is theirs
-            self.assertIn("editor", llm.agents_called())        # ...but it is still reviewed
-            tts.assert_not_called()
-            yt = ws.queue()[0]["youtube"]
-            self.assertEqual((yt["source"]["script"], yt["source"]["voice"]), ("own", "own"))
-            self.assertAlmostEqual(yt["seconds"], 12, delta=1.5)  # the voice sets the length
-
-    def test_the_owners_own_video_is_checked_and_used_as_it_is(self, _tts, _claude):
-        with TempWorkspace() as ws:
-            youtube_ws(ws)
-            mp4 = ws.root / "own.mp4"
-            subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-f", "lavfi", "-i", "color=c=blue:s=1080x1920:d=3",
-                            "-f", "lavfi", "-i", "sine=duration=3", "-shortest", "-pix_fmt", "yuv420p", str(mp4)], check=True)
-            data = mp4.read_bytes()
-            assets.save_stream(ws, "youtube", DAY.isoformat(), "video", "v.mp4", io.BytesIO(data), len(data))
-            res = self.run_short(ws)
-            self.assertTrue(res["ok"], res)
-            self.assertEqual(ws.queue()[0]["youtube"]["source"]["video"], "own")
-            wide = ws.root / "wide.mp4"
-            subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-f", "lavfi", "-i", "color=c=blue:s=1920x1080:d=3",
-                            "-f", "lavfi", "-i", "sine=duration=3", "-shortest", "-pix_fmt", "yuv420p", str(wide)], check=True)
-            data = wide.read_bytes()
-            ws.save_queue([])
-            assets.save_stream(ws, "youtube", DAY.isoformat(), "video", "v.mp4", io.BytesIO(data), len(data))
-            res = self.run_short(ws)
-            self.assertFalse(res["ok"])                          # a landscape video cannot be a Short
-            self.assertIn("does not fit", " ".join(res["problems"]))
 
 
 @unittest.skipUnless(HAVE_FFMPEG, "ffmpeg not installed")
@@ -326,9 +215,12 @@ class YouTubeCrewTests(unittest.TestCase):
 @mock.patch.object(voice, "cached_synthesize", side_effect=fake_tts)
 class YouTubePublishTests(unittest.TestCase):
     def queued(self, ws, approval="auto_with_veto"):
+        """A video made by the Shorts factory (faked: tests/test_shorts.py) and queued."""
+        from test_shorts import fake_factory
         youtube_ws(ws, dry_run=False, approval=approval)
-        llm = ScriptedLLM({"topic": [topic("Default arguments", ())], "writer": [script()], "editor": [review()]})
-        self.assertTrue(run_crew(ws, DAY, "short-tip", llm=llm, platform="youtube")["ok"])
+        with fake_factory(ws):
+            res = run_crew(ws, DAY, "short-tip", platform="youtube")
+        self.assertTrue(res["ok"], res)
         return ws.queue()[0]
 
     def due(self, post):
@@ -343,7 +235,7 @@ class YouTubePublishTests(unittest.TestCase):
             up = FakeYouTube.uploads[0]
             self.assertEqual(up["privacy"], "public")
             self.assertTrue(up["description"].endswith("#Shorts"))      # a Short is filed under Shorts
-            self.assertTrue(up["thumbnail"].endswith(".png"))
+            self.assertTrue(up["thumbnail"].endswith(".jpg"))   # the factory's own thumbnail
             self.assertEqual(ws.queue(), [])
             hist = ws.history()[-1]
             self.assertEqual((hist["platform"], hist["youtube"]["url"]), ("youtube", "https://www.youtube.com/watch?v=vid123"))
@@ -601,31 +493,3 @@ class TeachingVoiceTests(unittest.TestCase):
         self.assertIn("scene 4: no semicolons", text)
 
 
-@mock.patch.object(cred_mod, "check_claude", return_value=CLAUDE_OK)
-@mock.patch.object(voice, "cached_synthesize", side_effect=fake_tts)
-class WriterSelfRepairTests(unittest.TestCase):
-    def test_a_draft_that_breaks_a_rule_is_repaired_by_its_author_inside_the_step(self, _tts, _claude):
-        with TempWorkspace() as ws:
-            youtube_ws(ws)
-            bad = script()
-            bad["scenes"][1]["narration"] = "Here is a very short note; read it."   # a semicolon: a rule the checks send back
-            bad = finish(bad)
-            llm = ScriptedLLM({"topic": [topic("Default arguments", ())], "writer": [bad, script(), script()], "editor": [review()]})
-            res = run_crew(ws, DAY, "short-tip", llm=llm, platform="youtube")
-            self.assertTrue(res["ok"], res)
-            events = [json.loads(l) for l in (ws.runs_dir / res["run_id"] / "events.jsonl").read_text().splitlines()]
-            fixes = [e for e in events if e["kind"] == "self_fix"]
-            self.assertTrue(fixes and "0 problem" in fixes[0]["message"], fixes)        # fixed by the author, not sent back to the supervisor
-            self.assertFalse([e for e in events if e["step"] == "supervisor" and e["kind"] == "decision"])
-
-    def test_a_script_sent_back_is_revised_from_the_whole_previous_script(self, _tts, _claude):
-        from postcrew.agents.script import script_revision_block
-
-        class Ctx:
-            previous = {}
-        prev = finish(script())
-        prev["scenes"][1].update(layout="diagram", nodes=["Apple", "River"], edges=["Apple > River: go"])
-        block = script_revision_block(Ctx, ["fix scene 3"], prev)
-        self.assertIn('"nodes"', block)
-        self.assertIn("Apple > River: go", block)                                       # the pictures are shown too, not only the words
-        self.assertEqual(script_revision_block(Ctx, [], prev), "")

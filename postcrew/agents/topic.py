@@ -50,6 +50,12 @@ class TopicAgent(Agent):
 
     def run(self, ctx, guidance):
         planned = None if guidance else planned_for(ctx.ws, ctx.day, ctx.category, ctx.platform)
+        if getattr(ctx, "platform", "linkedin") == "youtube":   # the Shorts factory's writer takes the plan as it is (or picks a topic itself)
+            if not planned:
+                return {"topic": "", "angle": "", "why_now": "no plan for this day: the Script Writer picks the topic", "planned": ""}
+            out = {"topic": planned["topic"], "angle": planned.get("angle") or planned["topic"], "why_now": "from the plan",
+                   "planned": planned.get("source", "planner")}
+            return dict(out, owner_plan=planned["owner_plan"]) if planned.get("owner_plan") else out
         if planned:  # the Week Planner or the owner already chose this day's topic
             return self._planned(ctx, planned)
         if ctx.cat["media"] == "animation":
@@ -148,6 +154,8 @@ class TopicAgent(Agent):
                 "week_posts": [{"date": p["date"], "topic": p.get("topic", ""), "text": p.get("text", "")} for p in week]}
 
     def validate(self, ctx, out):
+        if getattr(ctx, "platform", "linkedin") == "youtube":   # the Shorts factory's writer checks its own topic
+            return []
         problems = []
         topic = (out.get("topic") or "").strip()
         if not 5 <= len(topic) <= 90:

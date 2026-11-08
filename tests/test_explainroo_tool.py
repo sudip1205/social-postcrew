@@ -15,14 +15,6 @@ from postcrew.agents.supervisor import crew_for  # noqa: E402
 
 
 class ExplainrooToolTests(unittest.TestCase):
-    def test_the_renderer_replaces_the_video_producer(self):
-        with TempWorkspace() as ws:
-            cfg = ws.config()
-            cfg["platforms"]["youtube"]["video"]["renderer"] = "explainroo"
-            ws.save_config(cfg)
-            view = platforms.view(ws.config(), "youtube")
-            media = [a for a in crew_for("youtube", view, "short-tip") if a.id == "media"][0]
-            self.assertIsInstance(media, ExplainrooAgent)
 
     def test_a_topic_can_choose_it_too(self):
         with TempWorkspace() as ws:

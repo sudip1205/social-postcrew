@@ -262,7 +262,7 @@ class PublisherAgent(Agent):
         if ctx.platform == "youtube":
             from .yt_publish import enqueue_youtube
             post = enqueue_youtube(ctx.ws, ctx.cfg, ctx.run.status["run_id"], ctx.day, ctx.category, ctx.outputs,
-                                   ctx.outputs["editor"])
+                                   ctx.outputs.get("editor") or {})
         else:
             post = enqueue(ctx.ws, ctx.cfg, ctx.run.status["run_id"], ctx.day, ctx.category, ctx.outputs["formatter"],
                            ctx.outputs["editor"])

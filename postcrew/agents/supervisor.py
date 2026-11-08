@@ -35,6 +35,7 @@ from .direction import CreativeDirectorAgent
 from .quality import QualityDirectorAgent
 from .voice import VoiceAgent
 from .writer import WriterAgent
+from .shorts import ShortsRender, ShortsWriter
 
 CREW = [CredentialsAgent(), TopicAgent(), ResearchAgent(), WriterAgent(), MediaAgent(), EditorAgent(),
         FormatterAgent(), PublisherAgent()]
@@ -42,8 +43,9 @@ CREW = [CredentialsAgent(), TopicAgent(), ResearchAgent(), WriterAgent(), MediaA
 # reviews the SCRIPT, so the voice and the video are only made after it passes: nothing is spent on a script sent back.
 # Motion Studio: the Creative Director plans every scene's picture before the Storyboard Artist draws it; the Quality Director watches the
 # finished video and sends weak scenes back to be drawn again (the voice is reused).
-YOUTUBE_CREW = [CredentialsAgent(), TopicAgent(), ResearchAgent(), ScriptWriter(), EditorAgent(), CreativeDirectorAgent(), GraphicsAgent(),
-                VoiceAgent(), VideoAgent(), VideoReviewAgent(), HooksAgent(), QualityDirectorAgent(), PublisherAgent()]
+# The YouTube crew is the owner's Shorts factory (agents/shorts.py): Claude Code with the factory's skill writes the episode, the factory
+# renders it (Kokoro, HyperFrames, FFmpeg), and the Publisher queues it.
+YOUTUBE_CREW = [CredentialsAgent(), TopicAgent(), ShortsWriter(), ShortsRender(), PublisherAgent()]
 CREWS = {"linkedin": CREW, "youtube": YOUTUBE_CREW}
 ORDER = [a.id for a in CREW]
 FIXABLE = ["topic", "research", "writer", "voice", "text_frames", "data_frames", "media"]   # steps the supervisor may send work back to
@@ -53,6 +55,8 @@ def crew_for(platform, cfg=None, category=None):
     """The agents of one run. cfg: that app's view of the config (platforms.view); with the blackboard renderer the
     Blackboard Producer replaces the Video Producer."""
     crew = CREWS.get(platform) or CREW
+    if platform == "youtube":   # the Shorts factory draws every video itself
+        return crew
     drawn = {"blackboard": BlackboardAgent, "explainer": ExplainerAgent, "explainroo": ExplainrooAgent, "remotion": RemotionAgent}.get(platforms.renderer_for(cfg, category)) if cfg else None
     if drawn:
         if drawn is RemotionAgent:   # three steps: the word scenes (HyperFrames), the data scenes (Remotion), then one joins them

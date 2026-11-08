@@ -123,16 +123,6 @@ class RenderTests(unittest.TestCase):
 
 
 class WiringTests(unittest.TestCase):
-    def test_the_crew_gets_the_blackboard_producer_only_when_asked(self):
-        with TempWorkspace() as ws:
-            cfg = platforms.view(ws.config(), "youtube")
-            ids = lambda crew: [type(a) for a in crew if a.id == "media"]
-            self.assertEqual(ids(crew_for("youtube", cfg, "short-tip")), [VideoAgent])
-            self.assertEqual(ids(crew_for("youtube", dict(cfg, video=dict(cfg["video"], renderer="blackboard")), "short-tip")),
-                             [BlackboardAgent])
-            cats = {**cfg["categories"], "short-tip": dict(cfg["categories"]["short-tip"], renderer="blackboard")}
-            self.assertEqual(ids(crew_for("youtube", dict(cfg, categories=cats), "short-tip")), [BlackboardAgent])
-            self.assertEqual(ids(crew_for("youtube", dict(cfg, categories=cats), "explainer")), [VideoAgent])
 
     def test_youtube_starts_with_no_predefined_topics(self):
         from postcrew.defaults import DEFAULT_CONFIG
@@ -156,33 +146,6 @@ class WiringTests(unittest.TestCase):
             self.assertTrue(any("short-tip.renderer" in e for e in validate_config(cfg)))
 
 
-@unittest.skipUnless(FFMPEG, "ffmpeg is not installed")
-@mock.patch.object(cred_mod, "check_claude", return_value=yc.CLAUDE_OK)
-@mock.patch.object(voice, "cached_synthesize", side_effect=yc.fake_tts)
-class BlackboardCrewTests(unittest.TestCase):
-    def test_the_voice_is_made_first_and_the_board_is_drawn_to_it(self, tts, _claude):
-        seen = {}
-        real = bb.render
-
-        def spy(*a, **kw):
-            seen["tts_calls"], seen["audio"] = tts.call_count, kw.get("audio")
-            return real(*a, **kw)
-
-        with TempWorkspace() as ws, mock.patch.object(bb, "render", spy):
-            yc.youtube_ws(ws)
-            cfg = ws.config()
-            cfg["platforms"]["youtube"]["video"]["renderer"] = "blackboard"
-            ws.save_config(cfg)
-            llm = ScriptedLLM({"topic": [yc.topic("Default arguments", ())], "writer": [yc.script()], "editor": [yc.review()],
-                               "video_review": [{"verdict": "pass", "score": 95, "summary": "in step", "scenes": []}]})
-            res = run_crew(ws, yc.DAY, "short-tip", llm=llm, platform="youtube")
-            self.assertTrue(res["ok"], res)
-            self.assertEqual(seen["tts_calls"], 5)                    # every scene was voiced before the first stroke
-            self.assertEqual(len(seen["audio"]), 5)
-            post = ws.queue()[0]
-            self.assertEqual(video_mod.probe(ws.root / post["media"])["width"], 1080)
-            run = json.loads((ws.runs_dir / res["run_id"] / "status.json").read_text())
-            self.assertEqual(run["steps"]["media"]["state"], "passed")
 
 
 if __name__ == "__main__":

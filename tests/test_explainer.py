@@ -163,41 +163,8 @@ class SettingsTests(unittest.TestCase):
             yt["video"].update(target_seconds=90, pace="fast")
             self.assertTrue(any("video.pace" in e for e in validate_config(cfg)))
 
-    def test_explainer_is_a_renderer_and_the_default(self):
-        from postcrew.defaults import DEFAULT_CONFIG
-        self.assertEqual(DEFAULT_CONFIG["platforms"]["youtube"]["video"]["renderer"], "remotion")
-        self.assertEqual(DEFAULT_CONFIG["platforms"]["youtube"]["video"]["pace"], "slow")
-        with TempWorkspace() as ws:
-            cfg = platforms.view(ws.config(), "youtube")
-            ids = lambda crew: [type(a) for a in crew if a.id == "media"]
-            self.assertEqual(ids(crew_for("youtube", dict(cfg, video=dict(cfg["video"], renderer="explainer")), "short-tip")),
-                             [ExplainerAgent])
 
 
-@unittest.skipUnless(yc.HAVE_FFMPEG, "ffmpeg not installed")
-@mock.patch.object(cred_mod, "check_claude", return_value=yc.CLAUDE_OK)
-@mock.patch.object(voice, "cached_synthesize", side_effect=yc.fake_tts)
-class ExplainerCrewTests(unittest.TestCase):
-    def test_the_crew_makes_an_explainer_video_and_the_video_editor_checks_it(self, tts, _claude):
-        with TempWorkspace() as ws:
-            yc.youtube_ws(ws)
-            cfg = ws.config()
-            cfg["platforms"]["youtube"]["video"]["renderer"] = "explainer"
-            ws.save_config(cfg)
-            script = yc.script()
-            script["scenes"][1] = dict(script["scenes"][1], narration="The client asks the server. " + script["scenes"][1]["narration"], layout="diagram", on_screen="Ask the server",
-                                       nodes=["Client|client", "Server|server"], edges=["Client > Server: ask"])
-            llm = ScriptedLLM({"topic": [topic("Default arguments", ())], "writer": [yc.finish(script)], "editor": [review()],
-                               "video_review": [{"verdict": "pass", "score": 95, "summary": "in step", "scenes": []}]})
-            res = run_crew(ws, yc.DAY, "short-tip", llm=llm, platform="youtube")
-            self.assertTrue(res["ok"], res)
-            run = ws.runs_dir / res["run_id"]
-            media = json.loads((run / "media.json").read_text())
-            self.assertEqual(media["renderer"], "explainer")
-            steps = json.loads((run / "status.json").read_text())["steps"]
-            self.assertEqual(steps["video_review"]["state"], "passed")      # the second review ran on the explainer too
-            self.assertEqual(tts.call_count, 5)
-            self.assertEqual(video_mod.probe(ws.root / ws.queue()[0]["media"])["width"], 1080)
 
 
 if __name__ == "__main__":

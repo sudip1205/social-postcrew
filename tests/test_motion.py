@@ -455,14 +455,6 @@ class QualityDirectorTests(unittest.TestCase):
             self.assertLessEqual(out["score"], 59)
             self.assertTrue(out["held"])
 
-    def test_the_supervisor_draws_again_from_the_frame_steps(self):
-        from postcrew.agents.supervisor import Supervisor, crew_for
-        crew = crew_for("youtube")
-        sup = Supervisor(crew)
-        d = sup._diagnose(SimpleNamespace(), "quality", ["picture quality 50/100"], {}, {})
-        self.assertEqual((d["action"], d["target"]), ("rewind", "media"))
-        self.assertLess(sup.order.index("direction"), sup.order.index("graphics"))
-        self.assertLess(sup.order.index("hooks"), sup.order.index("quality"))
 
 
 if __name__ == "__main__":

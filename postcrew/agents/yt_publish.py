@@ -19,6 +19,8 @@ LABEL = "YouTube"
 
 def enqueue_youtube(ws, cfg, run_id, day, category, outputs, review):
     """Queue the finished video. cfg: the app's view of the config. outputs: the run's accepted outputs."""
+    if "slug" in (outputs.get("writer") or {}):   # made by the Shorts factory (agents/shorts.py)
+        return _enqueue_short(ws, cfg, run_id, day, category, outputs)
     script, video, voice = outputs["writer"], outputs["media"], outputs.get("voice") or {}
     try:   # the scenes as they were drawn (after the Storyboard Artist and any redraw): the model a video you approve leaves (rewards.py)
         (ws.runs_dir / run_id / "script.final.json").write_text(json.dumps(script, indent=1, default=str))
@@ -71,6 +73,40 @@ def enqueue_youtube(ws, cfg, run_id, day, category, outputs, review):
     check = outputs.get("video_review")   # the Video Editor's verdict on the finished video (blackboard videos)
     if check:
         post["youtube"]["video_review"] = {k: check.get(k) for k in ("verdict", "score", "first_score", "redrawn", "summary", "measured")}
+    ws.save_queue([p for p in ws.queue() if p["id"] != pid] + [post])
+    return post
+
+
+def _enqueue_short(ws, cfg, run_id, day, category, outputs):
+    """Queue a Short the factory made: its video, thumbnail and youtube.json (title, description, tags)."""
+    w, video = outputs["writer"], outputs["media"]
+    platform = cfg.get("platform", "youtube")
+    pid = f"{day.isoformat()}-{platform}-{category}"
+    plan_id = plan_id_for(ws, platform, day, category)
+    if plan_id:
+        pid += f"-{plan_id}"
+    media_dir = ws.root / "media"
+    media_dir.mkdir(exist_ok=True)
+    dest = media_dir / f"{pid}.mp4"
+    shutil.copy2(video["path"], dest)
+    thumb = None
+    if video.get("thumbnail_path") and Path(video["thumbnail_path"]).exists():
+        thumb = media_dir / f"{pid}{Path(video['thumbnail_path']).suffix}"
+        shutil.copy2(video["thumbnail_path"], thumb)
+    mode = cfg["publishing"]["approval"]
+    post = {
+        "id": pid, "platform": platform, "run_id": run_id, "date": day.isoformat(), "category": category,
+        "topic": w["title"], "text": w["description"], "first_comment": "",
+        "media": str(dest.relative_to(ws.root)), "media_kind": "video", **({"poster_image": str(thumb.relative_to(ws.root))} if thumb else {}),
+        "status": "awaiting_approval" if mode == "manual" else "queued",
+        "scheduled_at": scheduled_at(cfg, day) if mode != "immediate" else datetime.now(timezone.utc).isoformat(),
+        "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "review": {},
+        **({"plan_id": plan_id} if plan_id else {}),
+        "youtube": {"title": w["title"], "description": w["description"], "tags": w["tags"], "format": "short",
+                    "seconds": video["seconds"], "thumbnail_text": "", "voice": "kokoro", "scenes": [],
+                    "episode": w["slug"], "source": {"script": "shorts-factory", "voice": "kokoro", "video": video.get("engine", "shorts-factory")},
+                    "video_id": None, "url": None},
+    }
     ws.save_queue([p for p in ws.queue() if p["id"] != pid] + [post])
     return post
 

@@ -43,14 +43,6 @@ class RemotionTests(unittest.TestCase):
         scenes = [{"layout": "title"}, {"layout": "statement"}, {"layout": "diagram"}, {"layout": "trace"}, {"layout": "statement"}]
         self.assertEqual([hf.engine_for(s) for s in scenes], ["hyperframes", "hyperframes", "remotion", "remotion", "hyperframes"])
 
-    def test_three_steps_replace_the_video_producer(self):
-        with TempWorkspace() as ws:
-            cfg = ws.config()
-            cfg["platforms"]["youtube"]["video"]["renderer"] = "remotion"
-            ws.save_config(cfg)
-            view = platforms.view(ws.config(), "youtube")
-            ids = [a.id for a in crew_for("youtube", view, None)]
-            self.assertEqual(ids[ids.index("voice") + 1:ids.index("voice") + 4], ["text_frames", "data_frames", "media"])
 
     def test_each_engine_draws_its_own_scenes(self):
         from postcrew.agents.base import RunContext
