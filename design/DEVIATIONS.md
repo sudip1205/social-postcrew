@@ -153,3 +153,7 @@ No Stitch screen exists for either view. Both are derived from the shell, design
 - "Problem files" in Add your own plan copies the dashed drop zone of upload-your-own-youtube.html (icon tile, title, limits line). A plan
   card's files sit in a light inner box with a `chip()` for the Reader's state, file pills with a remove x, and a <details> of what was read.
 
+
+## Factory (no Stitch screen)
+- A chat with Claude Code inside the Shorts factory, beside the factory's rendered videos and its skill files. Built from the Queue page's
+  width, the shared cards, chips and buttons; chat bubbles use the violet accent for your messages and white cards for Claude's.

@@ -72,3 +72,9 @@ category
 terminal
 event_busy
 fast_forward
+add_comment
+folder
+playlist_add
+send
+stop
+lightbulb

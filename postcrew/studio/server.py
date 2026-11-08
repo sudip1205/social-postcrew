@@ -33,7 +33,7 @@ from ..agents.frames import HyperFramesAgent, RemotionAgent, RemotionFramesAgent
 from ..agents.hooks import HooksAgent
 from ..agents.graphics import GraphicsAgent
 from ..agents.video_review import VideoReviewAgent
-from .. import attachments, engage, rewards, yt_analytics
+from .. import attachments, engage, factory_chat, rewards, yt_analytics
 from ..agents.direction import CreativeDirectorAgent
 from ..agents.quality import QualityDirectorAgent
 from ..agents.voice import VoiceAgent
@@ -906,6 +906,10 @@ def make_handler(studio):
                     return self.file(STATIC / p[len("/static/"):], STATIC)
                 if method == "GET" and p.startswith("/media/"):
                     return self.media(ws.root / "media" / p[len("/media/"):], ws.root / "media")
+                if method == "GET" and p.startswith("/factory-out/"):   # the Shorts factory's rendered videos (Factory page)
+                    from ..agents.shorts import factory_dir
+                    out = factory_dir(platforms.view(ws.config(), "youtube")) / "out"
+                    return self.media(out / p[len("/factory-out/"):], out)
                 if method == "GET" and p == "/oauth/start":
                     try:
                         return self.send(302, {}, headers={"Location": studio.oauth_start()})
@@ -993,6 +997,11 @@ def make_handler(studio):
                     ("POST", "/api/runs"): lambda: studio.start_run({k: v for k, v in self.body().items() if k not in ("kept", "kept_from")}),
                     ("POST", "/api/runs/rerun"): lambda: studio.rerun(self.body()),
                     ("GET", "/api/missed"): lambda: studio.missed(),
+                    ("GET", "/api/factory"): lambda: factory_chat.view(ws),
+                    ("POST", "/api/factory/send"): lambda: factory_chat.send(ws, self.body().get("text")),
+                    ("POST", "/api/factory/stop"): lambda: factory_chat.stop(ws),
+                    ("POST", "/api/factory/reset"): lambda: factory_chat.reset(ws),
+                    ("POST", "/api/factory/queue"): lambda: factory_chat.queue_video(ws, self.body().get("slug"), self.body().get("date")),
                     ("POST", "/api/missed/run"): lambda: studio.missed_run(self.body()),
                     ("POST", "/api/missed/dismiss"): lambda: studio.missed_dismiss(self.body()),
                     ("GET", "/api/queue"): lambda: {"queue": ws.queue(), "history": ws.history()},
