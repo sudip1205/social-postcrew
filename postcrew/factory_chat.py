@@ -13,16 +13,18 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .agents.shorts import factory_dir
+from .agents.shorts import SKILL_RULE, factory_dir, skill_version
 
 STATE = "factory-chat"
-TOOLS = ["Read", "Write", "Edit", "Glob", "Grep", "WebSearch", "WebFetch", "TodoWrite",
+TOOLS = ["Read", "Write", "Edit", "Glob", "Grep", "WebSearch", "WebFetch", "TodoWrite", "Skill",
          "Bash(npm run make:*)", "Bash(npm run tts:*)", "Bash(npm run voices:*)", "Bash(ls:*)", "Bash(ffprobe:*)", "Bash(cat:*)"]
 SYSTEM = ("You are working for the channel owner through the postcrew Studio's Factory page (a chat, like the Claude Code app). "
           "Follow CLAUDE.md and the explainer-short-style skill. A topic means: write the episode (script.json and youtube.json, privacyStatus "
           "\"private\") and render it with `npm run make -- episodes/<slug>` from shorts-factory/. An instruction about how videos should look, "
           "sound or be written from now on means: apply it and write it into the skill (CLAUDE.md's standing rule), then say which skill files "
-          "changed. Never upload to YouTube yourself: the owner queues finished videos from the Studio. Keep replies short.")
+          "changed. Never upload to YouTube yourself: the owner queues finished videos from the Studio. Keep replies short. "
+          "When making a video: " + SKILL_RULE)
+PLAN_SLUG = re.compile(r"^plan-([a-z0-9]{6,32})-")
 MAX_MESSAGES = 200
 _lock = threading.Lock()
 _busy = threading.Event()
@@ -65,7 +67,46 @@ def view(ws):
     root = factory_dir(_cfg(ws))
     st = load(ws)
     return {"messages": st["messages"], "session": bool(st.get("session_id")), "busy": busy(), "factory": str(root),
-            "found": (root / "package.json").exists(), "videos": videos(ws), "skill": skill_files(ws)}
+            "found": (root / "package.json").exists(), "videos": videos(ws), "skill": skill_files(ws),
+            "skill_version": skill_version(root) if (root / "package.json").exists() else {}, "plans": plans(ws)}
+
+
+def plans(ws):
+    """Your own YouTube plans that are not made yet (Manual run), for the Use a plan list."""
+    from . import monthly
+    try:
+        items = monthly.unassigned(ws, "youtube")
+    except Exception:
+        return []
+    return [{"id": i["id"], "title": i.get("title") or "", "format": i.get("format") or "short", "files": len((i.get("source") or {}).get("files") or []),
+             "read": (i.get("source") or {}).get("state") or ""} for i in items if i.get("manual")]
+
+
+def plan_prompt(ws, item_id):
+    """The message that asks for one of your plans: your words, how you want it made, the problem read from your files, and where those
+    files are on this computer (Claude opens them itself)."""
+    from . import monthly, attachments
+    try:
+        item = monthly._item(monthly.load(ws, "youtube"), str(item_id or ""))
+    except ValueError:
+        raise ValueError("that plan is gone")
+    slug = f"plan-{item['id']}-" + (re.sub(r"[^a-z0-9]+", "-", (item.get("title") or "short").lower()).strip("-")[:40].strip("-") or "short")
+    src = item.get("source") or {}
+    lines = [f"Make a YouTube {item.get('format') or 'short'} from my plan below, as episode `episodes/{slug}/` (use exactly this folder name: "
+             f"it ties the video to the plan). Write script.json and youtube.json, then render it.", "", f"Title: {item.get('title', '')}"]
+    for key, label in (("context", "What it is about"), ("how", "How I want it made"), ("takeaway", "What the viewer should take away"),
+                       ("tone", "Tone")):
+        if item.get(key):
+            lines.append(f"{label}: {item[key]}")
+    if item.get("references"):
+        lines.append("References: " + " ".join(item["references"]))
+    if src.get("statement"):
+        lines += ["", "The problem, as read from my files:", attachments.statement_text(src["statement"])]
+    files = src.get("files") or []
+    if files:
+        d = attachments.plan_dir(ws, "youtube", item["id"])
+        lines += ["", "My files for it (open them):"] + [f"- {d / f['file']}" for f in files if f.get("file")]
+    return {"text": "\n".join(lines), "slug": slug, "plan_id": item["id"]}
 
 
 def _cfg(ws):
@@ -237,8 +278,13 @@ def queue_video(ws, slug, day):
     except (ValueError, OSError):
         pass
     category = platforms.category_for(cfg["schedule"], day) or next(iter(cfg["categories"]), "short")
+    m = PLAN_SLUG.match(slug)
+    plan_id = m.group(1) if m else None
     outputs = {"writer": {"slug": slug, "title": meta.get("title") or slug, "description": meta.get("description", ""), "tags": meta.get("tags") or []},
                "media": {"path": str(video), "thumbnail_path": str(video.with_suffix(".jpg")) if video.with_suffix(".jpg").exists() else "",
                          "seconds": round(secs, 1), "engine": video.stem.rsplit("-", 1)[-1]}}
     post = enqueue_youtube(ws, cfg, f"factory-chat-{slug}", day, category, outputs, {})
+    if plan_id:   # made from one of your plans: the plan counts as made (it leaves Manual run) once its video is queued
+        post["plan_id"] = plan_id
+        ws.save_queue([post if p["id"] == post["id"] else p for p in ws.queue()])
     return {"post": post}

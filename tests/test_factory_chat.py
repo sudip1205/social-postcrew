@@ -96,6 +96,28 @@ class FactoryChatTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 factory_chat.delete_video(ws, "gil-explained")
 
+    def test_a_manual_plan_fills_the_message_and_its_video_marks_the_plan_made(self):
+        from postcrew import monthly
+        with TempWorkspace() as ws, fake_factory(ws) as (root, _calls):
+            item = monthly.add_manual(ws, "youtube", "Two Sum with a hash map", "Find two numbers that add to a target", "draw the map filling",
+                                      "short", "", "", [])
+            self.assertEqual([p["id"] for p in factory_chat.plans(ws)], [item["id"]])
+            r = factory_chat.plan_prompt(ws, item["id"])
+            self.assertTrue(r["slug"].startswith(f"plan-{item['id']}-two-sum"))
+            self.assertIn("Find two numbers that add to a target", r["text"])
+            self.assertIn("How I want it made: draw the map filling", r["text"])
+            self.assertIn(f"episodes/{r['slug']}/", r["text"])
+            ep = root / "episodes" / r["slug"]
+            ep.mkdir(parents=True)
+            (ep / "youtube.json").write_text(json.dumps({"title": "Two Sum in 45 seconds", "description": "d", "tags": []}))
+            (root / "out").mkdir()
+            (root / "out" / f"{r['slug']}-hyperframes.mp4").write_bytes(b"mp4")
+            post = factory_chat.queue_video(ws, r["slug"], "2030-01-05")["post"]
+            self.assertEqual(post["plan_id"], item["id"])
+            self.assertEqual(factory_chat.plans(ws), [])   # made: it leaves the list
+            with self.assertRaises(ValueError):
+                factory_chat.plan_prompt(ws, "nope0000")
+
 
 if __name__ == "__main__":
     unittest.main()

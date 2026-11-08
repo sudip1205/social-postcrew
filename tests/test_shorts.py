@@ -77,6 +77,8 @@ class ShortsCrewTests(unittest.TestCase):
             self.assertEqual(claude[1]["cwd"], str(root.parent))       # started in the factory's workspace: its CLAUDE.md and skill apply
             self.assertIn("explainer-short-style", claude[1]["input"])
             self.assertIn("Do NOT render", claude[1]["input"])
+            self.assertIn("read the current skill from disk", claude[1]["input"])   # every scheduled run reads the skill as it is now
+            self.assertIn("Skill", claude[0][claude[0].index("--tools") + 1])
             self.assertEqual(make[0][:3], ["npm", "run", "make"])
             self.assertEqual(make[1]["cwd"], str(root))
             post = ws.queue()[0]
@@ -85,6 +87,8 @@ class ShortsCrewTests(unittest.TestCase):
             self.assertTrue((ws.root / post["media"]).exists())
             self.assertTrue(post["poster_image"].endswith(".jpg"))
             self.assertAlmostEqual(res["cost_usd"], 0.42)
+            import json as _j
+            self.assertEqual(len(_j.loads((ws.runs_dir / res["run_id"] / "writer.json").read_text())["skill"]["fingerprint"]), 10)
 
     def test_a_planned_topic_is_handed_to_the_writer(self):
         with TempWorkspace() as ws, fake_factory(ws) as (_root, calls):

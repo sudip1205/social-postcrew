@@ -61,6 +61,13 @@ function fcDraw(d) {
     if (!confirm(`Delete the video "${b.dataset.fcTitle}"? Its script stays, so Claude can make it again.`)) return;
     try { fcDraw(await post("/api/factory/delete", { slug: b.dataset.fcDelete })); toast("Video deleted"); } catch (e) { toast(e.message, true); }
   });
+  const sel = $("#fc-plan"), was = sel.value;
+  if (sel.dataset.ids !== (d.plans || []).map(x => x.id).join(",")) {
+    sel.innerHTML = `<option value="">${(d.plans || []).length ? "Pick one of your plans…" : "No plans waiting in Manual run"}</option>` +
+      (d.plans || []).map(x => `<option value="${esc(x.id)}">${esc(x.title)} · ${esc(x.format)}${x.files ? ` · ${x.files} file${x.files > 1 ? "s" : ""}` : ""}</option>`).join("");
+    sel.dataset.ids = (d.plans || []).map(x => x.id).join(","); sel.value = was;
+  }
+  $("#fc-skillver").textContent = d.skill_version?.fingerprint ? `version ${d.skill_version.fingerprint}, changed ${ago(d.skill_version.changed)}` : "";
   $("#fc-skill").innerHTML = (d.skill || []).map(f => `<li class="flex items-center justify-between gap-2 py-1"><span class="font-mono text-[11px] text-slate-700 truncate">${esc(f.path)}</span><span class="text-[11px] text-slate-400 whitespace-nowrap">${esc(ago(f.changed))}</span></li>`).join("");
   document.querySelectorAll("[data-fc-example]").forEach(b => b.onclick = () => { $("#fc-text").value = b.dataset.fcExample; $("#fc-text").focus(); });
   document.querySelectorAll("[data-fc-queue]").forEach(b => b.onclick = async () => {
@@ -97,6 +104,10 @@ async function renderFactory() {
       <section class="lg:col-span-7 bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col h-[calc(100vh-14rem)] min-h-[480px]">
         <div id="fc-log" class="flex-1 overflow-y-auto p-5 space-y-3 bg-slate-50/50 rounded-t-xl"></div>
         <div class="p-3 border-t border-slate-200 flex flex-col gap-2">
+          <div class="flex items-center gap-2">
+            <label class="text-xs font-semibold text-slate-600 flex items-center gap-1 shrink-0" for="fc-plan">${icon("assignment", "text-sm text-slate-400")}<span>${tip("Use a plan", "One of your own YouTube plans from Manual run: its words, how you want it made, the problem read from your files, and the files themselves go into the message. Moving its video to the Queue marks the plan as made.")}</span></label>
+            <select id="fc-plan" class="flex-1 min-w-0 text-xs border border-slate-300 rounded-md px-2 py-1.5 bg-white"></select>
+          </div>
           <textarea id="fc-text" rows="3" class="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-violet-500 resize-y"
             placeholder="A topic for a new Short, or an instruction for every video (Enter sends, Shift+Enter for a new line)"></textarea>
           <div class="flex items-center justify-between gap-2">
@@ -117,7 +128,7 @@ async function renderFactory() {
         <section class="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-2">
           <div class="flex items-center gap-2"><div class="w-7 h-7 rounded-lg bg-sky-100 text-sky-700 flex items-center justify-center">${icon("school", "text-base")}</div>
             <h2 class="text-lg font-bold font-headline text-slate-900">Skill</h2></div>
-          <p class="text-xs text-slate-500">The rules every video follows, and when each file last changed.</p>
+          <p class="text-xs text-slate-500">The rules every video follows, read fresh by the chat and by every scheduled run: <span id="fc-skillver" class="font-mono"></span></p>
           <ul id="fc-skill" class="divide-y divide-slate-100"></ul>
         </section>
       </aside>
@@ -131,6 +142,13 @@ async function renderFactory() {
     try { fcDraw(await post("/api/factory/send", { text })); $("#fc-text").value = ""; fcPoll(); } catch (e) { toast(e.message, true); }
   };
   $("#fc-send").onclick = send;
+  $("#fc-plan").onchange = async e => {
+    if (!e.target.value) return;
+    const cur = $("#fc-text").value.trim();
+    if (cur && !confirm("Replace what you have typed with this plan?")) { e.target.value = ""; return; }
+    try { const r = await api(`/api/factory/plan?id=${encodeURIComponent(e.target.value)}`); $("#fc-text").value = r.text; $("#fc-text").focus(); }
+    catch (err) { toast(err.message, true); }
+  };
   $("#fc-text").onkeydown = e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } };
   $("#fc-stop").onclick = async () => { try { fcDraw(await post("/api/factory/stop")); } catch (e) { toast(e.message, true); } };
   $("#fc-new").onclick = async () => { try { fcDraw(await post("/api/factory/reset")); } catch (e) { toast(e.message, true); } };

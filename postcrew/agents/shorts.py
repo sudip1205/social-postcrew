@@ -20,7 +20,28 @@ from .base import Agent, AgentError
 from ..llm import agent_settings
 
 SLUG = re.compile(r"^[a-z0-9][a-z0-9-]{1,60}$")
-WRITER_TOOLS = ["Read", "Write", "Edit", "Glob", "Grep", "WebSearch", "WebFetch"]
+WRITER_TOOLS = ["Read", "Write", "Edit", "Glob", "Grep", "WebSearch", "WebFetch", "Skill"]
+SKILL = ".claude/skills/explainer-short-style"
+# Said to Claude on every run, so a scheduled video always follows the skill as it is NOW (changed from the Studio's Factory chat or by hand):
+# the skill is read from disk at the start of each run, never remembered from an earlier one.
+SKILL_RULE = (f"BEFORE writing anything, read the current skill from disk: {SKILL}/SKILL.md in full (including its Owner rules log at the "
+              f"bottom), then every file in {SKILL}/references/ that SKILL.md points to for this kind of video, and CLAUDE.md. These files "
+              f"change often: their newest rules win over anything in the example episodes.")
+
+
+def skill_version(root):
+    """{file: modified time} of the factory's CLAUDE.md and skill, and a short fingerprint of them: which rules a video was made with."""
+    import hashlib
+    base = Path(root).parent
+    files = [base / "CLAUDE.md"] + sorted((base / SKILL).rglob("*.md"))
+    h = hashlib.sha1()
+    for f in files:
+        if f.exists():
+            h.update(f.read_bytes())
+    newest = max((f.stat().st_mtime for f in files if f.exists()), default=0)
+    from datetime import datetime, timezone
+    return {"fingerprint": h.hexdigest()[:10],
+            "changed": datetime.fromtimestamp(newest, timezone.utc).isoformat(timespec="seconds") if newest else ""}
 
 
 def factory_dir(cfg):
@@ -65,6 +86,7 @@ class ShortsWriter(Agent):
             ("Owner's plan for this video:\n" + json.dumps(topic["owner_plan"], ensure_ascii=False, indent=1)) if topic.get("owner_plan") else "",
             ("Recent videos (do not repeat): " + "; ".join(_recent(ctx))) if _recent(ctx) else "",
             "",
+            SKILL_RULE,
             "Follow CLAUDE.md and the explainer-short-style skill exactly, as for any video in this workspace. Use the existing episodes as",
             "examples of the files. Write ONLY these two files:",
             f"  shorts-factory/episodes/{slug}/script.json   (the scenes and narration)",
@@ -102,7 +124,7 @@ class ShortsWriter(Agent):
             meta = json.loads((ep / "youtube.json").read_text())
         except (OSError, ValueError) as e:
             raise AgentError(f"the episode files were not written correctly: {e}")
-        return {"slug": slug, "episode": str(ep), "title": meta.get("title", ""), "description": meta.get("description", ""),
+        return {"slug": slug, "episode": str(ep), "skill": skill_version(root), "title": meta.get("title", ""), "description": meta.get("description", ""),
                 "tags": meta.get("tags") or [], "scene_count": len(script.get("scenes") or []),
                 "narration": " ".join(str(sc.get("say") or sc.get("narration") or sc.get("voice") or "") for sc in script.get("scenes") or [])[:4000]}
 
@@ -115,7 +137,7 @@ class ShortsWriter(Agent):
         return p
 
     def summary(self, out):
-        return f"{out['title']} ({out['scene_count']} scenes)"
+        return f"{out['title']} ({out['scene_count']} scenes, skill {(out.get('skill') or {}).get('fingerprint', '?')})"
 
 
 class ShortsRender(Agent):
