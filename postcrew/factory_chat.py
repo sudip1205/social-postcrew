@@ -18,7 +18,7 @@ from .agents.shorts import SKILL, SKILL_RULE, factory_dir, skill_version
 
 STATE = "factory-chat"
 TOOLS = ["Read", "Write", "Edit", "Glob", "Grep", "WebSearch", "WebFetch", "TodoWrite", "Skill",
-         "Bash(npm run make:*)", "Bash(npm run tts:*)", "Bash(npm run voices:*)", "Bash(ls:*)", "Bash(ffprobe:*)", "Bash(ffmpeg:*)", "Bash(cat:*)"]
+         "Bash(npm run make:*)", "Bash(npm run tts:*)", "Bash(npm run voices:*)", "Bash(ls:*)", "Bash(ffprobe:*)", "Bash(ffmpeg:*)", "Bash(cat:*)", "Bash(npm run variety:*)"]
 EDIT_DIR = "skill-edit"   # ~/Youtube/skill-edit/: the copy of the skill Claude edits (Claude Code never lets it write inside .claude/)
 SKILL_EDIT_RULE = (f" The skill folder {SKILL}/ is write-protected for you: to change the skill, edit the working copy in "
                    f"{EDIT_DIR}/explainer-short-style/ instead (same files; it is a fresh copy of the skill). The Studio copies your changes "

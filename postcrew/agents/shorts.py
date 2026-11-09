@@ -20,13 +20,16 @@ from .base import Agent, AgentError
 from ..llm import agent_settings
 
 SLUG = re.compile(r"^[a-z0-9][a-z0-9-]{1,60}$")
-WRITER_TOOLS = ["Read", "Write", "Edit", "Glob", "Grep", "WebSearch", "WebFetch", "Skill"]
+WRITER_TOOLS = ["Read", "Write", "Edit", "Glob", "Grep", "WebSearch", "WebFetch", "Skill", "Bash(npm run variety:*)"]
 SKILL = ".claude/skills/explainer-short-style"
 # Said to Claude on every run, so a scheduled video always follows the skill as it is NOW (changed from the Studio's Factory chat or by hand):
 # the skill is read from disk at the start of each run, never remembered from an earlier one.
 SKILL_RULE = (f"BEFORE writing anything, read the current skill from disk: {SKILL}/SKILL.md in full (including its Owner rules log at the "
               f"bottom), then every file in {SKILL}/references/ that SKILL.md points to for this kind of video, and CLAUDE.md. These files "
-              f"change often: their newest rules win over anything in the example episodes.")
+              f"change often: their newest rules win over anything in the example episodes. "
+              f"Every video must differ from the recent ones (the owner will monetise the channel; YouTube refuses template look-alikes): "
+              f"run `npm run variety` in shorts-factory/ first and follow {SKILL}/references/variety.md (shape, hook, voice, speed, scene "
+              f"order, opening, title, sign-off), then run `npm run variety -- episodes/<slug>` and fix the script until it prints ok.")
 
 
 def skill_version(root):
