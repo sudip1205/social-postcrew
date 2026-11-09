@@ -155,6 +155,8 @@ No Stitch screen exists for either view. Both are derived from the shell, design
 
 
 ## Factory (no Stitch screen)
+- Reference videos: an Add more button in the card header (the add box hides once there are references), a checkbox per reference,
+  and a violet Study together box (Pick all, an optional note, Study N together) shown when there are two or more.
 - Reference videos: a card under Videos with an add box (comment, Upload a video, or a link and Add link) and one row per reference
   (frame thumbnail to watch, length, Taught/Not taught chip, its comment, Teach the skill, Save comment, Delete). Same cards and buttons.
 - A chat with Claude Code inside the Shorts factory, beside the factory's rendered videos and its skill files. Built from the Queue page's

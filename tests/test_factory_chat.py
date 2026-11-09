@@ -221,3 +221,28 @@ class FactoryListAndReferenceTests(unittest.TestCase):
             self.assertTrue(factory_refs.listing(ws)[0]["learned"])
             factory_refs.delete(ws, r["id"])
             self.assertEqual(factory_refs.listing(ws), [])
+
+
+class StudyTogetherTests(unittest.TestCase):
+    def test_several_references_are_studied_together_for_their_pattern(self):
+        from postcrew import factory_refs
+
+        def fake_run(cmd, **kw):
+            if cmd[0] == "ffprobe":
+                return mock.Mock(stdout="30.0\n", returncode=0)
+            Path(cmd[-1]).write_bytes(b"jpg")
+            return mock.Mock(stdout="", returncode=0)
+
+        FakeProc.calls = []
+        with TempWorkspace() as ws, fake_factory(ws) as (root, _calls), \
+                mock.patch.object(factory_refs.subprocess, "run", side_effect=fake_run):
+            a = factory_refs.add_upload(ws, "a.mp4", "big captions", io.BytesIO(b"v"), 1)["reference"]["id"]
+            b = factory_refs.add_upload(ws, "b.mp4", "", io.BytesIO(b"v"), 1)["reference"]["id"]
+            with self.assertRaises(ValueError):
+                factory_refs.lesson(ws, [])
+            factory_chat.teach(ws, [a, b], note="how they open", runner=FakeProc)
+            wait_idle()
+            msg = factory_chat.view(ws)["messages"][0]["text"]
+            for part in ("these 2 reference videos", "pattern", "Video 1:", "Video 2:", "big captions", "how they open"):
+                self.assertIn(part, msg)
+            self.assertTrue(all(r["learned"] for r in factory_refs.listing(ws)))

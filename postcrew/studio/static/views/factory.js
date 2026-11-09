@@ -9,7 +9,8 @@ const FC_EXAMPLES = [
   ["What changed", "Which rules did we add to the skill this week? List them."],
 ];
 let fcTimer = null, fcSeen = -1;
-const FC_OPEN = new Set();   // videos whose details are open (kept open across refreshes)
+const FC_OPEN = new Set();
+const FC_PICK = new Set();   // references picked for Study together   // videos whose details are open (kept open across refreshes)
 
 function fcBubble(m) {
   const t = esc(m.text);
@@ -52,6 +53,7 @@ function fcVideo(v) {
 
 function fcRef(r) {
   return `<li class="py-3 flex gap-3" data-fc-ref="${esc(r.id)}">
+    <input type="checkbox" class="mt-5 shrink-0 accent-violet-600" data-fc-refpick title="Pick for Study together" ${FC_PICK.has(r.id) ? "checked" : ""}>
     <button class="relative shrink-0 w-20 h-14 rounded-lg overflow-hidden bg-slate-900 group" data-fc-refplay="${esc(r.video || "")}" title="Watch">
       ${r.thumb ? `<img class="w-full h-full object-cover" src="/factory-ref/${r.thumb.split("/").map(encodeURIComponent).join("/")}" alt="">` : ""}
       <span class="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/10 text-white">${icon("play_arrow", "text-xl")}</span>
@@ -71,16 +73,32 @@ function fcRef(r) {
     </div></li>`;
 }
 
+let FC_ADDING = false;
+function fcStudyCount() {
+  const n = FC_PICK.size, b = $("#fc-refstudy");
+  b.disabled = n < 2; b.querySelector("span:last-child").textContent = n >= 2 ? `Study ${n} together` : "Pick 2 or more to study together";
+  $("#fc-refall").textContent = n && n === document.querySelectorAll("[data-fc-ref]").length ? "Clear" : "Pick all";
+}
+
 function fcPlay(src) {
   const dlg = $("#fc-player"); dlg.querySelector("video").src = src; dlg.showModal(); dlg.querySelector("video").play();
 }
 
+let FC_REFS = [];
 function fcDrawRefs(refs) {
+  if (refs) FC_REFS = refs; else refs = FC_REFS;
   if (document.activeElement?.closest?.("#fc-refs")) return;   // never redraw while you are writing a comment
+  const ids = new Set((refs || []).map(r => r.id));
+  [...FC_PICK].forEach(id => ids.has(id) || FC_PICK.delete(id));
+  $("#fc-refadd-box").classList.toggle("hidden", (refs || []).length > 0 && !FC_ADDING);
+  $("#fc-refmore").classList.toggle("hidden", !(refs || []).length || FC_ADDING);
+  $("#fc-refstudy-box").classList.toggle("hidden", (refs || []).length < 2);
   $("#fc-refs").innerHTML = (refs || []).length ? refs.map(fcRef).join("")
     : `<li class="py-2 text-xs text-slate-500">No reference videos yet. Add a video you like and say what to learn from it.</li>`;
+  fcStudyCount();
   document.querySelectorAll("[data-fc-ref]").forEach(li => {
     const id = li.dataset.fcRef, note = () => li.querySelector("[data-fc-refnote]").value;
+    li.querySelector("[data-fc-refpick]").onchange = e => { e.target.checked ? FC_PICK.add(id) : FC_PICK.delete(id); e.target.blur(); fcStudyCount(); };
     li.querySelector("[data-fc-refplay]").onclick = e => { const v = e.currentTarget.dataset.fcRefplay; if (v) fcPlay(`/factory-ref/${v.split("/").map(encodeURIComponent).join("/")}`); };
     li.querySelector("[data-fc-refsave]").onclick = async () => {
       try { const r = await post("/api/factory/references/comment", { id, comment: note() }); document.activeElement?.blur?.(); fcDrawRefs(r.references); toast("Comment saved"); }
@@ -205,17 +223,27 @@ async function renderFactory() {
         </section>
         <section class="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-3">
           <div class="flex items-center gap-2"><div class="w-7 h-7 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center">${icon("video_library", "text-base")}</div>
-            <h2 class="text-lg font-bold font-headline text-slate-900">${tip("Reference videos", "Videos you like. Say what to learn from each one; Teach the skill sends Claude its frames and your comment, and Claude writes the lesson into the skill so every later Short follows it.")}</h2></div>
-          <div class="space-y-2 rounded-lg bg-slate-50 border border-slate-200 p-3">
+            <h2 class="text-lg font-bold font-headline text-slate-900 flex-1">${tip("Reference videos", "Videos you like. Say what to learn from each one; Teach the skill sends Claude its frames and your comment, and Claude writes the lesson into the skill. Pick several and Study together: Claude looks for the pattern they share and writes that into the skill.")}</h2>
+            <button id="fc-refmore" class="hidden inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold">${icon("add", "text-sm")}<span>Add more</span></button></div>
+          <div id="fc-refadd-box" class="space-y-2 rounded-lg bg-slate-50 border border-slate-200 p-3">
+            <div class="flex items-center justify-between"><span class="text-[11px] font-semibold text-slate-600">Add reference videos: pick several files, or paste one link per line</span>
+              <button id="fc-refclose" class="text-slate-400 hover:text-slate-600" title="Close">${icon("close", "text-sm")}</button></div>
             <textarea id="fc-refnote" rows="2" class="w-full text-xs border border-slate-300 rounded-md px-2 py-1 resize-y bg-white" maxlength="4000"
-              placeholder="What should the skill learn from it? (you can also write this later)"></textarea>
+              placeholder="What should the skill learn from them? (goes on each one added now; you can also write it later)"></textarea>
             <div class="flex flex-wrap items-center gap-1.5">
-              <label class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 text-xs font-semibold cursor-pointer">${icon("file_upload", "text-sm")}<span id="fc-refup-label">Upload a video</span>
-                <input id="fc-refup" type="file" accept="video/*,.mkv" class="hidden"></label>
+              <label class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 text-xs font-semibold cursor-pointer">${icon("file_upload", "text-sm")}<span id="fc-refup-label">Upload videos</span>
+                <input id="fc-refup" type="file" accept="video/*,.mkv" multiple class="hidden"></label>
               <span class="text-[11px] text-slate-400">or</span>
-              <input id="fc-reflink" type="url" class="flex-1 min-w-[8rem] text-xs border border-slate-300 rounded-md px-2 py-1 bg-white" placeholder="https://youtube.com/shorts/…">
-              <button id="fc-refadd" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold disabled:opacity-50">${icon("add_link", "text-sm")}<span>Add link</span></button>
+              <textarea id="fc-reflink" rows="1" class="flex-1 min-w-[8rem] text-xs border border-slate-300 rounded-md px-2 py-1 bg-white resize-y" placeholder="https://youtube.com/shorts/… (one per line)"></textarea>
+              <button id="fc-refadd" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold disabled:opacity-50">${icon("add_link", "text-sm")}<span>Add links</span></button>
             </div>
+          </div>
+          <div id="fc-refstudy-box" class="hidden space-y-2 rounded-lg bg-violet-50 border border-violet-200 p-3">
+            <div class="flex items-center justify-between gap-2"><span class="text-[11px] font-semibold text-violet-800 flex items-center gap-1">${icon("auto_awesome", "text-sm")}<span>${tip("Study together", "Claude looks at the frames of every video you pick, finds what they have in common (hook, pacing, captions, colours, motion, ending) and writes that pattern into the skill. One video's quirks are left out.")}</span></span>
+              <button id="fc-refall" class="text-[11px] font-semibold text-violet-700 hover:underline">Pick all</button></div>
+            <textarea id="fc-refgroup" rows="2" class="w-full text-xs border border-violet-200 rounded-md px-2 py-1 resize-y bg-white" maxlength="4000"
+              placeholder="Optional: what to look for across them, e.g. how they open in the first 2 seconds"></textarea>
+            <button id="fc-refstudy" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed" disabled>${icon("school", "text-sm")}<span>Pick 2 or more to study together</span></button>
           </div>
           <ul id="fc-refs" class="divide-y divide-slate-100"></ul>
         </section>
@@ -246,24 +274,57 @@ async function renderFactory() {
   $("#fc-text").onkeydown = e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } };
   $("#fc-stop").onclick = async () => { try { fcDraw(await post("/api/factory/stop")); } catch (e) { toast(e.message, true); } };
   $("#fc-new").onclick = async () => { try { fcDraw(await post("/api/factory/reset")); } catch (e) { toast(e.message, true); } };
-  const refBusy = (on, label) => { $("#fc-refadd").disabled = on; $("#fc-refup-label").textContent = label; };
+  const refBusy = (on, up, link) => { $("#fc-refadd").disabled = on; $("#fc-refup").disabled = on; $("#fc-refup-label").textContent = up;
+    $("#fc-refadd").querySelector("span:last-child").textContent = link; };
+  const refDone = (refs, n, failed) => {
+    $("#fc-refnote").value = ""; if (!failed) FC_ADDING = false; fcDrawRefs(refs);
+    if (n) toast(`${n} reference${n > 1 ? "s" : ""} added${failed ? `; ${failed} failed` : ""}`, !!failed);
+  };
   $("#fc-refup").onchange = async e => {
-    const f = e.target.files[0]; if (!f) return;
-    refBusy(true, "Uploading…");
-    try {
-      const res = await fetch(`/api/factory/references/upload?name=${encodeURIComponent(f.name)}&comment=${encodeURIComponent($("#fc-refnote").value.trim())}`,
-        { method: "POST", headers: { "X-Postcrew": "1", "Content-Type": "application/octet-stream" }, body: f });
-      const r = await res.json(); if (!res.ok) throw new Error(r.error || "upload failed");
-      $("#fc-refnote").value = ""; fcDrawRefs(r.references); toast("Reference added");
-    } catch (err) { toast(err.message, true); }
-    finally { refBusy(false, "Upload a video"); e.target.value = ""; }
+    const files = [...e.target.files]; if (!files.length) return;
+    const comment = $("#fc-refnote").value.trim(); let n = 0, failed = 0, refs = null;
+    for (const [i, f] of files.entries()) {
+      refBusy(true, files.length > 1 ? `Uploading ${i + 1} of ${files.length}…` : "Uploading…", "Add links");
+      try {
+        const res = await fetch(`/api/factory/references/upload?name=${encodeURIComponent(f.name)}&comment=${encodeURIComponent(comment)}`,
+          { method: "POST", headers: { "X-Postcrew": "1", "Content-Type": "application/octet-stream" }, body: f });
+        const r = await res.json(); if (!res.ok) throw new Error(r.error || "upload failed");
+        refs = r.references; n++;
+      } catch (err) { failed++; toast(`${f.name}: ${err.message}`, true); }
+    }
+    refBusy(false, "Upload videos", "Add links"); e.target.value = "";
+    refDone(refs || (await api("/api/factory")).references, n, failed);
   };
   $("#fc-refadd").onclick = async () => {
-    const url = $("#fc-reflink").value.trim(); if (!url) return toast("Paste a link first", true);
-    refBusy(true, "Upload a video"); $("#fc-refadd").querySelector("span:last-child").textContent = "Fetching…";
-    try { const r = await post("/api/factory/references/link", { url, comment: $("#fc-refnote").value.trim() }); $("#fc-reflink").value = ""; $("#fc-refnote").value = ""; fcDrawRefs(r.references); toast("Reference added"); }
-    catch (err) { toast(err.message, true); }
-    finally { refBusy(false, "Upload a video"); $("#fc-refadd").querySelector("span:last-child").textContent = "Add link"; }
+    const urls = $("#fc-reflink").value.split(/\s+/).map(x => x.trim()).filter(Boolean);
+    if (!urls.length) return toast("Paste a link first", true);
+    const comment = $("#fc-refnote").value.trim(), bad = []; let n = 0, refs = null;
+    for (const [i, url] of urls.entries()) {
+      refBusy(true, "Upload videos", urls.length > 1 ? `Fetching ${i + 1} of ${urls.length}…` : "Fetching…");
+      try { refs = (await post("/api/factory/references/link", { url, comment })).references; n++; }
+      catch (err) { bad.push(url); toast(`${url}: ${err.message}`, true); }
+    }
+    refBusy(false, "Upload videos", "Add links");
+    $("#fc-reflink").value = bad.join("\n");   // the ones that failed stay, to retry
+    refDone(refs || (await api("/api/factory")).references, n, bad.length);
+  };
+  $("#fc-refmore").onclick = () => { FC_ADDING = true; fcDrawRefs(null); $("#fc-reflink").focus(); };
+  $("#fc-refclose").onclick = () => { FC_ADDING = false; fcDrawRefs(null); };
+  $("#fc-refall").onclick = () => {
+    const all = [...document.querySelectorAll("[data-fc-ref]")].map(li => li.dataset.fcRef);
+    if (FC_PICK.size === all.length) FC_PICK.clear(); else all.forEach(id => FC_PICK.add(id));
+    document.querySelectorAll("[data-fc-refpick]").forEach(c => c.checked = FC_PICK.has(c.closest("[data-fc-ref]").dataset.fcRef));
+    fcStudyCount();
+  };
+  $("#fc-refstudy").onclick = async e => {
+    const b = e.currentTarget, ids = [...FC_PICK]; b.disabled = true;
+    try {
+      for (const li of document.querySelectorAll("[data-fc-ref]"))   // save what you typed in each picked one first
+        if (FC_PICK.has(li.dataset.fcRef)) await post("/api/factory/references/comment", { id: li.dataset.fcRef, comment: li.querySelector("[data-fc-refnote]").value });
+      const r = await post("/api/factory/references/teach", { ids, note: $("#fc-refgroup").value.trim() });
+      FC_PICK.clear(); $("#fc-refgroup").value = ""; document.activeElement?.blur?.(); fcDraw(r); fcPoll();
+      toast(`Sent ${ids.length} videos to Claude: it is looking for their pattern and updating the skill`);
+    } catch (err) { toast(err.message, true); fcStudyCount(); }
   };
   $("#fc-player").addEventListener("close", () => { const v = $("#fc-player video"); v.pause(); v.removeAttribute("src"); v.load(); });
   fcDraw(d);

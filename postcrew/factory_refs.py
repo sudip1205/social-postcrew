@@ -175,26 +175,53 @@ def delete(ws, rid):
     return {"references": listing(ws)}
 
 
-def lesson(ws, rid):
-    """The chat message that asks Claude to learn from one reference and write it into the skill."""
-    d = _dir(ws, rid)
+def _part(d, n=None):
+    """One reference's lines for a lesson: its name, length, your comment, its frames and the video file."""
     ref = _read(d)
-    if not ref.get("comment"):
-        raise ValueError("write what to learn from this video first (your comment)")
     frames = sorted((d / "frames").glob("*.jpg"))
-    lines = [f"Learn from a reference video I like and update the skill (explainer-short-style) so future Shorts do this too.",
-             "", f"Video: {ref.get('name') or d.name}" + (f" ({ref['url']})" if ref.get("url") else "") + f", {ref.get('seconds', 0)} s long.",
-             f"What I want you to learn from it: {ref['comment']}", "",
-             f"You cannot watch it, so look at these {len(frames)} frames, taken evenly from start to end (open each with Read):"]
-    lines += [f"- {f}" for f in frames]
-    lines += ["", f"The video itself is {_video(d)}; use ffprobe or take more frames with ffmpeg into {d / 'frames'} if you need a closer look.",
-              "Then write the lesson into the skill as a concrete rule (what to do, with numbers where you can: sizes, positions, timing, "
-              "colours, pacing), say which skill files changed, and do not make a video now."]
-    return {"text": "\n".join(lines), "id": rid}
+    head = f"Video {n}: " if n else "Video: "
+    lines = [head + (ref.get("name") or d.name) + (f" ({ref['url']})" if ref.get("url") and ref["url"] != ref.get("name") else "")
+             + f", {ref.get('seconds', 0)} s long. File: {_video(d)}",
+             "What I want learned from it: " + (ref.get("comment") or "(no comment: find what makes it work)"),
+             f"Its {len(frames)} frames, evenly from start to end:"] + [f"- {f}" for f in frames]
+    return lines
 
 
-def mark_learned(ws, rid):
-    d = _dir(ws, rid)
-    ref = _read(d)
-    ref["learned"] = _now()
-    _write(d, ref)
+def lesson(ws, ids, note=""):
+    """The chat message that asks Claude to learn from one or more references and write it into the skill. With several, it looks
+    for the pattern they share (and what your comments ask for), not one video's quirks."""
+    ids = [ids] if isinstance(ids, str) else list(dict.fromkeys(ids or []))
+    if not ids:
+        raise ValueError("pick at least one reference video")
+    if len(ids) > 10:
+        raise ValueError("pick 10 reference videos at most at once")
+    dirs = [_dir(ws, i) for i in ids]
+    if len(dirs) == 1 and not _read(dirs[0]).get("comment"):
+        raise ValueError("write what to learn from this video first (your comment)")
+    many = len(dirs) > 1
+    lines = [(f"Study these {len(dirs)} reference videos I like together, find the pattern they share, and update the skill "
+              "(explainer-short-style) so future Shorts follow it." if many else
+              "Learn from a reference video I like and update the skill (explainer-short-style) so future Shorts do this too."),
+             "You cannot watch videos, so look at the frames listed for each one (open each with Read). Use ffprobe, or take more "
+             "frames with ffmpeg into a video's frames folder, if you need a closer look.", ""]
+    if str(note or "").strip():
+        lines += ["What I want you to look for across them: " + str(note).strip()[:4000], ""]
+    for n, d in enumerate(dirs, 1):
+        lines += _part(d, n if many else None) + [""]
+    if many:
+        lines += ["Compare them on: hook and first 2 seconds, pacing and cut rhythm, text and caption size, position and animation, "
+                  "colour and background, layout of diagrams, motion, and how they end. Write into the skill only what most of them share "
+                  "(or what my comments ask for), as concrete rules with numbers where you can. Then list the pattern you found, one line "
+                  "per rule with which videos show it, and say which skill files changed. Do not make a video now."]
+    else:
+        lines += ["Then write the lesson into the skill as a concrete rule (what to do, with numbers where you can: sizes, positions, "
+                  "timing, colours, pacing), say which skill files changed, and do not make a video now."]
+    return {"text": "\n".join(lines), "ids": ids}
+
+
+def mark_learned(ws, ids):
+    for rid in [ids] if isinstance(ids, str) else ids:
+        d = _dir(ws, rid)
+        ref = _read(d)
+        ref["learned"] = _now()
+        _write(d, ref)

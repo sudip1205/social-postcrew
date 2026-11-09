@@ -82,3 +82,4 @@ edit_note
 add_link
 check_circle
 schedule
+auto_awesome

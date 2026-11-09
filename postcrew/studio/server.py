@@ -1014,7 +1014,7 @@ def make_handler(studio):
                     ("POST", "/api/factory/references/link"): lambda: factory_refs.add_link(ws, self.body().get("url"), self.body().get("comment")),
                     ("POST", "/api/factory/references/comment"): lambda: factory_refs.comment(ws, self.body().get("id"), self.body().get("comment")),
                     ("POST", "/api/factory/references/delete"): lambda: factory_refs.delete(ws, self.body().get("id")),
-                    ("POST", "/api/factory/references/teach"): lambda: factory_chat.teach(ws, self.body().get("id")),
+                    ("POST", "/api/factory/references/teach"): lambda: factory_chat.teach(ws, self.body().get("ids") or self.body().get("id"), self.body().get("note") or ""),
                     ("POST", "/api/factory/delete"): lambda: factory_chat.delete_video(ws, self.body().get("slug")),
                     ("POST", "/api/factory/queue"): lambda: factory_chat.queue_video(ws, **{k: v for k, v in self.body().items()
                                                                                           if k in ("slug", "date", "title", "description", "tags")}),

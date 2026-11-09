@@ -329,9 +329,10 @@ def queue_video(ws, slug, date=None, title=None, description=None, tags=None):
     return {"post": post, **view(ws)}
 
 
-def teach(ws, rid, runner=subprocess.Popen):
-    """Send the chat a reference video's lesson (its frames and your comment), so Claude writes it into the skill."""
-    msg = factory_refs.lesson(ws, rid)
+def teach(ws, ids, note="", runner=subprocess.Popen):
+    """Send the chat one or more reference videos' lesson (frames and your comments), so Claude writes it (or their shared pattern)
+    into the skill."""
+    msg = factory_refs.lesson(ws, ids, note)
     out = send(ws, msg["text"], runner=runner)
-    factory_refs.mark_learned(ws, rid)
+    factory_refs.mark_learned(ws, msg["ids"])
     return dict(out, references=factory_refs.listing(ws))
