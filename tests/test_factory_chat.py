@@ -271,3 +271,12 @@ class SkillCopyTests(unittest.TestCase):
             self.assertEqual((real / "references" / "motion-groups.md").read_text(), "groups\n")
             self.assertIn("skill-edit/explainer-short-style/", EditingProc.calls[-1]["cmd"][-1])
             self.assertTrue(any(m["text"].startswith("Skill updated") for m in factory_chat.view(ws)["messages"]))
+
+
+class AllowedCommandTests(unittest.TestCase):
+    def test_path_rules_use_the_wildcard_form(self):
+        # Claude Code 2.1 matches "Bash(x:*)" only at a word boundary: "Bash(python3 algo/:*)" never allowed python3 algo/x.py
+        from postcrew.agents.shorts import WRITER_TOOLS
+        for rule in factory_chat.TOOLS + WRITER_TOOLS:
+            self.assertNotRegex(rule, r"/:\*\)$", rule)
+        self.assertIn("Bash(python3 algo/*)", factory_chat.TOOLS)
