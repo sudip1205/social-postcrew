@@ -20,7 +20,7 @@ from .base import Agent, AgentError
 from ..llm import agent_settings
 
 SLUG = re.compile(r"^[a-z0-9][a-z0-9-]{1,60}$")
-WRITER_TOOLS = ["Read", "Write", "Edit", "Glob", "Grep", "WebSearch", "WebFetch", "Skill", "Bash(npm run variety:*)"]
+WRITER_TOOLS = ["Read", "Write", "Edit", "Glob", "Grep", "WebSearch", "WebFetch", "Skill", "Bash(npm run variety:*)", "Bash(python3 algo/:*)", "Bash(python3 -I algo/:*)"]
 SKILL = ".claude/skills/explainer-short-style"
 # Said to Claude on every run, so a scheduled video always follows the skill as it is NOW (changed from the Studio's Factory chat or by hand):
 # the skill is read from disk at the start of each run, never remembered from an earlier one.

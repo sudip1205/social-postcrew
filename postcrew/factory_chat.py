@@ -18,7 +18,9 @@ from .agents.shorts import SKILL, SKILL_RULE, factory_dir, skill_version
 
 STATE = "factory-chat"
 TOOLS = ["Read", "Write", "Edit", "Glob", "Grep", "WebSearch", "WebFetch", "TodoWrite", "Skill",
-         "Bash(npm run make:*)", "Bash(npm run tts:*)", "Bash(npm run voices:*)", "Bash(ls:*)", "Bash(ffprobe:*)", "Bash(ffmpeg:*)", "Bash(cat:*)", "Bash(npm run variety:*)"]
+         "Bash(npm run make:*)", "Bash(npm run tts:*)", "Bash(npm run voices:*)", "Bash(ls:*)", "Bash(ffprobe:*)", "Bash(ffmpeg:*)", "Bash(cat:*)", "Bash(npm run variety:*)",
+         # algorithm videos: run the solver first (the skill's rule), then check the built page
+         "Bash(python3 algo/:*)", "Bash(python3 -I algo/:*)", "Bash(npx hyperframes check:*)", "Bash(npx hyperframes lint:*)"]
 EDIT_DIR = "skill-edit"   # ~/Youtube/skill-edit/: the copy of the skill Claude edits (Claude Code never lets it write inside .claude/)
 SKILL_EDIT_RULE = (f" The skill folder {SKILL}/ is write-protected for you: to change the skill, edit the working copy in "
                    f"{EDIT_DIR}/explainer-short-style/ instead (same files; it is a fresh copy of the skill). The Studio copies your changes "
@@ -27,7 +29,9 @@ SYSTEM = ("You are working for the channel owner through the postcrew Studio's F
           "Follow CLAUDE.md and the explainer-short-style skill. A topic means: write the episode (script.json and youtube.json, privacyStatus "
           "\"private\") and render it with `npm run make -- episodes/<slug>` from shorts-factory/. An instruction about how videos should look, "
           "sound or be written from now on means: apply it and write it into the skill (CLAUDE.md's standing rule), then say which skill files "
-          "changed. Never upload to YouTube yourself: the owner queues finished videos from the Studio. Keep replies short. "
+          "changed. Run commands from shorts-factory/ with relative paths (`cd shorts-factory && python3 algo/<name>.py`, "
+          "`npx hyperframes check ...`, ffmpeg for frame grabs): only those forms are allowed, and nobody can approve anything else "
+          "while you run, so never ask for approval. Never upload to YouTube yourself: the owner queues finished videos from the Studio. Keep replies short. "
           "When making a video: " + SKILL_RULE + SKILL_EDIT_RULE)
 PLAN_SLUG = re.compile(r"^plan-([a-z0-9]{6,32})-")
 MAX_MESSAGES = 200
