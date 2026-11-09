@@ -83,3 +83,5 @@ add_link
 check_circle
 schedule
 auto_awesome
+mic
+smart_toy

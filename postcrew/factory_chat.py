@@ -136,8 +136,17 @@ def videos(ws, n=24):
         rows.append({"file": f.name, "slug": slug, "title": meta.get("title") or slug, "mb": round(f.stat().st_size / 1e6, 1),
                      "yt_title": meta.get("title") or "", "description": meta.get("description") or "", "tags": meta.get("tags") or [],
                      "made": datetime.fromtimestamp(f.stat().st_mtime, timezone.utc).isoformat(timespec="seconds"),
-                     "has_meta": bool(meta), "thumb": f.with_suffix(".jpg").name if f.with_suffix(".jpg").exists() else None})
+                     "has_meta": bool(meta), "own_voice": _own(out.parent / "episodes" / slug), "thumb": f.with_suffix(".jpg").name if f.with_suffix(".jpg").exists() else None})
     return rows
+
+
+def _own(ep):
+    """How many scenes of the episode have your own recording (and how many scenes it has)."""
+    try:
+        n = len(json.loads((ep / "script.json").read_text()).get("scenes") or [])
+    except (OSError, ValueError):
+        return None
+    return {"own": sum((ep / "voice" / f"scene{i}.wav").exists() for i in range(n)), "scenes": n}
 
 
 def skill_files(ws):

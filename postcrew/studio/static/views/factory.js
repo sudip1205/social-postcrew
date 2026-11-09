@@ -35,6 +35,7 @@ function fcVideo(v) {
         ${v.has_meta ? `<input type="date" class="text-xs border border-slate-300 rounded-md px-2 py-1" value="${today}" min="${today}" data-fc-date="${esc(v.slug)}">
           <button class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold" data-fc-queue="${esc(v.slug)}">${icon("playlist_add", "text-sm")}<span>Move to Queue</span></button>`
           : `<span class="text-[11px] text-amber-700">${tip("No youtube.json", "Ask Claude to write the title, description and tags for this episode; then it can be queued.")}</span>`}
+        ${v.own_voice ? `<button class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold" data-fc-voice="${esc(v.slug)}">${icon("mic", "text-sm")}<span>My voice${v.own_voice.own ? ` ${v.own_voice.own}/${v.own_voice.scenes}` : ""}</span></button>` : ""}
         <button class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 text-xs font-semibold" data-fc-delete="${esc(v.slug)}" data-fc-title="${esc(v.title)}">${icon("delete", "text-sm")}<span>Delete</span></button>
       </div>
       ${v.has_meta ? `<details class="group" data-fc-meta="${esc(v.slug)}" ${FC_OPEN.has(v.slug) ? "open" : ""}>
@@ -78,6 +79,83 @@ function fcStudyCount() {
   const n = FC_PICK.size, b = $("#fc-refstudy");
   b.disabled = n < 2; b.querySelector("span:last-child").textContent = n >= 2 ? `Study ${n} together` : "Pick 2 or more to study together";
   $("#fc-refall").textContent = n && n === document.querySelectorAll("[data-fc-ref]").length ? "Clear" : "Pick all";
+}
+
+let FC_VOICE = null, fcVoiceTimer = null;
+async function fcVoiceUpload(slug, scene, file) {
+  const q = `slug=${encodeURIComponent(slug)}&name=${encodeURIComponent(file.name)}${scene === null ? "" : `&scene=${scene}`}`;
+  const res = await fetch(`/api/factory/voice/upload?${q}`, { method: "POST", headers: { "X-Postcrew": "1", "Content-Type": "application/octet-stream" }, body: file });
+  const r = await res.json(); if (!res.ok) throw new Error(r.error || "upload failed"); return r;
+}
+
+function fcVoiceDraw(d) {
+  FC_VOICE = d;
+  const dlg = $("#fc-voice"), r = d.render || {}, mine = r.slug === d.slug;
+  const status = mine && r.busy ? `<span class="inline-flex items-center gap-1 text-violet-700">${icon("sync", "text-sm animate-spin")}<span>Making the video again with your voice… (a few minutes)</span></span>`
+    : mine && r.error ? `<span class="inline-flex items-center gap-1 text-rose-700">${icon("error", "text-sm")}<span>${esc(r.error)}</span></span>`
+    : mine && r.done ? `<span class="inline-flex items-center gap-1 text-emerald-700">${icon("check_circle", "text-sm")}<span>Done: the new video is in the Videos list</span></span>` : "";
+  dlg.querySelector("[data-fcv-body]").innerHTML = `
+    <div class="flex items-start justify-between gap-3">
+      <div><h2 class="text-lg font-bold font-headline text-slate-900">My voice</h2>
+        <p class="text-xs text-slate-500">${esc(d.title)} · ${d.own}/${d.scenes.length} scenes in your voice; the others are read by Kokoro.</p></div>
+      <button class="w-8 h-8 rounded-full hover:bg-slate-100 text-slate-500 flex items-center justify-center" data-fcv-close title="Close">${icon("close", "text-base")}</button>
+    </div>
+    <div class="rounded-lg bg-violet-50 border border-violet-200 p-3 text-xs text-violet-900 space-y-2">
+      <p><strong>Read the whole script in one take</strong> (a phone voice memo is fine: quiet room, phone 20 cm away, short pause between scenes). ${d.whisper ? "It is split into scenes by the words you say." : `<span class="text-rose-700">Splitting a whole take needs faster-whisper on the lab: upload scene by scene instead.</span>`}</p>
+      <div class="flex flex-wrap items-center gap-2">
+        <label class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold cursor-pointer ${d.whisper ? "" : "opacity-50 pointer-events-none"}">${icon("file_upload", "text-sm")}<span>Upload whole recording</span>
+          <input type="file" accept="audio/*,video/*" class="hidden" data-fcv-whole></label>
+        ${d.own ? `<button class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 text-xs font-semibold" data-fcv-clearall>${icon("delete", "text-sm")}<span>Remove all my recordings</span></button>` : ""}
+      </div>
+    </div>
+    <ol class="divide-y divide-slate-100 max-h-[50vh] overflow-y-auto">${d.scenes.map(sc => `
+      <li class="py-2.5 flex gap-3" data-fcv-scene="${sc.i}">
+        <span class="shrink-0 w-6 h-6 rounded-full ${sc.own ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"} text-[11px] font-bold flex items-center justify-center">${sc.i + 1}</span>
+        <div class="min-w-0 flex-1 space-y-1.5">
+          <p class="text-sm text-slate-800">${esc(sc.text)}</p>
+          <div class="flex flex-wrap items-center gap-1.5 text-[11px]">
+            ${sc.own ? `<span class="inline-flex items-center gap-0.5 text-emerald-700">${icon("mic", "text-xs")}<span>Your voice · ${sc.seconds} s</span></span>
+              <audio controls preload="none" class="h-7" src="/factory-voice/${sc.audio.split("/").map(encodeURIComponent).join("/")}?v=${Date.now()}"></audio>`
+              : `<span class="inline-flex items-center gap-0.5 text-slate-500">${icon("smart_toy", "text-xs")}<span>Kokoro</span></span>`}
+            <label class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 font-semibold cursor-pointer">${icon("file_upload", "text-xs")}<span>${sc.own ? "Replace" : "Upload this scene"}</span>
+              <input type="file" accept="audio/*,video/*" class="hidden" data-fcv-one></label>
+            ${sc.own ? `<button class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md hover:bg-rose-50 text-rose-700 font-semibold" data-fcv-clear>${icon("delete", "text-xs")}<span>Use Kokoro</span></button>` : ""}
+          </div>
+        </div></li>`).join("")}</ol>
+    <div class="flex flex-wrap items-center justify-between gap-2 pt-1">
+      <span class="text-xs">${status}</span>
+      <button class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed" data-fcv-render ${d.own && !(r.busy) ? "" : "disabled"}>${icon("movie", "text-sm")}<span>Make it again with my voice</span></button>
+    </div>`;
+  const busy = (on, msg) => { dlg.querySelectorAll("input,button").forEach(x => x.disabled = on); if (msg) toast(msg); };
+  const after = async p => { try { fcVoiceDraw(await p); } catch (e) { toast(e.message, true); fcVoiceDraw(FC_VOICE); } };
+  dlg.querySelector("[data-fcv-close]").onclick = () => dlg.close();
+  dlg.querySelector("[data-fcv-whole]").onchange = e => { const f = e.target.files[0]; if (!f) return;
+    busy(true, "Uploading and splitting into scenes… (a minute or two)");
+    after(fcVoiceUpload(d.slug, null, f).then(r => { toast(`Your voice is in ${r.saved.length} scenes: listen, then make the video again`); return r; })); };
+  dlg.querySelectorAll("[data-fcv-scene]").forEach(li => {
+    const i = +li.dataset.fcvScene;
+    li.querySelector("[data-fcv-one]").onchange = e => { const f = e.target.files[0]; if (!f) return; busy(true, `Uploading scene ${i + 1}…`);
+      after(fcVoiceUpload(d.slug, i, f)); };
+    const c = li.querySelector("[data-fcv-clear]"); if (c) c.onclick = () => after(post("/api/factory/voice/clear", { slug: d.slug, scene: i }));
+  });
+  const ca = dlg.querySelector("[data-fcv-clearall]");
+  if (ca) ca.onclick = () => { if (confirm("Remove all your recordings for this video? Kokoro reads it again.")) after(post("/api/factory/voice/clear", { slug: d.slug })); };
+  dlg.querySelector("[data-fcv-render]").onclick = () => after(post("/api/factory/voice/render", { slug: d.slug }).then(r => { fcVoicePoll(); return r; }));
+}
+
+async function fcVoicePoll() {
+  clearTimeout(fcVoiceTimer);
+  const dlg = $("#fc-voice"); if (!dlg?.open || !FC_VOICE) return;
+  try {
+    const d = await api(`/api/factory/voice?slug=${encodeURIComponent(FC_VOICE.slug)}`);
+    if (!dlg.querySelector("input:disabled")) fcVoiceDraw(d);
+    if (d.render?.busy) fcVoiceTimer = setTimeout(fcVoicePoll, 4000); else fcPoll();
+  } catch (e) { fcVoiceTimer = setTimeout(fcVoicePoll, 6000); }
+}
+
+async function fcVoiceOpen(slug) {
+  try { const d = await api(`/api/factory/voice?slug=${encodeURIComponent(slug)}`); $("#fc-voice").showModal(); fcVoiceDraw(d); if (d.render?.busy) fcVoicePoll(); }
+  catch (e) { toast(e.message, true); }
 }
 
 function fcPlay(src) {
@@ -136,6 +214,7 @@ function fcDrawVideos(d) {
     dt.ontoggle = () => dt.open ? FC_OPEN.add(dt.dataset.fcMeta) : FC_OPEN.delete(dt.dataset.fcMeta);
     const t = dt.querySelector('[data-fc-field="title"]'); t.oninput = () => dt.querySelector('[data-fc-count="title"]').textContent = `${t.value.length}/100`;
   });
+  document.querySelectorAll("[data-fc-voice]").forEach(b => b.onclick = () => fcVoiceOpen(b.dataset.fcVoice));
   document.querySelectorAll("[data-fc-play]").forEach(b => b.onclick = () => fcPlay(`/factory-out/${encodeURIComponent(b.dataset.fcPlay)}`));
   document.querySelectorAll("[data-fc-delete]").forEach(b => b.onclick = async () => {
     if (!confirm(`Delete the video "${b.dataset.fcTitle}"? Its script stays, so Claude can make it again.`)) return;
@@ -255,6 +334,7 @@ async function renderFactory() {
         </section>
       </aside>
     </div>
+    <dialog id="fc-voice" class="rounded-xl p-0 w-[min(44rem,calc(100vw-2rem))] backdrop:bg-black/50"><div class="p-5 space-y-4" data-fcv-body></div></dialog>
     <dialog id="fc-player" class="rounded-xl p-0 bg-black backdrop:bg-black/70">
       <video class="max-h-[85vh] max-w-[90vw]" controls></video>
       <form method="dialog" class="absolute top-2 right-2"><button class="w-8 h-8 rounded-full bg-white/90 text-slate-800 flex items-center justify-center">${icon("close", "text-base")}</button></form>

@@ -155,6 +155,9 @@ No Stitch screen exists for either view. Both are derived from the shell, design
 
 
 ## Factory (no Stitch screen)
+- My voice: a button on each video opens a dialog with the script scene by scene (number chip green when it is your voice), upload
+  whole recording / per-scene upload or replace, an audio player per recorded scene, Use Kokoro, and Make it again with my voice.
+  Recording in the browser is not offered: the Studio is served over plain http on the LAN, where browsers block the microphone.
 - Reference videos: an Add more button in the card header (the add box hides once there are references), a checkbox per reference,
   and a violet Study together box (Pick all, an optional note, Study N together) shown when there are two or more.
 - Reference videos: a card under Videos with an add box (comment, Upload a video, or a link and Add link) and one row per reference
