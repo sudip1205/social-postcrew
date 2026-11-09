@@ -18,6 +18,8 @@ from .agents.shorts import factory_dir
 AUDIO_EXT = (".wav", ".mp3", ".m4a", ".aac", ".ogg", ".oga", ".opus", ".webm", ".flac", ".mp4", ".mov", ".3gp", ".caf", ".aiff")
 LIMIT = 300 * 2**20
 CHUNK = 1 << 20
+CTA_LINE = ("If this was useful, please like, comment and subscribe. And if you liked it, share it with someone who would find it "
+            "helpful.")   # the factory's fallback outro (pipeline/tts.mjs CTA_LINE), read when a cta scene has no text
 _render = {"slug": None, "started": None, "error": None, "done": None}
 _lock = threading.Lock()
 
@@ -45,6 +47,14 @@ def _secs(f):
         return 0.0
 
 
+def scene_text(sc):
+    return (sc.get("text") or "").strip() or (CTA_LINE if sc.get("type") == "cta" else "")
+
+
+def _tok(w):
+    return re.sub(r"[^a-z0-9]", "", str(w).lower())
+
+
 def own_count(ep, n):
     return sum((ep / "voice" / f"scene{i}.wav").exists() for i in range(n))
 
@@ -54,7 +64,7 @@ def view(ws, slug):
     scenes = []
     for i, sc in enumerate(script.get("scenes") or []):
         f = ep / "voice" / f"scene{i}.wav"
-        scenes.append({"i": i, "type": sc.get("type") or "", "text": sc.get("text") or "", "own": f.exists(),
+        scenes.append({"i": i, "type": sc.get("type") or "", "text": scene_text(sc), "own": f.exists(),
                        "seconds": round(_secs(f), 1) if f.exists() else 0,
                        "audio": f"{slug}/voice/scene{i}.wav" if f.exists() else None})
     return {"slug": slug, "title": script.get("title") or slug, "scenes": scenes, "own": sum(s["own"] for s in scenes),
@@ -113,15 +123,32 @@ def _save_scene(voice, i, src, start=None, end=None, words=None):
     return out
 
 
-def _split(words, counts):
-    """Cut points between scenes: each scene's share of the script's words, moved to the longest pause within 3 words."""
-    total, h = sum(counts), len(words)
-    cuts, cum = [], 0
-    for n in counts[:-1]:
-        cum += n
-        b = max(1, min(h - 1, round(cum / total * h)))
-        best = max(range(max(1, b - 3), min(h - 1, b + 3) + 1), key=lambda j: words[j]["s"] - words[j - 1]["e"])
-        cuts.append(best)
+def _split(words, texts):
+    """Where each scene starts in the heard words: the script's words matched to what was said (difflib), so a slip or an extra
+    word does not shift the cuts; scenes with no match fall back to their share of the words. Each cut moves to the longest pause
+    within two words."""
+    import difflib
+    said, heard = [], [_tok(w["w"]) for w in words]
+    starts = []
+    for t in texts:
+        starts.append(len(said))
+        said += [x for x in (_tok(w) for w in t.split()) if x]
+    m = difflib.SequenceMatcher(None, said, heard, autojunk=False)
+    pair = {}
+    for a, b, n in m.get_matching_blocks():
+        for k in range(n):
+            pair[a + k] = b + k
+    h, total, cuts = len(words), max(1, len(said)), []
+    for st in starts[1:]:
+        j = next((pair[k] - (k - st) for k in range(st, min(len(said), st + 6)) if k in pair), None)
+        if j is None:
+            j = round(st / total * h)
+        j = max(1, min(h - 1, j))
+        gap = lambda x: words[x]["s"] - words[x - 1]["e"]
+        best = max(range(max(1, j - 2), min(h - 1, j + 2) + 1), key=lambda x: (gap(x), -abs(x - j)))
+        if gap(best) > gap(j) + 0.15:   # only for a clearly longer pause: the matched word wins otherwise
+            j = best
+        cuts.append(max(j, (cuts[-1] + 1) if cuts else 1))
     return cuts
 
 
@@ -161,10 +188,9 @@ def upload(ws, slug, scene, name, rfile, length):
             if heard is None:
                 raise ValueError("a whole-script recording needs faster-whisper on this computer to split it into scenes "
                                  "(pip install faster-whisper); or upload each scene on its own")
-            counts = [max(1, len((sc.get("text") or "").split())) for sc in scenes]
             if len(heard) < len(scenes):
                 raise ValueError(f"only {len(heard)} words were heard in the recording: is it the whole script?")
-            cuts = _split(heard, counts)
+            cuts = _split(heard, [scene_text(sc) for sc in scenes])
             bounds = [0] + cuts + [len(heard)]
             done = []
             for i in range(len(scenes)):

@@ -98,3 +98,13 @@ class FactoryVoiceTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SplitTests(unittest.TestCase):
+    def test_the_split_follows_the_words_even_with_a_slip_and_an_empty_outro(self):
+        texts = ["your app runs on your laptop", "docker fixes this by shipping the environment", factory_voice.CTA_LINE]
+        said = "um your app runs on your laptop docker fixes uh this by shipping the environment".split() + \
+            [w for w in factory_voice.CTA_LINE.split()]
+        words = [{"w": w, "s": i * 0.4, "e": i * 0.4 + 0.3} for i, w in enumerate(said)]
+        cuts = factory_voice._split(words, texts)
+        self.assertEqual([said[c] for c in cuts], ["docker", "If"])
