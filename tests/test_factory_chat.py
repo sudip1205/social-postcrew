@@ -246,3 +246,28 @@ class StudyTogetherTests(unittest.TestCase):
             for part in ("these 2 reference videos", "pattern", "Video 1:", "Video 2:", "big captions", "how they open"):
                 self.assertIn(part, msg)
             self.assertTrue(all(r["learned"] for r in factory_refs.listing(ws)))
+
+
+class SkillCopyTests(unittest.TestCase):
+    """Claude Code never lets the chat write inside .claude/: it edits skill-edit/, and the Studio copies the change into the skill."""
+
+    def test_a_skill_edit_made_in_the_working_copy_reaches_the_skill(self):
+        with TempWorkspace() as ws, fake_factory(ws) as (root, _calls):
+            real = root.parent / ".claude" / "skills" / "explainer-short-style"
+            (real / "references").mkdir(parents=True, exist_ok=True)
+            (real / "SKILL.md").write_text("old rules\n")
+
+            class EditingProc(FakeProc):
+                def __init__(self, cmd, cwd=None, **kw):
+                    work = Path(cwd) / "skill-edit" / "explainer-short-style"
+                    assert (work / "SKILL.md").read_text() == "old rules\n"   # a fresh copy is ready before Claude starts
+                    (work / "SKILL.md").write_text("old rules\nmore motion types\n")
+                    (work / "references" / "motion-groups.md").write_text("groups\n")
+                    super().__init__(cmd, cwd, **kw)
+
+            factory_chat.send(ws, "Use more kinds of motion graphics. Update the skill.", runner=EditingProc)
+            wait_idle()
+            self.assertIn("more motion types", (real / "SKILL.md").read_text())
+            self.assertEqual((real / "references" / "motion-groups.md").read_text(), "groups\n")
+            self.assertIn("skill-edit/explainer-short-style/", EditingProc.calls[-1]["cmd"][-1])
+            self.assertTrue(any(m["text"].startswith("Skill updated") for m in factory_chat.view(ws)["messages"]))
