@@ -91,7 +91,7 @@ class FactoryChatTests(unittest.TestCase):
             (root / "out" / "gil-explained.srt").write_text("1")
             (root / "out" / "gil-explained-two-hyperframes.mp4").write_bytes(b"other episode")
             factory_chat.delete_video(ws, "gil-explained")
-            self.assertEqual(sorted(f.name for f in (root / "out").iterdir()), ["gil-explained-two-hyperframes.mp4"])   # only this episode's files
+            self.assertEqual(sorted(f.name for f in (root / "out").iterdir() if f.is_file()), ["gil-explained-two-hyperframes.mp4"])   # only this episode's files
             self.assertTrue((ep / "youtube.json").exists())                                                              # its script stays
             with self.assertRaises(ValueError):
                 factory_chat.delete_video(ws, "gil-explained")
@@ -175,3 +175,49 @@ class FactoryHttpTests(unittest.TestCase):
             code, out = self.post("/api/factory/queue", {"slug": "zoom-sfu", "date": "2030-01-05", "title": ""})
             self.assertEqual(code, 400)
             self.assertIn("title", out["error"])
+
+
+class FactoryListAndReferenceTests(unittest.TestCase):
+    def setUp(self):
+        FakeProc.calls = []
+
+    def test_a_queued_video_leaves_the_factory_list(self):
+        with TempWorkspace() as ws, fake_factory(ws) as (root, _calls):
+            ep = root / "episodes" / "gil"
+            ep.mkdir(parents=True)
+            (ep / "youtube.json").write_text(json.dumps({"title": "GIL", "description": "d", "tags": []}))
+            (root / "out").mkdir()
+            (root / "out" / "gil-hyperframes.mp4").write_bytes(b"mp4")
+            (root / "out" / "gil-hyperframes.jpg").write_bytes(b"jpg")
+            out = factory_chat.queue_video(ws, "gil", "2030-01-05")
+            self.assertEqual(out["videos"], [])
+            self.assertEqual(len(ws.queue()), 1)
+            self.assertTrue((root / "out" / "queued" / "gil-hyperframes.mp4").exists())
+
+    def test_a_reference_video_with_a_comment_is_sent_to_claude_to_learn(self):
+        from postcrew import factory_refs
+
+        def fake_run(cmd, **kw):
+            if cmd[0] == "ffprobe":
+                return mock.Mock(stdout="20.0\n", returncode=0)
+            Path(cmd[-1]).write_bytes(b"jpg")   # ffmpeg frame
+            return mock.Mock(stdout="", returncode=0)
+
+        with TempWorkspace() as ws, fake_factory(ws) as (root, _calls), \
+                mock.patch.object(factory_refs.subprocess, "run", side_effect=fake_run):
+            with self.assertRaises(ValueError):
+                factory_refs.add_upload(ws, "notes.txt", "", io.BytesIO(b"x"), 1)
+            r = factory_refs.add_upload(ws, "liked.mp4", "", io.BytesIO(b"v" * 10), 10)["reference"]
+            self.assertEqual((r["frames"], r["seconds"]), (factory_refs.FRAMES, 20.0))
+            self.assertTrue(str(factory_refs.folder(ws)).startswith(str(root.parent)))
+            with self.assertRaises(ValueError):   # nothing to learn yet
+                factory_chat.teach(ws, r["id"], runner=FakeProc)
+            factory_refs.comment(ws, r["id"], "the title pops in word by word")
+            factory_chat.teach(ws, r["id"], runner=FakeProc)
+            wait_idle()
+            msg = factory_chat.view(ws)["messages"][0]["text"]
+            self.assertIn("the title pops in word by word", msg)
+            self.assertIn("frames/01.jpg", msg)
+            self.assertTrue(factory_refs.listing(ws)[0]["learned"])
+            factory_refs.delete(ws, r["id"])
+            self.assertEqual(factory_refs.listing(ws), [])

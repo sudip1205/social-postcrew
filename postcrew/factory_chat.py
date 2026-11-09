@@ -13,11 +13,12 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+from . import factory_refs
 from .agents.shorts import SKILL_RULE, factory_dir, skill_version
 
 STATE = "factory-chat"
 TOOLS = ["Read", "Write", "Edit", "Glob", "Grep", "WebSearch", "WebFetch", "TodoWrite", "Skill",
-         "Bash(npm run make:*)", "Bash(npm run tts:*)", "Bash(npm run voices:*)", "Bash(ls:*)", "Bash(ffprobe:*)", "Bash(cat:*)"]
+         "Bash(npm run make:*)", "Bash(npm run tts:*)", "Bash(npm run voices:*)", "Bash(ls:*)", "Bash(ffprobe:*)", "Bash(ffmpeg:*)", "Bash(cat:*)"]
 SYSTEM = ("You are working for the channel owner through the postcrew Studio's Factory page (a chat, like the Claude Code app). "
           "Follow CLAUDE.md and the explainer-short-style skill. A topic means: write the episode (script.json and youtube.json, privacyStatus "
           "\"private\") and render it with `npm run make -- episodes/<slug>` from shorts-factory/. An instruction about how videos should look, "
@@ -68,7 +69,8 @@ def view(ws):
     st = load(ws)
     return {"messages": st["messages"], "session": bool(st.get("session_id")), "busy": busy(), "factory": str(root),
             "found": (root / "package.json").exists(), "videos": videos(ws), "skill": skill_files(ws),
-            "skill_version": skill_version(root) if (root / "package.json").exists() else {}, "plans": plans(ws)}
+            "skill_version": skill_version(root) if (root / "package.json").exists() else {}, "plans": plans(ws),
+            "references": factory_refs.listing(ws)}
 
 
 def plans(ws):
@@ -237,18 +239,32 @@ def _set_session(ws, sid):
             _save(ws, st)
 
 
-def delete_video(ws, slug):
-    """Delete an episode's rendered files from out/ (video, thumbnail, captions). The episode's script stays, so it can be made again."""
+def _rendered(ws, slug):
+    """An episode's rendered files in out/ (video, thumbnail, captions)."""
     if not re.fullmatch(r"[a-z0-9][a-z0-9-]{1,80}", str(slug or "")):
         raise ValueError("unknown episode")
-    root = factory_dir(_cfg(ws))
-    out = root / "out"
-    gone = [f for f in out.glob(f"{slug}*") if re.fullmatch(re.escape(slug) + r"(-(hyperframes|remotion))?\.(mp4|jpg|srt)", f.name)]
+    out = factory_dir(_cfg(ws)) / "out"
+    return [f for f in out.glob(f"{slug}*") if re.fullmatch(re.escape(slug) + r"(-(hyperframes|remotion))?\.(mp4|jpg|srt)", f.name)]
+
+
+def delete_video(ws, slug):
+    """Delete an episode's rendered files from out/. The episode's script stays, so it can be made again."""
+    gone = _rendered(ws, slug)
     if not gone:
         raise ValueError("that video is already gone")
     for f in gone:
         f.unlink()
     return view(ws)
+
+
+def _move_out(ws, slug):
+    """Once queued (the Queue keeps its own copy), the episode's files go to out/queued/, so it leaves the Factory's list."""
+    files = _rendered(ws, slug)
+    if files:
+        dest = files[0].parent / "queued"
+        dest.mkdir(exist_ok=True)
+        for f in files:
+            f.replace(dest / f.name)
 
 
 def queue_video(ws, slug, date=None, title=None, description=None, tags=None):
@@ -309,4 +325,13 @@ def queue_video(ws, slug, date=None, title=None, description=None, tags=None):
     if plan_id:   # made from one of your plans: the plan counts as made (it leaves Manual run) once its video is queued
         post["plan_id"] = plan_id
         ws.save_queue([post if p["id"] == post["id"] else p for p in ws.queue()])
-    return {"post": post}
+    _move_out(ws, slug)
+    return {"post": post, **view(ws)}
+
+
+def teach(ws, rid, runner=subprocess.Popen):
+    """Send the chat a reference video's lesson (its frames and your comment), so Claude writes it into the skill."""
+    msg = factory_refs.lesson(ws, rid)
+    out = send(ws, msg["text"], runner=runner)
+    factory_refs.mark_learned(ws, rid)
+    return dict(out, references=factory_refs.listing(ws))

@@ -79,3 +79,6 @@ send
 stop
 lightbulb
 edit_note
+add_link
+check_circle
+schedule

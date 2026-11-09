@@ -33,7 +33,7 @@ from ..agents.frames import HyperFramesAgent, RemotionAgent, RemotionFramesAgent
 from ..agents.hooks import HooksAgent
 from ..agents.graphics import GraphicsAgent
 from ..agents.video_review import VideoReviewAgent
-from .. import attachments, engage, factory_chat, rewards, yt_analytics
+from .. import attachments, engage, factory_chat, factory_refs, rewards, yt_analytics
 from ..agents.direction import CreativeDirectorAgent
 from ..agents.quality import QualityDirectorAgent
 from ..agents.voice import VoiceAgent
@@ -909,6 +909,9 @@ def make_handler(studio):
                     return self.file(STATIC / p[len("/static/"):], STATIC)
                 if method == "GET" and p.startswith("/media/"):
                     return self.media(ws.root / "media" / p[len("/media/"):], ws.root / "media")
+                if method == "GET" and p.startswith("/factory-ref/"):   # reference videos and their frames (Factory page)
+                    root = factory_refs.folder(ws)
+                    return self.media(root / p[len("/factory-ref/"):], root)
                 if method == "GET" and p.startswith("/factory-out/"):   # the Shorts factory's rendered videos (Factory page)
                     from ..agents.shorts import factory_dir
                     out = factory_dir(platforms.view(ws.config(), "youtube")) / "out"
@@ -960,6 +963,9 @@ def make_handler(studio):
                 if p == "/api/manual/plan/attach" and method == "POST":   # a PDF or image for your own plan (raw body)
                     return self.send(200, {"source": attachments.save_upload(ws, studio._view(q.get("platform"))[0], q.get("id", ""), q.get("name", ""),
                                                                               self.rfile, int(self.headers.get("Content-Length") or 0))})
+                if p == "/api/factory/references/upload" and method == "POST":   # a reference video for the Factory (raw body)
+                    return self.send(200, factory_refs.add_upload(ws, q.get("name", ""), q.get("comment", ""), self.rfile,
+                                                                  int(self.headers.get("Content-Length") or 0)))
                 if p == "/api/motion/references/upload" and method == "POST":
                     return self.send(200, studio.motion.upload(q, self.rfile, int(self.headers.get("Content-Length") or 0)))
                 m = re.match(r"^/api/motion/references/([a-z0-9-]+)/(analyze|approve|reject|delete)$", p)
@@ -1005,6 +1011,10 @@ def make_handler(studio):
                     ("POST", "/api/factory/stop"): lambda: factory_chat.stop(ws),
                     ("POST", "/api/factory/reset"): lambda: factory_chat.reset(ws),
                     ("GET", "/api/factory/plan"): lambda: factory_chat.plan_prompt(ws, q.get("id")),
+                    ("POST", "/api/factory/references/link"): lambda: factory_refs.add_link(ws, self.body().get("url"), self.body().get("comment")),
+                    ("POST", "/api/factory/references/comment"): lambda: factory_refs.comment(ws, self.body().get("id"), self.body().get("comment")),
+                    ("POST", "/api/factory/references/delete"): lambda: factory_refs.delete(ws, self.body().get("id")),
+                    ("POST", "/api/factory/references/teach"): lambda: factory_chat.teach(ws, self.body().get("id")),
                     ("POST", "/api/factory/delete"): lambda: factory_chat.delete_video(ws, self.body().get("slug")),
                     ("POST", "/api/factory/queue"): lambda: factory_chat.queue_video(ws, **{k: v for k, v in self.body().items()
                                                                                           if k in ("slug", "date", "title", "description", "tags")}),
