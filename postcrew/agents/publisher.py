@@ -230,6 +230,11 @@ def publish_post(ws, post, client_factory=LinkedIn, log=print, sleep=time.sleep,
 def publish_due(ws, now=None, client_factory=LinkedIn, log=print, sleep=time.sleep, yt_factory=None):
     now = now or datetime.now(timezone.utc)
     retry_comments(ws, client_factory, log, sleep)
+    try:   # Shorts on YouTube whose Facebook/Instagram Reel failed earlier
+        from .. import meta
+        meta.retry_failed(ws, log=log, notify_fn=notify)
+    except Exception as e:
+        log(f"facebook/instagram retry: {e}")
     results, done = [], set()
     for p in sorted(ws.queue(), key=lambda p: p["scheduled_at"]):
         app = platforms.platform_of(p)

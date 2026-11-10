@@ -135,7 +135,7 @@ def full_description(post):
     return desc
 
 
-def publish_one(ws, post, client_factory=YouTube, log=print, check=check_youtube):
+def publish_one(ws, post, client_factory=YouTube, log=print, check=check_youtube, meta_client=None):
     """Upload one queued video. Returns the updated post (status published | dry_run | failed | queued when blocked)."""
     cfg = platforms.view(ws.config(), "youtube")
     run = RunLog(ws.runs_dir / post["run_id"]) if post.get("run_id") and (ws.runs_dir / post["run_id"]).exists() else None
@@ -217,9 +217,18 @@ def publish_one(ws, post, client_factory=YouTube, log=print, check=check_youtube
     ev("published", f"uploaded {res['url']}" + (f" to the channel \"{channel['title']}\"" if channel else "") + thumb_note)
     if run:
         run.step("publisher", "passed", summary=f"uploaded {res['url']}")
+    if yt["format"] == "short":   # every Short that goes to YouTube also goes to Facebook and Instagram as a Reel
+        from .. import meta
+        try:
+            meta.cross_post(ws, post, client=meta_client, log=lambda m: ev("meta", m), notify_fn=notify)
+        except Exception as e:   # never lose the YouTube upload over the other apps
+            post.setdefault("meta", {})["error"] = f"{type(e).__name__}: {e}"[:400]
+            ev("meta", f"Facebook/Instagram skipped: {e}", "error")
     ws.add_history({k: post.get(k) for k in ("id", "platform", "date", "category", "topic", "text", "media", "published_at",
-                                             "run_id", "youtube", "plan_id")})
+                                             "run_id", "youtube", "plan_id", "meta")})
+    social = [(f"Reel on {n}", (post.get("meta") or {}).get(k, {}).get("url") or (post.get("meta") or {}).get(k, {}).get("error", ""))
+              for k, n in (("facebook", "Facebook"), ("instagram", "Instagram")) if (post.get("meta") or {}).get(k)]
     notify(ws, "Uploaded to YouTube", f"{yt['title']} is on your channel" + (f" \"{channel['title']}\"." if channel else "."), level="success",
            action={"label": "Open Queue", "tab": "queue"},
-           details=post_details(ws, post, ("Video on YouTube", res["url"])))
+           details=post_details(ws, post, ("Video on YouTube", res["url"]), *social))
     return post

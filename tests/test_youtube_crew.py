@@ -299,6 +299,75 @@ class YouTubePublishTests(unittest.TestCase):
             self.assertEqual(res[0]["status"], "queued")
             self.assertIn("Connect YouTube", res[0]["error"])
 
+    def meta_ready(self, ws):
+        from postcrew.agents.shorts import factory_dir
+        f = factory_dir(platforms.view(ws.config(), "youtube")) / "secrets" / "meta.json"
+        f.parent.mkdir(parents=True, exist_ok=True)
+        f.write_text(json.dumps({"pageId": "P1", "igUserId": "IG1", "pageAccessToken": "tok", "graphVersion": "v23.0"}))
+
+    def test_a_short_on_youtube_also_goes_to_facebook_and_instagram(self, _tts, _claude):
+        FakeYouTube.uploads, FakeYouTube.fail = [], None
+        FakeMeta.calls, FakeMeta.fail = [], set()
+        with TempWorkspace() as ws, mock.patch("postcrew.meta.Meta", FakeMeta):
+            post = self.queued(ws)
+            self.meta_ready(ws)
+            res = publish_due(ws, now=self.due(post), yt_factory=FakeYouTube, log=lambda m: None)
+            self.assertEqual(res[0]["status"], "published")
+            self.assertEqual([c[0] for c in FakeMeta.calls], ["facebook", "instagram"])
+            self.assertEqual(FakeMeta.calls[1][2], "fb1")   # Instagram may fall back to the Facebook copy
+            cap = FakeMeta.calls[0][1]
+            self.assertTrue(cap.startswith(post["youtube"]["title"]))
+            self.assertNotIn("#Shorts", cap)
+            meta = ws.history()[-1]["meta"]
+            self.assertEqual((meta["facebook"]["url"], meta["instagram"]["url"]),
+                             ("https://www.facebook.com/reel/fb1", "https://www.instagram.com/reel/ig1/"))
+
+    def test_a_failed_reel_is_tried_again_later_and_never_posted_twice(self, _tts, _claude):
+        FakeYouTube.uploads, FakeYouTube.fail = [], None
+        FakeMeta.calls, FakeMeta.fail = [], {"instagram"}
+        with TempWorkspace() as ws, mock.patch("postcrew.meta.Meta", FakeMeta):
+            post = self.queued(ws)
+            self.meta_ready(ws)
+            publish_due(ws, now=self.due(post), yt_factory=FakeYouTube, log=lambda m: None)
+            meta = ws.history()[-1]["meta"]
+            self.assertEqual((meta["facebook"]["status"], meta["instagram"]["status"]), ("published", "failed"))
+            FakeMeta.fail = set()
+            publish_due(ws, now=self.due(post), yt_factory=FakeYouTube, log=lambda m: None)   # the next publish window
+            self.assertEqual([c[0] for c in FakeMeta.calls], ["facebook", "instagram", "instagram"])
+            self.assertEqual(ws.history()[-1]["meta"]["instagram"]["status"], "published")
+            self.assertEqual(len(FakeYouTube.uploads), 1)
+
+    def test_without_a_meta_connection_youtube_still_publishes(self, _tts, _claude):
+        FakeYouTube.uploads, FakeYouTube.fail = [], None
+        FakeMeta.calls = []
+        with TempWorkspace() as ws, mock.patch("postcrew.meta.Meta", FakeMeta):
+            post = self.queued(ws)
+            res = publish_due(ws, now=self.due(post), yt_factory=FakeYouTube, log=lambda m: None)
+            self.assertEqual(res[0]["status"], "published")
+            self.assertEqual(FakeMeta.calls, [])
+            self.assertIn("not connected", ws.history()[-1]["meta"]["skipped"])
+
+
+class FakeMeta:
+    calls, fail = [], set()
+
+    def __init__(self, page_id, ig_user_id, token, version="v23.0"):
+        assert (page_id, ig_user_id, token) == ("P1", "IG1", "tok")
+
+    def facebook_reel(self, video, caption, log=print):
+        FakeMeta.calls.append(("facebook", caption, None))
+        if "facebook" in FakeMeta.fail:
+            from postcrew.meta import MetaError
+            raise MetaError("fb down")
+        return {"id": "fb1", "url": "https://www.facebook.com/reel/fb1"}
+
+    def instagram_reel(self, video, caption, facebook_id=None, log=print):
+        FakeMeta.calls.append(("instagram", caption, facebook_id))
+        if "instagram" in FakeMeta.fail:
+            from postcrew.meta import MetaError
+            raise MetaError("ig busy")
+        return {"id": "ig1", "url": "https://www.instagram.com/reel/ig1/"}
+
 
 if __name__ == "__main__":
     unittest.main()
