@@ -3,6 +3,8 @@
 ## 0.2.0: YouTube, per-app settings and a faster Studio
 
 ### New
+- **Shorts too long for Instagram's API wait in a folder, ready to post by hand.** Each one goes to `workspace/instagram/<date>-<title>/` with `video.mp4`, `cover.jpg`, `caption.txt` and `details.txt` (length, YouTube and Facebook links, the steps to post it in the Instagram app, which takes 3 minutes).
+- **The daily clean-up covers everything older than 30 days.** On top of runs, media, cache and briefs it now deletes old `motion/` clips, folders in `instagram/`, `*.bak*` backups and, with `cleanup.factory` on (the lab), the Shorts factory's episodes (script, voice, render) and renders in `episodes/` and `out/`, judged by their newest file. The factory's code, skill, music and secrets are never touched.
 - **Shorts longer than 45 seconds skip Instagram, with a reason.** Instagram's API accepts Reels only up to 45 s from your account (tested: 38 s and 45 s go through, 48 s and longer are refused, whatever the file size). A longer Short is marked "too long for Instagram's API" instead of failing five times with error notices. Facebook still gets every Short.
 - **Instagram uploads work.** Instagram refuses a direct upload made with a Page token (it stores 0 bytes). Its calls now use the system-user token (`userAccessToken` in the factory's `secrets/meta.json`), and Facebook keeps the Page token.
 - **Facebook and Instagram Reels get a cover picture.** Postcrew picks the frame of the hook with the most on screen (its headline and picture drawn) and sets it as the Facebook cover; Instagram gets the same moment as its cover frame.

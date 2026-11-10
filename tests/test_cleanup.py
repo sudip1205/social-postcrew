@@ -2,6 +2,7 @@
 import json
 import os
 import sys
+import tempfile
 import time
 import unittest
 from datetime import datetime
@@ -88,6 +89,33 @@ class CleanupTests(unittest.TestCase):
             for kept in ("media/2026.png", "runs/run1/events.jsonl", "cache/voice/abc.mp3"):
                 self.assertTrue((r / kept).exists(), kept)
             self.assertGreater(res["removed"], 4)
+
+    def test_the_factory_episodes_and_renders_go_after_thirty_days_and_nothing_else_there(self):
+        with TempWorkspace() as ws, tempfile.TemporaryDirectory() as tmp:
+            f = Path(tmp)
+            make(f / "episodes" / "old-ep" / "script.json", 40)
+            make(f / "episodes" / "old-ep" / "build" / "voice.wav", 40)
+            make(f / "episodes" / "new-ep" / "script.json", 40)
+            make(f / "episodes" / "new-ep" / "build" / "video.mp4", 2)   # touched recently: the whole episode stays
+            make(f / "out" / "old-ep-hf.mp4", 40)
+            make(f / "out" / "queued" / "old.mp4", 40)
+            make(f / "out" / "queued" / "new.mp4", 2)
+            make(f / "pipeline" / "make.mjs", 400)   # the factory's code, skill and secrets are never touched
+            make(f / "secrets" / "meta.json", 400)
+            make(ws.root / "instagram" / "2026-01-01-old" / "video.mp4", 40)
+            make(ws.root / "motion" / "old.mp4", 40)
+            make(ws.root / "history.json.bak-cap", 40)
+            cleanup.clean(ws, factory=[f / "episodes", f / "out"])
+            self.assertFalse((f / "episodes" / "old-ep").exists())
+            self.assertTrue((f / "episodes" / "new-ep" / "script.json").exists())
+            self.assertFalse((f / "out" / "old-ep-hf.mp4").exists())
+            self.assertFalse((f / "out" / "queued" / "old.mp4").exists())
+            self.assertTrue((f / "out" / "queued" / "new.mp4").exists())
+            self.assertTrue((f / "pipeline" / "make.mjs").exists() and (f / "secrets" / "meta.json").exists())
+            self.assertFalse((ws.root / "instagram" / "2026-01-01-old").exists())
+            self.assertFalse((ws.root / "motion" / "old.mp4").exists())
+            self.assertFalse((ws.root / "history.json.bak-cap").exists())
+            self.assertTrue((ws.root / "history.json").exists())
 
     def test_a_dry_run_deletes_nothing_and_says_what_would_go(self):
         with TempWorkspace() as ws:

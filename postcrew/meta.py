@@ -5,6 +5,7 @@ Connection details: the Page id, Instagram user id and a Page access token. They
 ({"pageId", "igUserId", "pageAccessToken", "graphVersion"}), the same file meta-publish.mjs reads.
 """
 import json
+import os
 import re
 import time
 import urllib.error
@@ -269,7 +270,11 @@ def cross_post(ws, post, client=None, log=print, notify_fn=None):
         if name == "instagram" and length > IG_MAX_S:
             meta[name] = {"status": "too_long", "seconds": round(length),
                           "reason": f"Instagram's API takes Reels up to {IG_MAX_S} s from this account; this one is {round(length)} s"}
-            log(f"instagram: skipped, {round(length)} s is longer than the {IG_MAX_S} s Instagram's API allows")
+            try:
+                meta[name]["folder"] = str(manual_folder(ws, post, video, pic, cap, length).relative_to(ws.root))
+                log(f"instagram: {round(length)} s is too long for the API; ready to post by hand in {meta[name]['folder']}")
+            except OSError as e:
+                log(f"instagram: too long for the API, and the folder to post it by hand failed: {e}")
             continue
         if cur.get("status") == "published" or cur.get("tries", 0) >= TRIES:
             continue
@@ -299,6 +304,49 @@ def cross_post(ws, post, client=None, log=print, notify_fn=None):
                           level="error", key=f"meta-{name}-{post.get('id')}", action={"label": "Open Queue", "tab": "queue"},
                           details={"rows": [("Video", yt.get("title") or ""), (f"{NAMES[name]} said", str(e)[:300])]})
     return post
+
+
+MANUAL_DIR = "instagram"   # workspace/instagram/<date>-<slug>/: the Reels to post by hand in the Instagram app
+
+
+def manual_folder(ws, post, video, pic, cap, length):
+    """Put a Short Instagram's API refuses into workspace/instagram/<date>-<slug>/ (video, cover, caption and the details) so the
+    owner can post it from the Instagram app, which takes Reels up to 3 minutes. Returns the folder."""
+    import re
+    import shutil
+    yt = post.get("youtube") or {}
+    title = yt.get("title") or post.get("topic") or "Short"
+    day = (post.get("published_at") or post.get("date") or time.strftime("%Y-%m-%d"))[:10]
+    slug = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")[:60].strip("-") or "short"
+    d = ws.root / MANUAL_DIR / f"{day}-{slug}"
+    d.mkdir(parents=True, exist_ok=True)
+    for src, name in ((video, "video.mp4"), (pic, "cover.jpg")):
+        if src and Path(src).exists() and not (d / name).exists():
+            try:
+                os.link(src, d / name)   # same disk: no extra space
+            except OSError:
+                shutil.copy2(src, d / name)
+    (d / "caption.txt").write_text(cap + "\n")
+    fb = ((post.get("meta") or {}).get("facebook") or {}).get("url") or "not yet"
+    m, s = divmod(round(length), 60)
+    (d / "details.txt").write_text("\n".join([
+        title, "",
+        f"Length:     {m}:{s:02d} ({round(length)} s)",
+        f"YouTube:    {yt.get('url') or ''}",
+        f"Facebook:   {fb}",
+        f"Published:  {post.get('published_at') or ''}",
+        f"Cover:      cover.jpg" + (" (the frame Postcrew picked; in the app, Edit cover > Add from camera roll)" if (d / "cover.jpg").exists() else " (none)"),
+        "",
+        "Why it is here: Instagram's API only accepts Reels up to "
+        f"{IG_MAX_S} s from this account. The Instagram app takes up to 3 minutes.",
+        "",
+        "To post it:",
+        "  1. Copy video.mp4 and cover.jpg to your phone.",
+        "  2. Instagram > + > Reel > pick video.mp4.",
+        "  3. Paste caption.txt as the caption, set cover.jpg as the cover, share.",
+        "  4. Delete this folder (or leave it: the daily clean-up removes it after 30 days).",
+        ""]))
+    return d
 
 
 def retry_failed(ws, client=None, log=print, notify_fn=None):

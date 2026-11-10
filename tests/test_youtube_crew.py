@@ -362,7 +362,14 @@ class YouTubePublishTests(unittest.TestCase):
             publish_due(ws, now=self.due(post), yt_factory=FakeYouTube, log=lambda m: None)
             publish_due(ws, now=self.due(post), yt_factory=FakeYouTube, log=lambda m: None)
             self.assertEqual([c[0] for c in FakeMeta.calls], ["facebook", "thumbnail"])
-            self.assertEqual(ws.history()[-1]["meta"]["instagram"]["status"], "too_long")
+            ig = ws.history()[-1]["meta"]["instagram"]
+            self.assertEqual(ig["status"], "too_long")
+            folder = ws.root / ig["folder"]   # ready to post by hand in the Instagram app
+            self.assertTrue(folder.parent.name == "instagram" and (folder / "video.mp4").exists())
+            self.assertIn("#", (folder / "caption.txt").read_text())
+            details = (folder / "details.txt").read_text()
+            self.assertIn("1:10", details)
+            self.assertIn("https://www.facebook.com/", details)
 
     def test_without_a_meta_connection_youtube_still_publishes(self, _tts, _claude):
         FakeYouTube.uploads, FakeYouTube.fail = [], None

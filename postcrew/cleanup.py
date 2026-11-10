@@ -2,7 +2,9 @@
 
 Every day (when `postcrew serve` runs; time and age in the `cleanup` settings) everything older than `keep_days` (30) is deleted:
 the run folders (logs, scripts, frames, videos), the planner's logs, the voice cache, the day briefs, the videos and pictures kept in
-media/ and old config backups. A run, a video or a picture that a post still in the Queue uses is never deleted, whatever its age.
+media/ and motion/, the Reels left to post by hand in instagram/, old config and history backups (*.bak*), and in the Shorts
+factory (when cleanup.factory is on: the lab) every episode (script, voice, render) and render in episodes/ and out/ whose newest
+file is that old. A run, a video or a picture that a post still in the Queue uses is never deleted, whatever its age.
 
 What is NEVER deleted: config.json, secrets.json, the access token, history.json and queue.json (the history is how Postcrew knows what it
 has already published), and state/ (the plan, the lessons the crew has learned, the scheduler's memory).
@@ -56,10 +58,10 @@ def _protected(ws):
     return files, runs
 
 
-def _remove(path, root, dry_run):
-    """Delete a file or folder (never outside the workspace, never through a link). Returns the bytes freed."""
+def _remove(path, roots, dry_run):
+    """Delete a file or folder (never outside the workspace or the factory's video folders, never through a link). Returns the bytes freed."""
     path = Path(path)
-    if root.resolve() not in path.resolve().parents and not path.is_symlink():
+    if not any(Path(r).resolve() in path.resolve().parents for r in roots) and not path.is_symlink():
         return 0
     freed = _size(path)
     if dry_run:
@@ -74,22 +76,37 @@ def _remove(path, root, dry_run):
     return freed
 
 
-def clean(ws, keep_days=30, dry_run=False, now=None, videos=False):
+def _factory(ws):
+    """The Shorts factory's episodes/ and out/ (scripts, voice, renders): cleaned too. Never its skill, code, music or secrets."""
+    try:
+        from . import platforms
+        from .agents.shorts import factory_dir
+        f = factory_dir(platforms.view(ws.config(), "youtube"))
+    except Exception:   # noqa: BLE001 - no factory, nothing to clean there
+        return []
+    return [f / n for n in FACTORY_DIRS if (f / n).is_dir()]
+
+
+FACTORY_DIRS = ("episodes", "out")
+
+
+def clean(ws, keep_days=30, dry_run=False, now=None, videos=False, factory=()):
     """Delete what is older than keep_days (and, with videos=True, every finished video, frames folder and voice recording).
     Returns {"removed": files and folders, "freed_mb", "areas": {name: count}, "dry_run", "videos"}."""
     root = ws.root.resolve()
     cutoff = (now or time.time()) - keep_days * DAY
     keep_files, keep_runs = _protected(ws)
     removed, freed, areas = [], 0, {}
+    fdirs = [Path(d).resolve() for d in factory]   # the factory folders to clean (run_cleanup passes them when cleanup.factory is on)
 
-    def drop(path, area):
+    def drop(path, area, base=None):
         nonlocal freed
         if str(Path(path).resolve()) in keep_files:
             return
-        n = _remove(path, root, dry_run)
+        n = _remove(path, [base or root], dry_run)
         if n or dry_run:
             freed += n
-            removed.append(str(Path(path).relative_to(root)))
+            removed.append(str(Path(path).relative_to(base.parent)) if base else str(Path(path).relative_to(root)))
             areas[area] = areas.get(area, 0) + 1
 
     # old things, whatever they are: run folders, planner logs, caches, briefs, pictures and videos kept in media/, config backups
@@ -97,15 +114,28 @@ def clean(ws, keep_days=30, dry_run=False, now=None, videos=False):
         for d in sorted((root / name).glob("*")) if (root / name).is_dir() else []:
             if d.is_dir() and d.name not in keep_runs and _newest(d) < cutoff:
                 drop(d, kind)
-    for name in ("media", "cache", "briefs"):
+    for name in ("media", "cache", "briefs", "motion"):
         base = root / name
         if base.is_dir():
             for f in sorted(base.rglob("*")):
                 if f.is_file() and f.lstat().st_mtime < cutoff:
                     drop(f, name)
-    for f in sorted(root.glob("config.backup-*.json")):
-        if f.lstat().st_mtime < cutoff:
+    for d in sorted((root / "instagram").glob("*")) if (root / "instagram").is_dir() else []:   # Reels left to post by hand
+        if _newest(d) < cutoff:
+            drop(d, "instagram")
+    for f in sorted(set(root.glob("config.backup-*.json")) | set(root.glob("*.bak*"))):
+        if f.is_file() and f.name not in KEEP_FILES and f.lstat().st_mtime < cutoff:
             drop(f, "backups")
+    for base in fdirs:   # the factory: an episode (script, voice, render) or a render older than keep_days, judged by its newest file
+        for d in sorted(base.iterdir()):
+            if d.is_dir() and not d.is_symlink() and not any(d.iterdir()):
+                continue
+            if d.is_dir() and not d.is_symlink() and d.name == "queued":   # out/queued/<video>: one level down
+                for q in sorted(d.iterdir()):
+                    if _newest(q) < cutoff:
+                        drop(q, "factory", base)
+            elif _newest(d) < cutoff:
+                drop(d, "factory", base)
     for f in sorted(root.glob("*")):   # a video left in the workspace folder itself
         if f.is_file() and f.suffix.lower() in VIDEO_EXT and f.lstat().st_mtime < cutoff:
             drop(f, "videos")
@@ -143,4 +173,4 @@ def run_cleanup(ws):
     cfg = ws.config().get("cleanup") or {}
     if not cfg.get("enabled", True):
         return None
-    return clean(ws, keep_days=int(cfg.get("keep_days", 30)))
+    return clean(ws, keep_days=int(cfg.get("keep_days", 30)), factory=_factory(ws) if cfg.get("factory") else ())
