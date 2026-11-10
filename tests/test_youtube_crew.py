@@ -381,7 +381,7 @@ class MetaClientTests(unittest.TestCase):
 class FakeMeta:
     calls, fail = [], set()
 
-    def __init__(self, page_id, ig_user_id, token, version="v23.0"):
+    def __init__(self, page_id, ig_user_id, token, version="v23.0", ig_token=None):
         assert (page_id, ig_user_id, token) == ("P1", "IG1", "tok")
 
     def facebook_reel(self, video, caption, log=print):

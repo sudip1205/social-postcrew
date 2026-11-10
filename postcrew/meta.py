@@ -27,7 +27,7 @@ def connection(ws):
     s = ws.secrets()
     if s.get("meta_page_token") and s.get("meta_page_id"):
         return {"page_id": s["meta_page_id"], "ig_user_id": s.get("meta_ig_user_id"), "token": s["meta_page_token"],
-                "version": s.get("meta_graph_version") or VERSION, "source": "Credentials"}
+                "ig_token": s.get("meta_user_token") or s["meta_page_token"], "version": s.get("meta_graph_version") or VERSION, "source": "Credentials"}
     from . import platforms
     from .agents.shorts import factory_dir
     f = factory_dir(platforms.view(ws.config(), "youtube")) / "secrets" / "meta.json"
@@ -37,20 +37,22 @@ def connection(ws):
         return None
     if not (c.get("pageAccessToken") and c.get("pageId")):
         return None
+    # Instagram's direct upload refuses a Page token (it stores 0 bytes): it needs the system-user token (userAccessToken)
     return {"page_id": str(c["pageId"]), "ig_user_id": str(c.get("igUserId") or "") or None, "token": c["pageAccessToken"],
-            "version": c.get("graphVersion") or VERSION, "source": str(f)}
+            "ig_token": c.get("userAccessToken") or c["pageAccessToken"], "version": c.get("graphVersion") or VERSION, "source": str(f)}
 
 
 class Meta:
-    def __init__(self, page_id, ig_user_id, token, version=VERSION, sleep=time.sleep, timeout=120):
+    def __init__(self, page_id, ig_user_id, token, version=VERSION, sleep=time.sleep, timeout=120, ig_token=None):
         self.page_id, self.ig_user_id, self.token, self.version = page_id, ig_user_id, token, version
+        self.ig_token = ig_token or token   # Instagram calls: the system-user token when there is one
         self.sleep, self.timeout = sleep, timeout
 
-    def api(self, method, path, params=None, headers=None, body=None):
+    def api(self, method, path, params=None, headers=None, body=None, token=None):
         url = path if path.startswith("http") else f"{GRAPH}/{self.version}/{path}"
         q = dict(params or {})
         if not path.startswith("http"):
-            q["access_token"] = self.token
+            q["access_token"] = token or self.token
         if q:
             url += ("&" if "?" in url else "?") + urllib.parse.urlencode(q)
         req = urllib.request.Request(url, data=body if body is not None else (b"" if method == "POST" else None), method=method,
@@ -139,7 +141,8 @@ class Meta:
     def _ig_from_url(self, url, caption, thumb_ms=None):
         return self.api("POST", f"{self.ig_user_id}/media", {"media_type": "REELS", "video_url": url, "caption": caption,
                                                              "share_to_feed": "true",
-                                                             **({"thumb_offset": str(thumb_ms)} if thumb_ms is not None else {})})
+                                                             **({"thumb_offset": str(thumb_ms)} if thumb_ms is not None else {})},
+                        token=self.ig_token)
 
     def instagram_reel(self, video, caption, facebook_id=None, log=print, thumb_ms=None):
         """Resumable upload first; if Instagram refuses it, let it fetch the copy Facebook already hosts (as meta-publish.mjs)."""
@@ -149,10 +152,13 @@ class Meta:
         try:
             c = self.api("POST", f"{self.ig_user_id}/media", {"media_type": "REELS", "upload_type": "resumable",
                                                               "caption": caption, "share_to_feed": "true",
-                                                              **({"thumb_offset": str(thumb_ms)} if thumb_ms is not None else {})})
+                                                              **({"thumb_offset": str(thumb_ms)} if thumb_ms is not None else {})},
+                         token=self.ig_token)
             log(f"instagram: uploading {len(data) / 1e6:.1f} MB")
-            self.api("POST", c["uri"], headers={"Authorization": f"OAuth {self.token}", "offset": "0", "file_size": str(len(data)),
-                                                "Content-Type": "application/octet-stream"}, body=data)
+            up = self.api("POST", c["uri"], headers={"Authorization": f"OAuth {self.ig_token}", "offset": "0",
+                                                     "file_size": str(len(data))}, body=data)
+            if up.get("debug_info") or up.get("success") is False:
+                raise MetaError(f"upload refused: {json.dumps(up)[:200]}")
         except (MetaError, KeyError) as e:
             src = None
             for _ in range(12 if facebook_id else 0):
@@ -168,14 +174,14 @@ class Meta:
             log(f"instagram: upload refused ({str(e)[:120]}); using the Facebook copy")
             c = self._ig_from_url(src, caption, thumb_ms)
         for _ in range(120):
-            s = self.api("GET", c["id"], {"fields": "status_code,status"})
+            s = self.api("GET", c["id"], {"fields": "status_code,status"}, token=self.ig_token)
             if s.get("status_code") == "FINISHED":
                 break
             if s.get("status_code") in ("ERROR", "EXPIRED"):
                 raise MetaError(f"Instagram could not process the video: {s.get('status')}", "media")
             self.sleep(5)
-        pub = self.api("POST", f"{self.ig_user_id}/media_publish", {"creation_id": c["id"]})
-        link = self.api("GET", pub["id"], {"fields": "permalink"}).get("permalink")
+        pub = self.api("POST", f"{self.ig_user_id}/media_publish", {"creation_id": c["id"]}, token=self.ig_token)
+        link = self.api("GET", pub["id"], {"fields": "permalink"}, token=self.ig_token).get("permalink")
         return {"id": pub["id"], "url": link or ""}
 
 
@@ -247,7 +253,7 @@ def cross_post(ws, post, client=None, log=print, notify_fn=None):
     meta.pop("skipped", None)
     from .agents.yt_publish import full_description
     cap = caption(yt.get("title"), full_description(post))
-    m = client or Meta(conn["page_id"], conn["ig_user_id"], conn["token"], conn["version"])
+    m = client or Meta(conn["page_id"], conn["ig_user_id"], conn["token"], conn["version"], ig_token=conn.get("ig_token"))
     video = ws.root / post["media"]
     targets = ["facebook"] + (["instagram"] if conn["ig_user_id"] else [])
     try:
