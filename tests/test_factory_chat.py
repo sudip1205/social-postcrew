@@ -2,6 +2,7 @@
 import io
 import json
 import sys
+import tempfile
 import time
 import unittest
 from pathlib import Path
@@ -269,8 +270,58 @@ class SkillCopyTests(unittest.TestCase):
             wait_idle()
             self.assertIn("more motion types", (real / "SKILL.md").read_text())
             self.assertEqual((real / "references" / "motion-groups.md").read_text(), "groups\n")
-            self.assertIn("skill-edit/explainer-short-style/", EditingProc.calls[-1]["cmd"][-1])
+            cmd = EditingProc.calls[-1]["cmd"]
+            self.assertIn("edit its files in .claude/skills/explainer-short-style/ directly", cmd[cmd.index("--append-system-prompt") + 1])
+            self.assertIn("skill_hook.py", cmd[cmd.index("--settings") + 1])
             self.assertTrue(any(m["text"].startswith("Skill updated") for m in factory_chat.view(ws)["messages"]))
+
+
+class SkillHookTests(unittest.TestCase):
+    """The live hook: Claude's Edit/Write on .claude/skills/... goes to skill-edit/ and lands in the skill at once."""
+
+    def hook(self, mode, base, event):
+        import subprocess, sys as _sys
+        script = Path(factory_chat.skill_hook.__file__)
+        r = subprocess.run([_sys.executable, str(script), mode, str(base)], input=json.dumps(event), capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        return json.loads(r.stdout) if r.stdout.strip() else None
+
+    def test_an_edit_of_the_skill_is_redirected_and_saved_at_once(self):
+        with tempfile.TemporaryDirectory() as d:
+            base = Path(d)
+            real = base / ".claude" / "skills" / "explainer-short-style"
+            real.mkdir(parents=True)
+            (real / "SKILL.md").write_text("rule one\n")
+            ev = {"tool_name": "Edit", "cwd": str(base / "shorts-factory"),
+                  "tool_input": {"file_path": str(real / "SKILL.md"), "old_string": "rule one", "new_string": "rule two"}}
+            out = self.hook("pre", base, ev)["hookSpecificOutput"]
+            self.assertEqual(out["permissionDecision"], "allow")
+            work = Path(out["updatedInput"]["file_path"])
+            self.assertEqual(work, (base / "skill-edit" / "explainer-short-style" / "SKILL.md").resolve())
+            self.assertEqual(work.read_text(), "rule one\n")   # the skill's current text, ready to edit
+            self.assertEqual(out["updatedInput"]["new_string"], "rule two")
+            work.write_text("rule two\n")   # what Claude's Edit does
+            self.hook("post", base, dict(ev, tool_input=out["updatedInput"]))
+            self.assertEqual((real / "SKILL.md").read_text(), "rule two\n")
+
+    def test_a_new_reference_file_is_written_into_the_skill(self):
+        with tempfile.TemporaryDirectory() as d:
+            base = Path(d)
+            (base / ".claude" / "skills" / "explainer-short-style").mkdir(parents=True)
+            f = base / ".claude" / "skills" / "explainer-short-style" / "references" / "pacing.md"
+            ev = {"tool_name": "Write", "cwd": str(base), "tool_input": {"file_path": str(f), "content": "slow\n"}}
+            work = Path(self.hook("pre", base, ev)["hookSpecificOutput"]["updatedInput"]["file_path"])
+            work.write_text("slow\n")
+            self.hook("post", base, ev)
+            self.assertEqual(f.read_text(), "slow\n")
+
+    def test_other_files_are_left_to_claude_code(self):
+        with tempfile.TemporaryDirectory() as d:
+            base = Path(d)
+            for path in (base / "shorts-factory" / "episodes" / "x" / "script.json", base / ".claude" / "settings.json",
+                         base / ".claude" / "skills" / "explainer-short-style" / ".." / ".." / "settings.json"):
+                self.assertIsNone(self.hook("pre", base, {"tool_name": "Write", "cwd": str(base), "tool_input": {"file_path": str(path)}}))
+            self.assertIsNone(self.hook("pre", base, {"tool_name": "Bash", "tool_input": {"command": "ls"}}))
 
 
 class AllowedCommandTests(unittest.TestCase):

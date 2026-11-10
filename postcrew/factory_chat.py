@@ -7,13 +7,15 @@ state/factory-chat.json, which the Studio's Factory page polls.
 """
 import json
 import re
+import shlex
 import subprocess
+import sys
 import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-from . import factory_refs
+from . import factory_refs, skill_hook
 from .agents.shorts import SKILL, SKILL_RULE, factory_dir, skill_version
 
 STATE = "factory-chat"
@@ -23,9 +25,9 @@ TOOLS = ["Read", "Write", "Edit", "Glob", "Grep", "WebSearch", "WebFetch", "Todo
          "Bash(python3 algo/*)", "Bash(python3 -I algo/*)", "Bash(npx hyperframes check *)", "Bash(npx hyperframes lint *)",
          "Bash(npx hyperframes snapshot *)"]
 EDIT_DIR = "skill-edit"   # ~/Youtube/skill-edit/: the copy of the skill Claude edits (Claude Code never lets it write inside .claude/)
-SKILL_EDIT_RULE = (f" The skill folder {SKILL}/ is write-protected for you: to change the skill, edit the working copy in "
-                   f"{EDIT_DIR}/explainer-short-style/ instead (same files; it is a fresh copy of the skill). The Studio copies your changes "
-                   f"into {SKILL}/ as soon as you finish. Never try to write inside .claude/.")
+SKILL_EDIT_RULE = (f" To change the skill, edit its files in {SKILL}/ directly with Edit/Write: the Studio saves each edit into the "
+                   "skill the moment you make it (the tool result may name a skill-edit/ path: that is the same file, already saved). "
+                   "Never put the owner's rules in your memory, in shorts-factory/ notes or anywhere else instead of the skill.")
 SYSTEM = ("You are working for the channel owner through the postcrew Studio's Factory page (a chat, like the Claude Code app). "
           "Follow CLAUDE.md and the explainer-short-style skill. A topic means: write the episode (script.json and youtube.json, privacyStatus "
           "\"private\") and render it with `npm run make -- episodes/<slug>` from shorts-factory/. An instruction about how videos should look, "
@@ -204,7 +206,8 @@ def _turn(ws, text, root, runner):
     st = load(ws)
     binary = cfg["llm"].get("claude_path") or "claude"
     cmd = [binary, "-p", "--output-format", "stream-json", "--verbose", "--model", "sonnet", "--max-budget-usd", "5",
-           "--permission-mode", "acceptEdits", "--allowedTools", ",".join(TOOLS), "--append-system-prompt", SYSTEM]
+           "--permission-mode", "acceptEdits", "--allowedTools", ",".join(TOOLS), "--append-system-prompt", SYSTEM,
+           "--settings", json.dumps(hook_settings(root))]
     if st.get("session_id"):
         cmd += ["--resume", st["session_id"]]
     t0 = time.time()
@@ -217,7 +220,7 @@ def _turn(ws, text, root, runner):
         _proc["p"] = p
         p.stdin.write(text)
         p.stdin.close()
-        steps = []
+        steps, edits = [], {}
         for line in p.stdout:
             try:
                 ev = json.loads(line)
@@ -233,6 +236,14 @@ def _turn(ws, text, root, runner):
                     elif b.get("type") == "tool_use":
                         steps.append(_tool_line(b))
                         _add(ws, {"role": "tool", "text": steps[-1]})
+                        f = (b.get("input") or {}).get("file_path")
+                        if b.get("name") in skill_hook.TOOLS and f and skill_hook.locate(Path(root.parent, f), root.parent):
+                            edits[b.get("id")] = skill_hook.locate(Path(root.parent, f), root.parent)[0]
+            elif kind == "user":   # tool results: say at once when a skill edit is saved
+                for b in (ev.get("message") or {}).get("content") or []:
+                    real = edits.pop(b.get("tool_use_id"), None) if isinstance(b, dict) else None
+                    if real and not b.get("is_error"):
+                        _add(ws, {"role": "system", "text": "Skill updated: " + str(real.relative_to(root.parent / ".claude" / "skills"))})
             elif kind == "result":
                 if ev.get("session_id"):
                     _set_session(ws, ev["session_id"])
@@ -250,13 +261,22 @@ def _turn(ws, text, root, runner):
         _add(ws, {"role": "error", "text": f"{type(e).__name__}: {e}"[:600]})
     finally:
         try:
-            changed = apply_skill_copy(root)
+            changed = apply_skill_copy(root)   # anything the live hook did not save already (e.g. an edit made by a shell command)
             if changed:
                 _add(ws, {"role": "system", "text": "Skill updated: " + ", ".join(Path(c).name for c in changed)})
         except OSError as e:
             _add(ws, {"role": "error", "text": f"could not save the skill changes: {e}"[:600]})
         _proc["p"] = None
         _busy.clear()
+
+
+def hook_settings(root):
+    """Claude Code hooks for one chat turn: skill edits are redirected out of .claude/ and saved into the skill at once."""
+    script, base = str(Path(skill_hook.__file__).resolve()), str(root.parent)
+    run = lambda mode: {"type": "command", "command": " ".join(shlex.quote(x) for x in (sys.executable, script, mode, base))}
+    match = "|".join(skill_hook.TOOLS)
+    return {"hooks": {"PreToolUse": [{"matcher": match, "hooks": [run("pre")]}],
+                      "PostToolUse": [{"matcher": match, "hooks": [run("post")]}]}}
 
 
 def _skill_dirs(root):
