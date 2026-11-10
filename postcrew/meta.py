@@ -226,6 +226,8 @@ def cover(video, out, window=6.0, step=0.5):
 
 
 TRIES = 5
+IG_MAX_S = 45   # measured 2026-11-10: Instagram's API took 38-45 s Reels from this account and refused every one of 48 s or more
+                # (the Instagram app allows 3 minutes; the API does not, for this account). Raise it when Meta lifts that.
 REEL_MAX_S = 90   # Facebook Reels: 3-90 seconds; longer clips go up as a Page video. Instagram Reels take up to 15 minutes.
 
 
@@ -261,14 +263,20 @@ def cross_post(ws, post, client=None, log=print, notify_fn=None):
     except (OSError, ValueError) as e:   # no cover: Facebook and Instagram pick one themselves
         pic, at = None, None
         log(f"cover: {e}")
+    length = seconds(video) or yt.get("seconds") or 0
     for name in targets:
         cur = meta.get(name) or {}
+        if name == "instagram" and length > IG_MAX_S:
+            meta[name] = {"status": "too_long", "seconds": round(length),
+                          "reason": f"Instagram's API takes Reels up to {IG_MAX_S} s from this account; this one is {round(length)} s"}
+            log(f"instagram: skipped, {round(length)} s is longer than the {IG_MAX_S} s Instagram's API allows")
+            continue
         if cur.get("status") == "published" or cur.get("tries", 0) >= TRIES:
             continue
         try:
             fb_id = (meta.get("facebook") or {}).get("id")
             if name == "facebook":
-                long_ = (seconds(video) or yt.get("seconds") or 0) > REEL_MAX_S
+                long_ = length > REEL_MAX_S
                 res = m.facebook_video(video, cap, yt.get("title") or "", log=log) if long_ else m.facebook_reel(video, cap, log=log)
                 if pic:
                     try:
