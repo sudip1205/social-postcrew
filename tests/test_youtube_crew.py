@@ -358,6 +358,22 @@ class YouTubePublishTests(unittest.TestCase):
             self.assertIn("not connected", ws.history()[-1]["meta"]["skipped"])
 
 
+class MetaClientTests(unittest.TestCase):
+    def test_facebook_not_knowing_a_new_video_for_a_moment_is_not_a_failure(self):
+        from postcrew.meta import Meta, MetaError
+        m = Meta("P1", "IG1", "tok", sleep=lambda s: None)
+        answers = iter([MetaError("GET 400: does not exist"), MetaError("GET 400: does not exist"), {"status": {"video_status": "ready"}}])
+
+        def api(method, path, params=None, headers=None, body=None):
+            a = next(answers)
+            if isinstance(a, Exception):
+                raise a
+            return a
+        m.api = api
+        m._wait_ready("v1")   # no exception
+        self.assertIsNone(next(answers, None))
+
+
 class FakeMeta:
     calls, fail = [], set()
 

@@ -87,13 +87,7 @@ class Meta:
                                                       "file_size": str(len(data))}, body=data)
         self.api("POST", f"{self.page_id}/video_reels", {"upload_phase": "finish", "video_id": vid, "video_state": "PUBLISHED",
                                                          "description": caption})
-        for _ in range(120):
-            st = (self.api("GET", vid, {"fields": "status"}).get("status") or {})
-            if st.get("video_status") == "ready":
-                break
-            if st.get("video_status") == "error":
-                raise MetaError(f"Facebook could not process the video: {json.dumps(st)[:300]}", "media")
-            self.sleep(5)
+        self._wait_ready(vid)
         return {"id": vid, "url": f"https://www.facebook.com/reel/{vid}"}
 
     def facebook_video(self, video, caption, title="", log=print):
@@ -110,14 +104,27 @@ class Meta:
                      + urllib.parse.urlencode({"access_token": self.token}),
                      headers={"Content-Type": f"multipart/form-data; boundary={b}"}, body=b"".join(parts))
         vid = r["id"]
+        self._wait_ready(vid)
+        return {"id": vid, "url": f"https://www.facebook.com/{self.page_id}/videos/{vid}"}
+
+    def _wait_ready(self, vid):
+        """Wait until Facebook has processed the video. Just after publishing, Facebook may answer "does not exist" for a short
+        while: that is not a failure (the upload is done), so keep asking."""
+        unseen = 0
         for _ in range(120):
-            st = (self.api("GET", vid, {"fields": "status"}).get("status") or {})
+            try:
+                st = (self.api("GET", vid, {"fields": "status"}).get("status") or {})
+            except MetaError:
+                unseen += 1
+                if unseen >= 24:   # two minutes without an answer: the upload went through, stop waiting
+                    return
+                self.sleep(5)
+                continue
             if st.get("video_status") == "ready":
-                break
+                return
             if st.get("video_status") == "error":
                 raise MetaError(f"Facebook could not process the video: {json.dumps(st)[:300]}", "media")
             self.sleep(5)
-        return {"id": vid, "url": f"https://www.facebook.com/{self.page_id}/videos/{vid}"}
 
     def _ig_from_url(self, url, caption):
         return self.api("POST", f"{self.ig_user_id}/media", {"media_type": "REELS", "video_url": url, "caption": caption,
@@ -135,7 +142,15 @@ class Meta:
             self.api("POST", c["uri"], headers={"Authorization": f"OAuth {self.token}", "offset": "0", "file_size": str(len(data)),
                                                 "Content-Type": "application/octet-stream"}, body=data)
         except (MetaError, KeyError) as e:
-            src = facebook_id and self.api("GET", facebook_id, {"fields": "source"}).get("source")
+            src = None
+            for _ in range(12 if facebook_id else 0):
+                try:
+                    src = self.api("GET", facebook_id, {"fields": "source"}).get("source")
+                except MetaError:
+                    src = None
+                if src:
+                    break
+                self.sleep(5)
             if not src:
                 raise
             log(f"instagram: upload refused ({str(e)[:120]}); using the Facebook copy")
