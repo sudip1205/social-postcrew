@@ -96,6 +96,29 @@ class Meta:
             self.sleep(5)
         return {"id": vid, "url": f"https://www.facebook.com/reel/{vid}"}
 
+    def facebook_video(self, video, caption, title="", log=print):
+        """A regular Page video, for clips longer than Facebook Reels allow (90 s)."""
+        import uuid
+        data, b = Path(video).read_bytes(), uuid.uuid4().hex
+        parts = []
+        for k, v in (("description", caption), ("title", title[:250]), ("published", "true")):
+            parts.append(f'--{b}\r\nContent-Disposition: form-data; name="{k}"\r\n\r\n{v}\r\n'.encode())
+        parts.append(f'--{b}\r\nContent-Disposition: form-data; name="source"; filename="{Path(video).name}"\r\n'
+                     f'Content-Type: video/mp4\r\n\r\n'.encode() + data + f"\r\n--{b}--\r\n".encode())
+        log(f"facebook: uploading {len(data) / 1e6:.1f} MB as a Page video (longer than a Reel may be)")
+        r = self.api("POST", f"https://graph-video.facebook.com/{self.version}/{self.page_id}/videos?"
+                     + urllib.parse.urlencode({"access_token": self.token}),
+                     headers={"Content-Type": f"multipart/form-data; boundary={b}"}, body=b"".join(parts))
+        vid = r["id"]
+        for _ in range(120):
+            st = (self.api("GET", vid, {"fields": "status"}).get("status") or {})
+            if st.get("video_status") == "ready":
+                break
+            if st.get("video_status") == "error":
+                raise MetaError(f"Facebook could not process the video: {json.dumps(st)[:300]}", "media")
+            self.sleep(5)
+        return {"id": vid, "url": f"https://www.facebook.com/{self.page_id}/videos/{vid}"}
+
     def _ig_from_url(self, url, caption):
         return self.api("POST", f"{self.ig_user_id}/media", {"media_type": "REELS", "video_url": url, "caption": caption,
                                                              "share_to_feed": "true"})
@@ -147,6 +170,16 @@ def caption(title, description):
 
 
 TRIES = 5
+REEL_MAX_S = 90   # Facebook Reels: 3-90 seconds; longer clips go up as a Page video. Instagram Reels take up to 15 minutes.
+
+
+def seconds(video):
+    import subprocess
+    try:
+        return float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(video)],
+                                    capture_output=True, text=True, timeout=60).stdout.strip())
+    except (ValueError, OSError):
+        return 0.0
 NAMES = {"facebook": "Facebook", "instagram": "Instagram"}
 
 
@@ -173,8 +206,11 @@ def cross_post(ws, post, client=None, log=print, notify_fn=None):
             continue
         try:
             fb_id = (meta.get("facebook") or {}).get("id")
-            res = (m.facebook_reel(video, cap, log=log) if name == "facebook"
-                   else m.instagram_reel(video, cap, facebook_id=fb_id, log=log))
+            if name == "facebook":
+                long_ = (seconds(video) or yt.get("seconds") or 0) > REEL_MAX_S
+                res = m.facebook_video(video, cap, yt.get("title") or "", log=log) if long_ else m.facebook_reel(video, cap, log=log)
+            else:
+                res = m.instagram_reel(video, cap, facebook_id=fb_id, log=log)
             meta[name] = {"status": "published", "id": res["id"], "url": res["url"], "tries": cur.get("tries", 0) + 1}
             log(f"{name}: published {res['url']}")
         except (MetaError, OSError, KeyError) as e:

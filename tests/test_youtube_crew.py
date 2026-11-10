@@ -308,7 +308,7 @@ class YouTubePublishTests(unittest.TestCase):
     def test_a_short_on_youtube_also_goes_to_facebook_and_instagram(self, _tts, _claude):
         FakeYouTube.uploads, FakeYouTube.fail = [], None
         FakeMeta.calls, FakeMeta.fail = [], set()
-        with TempWorkspace() as ws, mock.patch("postcrew.meta.Meta", FakeMeta):
+        with TempWorkspace() as ws, mock.patch("postcrew.meta.Meta", FakeMeta), mock.patch("postcrew.meta.seconds", return_value=50.0):
             post = self.queued(ws)
             self.meta_ready(ws)
             res = publish_due(ws, now=self.due(post), yt_factory=FakeYouTube, log=lambda m: None)
@@ -325,7 +325,7 @@ class YouTubePublishTests(unittest.TestCase):
     def test_a_failed_reel_is_tried_again_later_and_never_posted_twice(self, _tts, _claude):
         FakeYouTube.uploads, FakeYouTube.fail = [], None
         FakeMeta.calls, FakeMeta.fail = [], {"instagram"}
-        with TempWorkspace() as ws, mock.patch("postcrew.meta.Meta", FakeMeta):
+        with TempWorkspace() as ws, mock.patch("postcrew.meta.Meta", FakeMeta), mock.patch("postcrew.meta.seconds", return_value=50.0):
             post = self.queued(ws)
             self.meta_ready(ws)
             publish_due(ws, now=self.due(post), yt_factory=FakeYouTube, log=lambda m: None)
@@ -336,6 +336,16 @@ class YouTubePublishTests(unittest.TestCase):
             self.assertEqual([c[0] for c in FakeMeta.calls], ["facebook", "instagram", "instagram"])
             self.assertEqual(ws.history()[-1]["meta"]["instagram"]["status"], "published")
             self.assertEqual(len(FakeYouTube.uploads), 1)
+
+    def test_a_short_longer_than_a_reel_goes_to_facebook_as_a_page_video(self, _tts, _claude):
+        FakeYouTube.uploads, FakeYouTube.fail = [], None
+        FakeMeta.calls, FakeMeta.fail = [], set()
+        with TempWorkspace() as ws, mock.patch("postcrew.meta.Meta", FakeMeta), mock.patch("postcrew.meta.seconds", return_value=140.0):
+            post = self.queued(ws)
+            self.meta_ready(ws)
+            publish_due(ws, now=self.due(post), yt_factory=FakeYouTube, log=lambda m: None)
+            self.assertEqual([c[0] for c in FakeMeta.calls], ["facebook-video", "instagram"])
+            self.assertEqual(ws.history()[-1]["meta"]["facebook"]["url"], "https://www.facebook.com/P1/videos/fb2")
 
     def test_without_a_meta_connection_youtube_still_publishes(self, _tts, _claude):
         FakeYouTube.uploads, FakeYouTube.fail = [], None
@@ -360,6 +370,10 @@ class FakeMeta:
             from postcrew.meta import MetaError
             raise MetaError("fb down")
         return {"id": "fb1", "url": "https://www.facebook.com/reel/fb1"}
+
+    def facebook_video(self, video, caption, title="", log=print):
+        FakeMeta.calls.append(("facebook-video", caption, None))
+        return {"id": "fb2", "url": "https://www.facebook.com/P1/videos/fb2"}
 
     def instagram_reel(self, video, caption, facebook_id=None, log=print):
         FakeMeta.calls.append(("instagram", caption, facebook_id))
