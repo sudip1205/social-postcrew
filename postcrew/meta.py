@@ -126,18 +126,30 @@ class Meta:
                 raise MetaError(f"Facebook could not process the video: {json.dumps(st)[:300]}", "media")
             self.sleep(5)
 
-    def _ig_from_url(self, url, caption):
-        return self.api("POST", f"{self.ig_user_id}/media", {"media_type": "REELS", "video_url": url, "caption": caption,
-                                                             "share_to_feed": "true"})
+    def set_thumbnail(self, video_id, image):
+        """Make an image the video's cover on Facebook (Reels and Page videos)."""
+        import uuid
+        data, b = Path(image).read_bytes(), uuid.uuid4().hex
+        body = (f'--{b}\r\nContent-Disposition: form-data; name="is_preferred"\r\n\r\ntrue\r\n'
+                f'--{b}\r\nContent-Disposition: form-data; name="source"; filename="{Path(image).name}"\r\n'
+                f'Content-Type: image/jpeg\r\n\r\n').encode() + data + f"\r\n--{b}--\r\n".encode()
+        return self.api("POST", f"{GRAPH}/{self.version}/{video_id}/thumbnails?" + urllib.parse.urlencode({"access_token": self.token}),
+                        headers={"Content-Type": f"multipart/form-data; boundary={b}"}, body=body)
 
-    def instagram_reel(self, video, caption, facebook_id=None, log=print):
+    def _ig_from_url(self, url, caption, thumb_ms=None):
+        return self.api("POST", f"{self.ig_user_id}/media", {"media_type": "REELS", "video_url": url, "caption": caption,
+                                                             "share_to_feed": "true",
+                                                             **({"thumb_offset": str(thumb_ms)} if thumb_ms is not None else {})})
+
+    def instagram_reel(self, video, caption, facebook_id=None, log=print, thumb_ms=None):
         """Resumable upload first; if Instagram refuses it, let it fetch the copy Facebook already hosts (as meta-publish.mjs)."""
         if not self.ig_user_id:
             raise MetaError("no Instagram account is linked (igUserId)", "auth")
         data = Path(video).read_bytes()
         try:
             c = self.api("POST", f"{self.ig_user_id}/media", {"media_type": "REELS", "upload_type": "resumable",
-                                                              "caption": caption, "share_to_feed": "true"})
+                                                              "caption": caption, "share_to_feed": "true",
+                                                              **({"thumb_offset": str(thumb_ms)} if thumb_ms is not None else {})})
             log(f"instagram: uploading {len(data) / 1e6:.1f} MB")
             self.api("POST", c["uri"], headers={"Authorization": f"OAuth {self.token}", "offset": "0", "file_size": str(len(data)),
                                                 "Content-Type": "application/octet-stream"}, body=data)
@@ -154,7 +166,7 @@ class Meta:
             if not src:
                 raise
             log(f"instagram: upload refused ({str(e)[:120]}); using the Facebook copy")
-            c = self._ig_from_url(src, caption)
+            c = self._ig_from_url(src, caption, thumb_ms)
         for _ in range(120):
             s = self.api("GET", c["id"], {"fields": "status_code,status"})
             if s.get("status_code") == "FINISHED":
@@ -182,6 +194,29 @@ def caption(title, description):
     hook = re.sub(r"(\s*#\w+)+\s*$", "", hook).strip()
     out = "\n\n".join(x for x in (title, hook, challenge if challenge != hook else "", " ".join(tags[:30])) if x)
     return out[:2200]
+
+
+def cover(video, out, window=6.0, step=0.5):
+    """The cover picture of a Short: of the frames in its first seconds, the one with the most on screen (the hook once its
+    headline and picture are drawn; the largest JPEG = the most detail). Returns (path, seconds) or (None, None)."""
+    import subprocess
+    import tempfile
+    out = Path(out)
+    best = (0, None)
+    with tempfile.TemporaryDirectory() as d:
+        t = 1.0
+        while t <= window:
+            f = Path(d) / f"{t:.1f}.jpg"
+            subprocess.run(["ffmpeg", "-y", "-v", "error", "-ss", f"{t:.2f}", "-i", str(video), "-frames:v", "1", "-q:v", "2", str(f)],
+                           capture_output=True, timeout=120)
+            if f.exists() and f.stat().st_size > best[0]:
+                best = (f.stat().st_size, t)
+            t += step
+        if best[1] is None:
+            return None, None
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_bytes((Path(d) / f"{best[1]:.1f}.jpg").read_bytes())
+    return out, best[1]
 
 
 TRIES = 5
@@ -215,6 +250,11 @@ def cross_post(ws, post, client=None, log=print, notify_fn=None):
     m = client or Meta(conn["page_id"], conn["ig_user_id"], conn["token"], conn["version"])
     video = ws.root / post["media"]
     targets = ["facebook"] + (["instagram"] if conn["ig_user_id"] else [])
+    try:
+        pic, at = cover(video, ws.root / "media" / (Path(post["media"]).stem + ".cover.jpg"))
+    except (OSError, ValueError) as e:   # no cover: Facebook and Instagram pick one themselves
+        pic, at = None, None
+        log(f"cover: {e}")
     for name in targets:
         cur = meta.get(name) or {}
         if cur.get("status") == "published" or cur.get("tries", 0) >= TRIES:
@@ -224,9 +264,16 @@ def cross_post(ws, post, client=None, log=print, notify_fn=None):
             if name == "facebook":
                 long_ = (seconds(video) or yt.get("seconds") or 0) > REEL_MAX_S
                 res = m.facebook_video(video, cap, yt.get("title") or "", log=log) if long_ else m.facebook_reel(video, cap, log=log)
+                if pic:
+                    try:
+                        m.set_thumbnail(res["id"], pic)
+                        res["thumbnail"] = True
+                    except MetaError as e:   # the video is up anyway
+                        log(f"facebook: cover not set: {e}")
             else:
-                res = m.instagram_reel(video, cap, facebook_id=fb_id, log=log)
-            meta[name] = {"status": "published", "id": res["id"], "url": res["url"], "tries": cur.get("tries", 0) + 1}
+                res = m.instagram_reel(video, cap, facebook_id=fb_id, log=log, thumb_ms=int(at * 1000) if at is not None else None)
+            meta[name] = {"status": "published", "id": res["id"], "url": res["url"], "tries": cur.get("tries", 0) + 1,
+                          **({"thumbnail": True} if res.get("thumbnail") else {})}
             log(f"{name}: published {res['url']}")
         except (MetaError, OSError, KeyError) as e:
             meta[name] = {"status": "failed", "error": str(e)[:400], "tries": cur.get("tries", 0) + 1}
