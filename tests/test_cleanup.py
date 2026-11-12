@@ -47,6 +47,32 @@ class CleanupTests(unittest.TestCase):
             self.assertEqual(res["areas"], {"runs": 1, "media": 1, "cache": 1, "backups": 1})
             self.assertEqual(ws.state("cleanup")["removed"], 4)
 
+    def test_old_videos_are_copied_to_the_archive_before_they_are_deleted(self):
+        with TempWorkspace() as ws, tempfile.TemporaryDirectory() as nas:
+            old = make(ws.root / "media" / "2026-09-01-youtube-x.mp4", 40, 500)
+            reel = make(ws.root / "instagram" / "2026-09-01-reel" / "video.mp4", 40, 300)
+            make(ws.root / "instagram" / "2026-09-01-reel" / "caption.txt", 40, 10)
+            new = make(ws.root / "media" / "2026-11-01-youtube-y.mp4", 2)
+            (Path(nas) / ".postcrew-archive").write_text("")
+            res = cleanup.clean(ws, 30, archive=nas)
+            self.assertFalse(old.exists())
+            self.assertFalse(reel.exists())
+            self.assertTrue(new.exists())
+            month = time.strftime("%Y-%m", time.localtime(time.time() - 40 * DAY))
+            self.assertEqual((Path(nas) / month / "media" / old.name).stat().st_size, 500)
+            self.assertTrue((Path(nas) / month / "instagram" / "2026-09-01-reel" / "caption.txt").exists())
+            self.assertEqual(res["archived_videos"], 2)
+
+    def test_without_the_archive_mounted_old_videos_are_kept(self):
+        with TempWorkspace() as ws:
+            old = make(ws.root / "media" / "2026-09-01-youtube-x.mp4", 40)
+            pic = make(ws.root / "media" / "2026-09-01-youtube-x.png", 40)
+            (ws.root / "not-mounted").mkdir()   # an empty mount point: the NAS is not there
+            res = cleanup.clean(ws, 30, archive=ws.root / "not-mounted")
+            self.assertTrue(old.exists())
+            self.assertFalse(pic.exists())
+            self.assertEqual(res["kept_not_archived"], 1)
+
     def test_settings_history_queue_and_state_are_never_touched_whatever_their_age(self):
         with TempWorkspace() as ws:
             r = ws.root

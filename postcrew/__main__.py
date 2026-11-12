@@ -252,7 +252,8 @@ def main(argv=None):
         days = a.days or int(ws.config().get("cleanup", {}).get("keep_days", 30))
         from postcrew.cleanup import _factory
         r = clean(ws, keep_days=days, dry_run=a.dry_run, videos=a.videos,
-                  factory=_factory(ws) if ws.config().get("cleanup", {}).get("factory") else ())
+                  factory=_factory(ws) if ws.config().get("cleanup", {}).get("factory") else (),
+                  archive=ws.config().get("cleanup", {}).get("archive_dir") or None)
         print(("Would delete" if a.dry_run else "Deleted") + f" {r['removed']} item(s), {r['freed_mb']} MB " + ", ".join(f"{k}: {v}" for k, v in r["areas"].items()))
         for x in r.get("examples", []):
             print("  ", x)

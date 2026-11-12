@@ -176,7 +176,7 @@ DEFAULT_CONFIG = {
     # Every day at `time` (local, LinkedIn's time zone) everything older than `keep_days` is deleted from the workspace: run folders, frames,
     # videos, pictures in media/, the voice cache. Never the settings, the history or what a post in the Queue still uses.
     # factory: also clean the Shorts factory's episodes/ and out/ (on the machine that makes the videos).
-    "cleanup": {"enabled": True, "keep_days": 30, "time": "03:30", "factory": False},
+    "cleanup": {"enabled": True, "keep_days": 30, "time": "03:30", "factory": False, "archive_dir": ""},
     # Your topics for LinkedIn: one line each (Settings > Topics). The monthly plan is written from them.
     "topics": [],
     "categories": {

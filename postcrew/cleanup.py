@@ -9,10 +9,15 @@ file is that old. A run, a video or a picture that a post still in the Queue use
 What is NEVER deleted: config.json, secrets.json, the access token, history.json and queue.json (the history is how Postcrew knows what it
 has already published), and state/ (the plan, the lessons the crew has learned, the scheduler's memory).
 
+With `cleanup.archive_dir` set (e.g. the NAS mounted at /mnt/diptodive), every video is COPIED there before it is deleted:
+<archive_dir>/<YYYY-MM>/<area>/<name> (a Reel folder from instagram/ goes whole: video, cover, caption). If that folder is not
+there (the NAS is not mounted), nothing holding a video is deleted that day; the rest is cleaned as usual.
+
 `python3 -m postcrew clean --dry-run` shows what would go; `--videos` also clears every finished video, frames and voice recording at
 once (the one-off "delete my old videos"), whatever their age.
 """
 import json
+import os
 import shutil
 import time
 from pathlib import Path
@@ -76,6 +81,53 @@ def _remove(path, roots, dry_run):
     return freed
 
 
+ARCHIVE_AREAS = {"media", "instagram", "videos"}   # finished videos only; drafts and renders in runs/ and the factory are not kept
+
+
+def _archive_ready(archive):
+    """The archive is a mounted drive (an empty mount point on the local disk does not count) or carries a .postcrew-archive marker."""
+    return archive.is_dir() and (os.path.ismount(archive) or (archive / ".postcrew-archive").exists())
+
+
+def _videos_in(path):
+    path = Path(path)
+    if path.is_file():
+        return [path] if path.suffix.lower() in VIDEO_EXT else []
+    return [f for f in path.rglob("*") if f.is_file() and not f.is_symlink() and f.suffix.lower() in VIDEO_EXT] if path.is_dir() else []
+
+
+def _archive(path, area, archive, dry_run):
+    """Copy the videos in path (a Reel folder: the whole folder) to archive/<YYYY-MM>/<area>/. True when it is safe to delete path."""
+    vids = _videos_in(path)
+    if not vids:
+        return True
+    if archive is None:
+        return True
+    if not _archive_ready(archive):   # the NAS is not mounted: keep the videos until it is
+        return False
+    if dry_run:
+        return True
+    month = time.strftime("%Y-%m", time.localtime(_newest(path)))
+    dest = archive / month / area
+    try:
+        dest.mkdir(parents=True, exist_ok=True)
+        path = Path(path)
+        items = [path] if area == "instagram" else vids   # a Reel folder goes whole (video, cover, caption)
+        for src in items:
+            tgt = dest / src.name
+            if src.is_dir():
+                if not (tgt.is_dir() and _size(tgt) == _size(src)):
+                    shutil.copytree(src, tgt, dirs_exist_ok=True)
+            elif not (tgt.exists() and tgt.stat().st_size == src.stat().st_size):
+                shutil.copy2(src, tgt.with_suffix(tgt.suffix + ".part"))
+                tgt.with_suffix(tgt.suffix + ".part").replace(tgt)
+            if (_size(tgt) if tgt.is_dir() else tgt.stat().st_size) != _size(src):
+                return False
+        return True
+    except OSError:
+        return False
+
+
 def _factory(ws):
     """The Shorts factory's episodes/ and out/ (scripts, voice, renders): cleaned too. Never its skill, code, music or secrets."""
     try:
@@ -90,19 +142,26 @@ def _factory(ws):
 FACTORY_DIRS = ("episodes", "out")
 
 
-def clean(ws, keep_days=30, dry_run=False, now=None, videos=False, factory=()):
+def clean(ws, keep_days=30, dry_run=False, now=None, videos=False, factory=(), archive=None):
     """Delete what is older than keep_days (and, with videos=True, every finished video, frames folder and voice recording).
     Returns {"removed": files and folders, "freed_mb", "areas": {name: count}, "dry_run", "videos"}."""
     root = ws.root.resolve()
     cutoff = (now or time.time()) - keep_days * DAY
     keep_files, keep_runs = _protected(ws)
     removed, freed, areas = [], 0, {}
+    archive = Path(archive) if archive else None
+    archived, kept = [0], [0]
     fdirs = [Path(d).resolve() for d in factory]   # the factory folders to clean (run_cleanup passes them when cleanup.factory is on)
 
     def drop(path, area, base=None):
         nonlocal freed
         if str(Path(path).resolve()) in keep_files:
             return
+        if archive is not None and area in ARCHIVE_AREAS:
+            if not _archive(path, area, archive, dry_run):
+                kept[0] += 1
+                return
+            archived[0] += len(_videos_in(path))
         n = _remove(path, [base or root], dry_run)
         if n or dry_run:
             freed += n
@@ -161,6 +220,8 @@ def clean(ws, keep_days=30, dry_run=False, now=None, videos=False, factory=()):
                 pass
     result = {"removed": len(removed), "freed_mb": round(freed / 1e6, 1), "areas": areas, "dry_run": dry_run, "videos": videos,
               "keep_days": keep_days, "at": time.strftime("%Y-%m-%d %H:%M:%S")}
+    if archive is not None:
+        result.update(archive=str(archive), archived_videos=archived[0], kept_not_archived=kept[0])
     if not dry_run:
         ws.save_state("cleanup", result)
     if dry_run:
@@ -173,4 +234,5 @@ def run_cleanup(ws):
     cfg = ws.config().get("cleanup") or {}
     if not cfg.get("enabled", True):
         return None
-    return clean(ws, keep_days=int(cfg.get("keep_days", 30)), factory=_factory(ws) if cfg.get("factory") else ())
+    return clean(ws, keep_days=int(cfg.get("keep_days", 30)), factory=_factory(ws) if cfg.get("factory") else (),
+                 archive=cfg.get("archive_dir") or None)
