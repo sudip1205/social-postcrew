@@ -52,7 +52,7 @@ class CleanupTests(unittest.TestCase):
             old = make(ws.root / "media" / "2026-09-01-youtube-x.mp4", 40, 500)
             reel = make(ws.root / "instagram" / "2026-09-01-reel" / "video.mp4", 40, 300)
             make(ws.root / "instagram" / "2026-09-01-reel" / "caption.txt", 40, 10)
-            new = make(ws.root / "media" / "2026-11-01-youtube-y.mp4", 2)
+            new = make(ws.root / "media" / "2026-11-12-youtube-y.mp4", 0)
             (Path(nas) / ".postcrew-archive").write_text("")
             res = cleanup.clean(ws, 30, archive=nas)
             self.assertFalse(old.exists())
@@ -62,6 +62,21 @@ class CleanupTests(unittest.TestCase):
             self.assertEqual((Path(nas) / month / "media" / old.name).stat().st_size, 500)
             self.assertTrue((Path(nas) / month / "instagram" / "2026-09-01-reel" / "caption.txt").exists())
             self.assertEqual(res["archived_videos"], 2)
+
+    def test_with_an_archive_only_todays_videos_stay(self):
+        with TempWorkspace() as ws, tempfile.TemporaryDirectory() as nas:
+            (Path(nas) / ".postcrew-archive").write_text("")
+            yday = make(ws.root / "media" / "2026-11-10-youtube-x.mp4", 1.5)
+            cover = make(ws.root / "media" / "2026-11-10-youtube-x.cover.jpg", 1.5)
+            reel = make(ws.root / "instagram" / "2026-11-10-reel" / "video.mp4", 1.5)
+            today = make(ws.root / "media" / "2026-11-12-youtube-y.mp4", 0)
+            res = cleanup.clean(ws, 30, archive=nas)
+            self.assertFalse(yday.exists())
+            self.assertFalse(reel.exists())
+            self.assertTrue(today.exists())
+            self.assertTrue(cover.exists())   # pictures follow the 30-day rule
+            self.assertEqual(res["archived_videos"], 2)
+            self.assertEqual(len(list(Path(nas).rglob("*.mp4"))), 2)
 
     def test_without_the_archive_mounted_old_videos_are_kept(self):
         with TempWorkspace() as ws:

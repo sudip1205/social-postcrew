@@ -142,7 +142,7 @@ def _factory(ws):
 FACTORY_DIRS = ("episodes", "out")
 
 
-def clean(ws, keep_days=30, dry_run=False, now=None, videos=False, factory=(), archive=None):
+def clean(ws, keep_days=30, dry_run=False, now=None, videos=False, factory=(), archive=None, archive_after_days=0):
     """Delete what is older than keep_days (and, with videos=True, every finished video, frames folder and voice recording).
     Returns {"removed": files and folders, "freed_mb", "areas": {name: count}, "dry_run", "videos"}."""
     root = ws.root.resolve()
@@ -150,7 +150,7 @@ def clean(ws, keep_days=30, dry_run=False, now=None, videos=False, factory=(), a
     keep_files, keep_runs = _protected(ws)
     removed, freed, areas = [], 0, {}
     archive = Path(archive) if archive else None
-    archived, kept = [0], [0]
+    archived, kept = [0], set()
     fdirs = [Path(d).resolve() for d in factory]   # the factory folders to clean (run_cleanup passes them when cleanup.factory is on)
 
     def drop(path, area, base=None):
@@ -159,7 +159,7 @@ def clean(ws, keep_days=30, dry_run=False, now=None, videos=False, factory=(), a
             return
         if archive is not None and area in ARCHIVE_AREAS:
             if not _archive(path, area, archive, dry_run):
-                kept[0] += 1
+                kept.add(str(path))
                 return
             archived[0] += len(_videos_in(path))
         n = _remove(path, [base or root], dry_run)
@@ -167,6 +167,19 @@ def clean(ws, keep_days=30, dry_run=False, now=None, videos=False, factory=(), a
             freed += n
             removed.append(str(Path(path).relative_to(base.parent)) if base else str(Path(path).relative_to(root)))
             areas[area] = areas.get(area, 0) + 1
+
+    if archive is not None:   # finished videos go to the archive early: only today's (and archive_after_days more) stay on this machine
+        t = time.localtime(now if now is not None else time.time())
+        acut = time.mktime((t.tm_year, t.tm_mon, t.tm_mday, 0, 0, 0, 0, 0, -1)) - archive_after_days * 86400
+        for f in sorted((root / "media").glob("*")) if (root / "media").is_dir() else []:
+            if f.is_file() and f.suffix.lower() in VIDEO_EXT and f.lstat().st_mtime < acut:
+                drop(f, "media")
+        for d in sorted((root / "instagram").glob("*")) if (root / "instagram").is_dir() else []:
+            if d.is_dir() and _newest(d) < acut:
+                drop(d, "instagram")
+        for f in sorted(root.glob("*")):
+            if f.is_file() and f.suffix.lower() in VIDEO_EXT and f.lstat().st_mtime < acut:
+                drop(f, "videos")
 
     # old things, whatever they are: run folders, planner logs, caches, briefs, pictures and videos kept in media/, config backups
     for name, kind in (("runs", "runs"), ("plans", "plans")):
@@ -221,7 +234,7 @@ def clean(ws, keep_days=30, dry_run=False, now=None, videos=False, factory=(), a
     result = {"removed": len(removed), "freed_mb": round(freed / 1e6, 1), "areas": areas, "dry_run": dry_run, "videos": videos,
               "keep_days": keep_days, "at": time.strftime("%Y-%m-%d %H:%M:%S")}
     if archive is not None:
-        result.update(archive=str(archive), archived_videos=archived[0], kept_not_archived=kept[0])
+        result.update(archive=str(archive), archived_videos=archived[0], kept_not_archived=len(kept))
     if not dry_run:
         ws.save_state("cleanup", result)
     if dry_run:
@@ -235,4 +248,4 @@ def run_cleanup(ws):
     if not cfg.get("enabled", True):
         return None
     return clean(ws, keep_days=int(cfg.get("keep_days", 30)), factory=_factory(ws) if cfg.get("factory") else (),
-                 archive=cfg.get("archive_dir") or None)
+                 archive=cfg.get("archive_dir") or None, archive_after_days=int(cfg.get("archive_after_days", 0)))
