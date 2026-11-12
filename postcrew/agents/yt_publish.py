@@ -33,6 +33,7 @@ def enqueue_youtube(ws, cfg, run_id, day, category, outputs, review):
         pid += f"-{plan_id}"
     media_dir = ws.root / "media"
     media_dir.mkdir(exist_ok=True)
+    pid = _unique_pid(ws, media_dir, pid)
     dest = media_dir / f"{pid}.mp4"
     shutil.copy2(video["path"], dest)
     thumb = media_dir / f"{pid}.png"
@@ -77,6 +78,16 @@ def enqueue_youtube(ws, cfg, run_id, day, category, outputs, review):
     return post
 
 
+
+def _unique_pid(ws, media_dir, pid):
+    """A post id no other post uses. Two posts on the same day, platform and plan slot (e.g. one made in chat and the
+    scheduled one) used to get the same id, so the second video overwrote the first one's media file (2026-11-11)."""
+    taken = {str(p.get("id")) for p in (ws.queue() or []) + (ws.history() or [])}
+    base, n = pid, 2
+    while pid in taken or any(media_dir.glob(f"{pid}.*")):
+        pid, n = f"{base}-{n}", n + 1
+    return pid
+
 def _enqueue_short(ws, cfg, run_id, day, category, outputs):
     """Queue a Short the factory made: its video, thumbnail and youtube.json (title, description, tags)."""
     w, video = outputs["writer"], outputs["media"]
@@ -87,6 +98,7 @@ def _enqueue_short(ws, cfg, run_id, day, category, outputs):
         pid += f"-{plan_id}"
     media_dir = ws.root / "media"
     media_dir.mkdir(exist_ok=True)
+    pid = _unique_pid(ws, media_dir, pid)
     dest = media_dir / f"{pid}.mp4"
     shutil.copy2(video["path"], dest)
     thumb = None
