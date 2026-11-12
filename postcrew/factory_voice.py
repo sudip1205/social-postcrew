@@ -219,7 +219,7 @@ def clear(ws, slug, scene=None):
         for f in (voice / f"scene{i}.wav", voice / f"scene{i}.words.json"):
             f.unlink(missing_ok=True)
     if script.get("voice") == "own" and not own_count(ep, len(script.get("scenes") or [])):
-        script["voice"] = script.pop("voice_kokoro", None) or "am_echo"
+        script["voice"] = script.pop("voice_kokoro", None) or "dip_puck"   # the channel voice (owner, 2026-11-12)
         (ep / "script.json").write_text(json.dumps(script, ensure_ascii=False, indent=2) + "\n")
     return view(ws, slug)
 
