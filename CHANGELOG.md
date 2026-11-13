@@ -3,6 +3,10 @@
 ## 0.2.0: YouTube, per-app settings and a faster Studio
 
 ### New
+- **Pick the video looks in the Factory, and mix them in one video.** The Factory has a Looks row: Signal (blue), Story (cast) and VS Code. The ticked looks go to the Factory chat and to the crew's Script Writer, and a video uses only those.
+  - **One video, several looks:** a video can switch looks scene by scene, and the factory makes each part with its own renderer, then joins them with one caption file.
+  - **Long algorithm videos:** explain each idea on the blue board, then type and run the code in a real VS Code (code-server on the lab, recorded, with the camera zooming on the lines the narrator names), approach by approach.
+  - **Where each look may go:** Story is used in Shorts only, VS Code in long algorithm videos only.
 - **Explainer Shorts are cartoon stories; algorithm videos keep the Signal look.** This is the owner's rule from 2026-11-12. A Short that explains what something is and how it works:
   - is told by the channel's fixed cast (Max, Lily, Jake, Olivia, Grace, Tom) as an everyday story, in a background that fits it (library, office, server room, street, kitchen, classroom, home or warehouse);
   - draws the idea on that background's board;

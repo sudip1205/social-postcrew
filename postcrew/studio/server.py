@@ -33,7 +33,7 @@ from ..agents.frames import HyperFramesAgent, RemotionAgent, RemotionFramesAgent
 from ..agents.hooks import HooksAgent
 from ..agents.graphics import GraphicsAgent
 from ..agents.video_review import VideoReviewAgent
-from .. import attachments, engage, factory_chat, factory_refs, factory_voice, rewards, yt_analytics
+from .. import attachments, engage, factory_chat, factory_refs, factory_styles, factory_voice, rewards, yt_analytics
 from ..agents.direction import CreativeDirectorAgent
 from ..agents.quality import QualityDirectorAgent
 from ..agents.voice import VoiceAgent
@@ -1016,6 +1016,7 @@ def make_handler(studio):
                     ("POST", "/api/runs/rerun"): lambda: studio.rerun(self.body()),
                     ("GET", "/api/missed"): lambda: studio.missed(),
                     ("GET", "/api/factory"): lambda: factory_chat.view(ws),
+                    ("POST", "/api/factory/styles"): lambda: {"styles": factory_styles.save(ws, self.body().get("styles"))},
                     ("POST", "/api/factory/send"): lambda: factory_chat.send(ws, self.body().get("text")),
                     ("POST", "/api/factory/stop"): lambda: factory_chat.stop(ws),
                     ("POST", "/api/factory/reset"): lambda: factory_chat.reset(ws),

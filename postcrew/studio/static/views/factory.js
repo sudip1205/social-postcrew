@@ -21,6 +21,24 @@ function fcBubble(m) {
   return `<div class="text-center text-[11px] text-slate-400">${t}</div>`;
 }
 
+function fcStyles(list) {
+  const box = $("#fc-styles");
+  if (!box || !list || box.dataset.drawn === JSON.stringify(list)) return;
+  box.dataset.drawn = JSON.stringify(list);
+  box.innerHTML = list.map((s) => `<label class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-xs font-semibold cursor-pointer ${s.on ? "bg-violet-50 border-violet-300 text-violet-800" : "bg-white border-slate-300 text-slate-500"}" title="${esc(s.what)}">
+      <input type="checkbox" class="accent-violet-600" data-fc-style="${esc(s.id)}" ${s.on ? "checked" : ""}>${icon(s.icon, "text-sm")}<span>${esc(s.label)}</span></label>`).join("");
+}
+
+async function fcSaveStyles() {
+  const on = [...document.querySelectorAll("[data-fc-style]")].filter((x) => x.checked).map((x) => x.dataset.fcStyle);
+  if (!on.length) { toast("Tick at least one look.", true); fcStyles(JSON.parse($("#fc-styles").dataset.drawn || "[]")); $("#fc-styles").dataset.drawn = ""; return; }
+  try {
+    const r = await post("/api/factory/styles", { styles: on });
+    const list = JSON.parse($("#fc-styles").dataset.drawn || "[]").map((s) => ({ ...s, on: r.styles.includes(s.id) }));
+    $("#fc-styles").dataset.drawn = ""; fcStyles(list);
+  } catch (e) { toast(e.message, true); }
+}
+
 function fcVideo(v) {
   const today = OV_ISO(new Date());
   return `<li class="py-3 flex gap-3">
@@ -257,6 +275,7 @@ async function fcPoll() {
   try {
     const d = await api("/api/factory");
     fcDraw(d);
+    fcStyles(d.styles);
     fcTimer = setTimeout(fcPoll, d.busy ? 1500 : 8000);
   } catch (e) { fcTimer = setTimeout(fcPoll, 8000); }
 }
@@ -282,6 +301,10 @@ async function renderFactory() {
           <div class="flex items-center gap-2">
             <label class="text-xs font-semibold text-slate-600 flex items-center gap-1 shrink-0" for="fc-plan">${icon("assignment", "text-sm text-slate-400")}<span>${tip("Use a plan", "One of your own YouTube plans from Manual run: its words, how you want it made, the problem read from your files, and the files themselves go into the message. Moving its video to the Queue marks the plan as made.")}</span></label>
             <select id="fc-plan" class="flex-1 min-w-0 text-xs border border-slate-300 rounded-md px-2 py-1.5 bg-white"></select>
+          </div>
+          <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+            <span class="text-xs font-semibold text-slate-600 flex items-center gap-1 shrink-0">${icon("palette", "text-sm text-slate-400")}<span>${tip("Looks", "The looks a video may use. Several ticked: Claude mixes them scene by scene. Story is used in Shorts only, VS Code in long algorithm videos only. The crew's own videos use the same choice.")}</span></span>
+            <div id="fc-styles" class="flex flex-wrap items-center gap-1.5"></div>
           </div>
           <textarea id="fc-text" rows="3" class="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-violet-500 resize-y"
             placeholder="A topic for a new Short, or an instruction for every video (Enter sends, Shift+Enter for a new line)"></textarea>
@@ -407,7 +430,9 @@ async function renderFactory() {
     } catch (err) { toast(err.message, true); fcStudyCount(); }
   };
   $("#fc-player").addEventListener("close", () => { const v = $("#fc-player video"); v.pause(); v.removeAttribute("src"); v.load(); });
+  $("#fc-styles").addEventListener("change", (e) => { if (e.target.matches("[data-fc-style]")) fcSaveStyles(); });
   fcDraw(d);
+  fcStyles(d.styles);
   fcPoll();
 }
 

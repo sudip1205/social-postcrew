@@ -85,3 +85,4 @@ schedule
 auto_awesome
 mic
 smart_toy
+code

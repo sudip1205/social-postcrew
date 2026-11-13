@@ -17,6 +17,7 @@ import time
 from pathlib import Path
 
 from .base import Agent, AgentError
+from .. import factory_styles
 from ..llm import agent_settings
 
 SLUG = re.compile(r"^[a-z0-9][a-z0-9-]{1,60}$")
@@ -149,6 +150,7 @@ class ShortsWriter(Agent):
             ("Recent videos (do not repeat): " + "; ".join(_recent(ctx))) if _recent(ctx) else "",
             "",
             SKILL_RULE,
+            factory_styles.instruction(factory_styles.ticked(ctx.ws)),
             "Follow CLAUDE.md and the explainer-short-style skill exactly, as for any video in this workspace. Use the existing episodes as",
             "examples of the files. Write ONLY these two files:",
             f"  shorts-factory/episodes/{slug}/script.json   (the scenes and narration)",

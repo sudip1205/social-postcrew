@@ -15,6 +15,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+from . import factory_styles
 from . import factory_refs, skill_hook
 from .agents.shorts import SKILL, SKILL_RULE, factory_dir, skill_version
 
@@ -80,7 +81,7 @@ def view(ws):
     st = load(ws)
     return {"messages": st["messages"], "session": bool(st.get("session_id")), "busy": busy(), "factory": str(root),
             "found": (root / "package.json").exists(), "videos": videos(ws), "skill": skill_files(ws),
-            "skill_version": skill_version(root) if (root / "package.json").exists() else {}, "plans": plans(ws),
+            "skill_version": skill_version(root) if (root / "package.json").exists() else {}, "plans": plans(ws), "styles": factory_styles.options(ws),
             "references": factory_refs.listing(ws)}
 
 
@@ -218,7 +219,7 @@ def _turn(ws, text, root, runner):
     try:
         p = runner(cmd, cwd=str(root.parent), stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         _proc["p"] = p
-        p.stdin.write(text)
+        p.stdin.write(text + "\n\n(" + factory_styles.instruction(factory_styles.ticked(ws)) + ")")
         p.stdin.close()
         steps, edits = [], {}
         for line in p.stdout:

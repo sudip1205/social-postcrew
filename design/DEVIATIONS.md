@@ -164,3 +164,9 @@ No Stitch screen exists for either view. Both are derived from the shell, design
   (frame thumbnail to watch, length, Taught/Not taught chip, its comment, Teach the skill, Save comment, Delete). Same cards and buttons.
 - A chat with Claude Code inside the Shorts factory, beside the factory's rendered videos and its skill files. Built from the Queue page's
   width, the shared cards, chips and buttons; chat bubbles use the violet accent for your messages and white cards for Claude's.
+
+- **Factory › Looks checkboxes (2026-11-12).** The owner asked for the video looks to be ticked in the Factory. There is no Stitch screen for the Factory, so the row is built from shared parts:
+  - a label with a `tip()`;
+  - checkbox chips in the violet accent (`bg-violet-50` / `border-violet-300` when on), each with a Material icon (`insights`, `groups`, `code`) and a label: Signal (blue), Story (cast), VS Code.
+  - The row sits between "Use a plan" and the message box.
+  - Ticking or unticking saves the choice at once (`POST /api/factory/styles`). It is used by the Factory chat and by the crew's Script Writer (`postcrew/factory_styles.py`).

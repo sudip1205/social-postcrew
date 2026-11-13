@@ -36,6 +36,7 @@ chevron_left
 chevron_right
 close
 cloud_off
+code
 dashboard
 data_usage
 date_range
