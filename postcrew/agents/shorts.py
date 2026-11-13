@@ -69,6 +69,51 @@ def _recent(ctx, n=12):
     return [t for t in titles if t][-n:]
 
 
+# a Story video must be a story (owner, 2026-11-12; the same check as the factory's pipeline/storycheck.mjs)
+STORY_MOVES = {"enter", "walk", "carry", "jump"}
+TECHY = {"computer", "computers", "model", "models", "algorithm", "data", "database", "server", "servers", "api", "apis", "code", "network", "vector",
+         "vectors", "software", "app", "apps", "ai", "internet", "website", "cloud", "cache", "token", "query", "bytes", "program", "cpu", "gpu"}
+COMMON = {"similar", "close", "nearest", "search", "numbers", "number", "list", "meaning", "first", "every", "right", "point"}
+
+
+def story_problems(script):
+    """What makes a "style": "story" script a lecture instead of a story. [] when it is a story."""
+    if script.get("style") != "story":
+        return []
+    out, scenes = [], script.get("scenes") or []
+    story = [s for s in scenes if s.get("type") == "story"]
+    if len(str((script.get("analogy") or {}).get("world") or "").split()) < 8:
+        out.append('"analogy": {"world": "…"} is missing: write the everyday story in one sentence first (who does what, where), with no tech '
+                   "words; every story scene acts it out")
+    if not any(s.get("type") == "map" for s in scenes):
+        out.append('a Story video ends its story with a "map" scene that pairs each part of the story with the real tech term')
+    terms = set()
+    for s in scenes:
+        for pr in s.get("pairs") or []:
+            t = str(pr.get("tech") or "").lower().strip()
+            if t:
+                terms.add(t)
+                head = t.split()[0].rstrip("s")
+                if len(head) >= 6 and head not in COMMON:
+                    terms.add(head)
+    for i, s in enumerate(scenes):
+        if s.get("type") != "story":
+            continue
+        text = str(s.get("text") or "").lower()
+        techy = sorted(w for w in TECHY if re.search(rf"\b{re.escape(w)}\b", text))
+        if techy:
+            out.append(f'scene {i} is in the computer world ("{", ".join(techy)}"): story scenes happen in the everyday world of the analogy; '
+                       f"computers are named only in the map scene")
+        hit = sorted(t for t in terms if re.search(rf"\b{re.escape(t)}", text))
+        if hit:
+            out.append(f'scene {i} says "{", ".join(hit)}" before the map: the tech is named only in the map scene')
+    moving = [s for s in story if any(b.get("do") in STORY_MOVES and b.get("who") for b in s.get("beats") or [])]
+    if story and len(moving) < max(1, len(story) - 1):
+        out.append(f"the cast only stands and talks: someone moves in {len(moving)} of {len(story)} story scenes. Make them act the story "
+                   f"(enter, walk, carry a thing to its place, jump), not present a diagram")
+    return out
+
+
 SHORT_MAX_WORDS = 160   # the channel voice reads ~190 words a minute with the scene gaps: 160 words is about 52 s (factory pipeline/rules.mjs)
 CODE_SCENES = {"code", "codeviz", "code-zoom", "run", "terminal", "editor"}
 
@@ -145,7 +190,8 @@ class ShortsWriter(Agent):
                 "tags": meta.get("tags") or [], "scene_count": len(script.get("scenes") or []),
                 "narration": " ".join(_said(sc) for sc in script.get("scenes") or [])[:4000],
                 "words": sum(len(_said(sc).split()) for sc in script.get("scenes") or []), "long": script.get("format") == "long",
-                "kind": script.get("kind") or "", "style": script.get("style") or "", "code_scenes": sum(1 for sc in script.get("scenes") or [] if sc.get("type") in CODE_SCENES)}
+                "kind": script.get("kind") or "", "style": script.get("style") or "", "code_scenes": sum(1 for sc in script.get("scenes") or [] if sc.get("type") in CODE_SCENES),
+                "story_problems": story_problems(script)}
 
     def validate(self, ctx, out):
         p = []
@@ -159,6 +205,7 @@ class ShortsWriter(Agent):
         if not out.get("long") and out.get("kind") != "algorithm" and out.get("style") != "story":
             p.append("an explainer Short is a Story video (owner, 2026-11-12): set \"style\": \"story\" and tell it with the cast in a fitting "
                      "background, as references/story-style.md says. Only algorithm problems (\"kind\": \"algorithm\") keep the Signal look")
+        p += out.get("story_problems") or []
         if out.get("code_scenes") and out.get("kind") != "algorithm":
             p.append(f"{out['code_scenes']} code scene(s) in a video that is not an algorithm problem: the channel makes visual explainers "
                      f"(owner, 2026-11-12). Replace them with diagram, flow or define scenes")

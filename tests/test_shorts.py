@@ -39,7 +39,9 @@ def fake_factory(ws, fail_render=False, write=True):
             ep = root / "episodes" / slug
             ep.mkdir(parents=True, exist_ok=True)
             if write:
-                (ep / "script.json").write_text(json.dumps({"style": "story", "scenes": [{"type": "hook", "say": "Ever wondered why?"}, {"type": "cta", "say": "Follow."}]}))
+                (ep / "script.json").write_text(json.dumps({"style": "story", "analogy": {"world": "Max shelves every book by what it is about in his library"},
+                                                         "scenes": [{"type": "story", "text": "Ever wondered why?", "beats": [{"do": "walk", "who": "max"}]},
+                                                                    {"type": "map", "text": "Follow.", "pairs": [{"tech": "Embedding"}]}]}))
                 (ep / "youtube.json").write_text(json.dumps({"title": "Why it works", "description": "A short explainer.", "tags": ["python", "tips"]}))
             return subprocess.CompletedProcess(cmd, 0, json.dumps({"subtype": "success", "is_error": False, "total_cost_usd": 0.42,
                                                                    "num_turns": 7, "result": "DONE"}), "")
@@ -129,3 +131,27 @@ class StoryLookTests(unittest.TestCase):
         self.assertFalse(w.validate(None, dict(base, kind="explainer", style="story")))
         self.assertFalse(w.validate(None, dict(base, kind="algorithm", style="", code_scenes=1)))
         self.assertFalse(w.validate(None, dict(base, long=True, kind="", style="")))   # long videos keep their wide look
+
+
+class StoryNotLectureTests(unittest.TestCase):
+    """Owner, 2026-11-12: a Story video acts out an everyday analogy; a lecture with the cast beside a diagram is sent back."""
+
+    def story(self, **kw):
+        s = {"style": "story", "analogy": {"world": "Max shelves every book by what it is about so neighbours share a topic"},
+             "scenes": [{"type": "story", "text": "Max shelves every book by topic.", "beats": [{"do": "carry", "who": "max"}]},
+                        {"type": "story", "text": "Lily wants a rockets book.", "beats": [{"do": "enter", "who": "lily"}]},
+                        {"type": "map", "text": "That is an embedding.", "pairs": [{"tech": "Embedding"}]}]}
+        s.update(kw)
+        return s
+
+    def test_a_story_passes_and_a_lecture_is_sent_back(self):
+        from postcrew.agents.shorts import story_problems
+        self.assertEqual(story_problems(self.story()), [])
+        self.assertEqual(story_problems({"style": "signal"}), [])
+        bad = self.story(analogy={})
+        bad["scenes"][0]["text"] = "The computer gives every word an embedding."
+        bad["scenes"][1]["beats"] = [{"do": "point", "who": "lily"}]
+        bad["scenes"][0]["beats"] = [{"do": "say", "who": "max"}]
+        got = " | ".join(story_problems(bad))
+        for want in ("analogy", "computer world", "before the map", "only stands"):
+            self.assertIn(want, got)
