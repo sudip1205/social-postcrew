@@ -131,6 +131,7 @@ class StoryLookTests(unittest.TestCase):
         self.assertFalse(w.validate(None, dict(base, kind="explainer", style="story")))
         self.assertFalse(w.validate(None, dict(base, kind="algorithm", style="", code_scenes=1)))
         self.assertFalse(w.validate(None, dict(base, long=True, kind="", style="")))   # long videos keep their wide look
+        self.assertFalse(w.validate(None, dict(base, kind="explainer", style="", ticked=["signal"])))   # Story not ticked: blue is right
 
 
 class StoryNotLectureTests(unittest.TestCase):
@@ -163,7 +164,7 @@ class FactoryStylesTests(unittest.TestCase):
     def test_ticked_looks_are_saved_and_explained(self):
         from postcrew import factory_styles as fs
         with TempWorkspace() as ws:
-            self.assertEqual(fs.ticked(ws), ["signal", "story", "code"])
+            self.assertEqual(fs.ticked(ws), ["signal"])   # the blue look by default (owner, 2026-11-13)
             self.assertEqual(fs.save(ws, ["code", "signal", "nope"]), ["signal", "code"])
             self.assertEqual([o["id"] for o in fs.options(ws) if o["on"]], ["signal", "code"])
             with self.assertRaises(ValueError):

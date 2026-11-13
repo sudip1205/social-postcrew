@@ -3,6 +3,7 @@
 ## 0.2.0: YouTube, per-app settings and a faster Studio
 
 ### New
+- **Videos use the blue Signal look by default.** Only Signal (blue) is ticked in the Factory at first. Story (the cast) and VS Code are used only when you tick them there. With only Signal ticked, every video is made in the blue look as before: explainer or algorithm, Short or long.
 - **Pick the video looks in the Factory, and mix them in one video.** The Factory has a Looks row: Signal (blue), Story (cast) and VS Code. The ticked looks go to the Factory chat and to the crew's Script Writer, and a video uses only those.
   - **One video, several looks:** a video can switch looks scene by scene, and the factory makes each part with its own renderer, then joins them with one caption file.
   - **Long algorithm videos:** explain each idea on the blue board, then type and run the code in a real VS Code (code-server on the lab, recorded, with the camera zooming on the lines the narrator names), approach by approach.

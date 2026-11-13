@@ -9,7 +9,7 @@ STYLES = {
     "story": {"label": "Story (cast)", "icon": "groups", "what": "the cast acting out an everyday story in a fitting set (Shorts only)"},
     "code": {"label": "VS Code", "icon": "code", "what": "real VS Code, the code typed and run, the camera zooming on it (long algorithm videos only)"},
 }
-DEFAULT = ["signal", "story", "code"]
+DEFAULT = ["signal"]   # owner, 2026-11-13: the blue look only, unless Story or VS Code is ticked in the Factory
 STATE = "factory-styles"
 
 
