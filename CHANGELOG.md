@@ -3,6 +3,10 @@
 ## 0.2.0: YouTube, per-app settings and a faster Studio
 
 ### New
+- **Shorts are at most 60 seconds, and they are visual explainers.** This is the owner's rule after an analysis: the Shorts had grown to 2–3 minutes, viewers watched 20–40% of them, and daily views were falling.
+  - A Short is now made at most 60 seconds long (160 words of narration). The Script Writer is sent back when a script is longer, and the factory refuses to voice or render one.
+  - The planner no longer proposes coding builds: "Build an API Gateway in Python" is refused, and "What Is an API Gateway and How It Works" is planned instead.
+  - Code scenes are only allowed in algorithm videos.
 - **Shorts are narrated in the channel's own voice, `dip_puck`.** The owner's recordings, converted to an American male sound and trained into a voice model on the lab, replace Kokoro Echo. The lab serves it at `127.0.0.1:8882` with the same API as Kokoro (other voices pass through to Kokoro), and the Shorts factory uses it for every video. When an episode's own recording is removed, it goes back to `dip_puck`.
 - **Old videos go to the NAS instead of being deleted.** With `cleanup.archive_dir` set (the lab: `/mnt/diptodive`, the TrueNAS share `CLOUDBEE/DipToDive`), only today's videos stay on this machine: the daily clean-up copies every finished video from an earlier day (`media/`, the Reel folders in `instagram/`, loose videos) to `<archive>/<YYYY-MM>/<area>/`, checks the copy's size, and only then deletes it (`cleanup.archive_after_days` keeps more days; videos still queued to post are never moved). Pictures and other files keep the 30-day rule. When the NAS is not mounted, the videos stay where they are until it is.
 - **Two posts never share a media file.** A Short made in chat and the scheduled Short for the same day and plan slot got the same post id, so the second video overwrote the first one's file (and its Instagram folder). A taken id now gets `-2`, `-3`, …

@@ -60,12 +60,12 @@ class PlannerTests(unittest.TestCase):
         with TempWorkspace() as ws:
             cfg = ws.config()
             cfg["platforms"]["youtube"]["enabled"] = True
-            cfg["platforms"]["youtube"]["categories"]["short-tip"].update(target_seconds=80)
+            cfg["platforms"]["youtube"]["categories"]["short-tip"].update(target_seconds=50)
             ws.save_config(cfg)
             llm = ScriptedLLM({"planner": [{"days": [day_answer("2026-10-16", "Why caches go stale")]}]})
             planner.PlannerAgent().plan(ws, [date(2026, 10, 16)], llm=llm, platform="youtube", force=True)
             prompt = llm.calls[0]["prompt"]
-            self.assertIn("Length: a short video of about 80 seconds", prompt)
+            self.assertIn("Length: a short video of about 50 seconds", prompt)
             self.assertIn("Plan ONE main idea", prompt)                      # one idea per 25 s, not four subtopics
             self.assertIn("KEEP ONE MAIN IDEA", llm.calls[0]["system"])
         with TempWorkspace() as ws:                                          # LinkedIn has no video length

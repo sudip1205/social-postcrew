@@ -77,7 +77,7 @@ class VoiceAgent(Agent):
         if len(out["files"]) != len(scenes) or any(s <= 0 for s in out["seconds"]):
             problems.append("a scene came back without audio")
         if ctx.video["format"] == "short" and out["total_seconds"] > platforms.SHORT_MAX_S + 0.5:
-            problems.append(f"the voice-over runs {out['total_seconds']:.0f} seconds: too long for a Short (3 minutes). Shorten the "
+            problems.append(f"the voice-over runs {out['total_seconds']:.0f} seconds: too long for a Short (1 minute). Shorten the "
                             f"narration by about {out['total_seconds'] - platforms.SHORT_MAX_S + 3:.0f} seconds of words")
         return problems
 

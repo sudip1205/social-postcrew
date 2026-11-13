@@ -29,7 +29,10 @@ SKILL_RULE = (f"BEFORE writing anything, read the current skill from disk: {SKIL
               f"change often: their newest rules win over anything in the example episodes. "
               f"Every video must differ from the recent ones (the owner will monetise the channel; YouTube refuses template look-alikes): "
               f"run `npm run variety` in shorts-factory/ first and follow {SKILL}/references/variety.md (shape, hook, voice, speed, scene "
-              f"order, opening, title, sign-off), then run `npm run variety -- episodes/<slug>` and fix the script until it prints ok.")
+              f"order, opening, title, sign-off), then run `npm run variety -- episodes/<slug>` and fix the script until it prints ok. "
+              f"Owner rules (2026-11-12): a Short is AT MOST 60 SECONDS, at most 160 words of narration (count them), one idea; and it is a "
+              f"VISUAL explainer of what the thing is and how it works, never a coding build: code scenes only in an algorithm problem, "
+              f"which sets \"kind\": \"algorithm\" in script.json.")
 
 
 def skill_version(root):
@@ -61,6 +64,14 @@ def _recent(ctx, n=12):
     titles = [str((p.get("youtube") or {}).get("title") or p.get("topic") or "") for p in ctx.ws.history()
               if p.get("platform") == "youtube"]
     return [t for t in titles if t][-n:]
+
+
+SHORT_MAX_WORDS = 160   # the channel voice reads ~190 words a minute with the scene gaps: 160 words is about 52 s (factory pipeline/rules.mjs)
+CODE_SCENES = {"code", "codeviz", "code-zoom", "run", "terminal", "editor"}
+
+
+def _said(sc):
+    return str(sc.get("text") or sc.get("say") or sc.get("narration") or sc.get("voice") or "")
 
 
 class ShortsWriter(Agent):
@@ -129,7 +140,9 @@ class ShortsWriter(Agent):
             raise AgentError(f"the episode files were not written correctly: {e}")
         return {"slug": slug, "episode": str(ep), "skill": skill_version(root), "title": meta.get("title", ""), "description": meta.get("description", ""),
                 "tags": meta.get("tags") or [], "scene_count": len(script.get("scenes") or []),
-                "narration": " ".join(str(sc.get("say") or sc.get("narration") or sc.get("voice") or "") for sc in script.get("scenes") or [])[:4000]}
+                "narration": " ".join(_said(sc) for sc in script.get("scenes") or [])[:4000],
+                "words": sum(len(_said(sc).split()) for sc in script.get("scenes") or []), "long": script.get("format") == "long",
+                "kind": script.get("kind") or "", "code_scenes": sum(1 for sc in script.get("scenes") or [] if sc.get("type") in CODE_SCENES)}
 
     def validate(self, ctx, out):
         p = []
@@ -137,6 +150,12 @@ class ShortsWriter(Agent):
             p.append("youtube.json has no title")
         if not out.get("scene_count"):
             p.append("script.json has no scenes")
+        if not out.get("long") and out.get("words", 0) > SHORT_MAX_WORDS:   # the owner's 60-second limit (2026-11-12), before any render
+            p.append(f"the narration has {out['words']} words: a Short is at most 60 seconds, {SHORT_MAX_WORDS} words. Cut whole scenes "
+                     f"(one idea per Short) and write script.json again")
+        if out.get("code_scenes") and out.get("kind") != "algorithm":
+            p.append(f"{out['code_scenes']} code scene(s) in a video that is not an algorithm problem: the channel makes visual explainers "
+                     f"(owner, 2026-11-12). Replace them with diagram, flow or define scenes")
         return p
 
     def summary(self, out):

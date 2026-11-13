@@ -68,7 +68,7 @@ def deep_merge(base, override):
 
 
 VIDEO_FORMATS = ["short", "long"]
-_SECONDS_HINT = "15-180 for a short, 60-1800 for a long video (a guide: the script takes the time the topic needs)"
+_SECONDS_HINT = "15-180 for a short (a Short is made at most 60 s long), 60-1800 for a long video (a guide: the script takes the time the topic needs)"
 
 
 def _seconds_ok(fmt, v):

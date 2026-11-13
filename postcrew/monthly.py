@@ -53,10 +53,12 @@ SCHEMA = {
 }
 
 
-# interview coaching, career advice, roadmaps, tips and concept lists are not what the YouTube channel makes (hands-on builds and solved problems are)
+# interview coaching, career advice, roadmaps, tips and concept lists are not what the YouTube channel makes (visual explainers and solved algorithm problems are)
 NOT_NICHE = re.compile(r"(how to|ways? to|steps? to|tips?|framework|strategy|guide)\b[^.?!]{0,40}\b(answer|ace|crack|pass|nail|prepare|prep|survive)\b[^.?!]{0,30}\binterview"
                        r"|\bwhat (the )?interviewers?\b|\binterview (tips|framework|strategy|prep|preparation|mistakes|checklist|roadmap)\b|\b(any|every|a) (system design |coding )?interview\b"
                        r"|\bcrack(ing)? the\b[^.?!]{0,20}\binterview|\binterview\b[^.?!]{0,25}\b(how to|tips|prepare|prep)\b|\broadmap\b|\bcareer\b|\b\d+ (concepts|things|tips|mistakes|rules)\b", re.I)
+# a coding build ("Build an API Gateway in Python") is not made either (owner, 2026-11-12): "What an API gateway is and how it works" is. Algorithms may show code.
+CODING_BUILD = re.compile(r"\b(build|implement|write|code|coding|create)\b[^.?!]{0,50}\b(in|with|using) (python|go|golang|java|javascript|node(\.js)?|typescript|rust|c\+\+|c#)\b", re.I)
 
 TREND = {
     "type": "object",
@@ -270,8 +272,11 @@ class MonthPlanner(Agent):
     def problems(p, taken, youtube=False):
         title, out = (p.get("title") or "").strip(), []
         if youtube and NOT_NICHE.search(f"{title} {p.get('angle', '')}"):
-            out.append("this is advice about interviews, careers or learning paths, or a list of concepts: the channel only makes hands-on videos that "
-                       "SOLVE one concrete problem or BUILD one concrete thing. Plan the problem or the build itself")
+            out.append("this is advice about interviews, careers or learning paths, or a list of concepts: the channel only makes visual explainers of "
+                       "what one thing is and how it works, and solved algorithm problems. Plan one of those")
+        if youtube and CODING_BUILD.search(f"{title} {p.get('angle', '')}"):
+            out.append("this is a coding build (\"build X in <language>\"): the channel makes visual explainers, not coding videos (owner, 2026-11-12). "
+                       "Plan \"What X is and how it works\" instead; code is only for algorithm problems")
         if not 5 <= len(title) <= 90:
             out.append(f"the title must be 5-90 characters (got {len(title)})")
         for key in ("angle", "context", "example", "takeaway"):
@@ -456,12 +461,14 @@ def _item(pool, item_id):
     raise ValueError("that plan no longer exists")
 
 
-BRIEF_SHORT = ("A vertical hands-on Short taught like a calm, caring professor to students: it SOLVES one concrete problem or BUILDS one small thing live. State the "
-               "problem or the goal with a real input, build it in a few small steps (code or a diagram that grows, one running example with numbers), RUN it and show the "
-               "result, show the common mistake, and end kindly. Whole spoken sentences, never clipped notes, never interview advice.")
-BRIEF_LONG = ("A 16:9 hands-on class by a calm, caring professor for students: it SOLVES one concrete problem or BUILDS one concrete thing from start to finish. Begin with the "
-              "problem the student has, draw the plan, then build it step by step (code in an editor window with its output, or a growing diagram), explaining what, why and how "
-              "for every part, run it and show it working, break it on purpose and fix it, check in with the class, and finish with a short recap. Never interview advice.")
+BRIEF_SHORT = ("A vertical VISUAL explainer Short of at most 60 seconds (160 words): what ONE thing is and how it works, shown with pictures. Hook with a real problem "
+               "in one breath, name and define the term with its picture, show the mechanism with ONE concrete example moving through a diagram, the common mistake in one "
+               "picture, then one line of recap and a specific question for the comments. No code and no building it in a language, except an algorithm problem (then one "
+               "trace and one short code scene). Whole spoken sentences, never clipped notes, never interview advice.")
+BRIEF_LONG = ("A 16:9 visual class by a calm, caring professor for students: what ONE system or idea is and how it works, from the problem it solves to every part of it. "
+              "Begin with the problem the student has, then build the picture step by step (a growing diagram, one request or value moving through it), explaining what, why "
+              "and how for every part, show what breaks and the fix, check in with the class, and finish with a short recap. No code, except an algorithm problem. Never "
+              "interview advice.")
 
 
 def short_fmt(fmt):

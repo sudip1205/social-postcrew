@@ -141,17 +141,17 @@ class RenderTests(unittest.TestCase):
 
 class SettingsTests(unittest.TestCase):
     def test_slow_pace_means_fewer_words_and_longer_pauses(self):
-        slow = platforms.video_spec({"video": {"format": "short", "target_seconds": 90, "pace": "slow"}})
-        normal = platforms.video_spec({"video": {"format": "short", "target_seconds": 90, "pace": "normal"}})
-        self.assertEqual((slow["max_words"], normal["max_words"]), (180, 225))
+        slow = platforms.video_spec({"video": {"format": "short", "target_seconds": 60, "pace": "slow"}})
+        normal = platforms.video_spec({"video": {"format": "short", "target_seconds": 60, "pace": "normal"}})
+        self.assertEqual((slow["max_words"], normal["max_words"]), (120, 150))
         self.assertEqual(slow["wps"], 2.0)
         text = "One thing. Another thing."
         self.assertIn('<break time="0.35s" />', voice.prepare(text, pace="slow"))
         self.assertIn('<break time="0.2s" />', voice.prepare(text, pace="normal"))
 
-    def test_shorts_may_run_three_minutes(self):
-        self.assertEqual(platforms.video_spec({"video": {"format": "short", "target_seconds": 170}})["target_seconds"], 170)
-        self.assertEqual(platforms.video_spec({"video": {"format": "short", "target_seconds": 500}})["target_seconds"], 180)
+    def test_shorts_are_made_at_most_a_minute_long(self):   # the owner's limit (2026-11-12); YouTube allows three minutes
+        self.assertEqual(platforms.video_spec({"video": {"format": "short", "target_seconds": 50}})["target_seconds"], 50)
+        self.assertEqual(platforms.video_spec({"video": {"format": "short", "target_seconds": 170}})["target_seconds"], 60)
         with TempWorkspace() as ws:
             cfg = ws.config()
             yt = cfg["platforms"]["youtube"]

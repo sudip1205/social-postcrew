@@ -188,7 +188,7 @@ def describe(ws, platform, day, cfg):
                 info.update(seconds=round(secs, 1))
                 info["checks"] = [{"label": "Duration", "ok": secs >= 5, "detail": f"{secs:.0f} s"},
                                   {"label": "Fits a Short", "ok": spec["format"] == "long" or secs <= SHORT_MAX_S + 1,
-                                   "detail": "under 3 minutes" if secs <= SHORT_MAX_S + 1 else "longer than 3 minutes: use a long video"}]
+                                   "detail": "a minute or less" if secs <= SHORT_MAX_S + 1 else "longer than a minute: use a long video"}]
             else:
                 from .render import video as vid
                 p = vid.probe(path)

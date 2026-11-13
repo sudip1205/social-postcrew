@@ -77,7 +77,7 @@ SCHEMA = {
 }
 
 FORMAT_RULES = {
-    "short": "A vertical 9:16 Short (up to 3 minutes): a short opening, the problem with an example, the ways it can be solved, then the chosen solution built up scene by scene with its code.",
+    "short": "A vertical 9:16 Short of at most 60 seconds: a short opening, the problem with an example, the idea named and defined with its picture, then how it works shown as a diagram with one example moving through it (code only for an algorithm problem).",
     "long": "A 16:9 video: open with a short introduction (about 15 seconds), state the problem, lay out the ways to solve it, then one idea per scene (about 4-12 scenes per ten minutes), "
             "and finish with one clear next step.",
 }
@@ -218,7 +218,7 @@ class ScriptWriter(WriterAgent):
             problems = script_problems(out, spec, ctx.cat, ctx.profile)
             if spec["format"] == "short" and words / platforms.WORDS_PER_SECOND > platforms.SHORT_MAX_S + 3:
                 problems.append(f"your script runs about {words / platforms.WORDS_PER_SECOND:.0f} seconds: too long for a "
-                                f"Short (3 minutes at most). Cut it or make a long video")
+                                f"Short (1 minute at most). Cut it or make a long video")
             return problems
         problems = script_problems(out, spec, ctx.cat, ctx.profile)
         problems += shapes.scene_problems(ctx, out)   # a problem's data drawn as its own shape (a grid as a grid)

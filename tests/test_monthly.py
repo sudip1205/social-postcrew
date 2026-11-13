@@ -297,7 +297,7 @@ class AssignedLengthTests(unittest.TestCase):
             cfg["platforms"]["youtube"]["enabled"] = True
             ws.save_config(cfg)
             cid = monthly.category_for_item(ws, "youtube", "short")
-            self.assertEqual(ws.config()["platforms"]["youtube"]["categories"][cid]["target_seconds"], 90)
+            self.assertEqual(ws.config()["platforms"]["youtube"]["categories"][cid]["target_seconds"], 55)
             self.assertEqual(monthly.category_for_item(ws, "youtube", "long"), "assigned-long")
             self.assertEqual(ws.config()["platforms"]["youtube"]["categories"]["assigned-long"]["target_seconds"], 480)
 
@@ -738,3 +738,14 @@ class TwoADayTests(unittest.TestCase):
         from helpers import REAL_PER_TOPIC
         self.assertEqual(REAL_PER_TOPIC("youtube", "2026-11", ["a"] * 6), 6)
         self.assertEqual(REAL_PER_TOPIC("youtube", "2026-11", ["a"] * 6, 2), 11)   # 60 runs over 6 topics, plus one each to run by hand
+
+
+class VisualExplainerNicheTests(unittest.TestCase):
+    """Owner, 2026-11-12: visual explainers, not coding builds; code only for algorithm problems."""
+
+    def test_a_coding_build_is_refused_but_what_it_is_and_how_it_works_is_planned(self):
+        from postcrew import monthly
+        for t in ["Build an API Gateway in Python", "Implement a Rate Limiter with Go", "Write a Load Balancer using Node.js"]:
+            self.assertTrue(any("coding build" in e for e in monthly.MonthPlanner.problems({"title": t}, [], youtube=True)), t)
+        for t in ["What Is an API Gateway and How It Works", "How a Rate Limiter Decides Who Waits", "Two Sum: Solve It in Python"]:
+            self.assertFalse(any("coding build" in e for e in monthly.MonthPlanner.problems({"title": t}, [], youtube=True)), t)
