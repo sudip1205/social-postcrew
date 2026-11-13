@@ -32,7 +32,10 @@ SKILL_RULE = (f"BEFORE writing anything, read the current skill from disk: {SKIL
               f"order, opening, title, sign-off), then run `npm run variety -- episodes/<slug>` and fix the script until it prints ok. "
               f"Owner rules (2026-11-12): a Short is AT MOST 60 SECONDS, at most 160 words of narration (count them), one idea; and it is a "
               f"VISUAL explainer of what the thing is and how it works, never a coding build: code scenes only in an algorithm problem, "
-              f"which sets \"kind\": \"algorithm\" in script.json.")
+              f"which sets \"kind\": \"algorithm\" in script.json. Two looks (owner, 2026-11-12): an algorithm problem keeps the Signal look "
+              f"(code and traces); EVERY OTHER Short is a Story video (\"style\": \"story\", \"kind\": \"explainer\"): the fixed cast acts out an "
+              f"everyday story in a background that fits it, and a map scene pairs the story with the real tech. Read "
+              f"{SKILL}/references/story-style.md first and follow it exactly. Only the narrator speaks; characters talk in short tooltips.")
 
 
 def skill_version(root):
@@ -142,7 +145,7 @@ class ShortsWriter(Agent):
                 "tags": meta.get("tags") or [], "scene_count": len(script.get("scenes") or []),
                 "narration": " ".join(_said(sc) for sc in script.get("scenes") or [])[:4000],
                 "words": sum(len(_said(sc).split()) for sc in script.get("scenes") or []), "long": script.get("format") == "long",
-                "kind": script.get("kind") or "", "code_scenes": sum(1 for sc in script.get("scenes") or [] if sc.get("type") in CODE_SCENES)}
+                "kind": script.get("kind") or "", "style": script.get("style") or "", "code_scenes": sum(1 for sc in script.get("scenes") or [] if sc.get("type") in CODE_SCENES)}
 
     def validate(self, ctx, out):
         p = []
@@ -153,6 +156,9 @@ class ShortsWriter(Agent):
         if not out.get("long") and out.get("words", 0) > SHORT_MAX_WORDS:   # the owner's 60-second limit (2026-11-12), before any render
             p.append(f"the narration has {out['words']} words: a Short is at most 60 seconds, {SHORT_MAX_WORDS} words. Cut whole scenes "
                      f"(one idea per Short) and write script.json again")
+        if not out.get("long") and out.get("kind") != "algorithm" and out.get("style") != "story":
+            p.append("an explainer Short is a Story video (owner, 2026-11-12): set \"style\": \"story\" and tell it with the cast in a fitting "
+                     "background, as references/story-style.md says. Only algorithm problems (\"kind\": \"algorithm\") keep the Signal look")
         if out.get("code_scenes") and out.get("kind") != "algorithm":
             p.append(f"{out['code_scenes']} code scene(s) in a video that is not an algorithm problem: the channel makes visual explainers "
                      f"(owner, 2026-11-12). Replace them with diagram, flow or define scenes")

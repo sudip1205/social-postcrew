@@ -461,10 +461,10 @@ def _item(pool, item_id):
     raise ValueError("that plan no longer exists")
 
 
-BRIEF_SHORT = ("A vertical VISUAL explainer Short of at most 60 seconds (160 words): what ONE thing is and how it works, shown with pictures. Hook with a real problem "
-               "in one breath, name and define the term with its picture, show the mechanism with ONE concrete example moving through a diagram, the common mistake in one "
-               "picture, then one line of recap and a specific question for the comments. No code and no building it in a language, except an algorithm problem (then one "
-               "trace and one short code scene). Whole spoken sentences, never clipped notes, never interview advice.")
+BRIEF_SHORT = ("A vertical Story explainer Short of at most 60 seconds (160 words): what ONE thing is and how it works, acted out by the channel's cast in an "
+               "everyday place that works exactly like the tech (a receptionist for an API gateway, a kitchen ticket rail for a queue), drawn on the set's board, then a map "
+               "scene that pairs each part of the story with the real term, and a specific question for the comments. Only the narrator speaks; characters talk in short "
+               "tooltips. An algorithm problem is the exception: the Signal look with one trace and one short code scene. Never interview advice.")
 BRIEF_LONG = ("A 16:9 visual class by a calm, caring professor for students: what ONE system or idea is and how it works, from the problem it solves to every part of it. "
               "Begin with the problem the student has, then build the picture step by step (a growing diagram, one request or value moving through it), explaining what, why "
               "and how for every part, show what breaks and the fix, check in with the class, and finish with a short recap. No code, except an algorithm problem. Never "

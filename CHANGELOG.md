@@ -3,6 +3,12 @@
 ## 0.2.0: YouTube, per-app settings and a faster Studio
 
 ### New
+- **Explainer Shorts are cartoon stories; algorithm videos keep the Signal look.** This is the owner's rule from 2026-11-12. A Short that explains what something is and how it works:
+  - is told by the channel's fixed cast (Max, Lily, Jake, Olivia, Grace, Tom) as an everyday story, in a background that fits it (library, office, server room, street, kitchen, classroom, home or warehouse);
+  - draws the idea on that background's board;
+  - ends with a scene that pairs each part of the story with the real tech term.
+
+  Algorithm problems keep the Signal look, with code and traces. The Script Writer is sent back when an explainer isn't a story. Only the narrator speaks: characters talk in short tooltips, and their own voices are built but switched off.
 - **Shorts are at most 60 seconds, and they are visual explainers.** This is the owner's rule after an analysis: the Shorts had grown to 2–3 minutes, viewers watched 20–40% of them, and daily views were falling.
   - A Short is now made at most 60 seconds long (160 words of narration). The Script Writer is sent back when a script is longer, and the factory refuses to voice or render one.
   - The planner no longer proposes coding builds: "Build an API Gateway in Python" is refused, and "What Is an API Gateway and How It Works" is planned instead.

@@ -39,7 +39,7 @@ def fake_factory(ws, fail_render=False, write=True):
             ep = root / "episodes" / slug
             ep.mkdir(parents=True, exist_ok=True)
             if write:
-                (ep / "script.json").write_text(json.dumps({"scenes": [{"type": "hook", "say": "Ever wondered why?"}, {"type": "cta", "say": "Follow."}]}))
+                (ep / "script.json").write_text(json.dumps({"style": "story", "scenes": [{"type": "hook", "say": "Ever wondered why?"}, {"type": "cta", "say": "Follow."}]}))
                 (ep / "youtube.json").write_text(json.dumps({"title": "Why it works", "description": "A short explainer.", "tags": ["python", "tips"]}))
             return subprocess.CompletedProcess(cmd, 0, json.dumps({"subtype": "success", "is_error": False, "total_cost_usd": 0.42,
                                                                    "num_turns": 7, "result": "DONE"}), "")
@@ -117,3 +117,15 @@ class ShortsCrewTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class StoryLookTests(unittest.TestCase):
+    """Owner, 2026-11-12: an explainer Short is a Story video; an algorithm video keeps the Signal look."""
+
+    def test_an_explainer_must_be_a_story_but_an_algorithm_may_not_be(self):
+        from postcrew.agents.shorts import ShortsWriter
+        w, base = ShortsWriter(), {"title": "t", "scene_count": 3, "words": 100, "long": False, "code_scenes": 0}
+        self.assertTrue(any("Story video" in p for p in w.validate(None, dict(base, kind="explainer", style=""))))
+        self.assertFalse(w.validate(None, dict(base, kind="explainer", style="story")))
+        self.assertFalse(w.validate(None, dict(base, kind="algorithm", style="", code_scenes=1)))
+        self.assertFalse(w.validate(None, dict(base, long=True, kind="", style="")))   # long videos keep their wide look
