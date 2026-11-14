@@ -172,3 +172,34 @@ class FactoryStylesTests(unittest.TestCase):
             line = fs.instruction(fs.ticked(ws))
             self.assertIn("Signal (blue)", line); self.assertIn("VS Code", line); self.assertIn("\"styles\": [\"signal\", \"code\"]", line)
             self.assertIn("mixing-styles.md", line)
+
+
+class ThreeDLookTests(unittest.TestCase):
+    """Owner, 2026-11-13: the 3D look makes the whole video with its own pipeline, so it is ticked on its own."""
+
+    def test_3d_is_ticked_alone_and_tells_the_factory_to_use_the_3d_pipeline(self):
+        from postcrew import factory_styles as fs
+        with TempWorkspace() as ws:
+            self.assertEqual(fs.save(ws, ["3d"]), ["3d"])
+            self.assertTrue(fs.is_3d(fs.ticked(ws)))
+            with self.assertRaises(ValueError):
+                fs.save(ws, ["signal", "3d"])
+            line = fs.instruction(["3d"])
+            self.assertIn('"style": "3d"', line); self.assertIn("youtube-3d", line)
+            self.assertFalse(fs.is_3d(["signal"]))
+
+    def test_the_script_writer_hands_a_3d_video_to_the_3d_planner(self):
+        from postcrew import factory_styles as fs
+        with TempWorkspace() as ws, tempfile.TemporaryDirectory() as d:
+            fs.save(ws, ["3d"])
+            root, ep = Path(d), Path(d) / "episodes" / "e1"
+            def fake_run(cmd, **kw):
+                self.assertIn("--plan-only", cmd)
+                (ep / "youtube.json").write_text(json.dumps({"title": "How a Hash Map Works", "description": "d", "tags": ["hash map"]}))
+                return subprocess.CompletedProcess(cmd, 0, "", "")
+            ctx = mock.Mock(ws=ws, cat={"label": "Short", "brief": "b", "format": "short"}, video={"format": "short", "target_seconds": 55})
+            with mock.patch("postcrew.agents.shorts.subprocess.run", side_effect=fake_run), mock.patch("postcrew.agents.shorts.skill_version", return_value={}):
+                out = shorts.ShortsWriter()._plan_3d(ctx, root, ep, "e1", "How a Hash Map Works", {"angle": "one step"})
+            self.assertEqual((out["title"], out["style"]), ("How a Hash Map Works", "3d"))
+            self.assertEqual(json.loads((ep / "script.json").read_text())["style"], "3d")
+            self.assertEqual(shorts.ShortsWriter().validate(ctx, out), [])

@@ -3,6 +3,10 @@
 ## 0.2.0: YouTube, per-app settings and a faster Studio
 
 ### New
+- **A 3D look: whole videos made by the Three.js explainer pipeline.** The Factory has a new look, 3D (Three.js), ticked on its own. When it is ticked:
+  - the Script Writer hands the topic to the 3D pipeline on the lab, which plans, writes, directs, reviews with a vision critic and renders the video with its own agents, unchanged;
+  - its planner gives the title, description and tags, and the finished video is queued like any other.
+  - A 3D Short is never over 60 seconds.
 - **Videos use the blue Signal look by default.** Only Signal (blue) is ticked in the Factory at first. Story (the cast) and VS Code are used only when you tick them there. With only Signal ticked, every video is made in the blue look as before: explainer or algorithm, Short or long.
 - **Pick the video looks in the Factory, and mix them in one video.** The Factory has a Looks row: Signal (blue), Story (cast) and VS Code. The ticked looks go to the Factory chat and to the crew's Script Writer, and a video uses only those.
   - **One video, several looks:** a video can switch looks scene by scene, and the factory makes each part with its own renderer, then joins them with one caption file.

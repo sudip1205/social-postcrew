@@ -139,6 +139,8 @@ class ShortsWriter(Agent):
             shutil.rmtree(ep / "build", ignore_errors=True)
             for f in ("script.json", "youtube.json"):
                 (ep / f).unlink(missing_ok=True)
+        if factory_styles.is_3d(factory_styles.ticked(ctx.ws)):   # the 3D look: its own pipeline plans the video (owner, 2026-11-13)
+            return self._plan_3d(ctx, root, ep, slug, subject, topic)
         prompt = "\n".join(x for x in [
             f"Make the next YouTube Short for this channel, as episode `episodes/{slug}/` of shorts-factory.",
             f"Topic: {subject}" if subject else f"Pick a fresh topic for the category below (not one of the recent videos).",
@@ -192,6 +194,31 @@ class ShortsWriter(Agent):
                 "words": sum(len(_said(sc).split()) for sc in script.get("scenes") or []), "long": script.get("format") == "long",
                 "kind": script.get("kind") or "", "style": script.get("style") or "", "code_scenes": sum(1 for sc in script.get("scenes") or [] if sc.get("type") in CODE_SCENES),
                 "story_problems": story_problems(script), "ticked": factory_styles.ticked(ctx.ws)}
+
+    def _plan_3d(self, ctx, root, ep, slug, subject, topic):
+        """Hand the topic to the 3D pipeline: script.json says what to make, its planner writes the title, description and tags."""
+        fmt = (ctx.cat.get("format") or (ctx.video or {}).get("format") or "short") if hasattr(ctx, "cat") else "short"
+        long = fmt == "long"
+        notes = " ".join(x for x in [topic.get("angle") if topic.get("angle") != subject else "",
+                                     "One idea, at most 60 seconds." if not long else "", (ctx.cat.get("brief") or "")[:600]] if x)
+        ep.mkdir(parents=True, exist_ok=True)
+        (ep / "script.json").write_text(json.dumps({"style": "3d", "topic": subject or ctx.cat["label"], "notes": notes, "format": "long" if long else "short",
+                                                    "seconds": int((ctx.video or {}).get("target_seconds") or (480 if long else 55)), "voice": "dip_puck"},
+                                                   ensure_ascii=False, indent=2) + "\n")
+        (ep / "youtube.json").unlink(missing_ok=True)
+        t0 = time.time()
+        try:
+            r = subprocess.run(["node", "pipeline/make3d.mjs", f"episodes/{slug}", "--plan-only"], cwd=str(root), capture_output=True, text=True, timeout=1200)
+        except subprocess.TimeoutExpired:
+            raise AgentError("the 3D planner did not finish within 20 minutes")
+        if r.returncode:
+            tail = re.sub(r"\x1b\[[0-9;]*m", "", r.stderr or r.stdout or "")[-400:]
+            raise AgentError(f"the 3D planner failed (exit {r.returncode}): {tail}")
+        ctx.run.event(self.id, "llm", f"the 3D pipeline planned the video in {time.time() - t0:.0f}s")
+        meta = json.loads((ep / "youtube.json").read_text())
+        return {"slug": slug, "episode": str(ep), "skill": skill_version(root), "title": meta.get("title", ""), "description": meta.get("description", ""),
+                "tags": meta.get("tags") or [], "scene_count": 1, "narration": "", "words": 0, "long": long, "kind": "3d", "style": "3d",
+                "code_scenes": 0, "story_problems": [], "ticked": ["3d"]}
 
     def validate(self, ctx, out):
         p = []

@@ -430,7 +430,14 @@ async function renderFactory() {
     } catch (err) { toast(err.message, true); fcStudyCount(); }
   };
   $("#fc-player").addEventListener("close", () => { const v = $("#fc-player video"); v.pause(); v.removeAttribute("src"); v.load(); });
-  $("#fc-styles").addEventListener("change", (e) => { if (e.target.matches("[data-fc-style]")) fcSaveStyles(); });
+  $("#fc-styles").addEventListener("change", (e) => {
+    if (!e.target.matches("[data-fc-style]")) return;
+    if (e.target.checked) {   // 3D makes the whole video by itself: ticking it unticks the others, ticking another unticks 3D
+      const solo = e.target.dataset.fcStyle === "3d";
+      document.querySelectorAll("[data-fc-style]").forEach((x) => { if (x !== e.target && (solo || x.dataset.fcStyle === "3d")) x.checked = false; });
+    }
+    fcSaveStyles();
+  });
   fcDraw(d);
   fcStyles(d.styles);
   fcPoll();

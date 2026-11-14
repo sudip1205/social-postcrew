@@ -178,6 +178,7 @@ video_library
 videocam
 view_agenda
 view_carousel
+view_in_ar
 view_timeline
 view_week
 visibility

@@ -86,3 +86,4 @@ auto_awesome
 mic
 smart_toy
 code
+view_in_ar
