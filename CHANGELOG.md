@@ -3,6 +3,11 @@
 ## 0.2.0: YouTube, per-app settings and a faster Studio
 
 ### New
+- **A new look: Isometric (pastel), in the style of your reference prompt.** Tick it on its own in the Factory. Then:
+  - the Script Writer writes the narration beats and the animation itself (a 2D-canvas isometric world the camera glides along), copying the reference's drawing kit in shorts-factory/styles/iso-pastel;
+  - a free storyboard check renders the key frame of every beat and catches errors, text too small for a phone, half-empty frames and randomness; the Script Writer looks at the storyboard and fixes it before anything is voiced;
+  - the factory voices it with your voice, times the animation to it, records it in headless Chrome and mixes in the style's synced sound effects, with captions and the channel's outro card.
+- **3D videos look cleaner:** the lettering is Inter (the lab fell back to DejaVu) and the background is a pastel paper instead of plain white.
 - **3D videos come from video-engine, with the channel voice and far fewer tokens.** The 3D look (now "3D (isometric)") no longer runs the separate 3D pipeline and its own agents. When it is ticked:
   - the Script Writer writes the video as one storyboard program (episodes/<slug>/scene.js) following video-engine's RULES.md, and checks it with `ve compile` until it is clean (free, no AI);
   - a storyboard that does not compile, or has more words than the budget, goes back to the Script Writer with the exact problems;

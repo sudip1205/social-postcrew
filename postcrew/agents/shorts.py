@@ -54,6 +54,22 @@ def skill_version(root):
 
 # 3D look (video-engine): the channel voice (dip_puck) reads ~2.9 words/s, and each beat adds ~0.6 s of breathing room
 SHORT_MAX_WORDS_3D = 100   # about 41 s with 8-10 beats, + the ~9 s like/subscribe outro the factory appends: under 60 s
+SHORT_MAX_WORDS_ISO = 140   # Isometric Pastel Shorts: 6-10 beats under 60 s with the channel voice, the outro line included (owner, 2026-11-14)
+
+
+def iso_check(root, ep):
+    """The Isometric Pastel storyboard check (free: key frames in headless Chrome, no voice, no LLM): its list of problems."""
+    (Path(ep) / "build-iso" / "check.json").unlink(missing_ok=True)   # never read an old run's problems
+    r = subprocess.run(["node", str(Path(root) / "pipeline" / "make-iso.mjs"), str(ep), "--check"], cwd=str(root), capture_output=True, text=True,
+                       timeout=300)
+    if r.returncode == 0:
+        return []
+    try:
+        got = json.loads((Path(ep) / "build-iso" / "check.json").read_text()).get("problems") or []
+    except (OSError, ValueError):
+        got = []
+    return got or [((r.stderr or r.stdout or "").strip().splitlines() or [f"the check failed (exit {r.returncode})"])[-1]]
+
 WORDS_PER_SECOND_3D = 2.5  # long videos: about 90% of the target length after beat pauses (measured 2026-11-14)
 
 
@@ -167,6 +183,8 @@ class ShortsWriter(Agent):
             shutil.rmtree(ep / "build", ignore_errors=True)
             for f in ("script.json", "youtube.json"):
                 (ep / f).unlink(missing_ok=True)
+        if factory_styles.is_iso(factory_styles.ticked(ctx.ws)):   # Isometric Pastel: Claude writes the animation (owner, 2026-11-14)
+            return self._plan_iso(ctx, root, ep, slug, subject, topic, guidance)
         if factory_styles.is_3d(factory_styles.ticked(ctx.ws)):   # the 3D look: its own pipeline plans the video (owner, 2026-11-13)
             return self._plan_3d(ctx, root, ep, slug, subject, topic, guidance)
         prompt = "\n".join(x for x in [
@@ -288,12 +306,76 @@ class ShortsWriter(Agent):
                 "kind": "3d", "style": "3d", "code_scenes": 0, "story_problems": [], "ticked": ["3d"],
                 "storyboard_errors": check["errors"], "word_budget": budget}
 
+    def _plan_iso(self, ctx, root, ep, slug, subject, topic, guidance=None):
+        """The Isometric Pastel look (owner, 2026-11-14): one Claude Code session writes the narration beats and the 2D-canvas animation
+        (explainer.js) in the style of the owner's reference prompt (shorts-factory/styles/iso-pastel), then runs the storyboard check
+        (free: key frames + automatic checks) and looks at the storyboard until it is clean. make-iso.mjs then voices and records it."""
+        kit = root / "styles" / "iso-pastel"
+        if not (kit / "STYLE.md").exists():
+            raise AgentError(f"the Isometric Pastel kit is not at {kit}: update the Shorts factory", fatal=True)
+        fmt = (ctx.cat.get("format") or (ctx.video or {}).get("format") or "short") if hasattr(ctx, "cat") else "short"
+        long = fmt == "long"
+        seconds = int((ctx.video or {}).get("target_seconds") or (480 if long else 50))
+        budget = int(seconds * WORDS_PER_SECOND_3D) if long else SHORT_MAX_WORDS_ISO
+        ep.mkdir(parents=True, exist_ok=True)
+        fixing = bool(guidance) and all((ep / f).exists() for f in ("script.json", "explainer.js", "youtube.json"))
+        if not fixing:
+            for f in ("script.json", "explainer.js", "youtube.json"):
+                (ep / f).unlink(missing_ok=True)
+        check_cmd = "node ../../pipeline/make-iso.mjs . --check"
+        prompt = "\n".join(x for x in [
+            f"Make the next YouTube {'long video' if long else 'Short'} for this channel in the Isometric Pastel look. You are in its episode folder.",
+            f"Topic: {subject}" if subject else "Pick a fresh topic for the category below (not one of the recent videos).",
+            f"Angle: {topic.get('angle')}" if topic.get("angle") and topic.get("angle") != subject else "",
+            f"Category: {ctx.cat['label']}: {ctx.cat.get('brief', '')}",
+            ("Owner's plan for this video:\n" + json.dumps(topic["owner_plan"], ensure_ascii=False, indent=1)) if topic.get("owner_plan") else "",
+            ("Recent videos (do not repeat): " + "; ".join(_recent(ctx))) if _recent(ctx) else "",
+            "",
+            f"Format: {'16:9 long video (1920x1080)' if long else '9:16 Short (1080x1920, vertical)'}. Word budget (hard): at most {budget} spoken words"
+            + ("" if long else ", 6-10 beats, one idea; the Short must stay under 60 s with the channel voice") + ". "
+            "The like / comment / share / subscribe outro is added after your last beat automatically: do not write one.",
+            f"Read {kit}/STYLE.md (the rules, below) and {kit}/reference.js (the style itself: copy its techniques, change only the story). "
+            f"{kit}/kit.js has the drawing helpers you may call (box, cylinder, tag, numberTag, arrow, shade, poly).",
+            "Write ONLY these files in this folder:",
+            '  script.json   {"style": "iso", "topic": "...", "format": "' + ("long" if long else "short") + '", "beats": [{"say": "..."}, ...]}',
+            "  explainer.js  function explainer(ctx, W, H_, t) { ... }  and  function scoreSound(k) { ... }",
+            f"  youtube.json  {{\"title\", \"description\", \"tags\": [...], \"privacyStatus\": \"private\", \"video\": \"../../out/{slug}-hyperframes.mp4\", \"captions\": \"../../out/{slug}.srt\"}}",
+            f"Then run `{check_cmd}` (free: no voice, no render). It writes build-iso/storyboard.png and lists problems. Fix every problem, "
+            "then Read build-iso/storyboard.png and fix every panel that is empty, cramped, unreadable, off-screen or not clearly about its line. "
+            "Repeat until both are clean. Do NOT render the video.",
+            "When it is clean, answer with one line: DONE.",
+            ("\nThe owner's notes on the last attempt (fix these):\n- " + "\n- ".join(guidance)) if guidance and not fixing else "",
+            ("\nThe files are already written. Do NOT start over: edit them only where needed to fix these problems, then check again:\n- "
+             + "\n- ".join(guidance)) if fixing else "",
+            "",
+            "=== STYLE.md (styles/iso-pastel) ===",
+            (kit / "STYLE.md").read_text(),
+        ] if x is not None)
+        self._claude(ctx, prompt, ["Read", "Write", "Edit", "Glob", "Grep", f"Bash({check_cmd}:*)"], ep, add_dirs=[kit])
+        try:
+            meta = json.loads((ep / "youtube.json").read_text())
+            script = json.loads((ep / "script.json").read_text())
+        except (OSError, ValueError) as e:
+            raise AgentError(f"youtube.json or script.json was not written correctly: {e}")
+        problems = iso_check(root, ep)
+        beats = [b for b in (script.get("beats") or []) if str(b.get("say") or "").strip()]
+        said = " ".join(str(b.get("say")) for b in beats)
+        return {"slug": slug, "episode": str(ep), "skill": skill_version(root), "title": meta.get("title", ""), "description": meta.get("description", ""),
+                "tags": meta.get("tags") or [], "scene_count": len(beats), "narration": said[:4000], "words": len(said.split()), "long": long,
+                "kind": "iso", "style": "iso", "code_scenes": 0, "story_problems": [], "ticked": ["iso"],
+                "storyboard_errors": problems, "word_budget": budget, "storyboard": str(ep / "build-iso" / "storyboard.png")}
+
     def validate(self, ctx, out):
         p = []
         if not out.get("title"):
             p.append("youtube.json has no title")
         if not out.get("scene_count"):
             p.append("script.json has no scenes")
+        if out.get("style") == "iso":
+            p += [f"storyboard check: {e}" for e in (out.get("storyboard_errors") or [])[:8]]
+            if out.get("words", 0) > out.get("word_budget", SHORT_MAX_WORDS_ISO):
+                p.append(f"the narration has {out['words']} words, over the budget of {out['word_budget']}: merge or cut beats in script.json")
+            return p
         if out.get("style") == "3d":
             p += [f"scene.js: {e}" for e in (out.get("storyboard_errors") or [])[:8]]
             if out.get("words", 0) > out.get("word_budget", SHORT_MAX_WORDS_3D):

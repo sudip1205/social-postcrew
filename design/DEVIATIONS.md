@@ -170,3 +170,4 @@ No Stitch screen exists for either view. Both are derived from the shell, design
   - checkbox chips in the violet accent (`bg-violet-50` / `border-violet-300` when on), each with a Material icon (`insights`, `groups`, `code`) and a label: Signal (blue), Story (cast), VS Code.
   - The row sits between "Use a plan" and the message box.
   - Ticking or unticking saves the choice at once (`POST /api/factory/styles`). It is used by the Factory chat and by the crew's Script Writer (`postcrew/factory_styles.py`).
+  - 2026-11-14: a fifth look, **Isometric (pastel)** (icon `deployed_code`). Like 3D it makes the whole video, so ticking it unticks the others, and the reverse.

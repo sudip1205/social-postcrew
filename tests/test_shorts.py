@@ -216,6 +216,44 @@ class ThreeDLookTests(unittest.TestCase):
             self.assertEqual(json.loads((ep / "script.json").read_text())["style"], "3d")
             self.assertEqual(w.validate(ctx, out), [])
 
+    def test_isometric_pastel_is_ticked_alone_and_tells_the_writer_to_use_the_kit(self):
+        from postcrew import factory_styles as fs
+        with TempWorkspace() as ws:
+            self.assertEqual(fs.save(ws, ["iso"]), ["iso"])
+            self.assertTrue(fs.is_iso(fs.ticked(ws))); self.assertFalse(fs.is_3d(fs.ticked(ws)))
+            for mix in (["signal", "iso"], ["iso", "3d"]):
+                with self.assertRaises(ValueError):
+                    fs.save(ws, mix)
+            line = fs.instruction(["iso"])
+            self.assertIn("styles/iso-pastel/STYLE.md", line); self.assertIn("explainer.js", line); self.assertIn("--check", line)
+
+    def test_the_script_writer_writes_the_isometric_animation_and_checks_its_storyboard(self):
+        from postcrew import factory_styles as fs
+        with TempWorkspace() as ws, tempfile.TemporaryDirectory() as d:
+            fs.save(ws, ["iso"])
+            root = Path(d); kit = root / "styles" / "iso-pastel"; kit.mkdir(parents=True); (kit / "STYLE.md").write_text("# iso rules")
+            ep = root / "episodes" / "e1"
+            def fake_claude(ctx, prompt, tools, cwd, add_dirs=()):
+                self.assertIn("=== STYLE.md (styles/iso-pastel) ===", prompt); self.assertIn("1080x1920", prompt)
+                self.assertTrue(any("make-iso.mjs . --check" in t for t in tools)); self.assertEqual(Path(cwd), ep)
+                (ep / "script.json").write_text(json.dumps({"style": "iso", "beats": [{"say": "One app, one database."}, {"say": "Then it slows down."}]}))
+                (ep / "explainer.js").write_text("function explainer(ctx, W, H_, t) {}\nfunction scoreSound(k) {}")
+                (ep / "youtube.json").write_text(json.dumps({"title": "Database Scaling", "description": "d", "tags": ["db"]}))
+                return {}
+            ctx = mock.Mock(ws=ws, cfg={}, cat={"label": "Short", "brief": "b", "format": "short"}, video={"format": "short"})
+            w = shorts.ShortsWriter()
+            with mock.patch.object(w, "_claude", side_effect=fake_claude), mock.patch("postcrew.agents.shorts.skill_version", return_value={}), \
+                 mock.patch("postcrew.agents.shorts.iso_check", return_value=[]):
+                out = w._plan_iso(ctx, root, ep, "e1", "Database Scaling", {"angle": "one to many"})
+            self.assertEqual((out["title"], out["style"], out["scene_count"], out["words"]), ("Database Scaling", "iso", 2, 8))
+            self.assertEqual(w.validate(ctx, out), [])
+
+    def test_an_isometric_storyboard_with_problems_or_too_many_words_goes_back(self):
+        out = {"title": "t", "scene_count": 8, "style": "iso", "long": False, "words": 170, "word_budget": 140,
+               "storyboard_errors": ["beat 3: text \"cache\" is 22 px"]}
+        p = shorts.ShortsWriter().validate(mock.Mock(), out)
+        self.assertTrue(any("22 px" in x for x in p)); self.assertTrue(any("170 words" in x for x in p))
+
     def test_a_3d_storyboard_that_does_not_compile_or_is_too_long_goes_back(self):
         out = {"title": "t", "scene_count": 3, "style": "3d", "long": False, "words": 200, "word_budget": 125,
                "storyboard_errors": ["beat 2: anchor \"@heap\" is not a word of say"]}

@@ -433,8 +433,8 @@ async function renderFactory() {
   $("#fc-styles").addEventListener("change", (e) => {
     if (!e.target.matches("[data-fc-style]")) return;
     if (e.target.checked) {   // 3D makes the whole video by itself: ticking it unticks the others, ticking another unticks 3D
-      const solo = e.target.dataset.fcStyle === "3d";
-      document.querySelectorAll("[data-fc-style]").forEach((x) => { if (x !== e.target && (solo || x.dataset.fcStyle === "3d")) x.checked = false; });
+      const SOLOS = ["3d", "iso"], solo = SOLOS.includes(e.target.dataset.fcStyle);   // each makes the whole video by itself
+      document.querySelectorAll("[data-fc-style]").forEach((x) => { if (x !== e.target && (solo || SOLOS.includes(x.dataset.fcStyle))) x.checked = false; });
     }
     fcSaveStyles();
   });
