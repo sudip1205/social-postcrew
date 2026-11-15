@@ -31,7 +31,8 @@ SKILL_RULE = (f"BEFORE writing anything, read the current skill from disk: {SKIL
               f"Every video must differ from the recent ones (the owner will monetise the channel; YouTube refuses template look-alikes): "
               f"run `npm run variety` in shorts-factory/ first and follow {SKILL}/references/variety.md (shape, hook, voice, speed, scene "
               f"order, opening, title, sign-off), then run `npm run variety -- episodes/<slug>` and fix the script until it prints ok. "
-              f"Owner rules (2026-11-12): a Short is AT MOST 60 SECONDS, at most 160 words of narration (count them), one idea; and it is a "
+              f"Owner rules (2026-11-15): a Short runs 50 TO 90 SECONDS, 150-260 words of narration (count them), one idea explained properly "
+              f"(what it is, why it matters, how it works, an example); and it is a "
               f"VISUAL explainer of what the thing is and how it works, never a coding build: code scenes only in an algorithm problem, "
               f"which sets \"kind\": \"algorithm\" in script.json. The look follows the LOOKS line below: Signal (blue) is the default; the Story "
               f"look (the cast, {SKILL}/references/story-style.md) is used only when it is ticked, and then only for explainer Shorts.")
@@ -53,8 +54,8 @@ def skill_version(root):
 
 
 # 3D look (video-engine): the channel voice (dip_puck) reads ~2.9 words/s, and each beat adds ~0.6 s of breathing room
-SHORT_MAX_WORDS_3D = 100   # about 41 s with 8-10 beats, + the ~9 s like/subscribe outro the factory appends: under 60 s
-SHORT_MAX_WORDS_ISO = 140   # Isometric Pastel Shorts: 6-10 beats under 60 s with the channel voice, the outro line included (owner, 2026-11-14)
+SHORT_MIN_WORDS_3D, SHORT_MAX_WORDS_3D = 110, 190   # owner, 2026-11-15: a Short runs 50-90 s; video-engine speaks ~2.45 words/s with its beat gaps, + the ~9 s outro
+SHORT_MIN_WORDS_ISO, SHORT_MAX_WORDS_ISO = 150, 250   # Isometric Pastel Shorts, 50-90 s (owner, 2026-11-15): ~3.2 words/s with the beat gaps, + the ~5 s outro
 
 
 def iso_check(root, ep):
@@ -157,7 +158,7 @@ def story_problems(script):
     return out
 
 
-SHORT_MAX_WORDS = 160   # the channel voice reads ~190 words a minute with the scene gaps: 160 words is about 52 s (factory pipeline/rules.mjs)
+SHORT_MIN_WORDS, SHORT_MAX_WORDS = 150, 260   # owner, 2026-11-15: a Short runs 50-90 s; ~3.1 words/s with the scene gaps (factory pipeline/rules.mjs)
 CODE_SCENES = {"code", "codeviz", "code-zoom", "run", "terminal", "editor"}
 
 
@@ -277,7 +278,7 @@ class ShortsWriter(Agent):
             "",
             f"Format: {'16:9 long video' if long else '9:16 Short (vertical)'}, target {seconds} s. Word budget (hard): at most {budget} spoken words"
             + (f" and at least {int(budget * .85)}" if long else "")
-            + ("" if long else f", one idea, 8-10 beats; the Short must stay under 60 s with the channel voice") + ". "
+            + (f" and at least {int(budget * .85)}" if long else f" and at least {SHORT_MIN_WORDS_3D}") + ("" if long else ", one idea explained properly (what it is, why it matters, how it works, a worked example), 12-18 beats; the Short must run 50-90 s with the channel voice") + ". "
             "A like / comment / share / subscribe outro is added after your last beat automatically: do not write one.",
             "Write the narration and the visuals together as ONE storyboard program, following the rules below exactly (parts A and B;",
             f"part C is the format; read {ve}/examples/dijkstra.scene.js only if you need a full example).",
@@ -332,7 +333,7 @@ class ShortsWriter(Agent):
             ("Recent videos (do not repeat): " + "; ".join(_recent(ctx))) if _recent(ctx) else "",
             "",
             f"Format: {'16:9 long video (1920x1080)' if long else '9:16 Short (1080x1920, vertical)'}. Word budget (hard): at most {budget} spoken words"
-            + ("" if long else ", 6-10 beats, one idea; the Short must stay under 60 s with the channel voice") + ". "
+            + ("" if long else f" and at least {SHORT_MIN_WORDS_ISO}, 12-18 beats, one idea explained properly (what it is, why it matters, how it works, a worked example); the Short must run 50-90 s with the channel voice") + ". "
             "The like / comment / share / subscribe outro is added after your last beat automatically: do not write one.",
             f"Read {kit}/STYLE.md (the rules, below) and {kit}/reference.js (the style itself: copy its techniques, change only the story). "
             f"{kit}/kit.js has the drawing helpers you may call (box, cylinder, tag, numberTag, arrow, shade, poly).",
@@ -375,15 +376,24 @@ class ShortsWriter(Agent):
             p += [f"storyboard check: {e}" for e in (out.get("storyboard_errors") or [])[:8]]
             if out.get("words", 0) > out.get("word_budget", SHORT_MAX_WORDS_ISO):
                 p.append(f"the narration has {out['words']} words, over the budget of {out['word_budget']}: merge or cut beats in script.json")
+            if not out.get("long") and out.get("words", 0) < SHORT_MIN_WORDS_ISO:
+                p.append(f"the narration has only {out['words']} words: a Short runs at least 50 s ({SHORT_MIN_WORDS_ISO}+ words). Explain more: "
+                         f"why it matters, how it works step by step, a worked example (owner, 2026-11-15)")
             return p
         if out.get("style") == "3d":
             p += [f"scene.js: {e}" for e in (out.get("storyboard_errors") or [])[:8]]
+            if not out.get("long") and out.get("words", 0) < SHORT_MIN_WORDS_3D:
+                p.append(f"the narration has only {out['words']} words: a Short runs at least 50 s ({SHORT_MIN_WORDS_3D}+ words). Explain more: "
+                         f"why it matters, how it works step by step, a worked example (owner, 2026-11-15)")
             if out.get("words", 0) > out.get("word_budget", SHORT_MAX_WORDS_3D):
                 p.append(f"the narration has {out['words']} words, over the budget of {out['word_budget']}: merge or cut beats in scene.js")
             return p
-        if not out.get("long") and out.get("words", 0) > SHORT_MAX_WORDS:   # the owner's 60-second limit (2026-11-12), before any render
-            p.append(f"the narration has {out['words']} words: a Short is at most 60 seconds, {SHORT_MAX_WORDS} words. Cut whole scenes "
+        if not out.get("long") and out.get("words", 0) > SHORT_MAX_WORDS:   # the owner's 90-second limit (2026-11-15), before any render
+            p.append(f"the narration has {out['words']} words: a Short is at most 90 seconds, {SHORT_MAX_WORDS} words. Cut whole scenes "
                      f"(one idea per Short) and write script.json again")
+        if not out.get("long") and 0 < out.get("words", 0) < SHORT_MIN_WORDS:   # ... and at least 50 seconds (owner, 2026-11-15)
+            p.append(f"the narration has only {out['words']} words: a Short runs at least 50 seconds, {SHORT_MIN_WORDS}+ words. Explain a "
+                     f"bit more (why it matters, how it works step by step, a worked example) and write script.json again")
         if not out.get("long") and out.get("kind") != "algorithm" and out.get("style") != "story" and "story" in out.get("ticked", ["story"]):
             p.append("the Story look is ticked, so an explainer Short is a Story video: set \"style\": \"story\" and tell it with the cast in a "
                      "fitting background, as references/story-style.md says. Only algorithm problems (\"kind\": \"algorithm\") keep the Signal look")

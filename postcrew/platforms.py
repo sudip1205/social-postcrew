@@ -130,13 +130,13 @@ def parse_day(value):
 # ---------- video ----------
 WORDS_PER_SECOND = 2.5   # how fast a voice-over is read: the script's word budget and every scene's timing
 PACE_WPS = {"normal": 2.5, "slow": 2.0}   # a teacher's pace leaves room for pauses and for the picture to build up
-SHORT_MAX_S = 60         # the owner's limit (2026-11-12): a Short is at most a minute (YouTube allows three)
+SHORT_MAX_S = 90         # the owner's limit (2026-11-15; was 60 from 2026-11-12): a Short runs at most 90 s (YouTube allows three minutes)
 # How fast a finished video really goes, pauses and scene tails included: measured on the lab's Shorts at the slow pace, 2.9-3.5 words a
 # second. Only the hard 1-minute limit of a Short uses it (with a margin); PACE_WPS stays the writing guide. The rendered video is checked
 # again against SHORT_MAX_S (render/video.check_video), so a script that slips through still cannot become a Short over a minute.
 SPOKEN_WPS = 2.6
-SHORT_MIN_S, SHORT_TOP_S, LONG_MIN_S = 40, 60, 300   # the owner's lengths (2026-11-12): a Short runs 40 to 60 seconds, a long video at least 5 minutes
-SHORT_DEFAULT_S, LONG_DEFAULT_S = 55, 480
+SHORT_MIN_S, SHORT_TOP_S, LONG_MIN_S = 50, 90, 300   # the owner's lengths (2026-11-15): a Short runs 50 to 90 seconds ("some shorts are very small: explain a bit more"), a long video at least 5 minutes
+SHORT_DEFAULT_S, LONG_DEFAULT_S = 70, 480
 
 
 def renderer_for(cfg, category=None):

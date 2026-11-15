@@ -297,7 +297,7 @@ class AssignedLengthTests(unittest.TestCase):
             cfg["platforms"]["youtube"]["enabled"] = True
             ws.save_config(cfg)
             cid = monthly.category_for_item(ws, "youtube", "short")
-            self.assertEqual(ws.config()["platforms"]["youtube"]["categories"][cid]["target_seconds"], 55)
+            self.assertEqual(ws.config()["platforms"]["youtube"]["categories"][cid]["target_seconds"], 70)
             self.assertEqual(monthly.category_for_item(ws, "youtube", "long"), "assigned-long")
             self.assertEqual(ws.config()["platforms"]["youtube"]["categories"]["assigned-long"]["target_seconds"], 480)
 

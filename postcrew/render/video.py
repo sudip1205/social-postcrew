@@ -183,7 +183,7 @@ def check_video(path, fmt):
                 "detail": f"{w}x{h}" + ("" if ok else f"; a {fmt} video should be {'vertical 9:16' if th > tw else '16:9'}")})
     if fmt == "short":
         from ..platforms import SHORT_MAX_S
-        ok = 0 < secs <= SHORT_MAX_S + 0.5   # the owner's limit (2026-11-12): a Short is at most a minute
+        ok = 0 < secs <= SHORT_MAX_S + 0.5   # the owner's limit (2026-11-15): a Short is at most 90 s
         det = f"{secs:.1f} s" + ("" if ok else f"; Shorts must be {SHORT_MAX_S} seconds or less")
     else:
         ok = 0 < secs <= 12 * 3600

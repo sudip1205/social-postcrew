@@ -159,10 +159,10 @@ class ScriptCheckTests(unittest.TestCase):
 class VideoSpecTests(unittest.TestCase):
     def test_later_settings_win_and_lengths_are_clamped(self):
         cfg = {"video": {"format": "short", "target_seconds": 75}}
-        self.assertEqual(platforms.video_spec(cfg)["max_words"], 150)   # clamped to the owner's 60 s (2026-11-12)
+        self.assertEqual(platforms.video_spec(cfg)["max_words"], 187)   # clamped to the owner's 90 s (2026-11-15)
         self.assertEqual(platforms.video_spec({"video": {"format": "short", "target_seconds": 45}})["target_seconds"], 45)   # the length is a guide
         self.assertEqual(platforms.video_spec(cfg, {"format": "long", "target_seconds": 600})["target_seconds"], 600)
-        self.assertEqual(platforms.video_spec(cfg, {"target_seconds": 600})["target_seconds"], 60)   # a Short stays a Short (at most a minute, the owner's limit)
+        self.assertEqual(platforms.video_spec(cfg, {"target_seconds": 600})["target_seconds"], 90)   # a Short stays a Short (at most 90 s, the owner's limit since 2026-11-15)
         self.assertEqual(platforms.video_spec(cfg, {}, {"format": "long"}, {"target_seconds": 300})["target_seconds"], 300)
 
     def test_config_validation_covers_the_video_settings(self):

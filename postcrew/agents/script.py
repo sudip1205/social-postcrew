@@ -77,7 +77,7 @@ SCHEMA = {
 }
 
 FORMAT_RULES = {
-    "short": "A vertical 9:16 Short of at most 60 seconds: a short opening, the problem with an example, the idea named and defined with its picture, then how it works shown as a diagram with one example moving through it (code only for an algorithm problem).",
+    "short": "A vertical 9:16 Short of 50 to 90 seconds: a short opening, the problem with an example, the idea named and defined with its picture, then how it works shown as a diagram with one example moving through it (code only for an algorithm problem).",
     "long": "A 16:9 video: open with a short introduction (about 15 seconds), state the problem, lay out the ways to solve it, then one idea per scene (about 4-12 scenes per ten minutes), "
             "and finish with one clear next step.",
 }

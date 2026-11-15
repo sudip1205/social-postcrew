@@ -90,7 +90,7 @@ async function renderPlan() {
         <span class="text-[10px] font-bold text-violet-700 bg-white border border-violet-200 px-1.5 py-0.5 rounded">${a.date ? esc(planNiceDay(a.date)) : "Pick a day"}</span></div>
       <div class="grid grid-cols-7 gap-0.5 bg-white p-1.5 rounded-lg border border-slate-200">${grid}</div>
       ${isYt ? `<div class="text-[10px] font-medium text-slate-500">Video length</div>
-        <div class="grid grid-cols-2 gap-1 bg-white p-1 rounded-lg border border-slate-200 text-[10px]">${fmtBtn("short", "smart_display", "Short · up to 60s")}${fmtBtn("long", "play_circle", "Long · 8 min")}</div>` : ""}
+        <div class="grid grid-cols-2 gap-1 bg-white p-1 rounded-lg border border-slate-200 text-[10px]">${fmtBtn("short", "smart_display", "Short · 50–90s")}${fmtBtn("long", "play_circle", "Long · 8 min")}</div>` : ""}
       <div class="flex items-center justify-end gap-1.5 pt-1"><button type="button" data-cancel class="px-2.5 py-1 text-[11px] rounded text-slate-600 hover:bg-slate-200">Cancel</button>
         <button type="button" data-confirm ${a.date ? "" : "disabled"} class="px-3 py-1 text-[11px] rounded-lg bg-violet-600 text-white font-semibold shadow-sm hover:bg-violet-700 disabled:opacity-50">${a.date ? `Assign to ${esc(planNiceDay(a.date))}` : "Pick a day"}</button></div></div>`;
   };

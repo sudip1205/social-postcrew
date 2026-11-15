@@ -41,7 +41,7 @@ def fake_factory(ws, fail_render=False, write=True):
             if write:
                 (ep / "script.json").write_text(json.dumps({"style": "story", "analogy": {"world": "Max shelves every book by what it is about in his library"},
                                                          "scenes": [{"type": "story", "text": "Ever wondered why?", "beats": [{"do": "walk", "who": "max"}]},
-                                                                    {"type": "map", "text": "Follow.", "pairs": [{"tech": "Embedding"}]}]}))
+                                                                    {"type": "map", "text": "Follow. " + " ".join(["Each word sits near the words it means."] * 20), "pairs": [{"tech": "Embedding"}]}]}))
                 (ep / "youtube.json").write_text(json.dumps({"title": "Why it works", "description": "A short explainer.", "tags": ["python", "tips"]}))
             return subprocess.CompletedProcess(cmd, 0, json.dumps({"subtype": "success", "is_error": False, "total_cost_usd": 0.42,
                                                                    "num_turns": 7, "result": "DONE"}), "")
@@ -126,7 +126,7 @@ class StoryLookTests(unittest.TestCase):
 
     def test_an_explainer_must_be_a_story_but_an_algorithm_may_not_be(self):
         from postcrew.agents.shorts import ShortsWriter
-        w, base = ShortsWriter(), {"title": "t", "scene_count": 3, "words": 100, "long": False, "code_scenes": 0}
+        w, base = ShortsWriter(), {"title": "t", "scene_count": 3, "words": 180, "long": False, "code_scenes": 0}
         self.assertTrue(any("Story video" in p for p in w.validate(None, dict(base, kind="explainer", style=""))))
         self.assertFalse(w.validate(None, dict(base, kind="explainer", style="story")))
         self.assertFalse(w.validate(None, dict(base, kind="algorithm", style="", code_scenes=1)))
@@ -141,7 +141,7 @@ class StoryNotLectureTests(unittest.TestCase):
         s = {"style": "story", "analogy": {"world": "Max shelves every book by what it is about so neighbours share a topic"},
              "scenes": [{"type": "story", "text": "Max shelves every book by topic.", "beats": [{"do": "carry", "who": "max"}]},
                         {"type": "story", "text": "Lily wants a rockets book.", "beats": [{"do": "enter", "who": "lily"}]},
-                        {"type": "map", "text": "That is an embedding.", "pairs": [{"tech": "Embedding"}]}]}
+                        {"type": "map", "text": "That is an embedding. " + " ".join(["Each word sits near the words it means."] * 20), "pairs": [{"tech": "Embedding"}]}]}
         s.update(kw)
         return s
 
@@ -199,7 +199,7 @@ class ThreeDLookTests(unittest.TestCase):
         with TempWorkspace() as ws, tempfile.TemporaryDirectory() as d:
             fs.save(ws, ["3d"])
             ve, root, ep = self._engine(d), Path(d), Path(d) / "episodes" / "e1"
-            beats = [{"say": "How does a hash map find your key so fast?"}, {"say": "It turns the key into a number."}]
+            beats = [{"say": "How does a hash map find your key so fast? " * 8}, {"say": "It turns the key into a number. " * 8}]
             def fake_claude(ctx, prompt, tools, cwd, add_dirs=()):
                 self.assertIn("=== RULES.md (video-engine) ===", prompt); self.assertIn("9:16 Short", prompt)
                 self.assertTrue(any("ve.mjs compile" in t for t in tools)); self.assertEqual(Path(cwd), ep)
@@ -236,7 +236,7 @@ class ThreeDLookTests(unittest.TestCase):
             def fake_claude(ctx, prompt, tools, cwd, add_dirs=()):
                 self.assertIn("=== STYLE.md (styles/iso-pastel) ===", prompt); self.assertIn("1080x1920", prompt)
                 self.assertTrue(any("make-iso.mjs . --check" in t for t in tools)); self.assertEqual(Path(cwd), ep)
-                (ep / "script.json").write_text(json.dumps({"style": "iso", "beats": [{"say": "One app, one database."}, {"say": "Then it slows down."}]}))
+                (ep / "script.json").write_text(json.dumps({"style": "iso", "beats": [{"say": "One app, one database. " * 20}, {"say": "Then it slows down. " * 20}]}))
                 (ep / "explainer.js").write_text("function explainer(ctx, W, H_, t) {}\nfunction scoreSound(k) {}")
                 (ep / "youtube.json").write_text(json.dumps({"title": "Database Scaling", "description": "d", "tags": ["db"]}))
                 return {}
@@ -245,7 +245,7 @@ class ThreeDLookTests(unittest.TestCase):
             with mock.patch.object(w, "_claude", side_effect=fake_claude), mock.patch("postcrew.agents.shorts.skill_version", return_value={}), \
                  mock.patch("postcrew.agents.shorts.iso_check", return_value=[]):
                 out = w._plan_iso(ctx, root, ep, "e1", "Database Scaling", {"angle": "one to many"})
-            self.assertEqual((out["title"], out["style"], out["scene_count"], out["words"]), ("Database Scaling", "iso", 2, 8))
+            self.assertEqual((out["title"], out["style"], out["scene_count"], out["words"]), ("Database Scaling", "iso", 2, 160))
             self.assertEqual(w.validate(ctx, out), [])
 
     def test_an_isometric_storyboard_with_problems_or_too_many_words_goes_back(self):

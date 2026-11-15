@@ -151,7 +151,7 @@ class SettingsTests(unittest.TestCase):
 
     def test_shorts_are_made_at_most_a_minute_long(self):   # the owner's limit (2026-11-12); YouTube allows three minutes
         self.assertEqual(platforms.video_spec({"video": {"format": "short", "target_seconds": 50}})["target_seconds"], 50)
-        self.assertEqual(platforms.video_spec({"video": {"format": "short", "target_seconds": 170}})["target_seconds"], 60)
+        self.assertEqual(platforms.video_spec({"video": {"format": "short", "target_seconds": 170}})["target_seconds"], 90)
         with TempWorkspace() as ws:
             cfg = ws.config()
             yt = cfg["platforms"]["youtube"]
