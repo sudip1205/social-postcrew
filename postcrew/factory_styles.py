@@ -5,7 +5,9 @@ ticked looks are saved (state "factory-styles") and used both by the Factory cha
 only those, as the skill's references/mixing-styles.md says, and `npm run make` refuses any other look.
 """
 STYLES = {
-    "signal": {"label": "Signal (blue)", "icon": "insights", "what": "the dark-blue diagram look: boards, traces, tables (Shorts and long videos)"},
+    "signal": {"label": "Signal (blue)", "icon": "insights",
+               "what": "the blue look: ticked on its own, the Tech Glow engine (navy glow, icon tiles, light-pulse connectors; owner, 2026-11-15); "
+                       "mixed with Story or VS Code, the blue diagram boards (Shorts and long videos)"},
     "story": {"label": "Story (cast)", "icon": "groups", "what": "the cast acting out an everyday story in a fitting set (Shorts only)"},
     "code": {"label": "VS Code", "icon": "code", "what": "real VS Code, the code typed and run, the camera zooming on it (long algorithm videos only)"},
     "3d": {"label": "3D (isometric)", "icon": "view_in_ar",
@@ -67,6 +69,12 @@ def instruction(styles):
                 "[{\"say\"}...]}), explainer.js (function explainer(ctx, W, H_, t) and function scoreSound(k)) and youtube.json. Run "
                 "`node pipeline/make-iso.mjs episodes/<slug> --check` and LOOK at build-iso/storyboard.png; fix until the checks and the "
                 "storyboard are clean, then `npm run make -- episodes/<slug>` (the channel voice narrates it; out/<slug>-hyperframes.mp4).")
+    if list(styles) == ["signal"]:
+        return ("LOOK ticked in the Factory: Signal (blue), rendered by the Tech Glow engine (owner, 2026-11-15). Do NOT write scenes: read "
+                "shorts-factory/styles/tech-glow/STYLE.md and reference.js, then write shorts-factory/episodes/<slug>/script.json "
+                "({\"style\": \"blue\", \"topic\", \"format\", \"beats\": [{\"say\"}...]}), explainer.js and youtube.json, matching the timing of "
+                "styles/iso-pastel/examples/. Run `node pipeline/make-iso.mjs episodes/<slug> --check`, look at build-iso/storyboard.png, fix, "
+                "then `npm run make -- episodes/<slug>`.")
     names = ", ".join(f'"{s}" ({STYLES[s]["label"]})' for s in styles)
     return (f"LOOKS ticked in the Factory: {names}. Use ONLY these looks, set \"styles\": {list(styles)} in script.json, and mix them scene by "
             f"scene as .claude/skills/explainer-short-style/references/mixing-styles.md says (read it, and the reference of each ticked look). "

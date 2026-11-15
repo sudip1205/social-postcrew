@@ -3,6 +3,7 @@
 ## 0.2.0: YouTube, per-app settings and a faster Studio
 
 ### New
+- **The Signal (blue) look has a new engine, in the style of your Tech Glow prompt.** It is not the default (Isometric stays the default). Tick Signal on its own in the Factory and the Script Writer writes the video the way Isometric videos are written, in the Tech Glow kit (shorts-factory/styles/tech-glow): a navy-to-indigo glow, icon tiles, glass cards, light-pulse connectors and gradient numbers, with an isometric view where it helps. Signal mixed with Story or VS Code keeps the old diagram boards.
 - **Isometric (pastel) is now the default look, and Shorts run 50 to 90 seconds.** The database-scaling and how-LLMs-work Shorts are the house standard: every new video copies their structure, look and timing (12-15 beats, about 65-75 s). Shorter or longer Shorts go back to the writer. Tick another look in the Factory to use it instead.
 - **A new look: Isometric (pastel), in the style of your reference prompt.** Tick it on its own in the Factory. Then:
   - the Script Writer writes the narration beats and the animation itself (a 2D-canvas isometric world the camera glides along), copying the reference's drawing kit in shorts-factory/styles/iso-pastel;

@@ -186,6 +186,8 @@ class ShortsWriter(Agent):
                 (ep / f).unlink(missing_ok=True)
         if factory_styles.is_iso(factory_styles.ticked(ctx.ws)):   # Isometric Pastel: Claude writes the animation (owner, 2026-11-14)
             return self._plan_iso(ctx, root, ep, slug, subject, topic, guidance)
+        if factory_styles.ticked(ctx.ws) == ["signal"]:   # Signal alone: the Tech Glow canvas engine (owner, 2026-11-15)
+            return self._plan_iso(ctx, root, ep, slug, subject, topic, guidance, look="blue")
         if factory_styles.is_3d(factory_styles.ticked(ctx.ws)):   # the 3D look: its own pipeline plans the video (owner, 2026-11-13)
             return self._plan_3d(ctx, root, ep, slug, subject, topic, guidance)
         prompt = "\n".join(x for x in [
@@ -307,11 +309,12 @@ class ShortsWriter(Agent):
                 "kind": "3d", "style": "3d", "code_scenes": 0, "story_problems": [], "ticked": ["3d"],
                 "storyboard_errors": check["errors"], "word_budget": budget}
 
-    def _plan_iso(self, ctx, root, ep, slug, subject, topic, guidance=None):
+    def _plan_iso(self, ctx, root, ep, slug, subject, topic, guidance=None, look="iso"):
         """The Isometric Pastel look (owner, 2026-11-14): one Claude Code session writes the narration beats and the 2D-canvas animation
         (explainer.js) in the style of the owner's reference prompt (shorts-factory/styles/iso-pastel), then runs the storyboard check
         (free: key frames + automatic checks) and looks at the storyboard until it is clean. make-iso.mjs then voices and records it."""
-        kit = root / "styles" / "iso-pastel"
+        kit = root / "styles" / ("tech-glow" if look == "blue" else "iso-pastel")
+        name = "Signal (blue), Tech Glow" if look == "blue" else "Isometric Pastel"
         if not (kit / "STYLE.md").exists():
             raise AgentError(f"the Isometric Pastel kit is not at {kit}: update the Shorts factory", fatal=True)
         fmt = (ctx.cat.get("format") or (ctx.video or {}).get("format") or "short") if hasattr(ctx, "cat") else "short"
@@ -325,7 +328,7 @@ class ShortsWriter(Agent):
                 (ep / f).unlink(missing_ok=True)
         check_cmd = "node ../../pipeline/make-iso.mjs . --check"
         prompt = "\n".join(x for x in [
-            f"Make the next YouTube {'long video' if long else 'Short'} for this channel in the Isometric Pastel look. You are in its episode folder.",
+            f"Make the next YouTube {'long video' if long else 'Short'} for this channel in the {name} look. You are in its episode folder.",
             f"Topic: {subject}" if subject else "Pick a fresh topic for the category below (not one of the recent videos).",
             f"Angle: {topic.get('angle')}" if topic.get("angle") and topic.get("angle") != subject else "",
             f"Category: {ctx.cat['label']}: {ctx.cat.get('brief', '')}",
@@ -335,11 +338,12 @@ class ShortsWriter(Agent):
             f"Format: {'16:9 long video (1920x1080)' if long else '9:16 Short (1080x1920, vertical)'}. Word budget (hard): at most {budget} spoken words"
             + ("" if long else f" and at least {SHORT_MIN_WORDS_ISO}; aim for 165-205 words in 12-15 beats (about 65-75 s, the owner's house standard), one idea explained properly (what it is, why it matters, how it works, a worked example)") + ". "
             "The like / comment / share / subscribe outro is added after your last beat automatically: do not write one.",
-            f"Read {kit}/STYLE.md (the rules, below), then the two house-standard Shorts in {kit}/examples/ (database-scaling, how-llms-work: match their "
-            f"structure, look and timing exactly, change only the topic) and {kit}/reference.js (the style itself). "
+            f"Read {kit}/STYLE.md (the rules, below), then the two house-standard Shorts in {root}/styles/iso-pastel/examples/ (database-scaling, how-llms-work: "
+            f"match their structure and timing exactly{', in the Tech Glow look instead of pastel' if look == 'blue' else ', and their look'}; change only the topic) "
+            f"and {kit}/reference.js (the style itself). "
             f"{kit}/kit.js has the drawing helpers you may call (box, cylinder, tag, numberTag, arrow, shade, poly).",
             "Write ONLY these files in this folder:",
-            '  script.json   {"style": "iso", "topic": "...", "format": "' + ("long" if long else "short") + '", "beats": [{"say": "..."}, ...]}',
+            '  script.json   {"style": "' + look + '", "topic": "...", "format": "' + ("long" if long else "short") + '", "beats": [{"say": "..."}, ...]}',
             "  explainer.js  function explainer(ctx, W, H_, t) { ... }  and  function scoreSound(k) { ... }",
             f"  youtube.json  {{\"title\", \"description\", \"tags\": [...], \"privacyStatus\": \"private\", \"video\": \"../../out/{slug}-hyperframes.mp4\", \"captions\": \"../../out/{slug}.srt\"}}",
             f"Then run `{check_cmd}` (free: no voice, no render). It writes build-iso/storyboard.png and lists problems. Fix every problem, "
@@ -350,10 +354,10 @@ class ShortsWriter(Agent):
             ("\nThe files are already written. Do NOT start over: edit them only where needed to fix these problems, then check again:\n- "
              + "\n- ".join(guidance)) if fixing else "",
             "",
-            "=== STYLE.md (styles/iso-pastel) ===",
+            f"=== STYLE.md (styles/{kit.name}) ===",
             (kit / "STYLE.md").read_text(),
         ] if x is not None)
-        self._claude(ctx, prompt, ["Read", "Write", "Edit", "Glob", "Grep", f"Bash({check_cmd}:*)"], ep, add_dirs=[kit])
+        self._claude(ctx, prompt, ["Read", "Write", "Edit", "Glob", "Grep", f"Bash({check_cmd}:*)"], ep, add_dirs=[kit, root / "styles" / "iso-pastel"])
         try:
             meta = json.loads((ep / "youtube.json").read_text())
             script = json.loads((ep / "script.json").read_text())
@@ -364,7 +368,7 @@ class ShortsWriter(Agent):
         said = " ".join(str(b.get("say")) for b in beats)
         return {"slug": slug, "episode": str(ep), "skill": skill_version(root), "title": meta.get("title", ""), "description": meta.get("description", ""),
                 "tags": meta.get("tags") or [], "scene_count": len(beats), "narration": said[:4000], "words": len(said.split()), "long": long,
-                "kind": "iso", "style": "iso", "code_scenes": 0, "story_problems": [], "ticked": ["iso"],
+                "kind": "iso", "style": "iso", "look": look, "code_scenes": 0, "story_problems": [], "ticked": ["signal"] if look == "blue" else ["iso"],
                 "storyboard_errors": problems, "word_budget": budget, "storyboard": str(ep / "build-iso" / "storyboard.png")}
 
     def validate(self, ctx, out):

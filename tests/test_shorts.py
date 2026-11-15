@@ -27,7 +27,7 @@ def fake_factory(ws, fail_render=False, write=True):
     (root / "episodes").mkdir(parents=True)
     (root / "package.json").write_text("{}")
     from postcrew import factory_styles
-    factory_styles.save(ws, ["signal"])   # this fake factory makes Signal episodes (the default look is Isometric since 2026-11-15)
+    factory_styles.save(ws, ["signal", "code"])   # this fake factory makes HyperFrames Signal episodes (Signal alone uses the Tech Glow canvas engine since 2026-11-15)
     cfg = ws.config()
     cfg["platforms"]["youtube"]["video"]["factory_path"] = str(root)
     cfg["platforms"]["youtube"]["enabled"] = True
@@ -248,6 +248,30 @@ class ThreeDLookTests(unittest.TestCase):
                  mock.patch("postcrew.agents.shorts.iso_check", return_value=[]):
                 out = w._plan_iso(ctx, root, ep, "e1", "Database Scaling", {"angle": "one to many"})
             self.assertEqual((out["title"], out["style"], out["scene_count"], out["words"]), ("Database Scaling", "iso", 2, 160))
+            self.assertEqual(w.validate(ctx, out), [])
+
+    def test_signal_alone_is_written_for_the_tech_glow_engine(self):
+        from postcrew import factory_styles as fs
+        with TempWorkspace() as ws, tempfile.TemporaryDirectory() as d:
+            fs.save(ws, ["signal"])
+            self.assertIn("tech-glow/STYLE.md", fs.instruction(["signal"]))
+            root = Path(d); (root / "package.json").write_text("{}")
+            for k in ("tech-glow", "iso-pastel"):
+                (root / "styles" / k).mkdir(parents=True); (root / "styles" / k / "STYLE.md").write_text(f"# {k}")
+            ep = root / "episodes" / "e1"
+            def fake_claude(ctx, prompt, tools, cwd, add_dirs=()):
+                self.assertIn("Tech Glow", prompt); self.assertIn("=== STYLE.md (styles/tech-glow) ===", prompt)
+                ep.mkdir(parents=True, exist_ok=True)
+                (ep / "script.json").write_text(json.dumps({"style": "blue", "beats": [{"say": "Binary search halves the range. " * 32}]}))
+                (ep / "explainer.js").write_text("function explainer(){}\nfunction scoreSound(k){}")
+                (ep / "youtube.json").write_text(json.dumps({"title": "Binary Search", "description": "d", "tags": []}))
+                return {}
+            ctx = mock.Mock(ws=ws, cfg={}, cat={"label": "Short", "brief": "b", "format": "short"}, video={"format": "short"})
+            w = shorts.ShortsWriter()
+            with mock.patch.object(w, "_claude", side_effect=fake_claude), mock.patch("postcrew.agents.shorts.skill_version", return_value={}), \
+                 mock.patch("postcrew.agents.shorts.iso_check", return_value=[]):
+                out = w._plan_iso(ctx, root, ep, "e1", "Binary Search", {}, look="blue")
+            self.assertEqual((out["look"], out["ticked"]), ("blue", ["signal"]))
             self.assertEqual(w.validate(ctx, out), [])
 
     def test_an_isometric_storyboard_with_problems_or_too_many_words_goes_back(self):
