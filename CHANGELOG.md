@@ -3,6 +3,7 @@
 ## 0.2.0: YouTube, per-app settings and a faster Studio
 
 ### New
+- **Isometric (pastel) is now the default look, and Shorts run 50 to 90 seconds.** The database-scaling and how-LLMs-work Shorts are the house standard: every new video copies their structure, look and timing (12-15 beats, about 65-75 s). Shorter or longer Shorts go back to the writer. Tick another look in the Factory to use it instead.
 - **A new look: Isometric (pastel), in the style of your reference prompt.** Tick it on its own in the Factory. Then:
   - the Script Writer writes the narration beats and the animation itself (a 2D-canvas isometric world the camera glides along), copying the reference's drawing kit in shorts-factory/styles/iso-pastel;
   - a free storyboard check renders the key frame of every beat and catches errors, text too small for a phone, half-empty frames and randomness; the Script Writer looks at the storyboard and fixes it before anything is voiced;

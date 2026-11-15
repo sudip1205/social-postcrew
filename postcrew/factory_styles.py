@@ -17,7 +17,7 @@ STYLES = {
 }
 SOLO = "3d"   # makes the whole video by itself: ticked alone (owner, 2026-11-13; video-engine since 2026-11-14)
 SOLOS = ("3d", "iso")   # every look that makes the whole video by itself (Isometric Pastel: owner, 2026-11-14)
-DEFAULT = ["signal"]   # owner, 2026-11-13: the blue look only, unless Story or VS Code is ticked in the Factory
+DEFAULT = ["iso"]   # owner, 2026-11-15: "this video style is perfect and the timing of shorts are perfect. keep it consistent" (was Signal only)
 STATE = "factory-styles"
 
 

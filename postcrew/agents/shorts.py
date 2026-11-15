@@ -333,9 +333,10 @@ class ShortsWriter(Agent):
             ("Recent videos (do not repeat): " + "; ".join(_recent(ctx))) if _recent(ctx) else "",
             "",
             f"Format: {'16:9 long video (1920x1080)' if long else '9:16 Short (1080x1920, vertical)'}. Word budget (hard): at most {budget} spoken words"
-            + ("" if long else f" and at least {SHORT_MIN_WORDS_ISO}, 12-18 beats, one idea explained properly (what it is, why it matters, how it works, a worked example); the Short must run 50-90 s with the channel voice") + ". "
+            + ("" if long else f" and at least {SHORT_MIN_WORDS_ISO}; aim for 165-205 words in 12-15 beats (about 65-75 s, the owner's house standard), one idea explained properly (what it is, why it matters, how it works, a worked example)") + ". "
             "The like / comment / share / subscribe outro is added after your last beat automatically: do not write one.",
-            f"Read {kit}/STYLE.md (the rules, below) and {kit}/reference.js (the style itself: copy its techniques, change only the story). "
+            f"Read {kit}/STYLE.md (the rules, below), then the two house-standard Shorts in {kit}/examples/ (database-scaling, how-llms-work: match their "
+            f"structure, look and timing exactly, change only the topic) and {kit}/reference.js (the style itself). "
             f"{kit}/kit.js has the drawing helpers you may call (box, cylinder, tag, numberTag, arrow, shade, poly).",
             "Write ONLY these files in this folder:",
             '  script.json   {"style": "iso", "topic": "...", "format": "' + ("long" if long else "short") + '", "beats": [{"say": "..."}, ...]}',

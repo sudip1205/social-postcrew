@@ -26,6 +26,8 @@ def fake_factory(ws, fail_render=False, write=True):
     root = Path(tempfile.mkdtemp(prefix="factory-")) / "shorts-factory"
     (root / "episodes").mkdir(parents=True)
     (root / "package.json").write_text("{}")
+    from postcrew import factory_styles
+    factory_styles.save(ws, ["signal"])   # this fake factory makes Signal episodes (the default look is Isometric since 2026-11-15)
     cfg = ws.config()
     cfg["platforms"]["youtube"]["video"]["factory_path"] = str(root)
     cfg["platforms"]["youtube"]["enabled"] = True
@@ -164,7 +166,7 @@ class FactoryStylesTests(unittest.TestCase):
     def test_ticked_looks_are_saved_and_explained(self):
         from postcrew import factory_styles as fs
         with TempWorkspace() as ws:
-            self.assertEqual(fs.ticked(ws), ["signal"])   # the blue look by default (owner, 2026-11-13)
+            self.assertEqual(fs.ticked(ws), ["iso"])   # Isometric Pastel by default (owner, 2026-11-15; was the blue look)
             self.assertEqual(fs.save(ws, ["code", "signal", "nope"]), ["signal", "code"])
             self.assertEqual([o["id"] for o in fs.options(ws) if o["on"]], ["signal", "code"])
             with self.assertRaises(ValueError):
