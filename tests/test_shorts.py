@@ -175,7 +175,8 @@ class FactoryStylesTests(unittest.TestCase):
 
 
 class ThreeDLookTests(unittest.TestCase):
-    """Owner, 2026-11-13: the 3D look makes the whole video with its own pipeline, so it is ticked on its own."""
+    """Owner, 2026-11-13: the 3D look makes the whole video by itself, so it is ticked on its own.
+    Owner, 2026-11-14: it is rendered by video-engine; the Script Writer writes its storyboard program (scene.js)."""
 
     def test_3d_is_ticked_alone_and_tells_the_factory_to_use_the_3d_pipeline(self):
         from postcrew import factory_styles as fs
@@ -185,21 +186,38 @@ class ThreeDLookTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 fs.save(ws, ["signal", "3d"])
             line = fs.instruction(["3d"])
-            self.assertIn('"style": "3d"', line); self.assertIn("youtube-3d", line)
+            self.assertIn('"style": "3d"', line); self.assertIn("video-engine", line); self.assertIn("scene.js", line)
             self.assertFalse(fs.is_3d(["signal"]))
 
-    def test_the_script_writer_hands_a_3d_video_to_the_3d_planner(self):
+    def _engine(self, d):
+        ve = Path(d) / "video-engine"; ve.mkdir()
+        (ve / "RULES.md").write_text("# rules"); (ve / "ve.mjs").write_text("")
+        return ve
+
+    def test_the_script_writer_writes_the_storyboard_program_for_video_engine(self):
         from postcrew import factory_styles as fs
         with TempWorkspace() as ws, tempfile.TemporaryDirectory() as d:
             fs.save(ws, ["3d"])
-            root, ep = Path(d), Path(d) / "episodes" / "e1"
-            def fake_run(cmd, **kw):
-                self.assertIn("--plan-only", cmd)
+            ve, root, ep = self._engine(d), Path(d), Path(d) / "episodes" / "e1"
+            beats = [{"say": "How does a hash map find your key so fast?"}, {"say": "It turns the key into a number."}]
+            def fake_claude(ctx, prompt, tools, cwd, add_dirs=()):
+                self.assertIn("=== RULES.md (video-engine) ===", prompt); self.assertIn("9:16 Short", prompt)
+                self.assertTrue(any("ve.mjs compile" in t for t in tools)); self.assertEqual(Path(cwd), ep)
+                (ep / "scene.js").write_text("function build(sb) {}")
                 (ep / "youtube.json").write_text(json.dumps({"title": "How a Hash Map Works", "description": "d", "tags": ["hash map"]}))
-                return subprocess.CompletedProcess(cmd, 0, "", "")
-            ctx = mock.Mock(ws=ws, cat={"label": "Short", "brief": "b", "format": "short"}, video={"format": "short", "target_seconds": 55})
-            with mock.patch("postcrew.agents.shorts.subprocess.run", side_effect=fake_run), mock.patch("postcrew.agents.shorts.skill_version", return_value={}):
-                out = shorts.ShortsWriter()._plan_3d(ctx, root, ep, "e1", "How a Hash Map Works", {"angle": "one step"})
-            self.assertEqual((out["title"], out["style"]), ("How a Hash Map Works", "3d"))
+                return {}
+            ctx = mock.Mock(ws=ws, cfg={"video": {"engine_path": str(ve)}}, cat={"label": "Short", "brief": "b", "format": "short"},
+                            video={"format": "short", "target_seconds": 55})
+            w = shorts.ShortsWriter()
+            with mock.patch.object(w, "_claude", side_effect=fake_claude), mock.patch("postcrew.agents.shorts.skill_version", return_value={}), \
+                 mock.patch("postcrew.agents.shorts.compile_storyboard", return_value={"errors": [], "storyboard": {"beats": beats}}):
+                out = w._plan_3d(ctx, root, ep, "e1", "How a Hash Map Works", {"angle": "one step"})
+            self.assertEqual((out["title"], out["style"], out["scene_count"]), ("How a Hash Map Works", "3d", 2))
             self.assertEqual(json.loads((ep / "script.json").read_text())["style"], "3d")
-            self.assertEqual(shorts.ShortsWriter().validate(ctx, out), [])
+            self.assertEqual(w.validate(ctx, out), [])
+
+    def test_a_3d_storyboard_that_does_not_compile_or_is_too_long_goes_back(self):
+        out = {"title": "t", "scene_count": 3, "style": "3d", "long": False, "words": 200, "word_budget": 125,
+               "storyboard_errors": ["beat 2: anchor \"@heap\" is not a word of say"]}
+        p = shorts.ShortsWriter().validate(mock.Mock(), out)
+        self.assertTrue(any("@heap" in x for x in p)); self.assertTrue(any("200 words" in x for x in p))

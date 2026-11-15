@@ -52,6 +52,34 @@ def skill_version(root):
             "changed": datetime.fromtimestamp(newest, timezone.utc).isoformat(timespec="seconds") if newest else ""}
 
 
+# 3D look (video-engine): the channel voice (dip_puck) reads ~2.9 words/s, and each beat adds ~0.6 s of breathing room
+SHORT_MAX_WORDS_3D = 100   # about 41 s with 8-10 beats, + the ~9 s like/subscribe outro the factory appends: under 60 s
+WORDS_PER_SECOND_3D = 2.5  # long videos: about 90% of the target length after beat pauses (measured 2026-11-14)
+
+
+def engine_dir(cfg):
+    """video-engine (render-only 3D engine): video.engine_path in YouTube settings, else $POSTCREW_VIDEO_ENGINE, else ~/video-engine."""
+    p = (cfg.get("video") or {}).get("engine_path") or os.environ.get("POSTCREW_VIDEO_ENGINE") or "~/video-engine"
+    return Path(p).expanduser()
+
+
+def compile_storyboard(ve, ep):
+    """`ve compile` the episode's scene.js (free, no LLM): {"errors": [...], "storyboard": {...}}."""
+    (ep / "build3d").mkdir(parents=True, exist_ok=True)
+    out = ep / "build3d" / "storyboard.json"
+    try:
+        r = subprocess.run(["node", str(ve / "ve.mjs"), "compile", str(ep / "scene.js"), str(out), "--json"],
+                           capture_output=True, text=True, cwd=str(ve), timeout=120)
+        res = json.loads(r.stdout or "{}")
+    except (OSError, ValueError, subprocess.TimeoutExpired) as e:
+        return {"errors": [f"could not compile scene.js: {e}"], "storyboard": {}}
+    try:
+        sb = json.loads(out.read_text())
+    except (OSError, ValueError):
+        sb = {}
+    return {"errors": list(res.get("errors") or ([] if res.get("ok") else ["scene.js did not compile"])), "storyboard": sb}
+
+
 def factory_dir(cfg):
     p = (cfg.get("video") or {}).get("factory_path") or os.environ.get("POSTCREW_SHORTS_FACTORY") or "~/Youtube/shorts-factory"
     return Path(p).expanduser()
@@ -140,7 +168,7 @@ class ShortsWriter(Agent):
             for f in ("script.json", "youtube.json"):
                 (ep / f).unlink(missing_ok=True)
         if factory_styles.is_3d(factory_styles.ticked(ctx.ws)):   # the 3D look: its own pipeline plans the video (owner, 2026-11-13)
-            return self._plan_3d(ctx, root, ep, slug, subject, topic)
+            return self._plan_3d(ctx, root, ep, slug, subject, topic, guidance)
         prompt = "\n".join(x for x in [
             f"Make the next YouTube Short for this channel, as episode `episodes/{slug}/` of shorts-factory.",
             f"Topic: {subject}" if subject else f"Pick a fresh topic for the category below (not one of the recent videos).",
@@ -159,14 +187,31 @@ class ShortsWriter(Agent):
             "the templates or the pipeline. When the two files are written, answer with one line: DONE.",
             ("\nThe owner's notes on the last attempt (fix these):\n- " + "\n- ".join(guidance)) if guidance else "",
         ] if x is not None)
+        out = self._claude(ctx, prompt, WRITER_TOOLS, root.parent)
+        try:
+            script = json.loads((ep / "script.json").read_text())
+            meta = json.loads((ep / "youtube.json").read_text())
+        except (OSError, ValueError) as e:
+            raise AgentError(f"the episode files were not written correctly: {e}")
+        return {"slug": slug, "episode": str(ep), "skill": skill_version(root), "title": meta.get("title", ""), "description": meta.get("description", ""),
+                "tags": meta.get("tags") or [], "scene_count": len(script.get("scenes") or []),
+                "narration": " ".join(_said(sc) for sc in script.get("scenes") or [])[:4000],
+                "words": sum(len(_said(sc).split()) for sc in script.get("scenes") or []), "long": script.get("format") == "long",
+                "kind": script.get("kind") or "", "style": script.get("style") or "", "code_scenes": sum(1 for sc in script.get("scenes") or [] if sc.get("type") in CODE_SCENES),
+                "story_problems": story_problems(script), "ticked": factory_styles.ticked(ctx.ws)}
+
+    def _claude(self, ctx, prompt, tools, cwd, add_dirs=()):
+        """One Claude Code session (the agent's model and budget from Settings): writes files with the given tools, answers DONE."""
         s = agent_settings(ctx.cfg, self.id)
         binary = ctx.cfg["llm"].get("claude_path") or "claude"
         cmd = [binary, "-p", "--output-format", "json", "--no-session-persistence", "--model", str(s.get("model", "sonnet")),
                "--max-budget-usd", str(max(float(s.get("max_budget_usd", 1.0)), 2.0)),
-               "--permission-mode", "acceptEdits", "--allowedTools", ",".join(WRITER_TOOLS), "--tools", ",".join(WRITER_TOOLS)]
+               "--permission-mode", "acceptEdits", "--allowedTools", ",".join(tools), "--tools", ",".join(tools)]
+        for d in add_dirs:
+            cmd += ["--add-dir", str(d)]
         t0 = time.time()
         try:
-            r = subprocess.run(cmd, input=prompt, capture_output=True, text=True, cwd=str(root.parent),
+            r = subprocess.run(cmd, input=prompt, capture_output=True, text=True, cwd=str(cwd),
                                timeout=max(int(s.get("timeout_s", 600)), 1200))
         except FileNotFoundError:
             raise AgentError(f"Claude Code CLI '{binary}' not found", fatal=True)
@@ -183,42 +228,65 @@ class ShortsWriter(Agent):
         if out.get("is_error") or out.get("subtype") != "success":
             text = str(out.get("result") or out.get("subtype"))[:300]
             raise AgentError(f"Claude Code stopped: {text}", fatal="limit" in text.lower())
-        try:
-            script = json.loads((ep / "script.json").read_text())
-            meta = json.loads((ep / "youtube.json").read_text())
-        except (OSError, ValueError) as e:
-            raise AgentError(f"the episode files were not written correctly: {e}")
-        return {"slug": slug, "episode": str(ep), "skill": skill_version(root), "title": meta.get("title", ""), "description": meta.get("description", ""),
-                "tags": meta.get("tags") or [], "scene_count": len(script.get("scenes") or []),
-                "narration": " ".join(_said(sc) for sc in script.get("scenes") or [])[:4000],
-                "words": sum(len(_said(sc).split()) for sc in script.get("scenes") or []), "long": script.get("format") == "long",
-                "kind": script.get("kind") or "", "style": script.get("style") or "", "code_scenes": sum(1 for sc in script.get("scenes") or [] if sc.get("type") in CODE_SCENES),
-                "story_problems": story_problems(script), "ticked": factory_styles.ticked(ctx.ws)}
+        return out
 
-    def _plan_3d(self, ctx, root, ep, slug, subject, topic):
-        """Hand the topic to the 3D pipeline: script.json says what to make, its planner writes the title, description and tags."""
+    def _plan_3d(self, ctx, root, ep, slug, subject, topic, guidance=None):
+        """The 3D look (owner, 2026-11-14): one Claude Code session writes the storyboard program for video-engine (scene.js, following the
+        engine's RULES.md) and the title, and checks it with `ve compile` (free, no LLM) until it is clean. The factory's make3d.mjs then
+        voices it with the channel voice and renders it; nothing in the engine calls an LLM."""
+        ve = engine_dir(ctx.cfg)
+        if not (ve / "RULES.md").exists():
+            raise AgentError(f"video-engine is not at {ve}: set video.engine_path in Settings or POSTCREW_VIDEO_ENGINE", fatal=True)
         fmt = (ctx.cat.get("format") or (ctx.video or {}).get("format") or "short") if hasattr(ctx, "cat") else "short"
         long = fmt == "long"
-        notes = " ".join(x for x in [topic.get("angle") if topic.get("angle") != subject else "",
-                                     "One idea, at most 60 seconds." if not long else "", (ctx.cat.get("brief") or "")[:600]] if x)
+        seconds = int((ctx.video or {}).get("target_seconds") or (480 if long else 55))
+        budget = int(seconds * WORDS_PER_SECOND_3D) if long else SHORT_MAX_WORDS_3D
         ep.mkdir(parents=True, exist_ok=True)
-        (ep / "script.json").write_text(json.dumps({"style": "3d", "topic": subject or ctx.cat["label"], "notes": notes, "format": "long" if long else "short",
-                                                    "seconds": int((ctx.video or {}).get("target_seconds") or (480 if long else 55)), "voice": "dip_puck"},
-                                                   ensure_ascii=False, indent=2) + "\n")
-        (ep / "youtube.json").unlink(missing_ok=True)
-        t0 = time.time()
+        (ep / "script.json").write_text(json.dumps({"style": "3d", "topic": subject or ctx.cat["label"], "format": "long" if long else "short",
+                                                    "seconds": seconds}, ensure_ascii=False, indent=2) + "\n")
+        fixing = bool(guidance) and (ep / "scene.js").exists() and (ep / "youtube.json").exists()   # a retry fixes, it does not rewrite
+        if not fixing:
+            for f in ("scene.js", "youtube.json"):
+                (ep / f).unlink(missing_ok=True)
+        compile_cmd = f"node {ve}/ve.mjs compile scene.js build3d/storyboard.json"
+        prompt = "\n".join(x for x in [
+            f"Make the next YouTube {'long video' if long else 'Short'} for this channel as an isometric 3D explainer. You are in its episode folder.",
+            f"Topic: {subject}" if subject else "Pick a fresh topic for the category below (not one of the recent videos).",
+            f"Angle: {topic.get('angle')}" if topic.get("angle") and topic.get("angle") != subject else "",
+            f"Category: {ctx.cat['label']}: {ctx.cat.get('brief', '')}",
+            ("Owner's plan for this video:\n" + json.dumps(topic["owner_plan"], ensure_ascii=False, indent=1)) if topic.get("owner_plan") else "",
+            ("Recent videos (do not repeat): " + "; ".join(_recent(ctx))) if _recent(ctx) else "",
+            "",
+            f"Format: {'16:9 long video' if long else '9:16 Short (vertical)'}, target {seconds} s. Word budget (hard): at most {budget} spoken words"
+            + (f" and at least {int(budget * .85)}" if long else "")
+            + ("" if long else f", one idea, 8-10 beats; the Short must stay under 60 s with the channel voice") + ". "
+            "A like / comment / share / subscribe outro is added after your last beat automatically: do not write one.",
+            "Write the narration and the visuals together as ONE storyboard program, following the rules below exactly (parts A and B;",
+            f"part C is the format; read {ve}/examples/dijkstra.scene.js only if you need a full example).",
+            "Write ONLY these two files in this folder:",
+            "  scene.js      the program: function build(sb) { ... }",
+            f"  youtube.json  {{\"title\", \"description\", \"tags\": [...], \"privacyStatus\": \"private\", \"video\": \"../../out/{slug}-hyperframes.mp4\", \"captions\": \"../../out/{slug}.srt\"}}",
+            f"Then run `{compile_cmd}` and fix scene.js until it reports no errors (each run is free). Do NOT render and do NOT voice anything.",
+            "When it compiles cleanly, answer with one line: DONE.",
+            ("\nThe owner's notes on the last attempt (fix these):\n- " + "\n- ".join(guidance)) if guidance and not fixing else "",
+            ("\nscene.js and youtube.json are already written. Do NOT rewrite them: edit scene.js only where needed to fix these problems, "
+             "then compile again:\n- " + "\n- ".join(guidance)) if fixing else "",
+            "",
+            "=== RULES.md (video-engine) ===",
+            (ve / "RULES.md").read_text(),
+        ] if x is not None)
+        self._claude(ctx, prompt, ["Read", "Write", "Edit", "Glob", "Grep", f"Bash(node {ve}/ve.mjs compile:*)"], ep, add_dirs=[ve])
         try:
-            r = subprocess.run(["node", "pipeline/make3d.mjs", f"episodes/{slug}", "--plan-only"], cwd=str(root), capture_output=True, text=True, timeout=1200)
-        except subprocess.TimeoutExpired:
-            raise AgentError("the 3D planner did not finish within 20 minutes")
-        if r.returncode:
-            tail = re.sub(r"\x1b\[[0-9;]*m", "", r.stderr or r.stdout or "")[-400:]
-            raise AgentError(f"the 3D planner failed (exit {r.returncode}): {tail}")
-        ctx.run.event(self.id, "llm", f"the 3D pipeline planned the video in {time.time() - t0:.0f}s")
-        meta = json.loads((ep / "youtube.json").read_text())
+            meta = json.loads((ep / "youtube.json").read_text())
+        except (OSError, ValueError) as e:
+            raise AgentError(f"youtube.json was not written correctly: {e}")
+        check = compile_storyboard(ve, ep)
+        beats = check["storyboard"].get("beats") or []
+        said = " ".join(str(b.get("say") or "") for b in beats)
         return {"slug": slug, "episode": str(ep), "skill": skill_version(root), "title": meta.get("title", ""), "description": meta.get("description", ""),
-                "tags": meta.get("tags") or [], "scene_count": 1, "narration": "", "words": 0, "long": long, "kind": "3d", "style": "3d",
-                "code_scenes": 0, "story_problems": [], "ticked": ["3d"]}
+                "tags": meta.get("tags") or [], "scene_count": len(beats), "narration": said[:4000], "words": len(said.split()), "long": long,
+                "kind": "3d", "style": "3d", "code_scenes": 0, "story_problems": [], "ticked": ["3d"],
+                "storyboard_errors": check["errors"], "word_budget": budget}
 
     def validate(self, ctx, out):
         p = []
@@ -226,6 +294,11 @@ class ShortsWriter(Agent):
             p.append("youtube.json has no title")
         if not out.get("scene_count"):
             p.append("script.json has no scenes")
+        if out.get("style") == "3d":
+            p += [f"scene.js: {e}" for e in (out.get("storyboard_errors") or [])[:8]]
+            if out.get("words", 0) > out.get("word_budget", SHORT_MAX_WORDS_3D):
+                p.append(f"the narration has {out['words']} words, over the budget of {out['word_budget']}: merge or cut beats in scene.js")
+            return p
         if not out.get("long") and out.get("words", 0) > SHORT_MAX_WORDS:   # the owner's 60-second limit (2026-11-12), before any render
             p.append(f"the narration has {out['words']} words: a Short is at most 60 seconds, {SHORT_MAX_WORDS} words. Cut whole scenes "
                      f"(one idea per Short) and write script.json again")

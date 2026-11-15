@@ -3,6 +3,12 @@
 ## 0.2.0: YouTube, per-app settings and a faster Studio
 
 ### New
+- **3D videos come from video-engine, with the channel voice and far fewer tokens.** The 3D look (now "3D (isometric)") no longer runs the separate 3D pipeline and its own agents. When it is ticked:
+  - the Script Writer writes the video as one storyboard program (episodes/<slug>/scene.js) following video-engine's RULES.md, and checks it with `ve compile` until it is clean (free, no AI);
+  - a storyboard that does not compile, or has more words than the budget, goes back to the Script Writer with the exact problems;
+  - the render step voices each line with the channel voice (the factory's .env voice, with word timestamps) and video-engine renders it: a 9:16 Short or a 16:9 long video, never both;
+  - the look is isometric 3D on white with the brand colours, and numbers on screen are big enough to read on a phone.
+  - One AI session per video instead of about a dozen. A 3D Short is still never over 60 seconds.
 - **A 3D look: whole videos made by the Three.js explainer pipeline.** The Factory has a new look, 3D (Three.js), ticked on its own. When it is ticked:
   - the Script Writer hands the topic to the 3D pipeline on the lab, which plans, writes, directs, reviews with a vision critic and renders the video with its own agents, unchanged;
   - its planner gives the title, description and tags, and the finished video is queued like any other.
