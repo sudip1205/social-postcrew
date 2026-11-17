@@ -3,6 +3,14 @@
 ## 0.2.0: YouTube, per-app settings and a faster Studio
 
 ### New
+- **Factory › Voice: approve the script and your voice before any video is made.** A new section at the top of the Factory page lists the next 7 scheduled days.
+  - **Scripts are written ahead.** Each day's script is written ahead, once a day automatically or with **Write the next scripts**. Read it, edit any line, then **Approve script**. **Write again** takes notes for the writer.
+  - **Upload one recording of the whole script.** Retakes are fine: the last take of a line is kept. Words that are not in the script are cut (false starts, "sorry, again"), and so are earlier takes. A hesitation longer than 1.2 s inside a sentence is shortened. Your other pauses, your pronunciation and how you say abbreviations stay as recorded.
+  - **Your voice is matched to dip_puck.** It is converted with Seed-VC to the same timbre dip_puck was trained on. Nothing is re-synthesised. Listen to the result before you approve it. A line you did not record, and the outro, are read by dip_puck.
+  - **Or skip your voice:** **Use dip_puck** or **Use am_puck**.
+  - **Scheduled runs:** a run writes the script (or reuses the one written ahead) and makes the video only when both are approved. Otherwise it stops at the Render step as *Waiting*, and you get a notification. Approving the voice of a waiting run makes the video straight away.
+  - **The Factory chat** now writes and checks a script, then stops. That script also appears in Factory › Voice, and the video is rendered once both are approved.
+- **One typeface for the whole Studio:** Geist, a Helvetica-style grotesque, replaces Inter and Plus Jakarta Sans. It is bundled with the Studio, so the lab no longer depends on its own fonts. Helvetica Neue and Helvetica are the fallbacks.
 - **The Signal (blue) look has a new engine, in the style of your Tech Glow prompt.** It is not the default (Isometric stays the default). Tick Signal on its own in the Factory and the Script Writer writes the video the way Isometric videos are written, in the Tech Glow kit (shorts-factory/styles/tech-glow): a navy-to-indigo glow, icon tiles, glass cards, light-pulse connectors and gradient numbers, with an isometric view where it helps. Signal mixed with Story or VS Code keeps the old diagram boards.
 - **Isometric (pastel) is now the default look, and Shorts run 50 to 90 seconds.** The database-scaling and how-LLMs-work Shorts are the house standard: every new video copies their structure, look and timing (12-15 beats, about 65-75 s). Shorter or longer Shorts go back to the writer. Tick another look in the Factory to use it instead.
 - **A new look: Isometric (pastel), in the style of your reference prompt.** Tick it on its own in the Factory. Then:

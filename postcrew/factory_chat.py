@@ -31,7 +31,9 @@ SKILL_EDIT_RULE = (f" To change the skill, edit its files in {SKILL}/ directly w
                    "Never put the owner's rules in your memory, in shorts-factory/ notes or anywhere else instead of the skill.")
 SYSTEM = ("You are working for the channel owner through the postcrew Studio's Factory page (a chat, like the Claude Code app). "
           "Follow CLAUDE.md and the explainer-short-style skill. A topic means: write the episode (script.json and youtube.json, privacyStatus "
-          "\"private\") and render it with `npm run make -- episodes/<slug>` from shorts-factory/. An instruction about how videos should look, "
+          "\"private\") and check it (`npm run make -- episodes/<slug> --check` for the canvas looks), then STOP: do NOT render it. The owner "
+          "approves the script and records their voice in Factory > Voice, and the video is made from there (owner rule 2026-11-16); say so in "
+          "one line. Render only when the owner asks you to render an episode whose voice is approved. An instruction about how videos should look, "
           "sound or be written from now on means: apply it and write it into the skill (CLAUDE.md's standing rule), then say which skill files "
           "changed. Run commands from shorts-factory/ with relative paths (`cd shorts-factory && python3 algo/<name>.py`, "
           "`npx hyperframes check ...`, ffmpeg for frame grabs): only those forms are allowed, and nobody can approve anything else "

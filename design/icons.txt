@@ -170,6 +170,7 @@ travel_explore
 trending_up
 tune
 undo
+upload
 upload_file
 verified
 verified_user

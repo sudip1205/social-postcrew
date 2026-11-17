@@ -15,7 +15,7 @@ from .. import platforms
 from ..notify import notify
 from . import team
 from ..checks import STALE
-from .base import AgentError, Feedback
+from .base import AgentError, AgentWait, Feedback
 from .credentials import CredentialsAgent
 from .editor import EditorAgent
 from .formatter import FormatterAgent
@@ -147,6 +147,13 @@ class Supervisor:
             try:
                 out = agent.run(ctx, guidance[step])
                 problems = agent.validate(ctx, out)
+            except AgentWait as e:   # the owner's turn (Factory > Voice): the run stops here, waiting, and is started again later
+                run.step(step, "waiting", summary=str(e), errors=[])
+                run.event(step, "waiting", str(e))
+                for s in self.order[i + 1:]:
+                    run.step(s, "pending")
+                run.finish("waiting", str(e))
+                return {"ok": False, "waiting": True, "reason": str(e), "cost_usd": run.cost}
             except AgentError as e:
                 out, problems, fatal = None, [str(e)], e.fatal
             except Exception as e:  # a bug or an unexpected failure: still logged and supervised

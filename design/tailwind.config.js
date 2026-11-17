@@ -8,8 +8,11 @@ module.exports = {
                variants: ["hover"] }],
   theme: { extend: {
     borderRadius: { DEFAULT: "0.5rem", lg: "1rem", xl: "1.5rem", full: "9999px" },
-    fontFamily: { headline: ["Plus Jakarta Sans", "sans-serif"], display: ["Plus Jakarta Sans", "sans-serif"],
-                  body: ["Inter", "sans-serif"], label: ["Inter", "sans-serif"] },
+    // one typeface everywhere, Helvetica-style (owner, 2026-11-16: "helvetica type professional font ... the same typography for the entire
+    // postcrew"): Geist, then the Helvetica family where it is installed
+    fontFamily: { headline: ["Geist", "Helvetica Neue", "Helvetica", "Arial", "sans-serif"], display: ["Geist", "Helvetica Neue", "Helvetica", "Arial", "sans-serif"],
+                  body: ["Geist", "Helvetica Neue", "Helvetica", "Arial", "sans-serif"], label: ["Geist", "Helvetica Neue", "Helvetica", "Arial", "sans-serif"],
+                  sans: ["Geist", "Helvetica Neue", "Helvetica", "Arial", "sans-serif"] },
   } },
   plugins: [require("@tailwindcss/forms"), require("@tailwindcss/container-queries")],
 };

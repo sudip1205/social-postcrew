@@ -171,3 +171,11 @@ No Stitch screen exists for either view. Both are derived from the shell, design
   - The row sits between "Use a plan" and the message box.
   - Ticking or unticking saves the choice at once (`POST /api/factory/styles`). It is used by the Factory chat and by the crew's Script Writer (`postcrew/factory_styles.py`).
   - 2026-11-14: a fifth look, **Isometric (pastel)** (icon `deployed_code`). Like 3D it makes the whole video, so ticking it unticks the others, and the reverse.
+
+- **Typography: Geist everywhere (2026-11-16).** The owner asked for "a helvetica type professional font ... the same typography for the entire postcrew". `font-headline`, `font-display`, `font-body` and `font-label` all map to Geist, with Helvetica Neue, Helvetica and Arial as fallbacks (design/tailwind.config.js, scripts/build_ui_assets.py). Stitch's screens use Plus Jakarta Sans for headlines and Inter for body text; the classes are unchanged, only the face is.
+- **Factory › Voice (2026-11-16).** There is no Stitch screen for it, so it is built from the Factory page's own cards, `chip()`, `button()`, `tip()` and Material icons:
+  - a header with **Write the next scripts**;
+  - one row per scheduled day, showing the date, category, title and a state chip;
+  - an open row has two cards: 1. Script (lines, Edit lines, Approve script, Write again with notes) and 2. Voice (Upload your recording, the cleaning report, audio players, Approve my voice, Use dip_puck, Use am_puck);
+  - a footer with **Make the video now**.
+

@@ -48,8 +48,7 @@ def fonts():
     names = icons()
     (ROOT / "design" / "icons.txt").write_text("\n".join(names) + "\n")   # what the font contains (checked by stitch_check.py)
     families = [
-        "family=Inter:wght@400;500;600;700",
-        "family=Plus+Jakarta+Sans:wght@500;600;700;800",
+        "family=Geist:wght@400;500;600;700;800",   # one Helvetica-style typeface for the whole Studio (owner, 2026-11-16)
         "family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-25..200&icon_names=" + ",".join(names),
     ]
     css_out = []

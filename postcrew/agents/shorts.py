@@ -16,7 +16,7 @@ import subprocess
 import time
 from pathlib import Path
 
-from .base import Agent, AgentError
+from .base import Agent, AgentError, AgentWait
 from .. import factory_styles
 from ..llm import agent_settings
 
@@ -173,9 +173,22 @@ class ShortsWriter(Agent):
     role = "Writes the Short's script.json and youtube.json in the Shorts factory, following its explainer-short-style skill."
 
     def run(self, ctx, guidance):
+        """The script already on the Voice desk for this day is used as it is (written ahead, or by a run that waited for the voice);
+        otherwise a new one is written and put on the desk (owner, 2026-11-16)."""
+        from .. import voice_desk
         root = factory_dir(ctx.cfg)
         if not (root / "package.json").exists():
             raise AgentError(f"the Shorts factory is not at {root}: set its folder in Settings (YouTube > video > factory path)", fatal=True)
+        if not guidance:
+            kept = voice_desk.reuse(ctx)
+            if kept:
+                return kept
+        notes = [str(n) for n in (ctx.options or {}).get("notes") or []]   # Factory > Voice > Write again, with your notes
+        out = self._write(ctx, root, (list(guidance or []) + notes) or guidance)
+        voice_desk.record(ctx, out)
+        return out
+
+    def _write(self, ctx, root, guidance):
         topic = ctx.outputs.get("topic") or {}
         subject = topic.get("topic") or ""
         slug = slug_for(ctx.day, subject or ctx.cat["label"])
@@ -420,8 +433,17 @@ class ShortsRender(Agent):
     uses_llm = False
 
     def run(self, ctx, guidance):
+        from .. import voice_desk
         root = factory_dir(ctx.cfg)
         w = ctx.outputs["writer"]
+        wait = voice_desk.gate(ctx, w["slug"])   # the video is made only with the script and the voice approved (owner, 2026-11-16)
+        if wait:
+            ahead = bool((ctx.options or {}).get("ahead"))   # written ahead: its day's scheduled run makes it; else it is made on approval
+            if not ahead:
+                from ..notify import notify
+                notify(ctx.ws, "Script ready for your voice", f"{w.get('title') or w['slug']} ({ctx.day.isoformat()}): {wait}")
+            voice_desk.mark_run(ctx.ws, w["slug"], ctx.run.dir.name, "ahead" if ahead else "waiting")
+            raise AgentWait(wait)
         t0 = time.time()
         try:
             r = subprocess.run(["npm", "run", "make", "--", f"episodes/{w['slug']}"], cwd=str(root), capture_output=True, text=True,

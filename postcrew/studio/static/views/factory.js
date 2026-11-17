@@ -294,6 +294,7 @@ async function renderFactory() {
       </div>
       <button id="fc-new" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors">${icon("add_comment", "text-sm")}<span>New chat</span></button>
     </div>
+    <section id="vd-root" class="bg-white rounded-xl border border-slate-200 shadow-sm"></section>
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
       <section class="lg:col-span-7 bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col h-[calc(100vh-14rem)] min-h-[480px]">
         <div id="fc-log" class="flex-1 overflow-y-auto p-5 space-y-3 bg-slate-50/50 rounded-t-xl"></div>
@@ -441,6 +442,7 @@ async function renderFactory() {
   fcDraw(d);
   fcStyles(d.styles);
   fcPoll();
+  if (typeof vdOpen === "function") vdOpen();   // Factory > Voice (views/voice-desk.js)
 }
 
 VIEWS.factory = renderFactory;

@@ -33,7 +33,7 @@ from ..agents.frames import HyperFramesAgent, RemotionAgent, RemotionFramesAgent
 from ..agents.hooks import HooksAgent
 from ..agents.graphics import GraphicsAgent
 from ..agents.video_review import VideoReviewAgent
-from .. import attachments, engage, factory_chat, factory_refs, factory_styles, factory_voice, rewards, yt_analytics
+from .. import attachments, engage, factory_chat, factory_refs, factory_styles, factory_voice, rewards, voice_desk, yt_analytics
 from ..agents.direction import CreativeDirectorAgent
 from ..agents.quality import QualityDirectorAgent
 from ..agents.voice import VoiceAgent
@@ -969,6 +969,15 @@ def make_handler(studio):
                 if p == "/api/manual/plan/attach" and method == "POST":   # a PDF or image for your own plan (raw body)
                     return self.send(200, {"source": attachments.save_upload(ws, studio._view(q.get("platform"))[0], q.get("id", ""), q.get("name", ""),
                                                                               self.rfile, int(self.headers.get("Content-Length") or 0))})
+                if p == "/api/voice-desk/upload" and method == "POST":   # your recording of a whole script (raw body), Factory > Voice
+                    return self.send(200, voice_desk.upload(ws, q.get("slug"), q.get("name", ""), self.rfile,
+                                                            int(self.headers.get("Content-Length") or 0)))
+                if method == "GET" and p.startswith("/voice-desk/"):   # your processed take, to listen to before approving it
+                    root = voice_desk._root(ws) / "episodes"
+                    rel = p[len("/voice-desk/"):]
+                    if not re.fullmatch(r"[a-z0-9][a-z0-9-]{1,80}/voice-take/take(-converted)?\.wav", rel):
+                        return self.send(404, {"error": "not found"})
+                    return self.media(root / rel, root)
                 if p == "/api/factory/voice/upload" and method == "POST":   # your own recording for a Factory video (raw body)
                     return self.send(200, factory_voice.upload(ws, q.get("slug"), q.get("scene"), q.get("name", ""), self.rfile,
                                                                int(self.headers.get("Content-Length") or 0)))
@@ -1022,6 +1031,15 @@ def make_handler(studio):
                     ("POST", "/api/factory/reset"): lambda: factory_chat.reset(ws),
                     ("GET", "/api/factory/plan"): lambda: factory_chat.plan_prompt(ws, q.get("id")),
                     ("GET", "/api/factory/voice"): lambda: factory_voice.view(ws, q.get("slug")),
+                    # Factory > Voice: the next days' scripts, your voice for each, and your approvals (owner, 2026-11-16)
+                    ("GET", "/api/voice-desk"): lambda: voice_desk.view(ws),
+                    ("POST", "/api/voice-desk/write-ahead"): lambda: voice_desk.write_ahead(ws),
+                    ("POST", "/api/voice-desk/write"): lambda: voice_desk.write(ws, self.body().get("day", ""), self.body().get("notes")),
+                    ("POST", "/api/voice-desk/lines"): lambda: voice_desk.save_lines(ws, self.body().get("slug"), self.body().get("lines")),
+                    ("POST", "/api/voice-desk/approve-script"): lambda: voice_desk.approve_script(ws, self.body().get("slug"), self.body().get("approved", True)),
+                    ("POST", "/api/voice-desk/voice"): lambda: voice_desk.choose(ws, self.body().get("slug"), self.body().get("mode")),
+                    ("POST", "/api/voice-desk/reopen"): lambda: voice_desk.reopen_voice(ws, self.body().get("slug")),
+                    ("POST", "/api/voice-desk/make"): lambda: voice_desk.make(ws, self.body().get("slug")),
                     ("POST", "/api/factory/voice/clear"): lambda: factory_voice.clear(ws, self.body().get("slug"), self.body().get("scene")),
                     ("POST", "/api/factory/voice/render"): lambda: factory_voice.render(ws, self.body().get("slug")),
                     ("POST", "/api/factory/references/link"): lambda: factory_refs.add_link(ws, self.body().get("url"), self.body().get("comment")),

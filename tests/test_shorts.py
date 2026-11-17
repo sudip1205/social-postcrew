@@ -21,7 +21,7 @@ DAY = date(2026, 11, 3)
 
 
 @contextlib.contextmanager
-def fake_factory(ws, fail_render=False, write=True):
+def fake_factory(ws, fail_render=False, write=True, desk=False):
     """A shorts-factory folder and a fake subprocess.run for `claude -p` (writes the episode) and `npm run make` (writes the video)."""
     root = Path(tempfile.mkdtemp(prefix="factory-")) / "shorts-factory"
     (root / "episodes").mkdir(parents=True)
@@ -31,6 +31,8 @@ def fake_factory(ws, fail_render=False, write=True):
     cfg = ws.config()
     cfg["platforms"]["youtube"]["video"]["factory_path"] = str(root)
     cfg["platforms"]["youtube"]["enabled"] = True
+    # Factory > Voice holds every video for the owner's approvals (2026-11-16); these tests are about the rest of the run
+    cfg["platforms"]["youtube"]["video"]["voice_desk"] = {"enabled": desk}
     ws.save_config(cfg)
     calls = []
 

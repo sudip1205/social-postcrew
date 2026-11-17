@@ -88,3 +88,11 @@ smart_toy
 code
 view_in_ar
 deployed_code
+upload
+close
+edit
+refresh
+check
+undo
+save
+mic

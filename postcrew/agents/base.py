@@ -25,6 +25,14 @@ class AgentError(RuntimeError):
         self.fatal = fatal
 
 
+class AgentWait(AgentError):
+    """Not a failure: the step needs the owner first (a YouTube video waits for the approved script and voice, Factory > Voice).
+    The run ends as "waiting"; nothing is retried and no one is asked to diagnose it."""
+
+    def __init__(self, message):
+        super().__init__(message, fatal=True)
+
+
 @dataclass
 class RunContext:
     ws: object

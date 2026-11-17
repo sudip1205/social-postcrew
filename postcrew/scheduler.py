@@ -113,6 +113,15 @@ def tick(ws, now=None, runner=run_crew, publisher=publish_due, checker=run_check
         ran = _catch_up(ws, runner)
         if ran:
             did.append(ran)
+    # Factory > Voice: once a day, the scripts of the next days are written ahead, so you can record your voice for them (owner, 2026-11-16)
+    if ("youtube" in platforms.enabled(cfg) and runner is run_crew and not any(d.startswith(("generate", "catch up")) for d in did)
+            and not is_running()):
+        from . import voice_desk
+        try:
+            if voice_desk.auto_write_due(ws, today):
+                did.append("write scripts ahead")
+        except Exception:
+            traceback.print_exc()
 
     last = st.get("published_check")
     utc = now.astimezone(timezone.utc)
