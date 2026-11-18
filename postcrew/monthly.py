@@ -461,7 +461,7 @@ def _item(pool, item_id):
     raise ValueError("that plan no longer exists")
 
 
-BRIEF_SHORT = ("A vertical explainer Short of 50 to 90 seconds (150-250 words): what ONE thing is and how it works, in the look ticked in the Factory "
+BRIEF_SHORT = ("A vertical explainer Short of 50 to 90 seconds (140-230 words): what ONE thing is and how it works, in the look ticked in the Factory "
                "(the blue Signal look by default: diagrams with ONE concrete example moving through them; the Story look with the cast only when it is "
                "ticked). Hook with a real problem in one breath, name and define the term with its picture, show the mechanism, the common mistake, then "
                "a specific question for the comments. No code, except an algorithm problem (one trace and one short code scene). Never interview advice.")
