@@ -160,7 +160,7 @@ def publish_one(ws, post, client_factory=YouTube, log=print, check=check_youtube
     yt = post["youtube"]
     if cfg["publishing"]["dry_run"]:
         ev("dry_run", f"DRY RUN - would upload '{yt['title']}' ({yt['format']}, {yt['seconds']:.0f}s) to YouTube as "
-                      f"{cfg['publishing'].get('visibility', 'public')}. Turn off practice mode in Settings to upload for real.")
+                      f"{cfg['publishing'].get('visibility', 'unlisted')}. Turn off practice mode in Settings to upload for real.")
         post.update(status="dry_run", published_at=datetime.now(timezone.utc).isoformat(timespec="seconds"))
         if run:
             run.step("publisher", "passed", summary="dry run: nothing uploaded")
@@ -198,7 +198,7 @@ def publish_one(ws, post, client_factory=YouTube, log=print, check=check_youtube
     try:
         ev("upload", f"uploading {Path(post['media']).name}" + (f" to the channel \"{channel['title']}\"" if channel else ""))
         res = client.upload(ws.root / post["media"], yt["title"], full_description(post), seo.normalize_tags(yt["tags"], yt["title"]),
-                            category_id=pub.get("category_id", "28"), privacy=pub.get("visibility", "public"),
+                            category_id=pub.get("category_id", "28"), privacy=pub.get("visibility", "unlisted"),
                             made_for_kids=bool(pub.get("made_for_kids", False)),
                             progress=lambda sent, total: ev("upload", f"{sent * 100 // max(total, 1)}% uploaded"))
     except YouTubeError as e:

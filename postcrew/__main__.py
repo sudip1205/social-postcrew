@@ -57,7 +57,7 @@ def cmd_doctor(ws):
         rows.append(("YouTube connected", bool(s.get("youtube_refresh_token")),
                      s.get("youtube_channel_title") or "click Connect YouTube in Studio > Credentials"))
         rows.append(("YouTube publishing", True, "DRY RUN (nothing is uploaded)" if yt["publishing"]["dry_run"] else
-                     f"LIVE, approval: {yt['publishing']['approval']}, {yt['publishing'].get('visibility', 'public')}"))
+                     f"LIVE, approval: {yt['publishing']['approval']}, {yt['publishing'].get('visibility', 'unlisted')}"))
     for name, ok, detail in rows:
         print(f"  {'OK ' if ok else 'NO '} {name:<28} {detail}")
     return 0 if all(ok for _, ok, _ in rows[:5]) else 1

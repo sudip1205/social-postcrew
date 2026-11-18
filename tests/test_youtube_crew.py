@@ -233,7 +233,7 @@ class YouTubePublishTests(unittest.TestCase):
             res = publish_due(ws, now=self.due(post), yt_factory=FakeYouTube, log=lambda m: None)
             self.assertEqual([r["status"] for r in res], ["published"])
             up = FakeYouTube.uploads[0]
-            self.assertEqual(up["privacy"], "public")
+            self.assertEqual(up["privacy"], "unlisted")   # owner, 2026-11-18: unlisted, made public by hand
             self.assertTrue(up["description"].endswith("#Shorts"))      # a Short is filed under Shorts
             self.assertTrue(up["thumbnail"].endswith(".jpg"))   # the factory's own thumbnail
             self.assertEqual(ws.queue(), [])

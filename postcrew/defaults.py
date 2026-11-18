@@ -69,7 +69,7 @@ DEFAULT_CONFIG = {
             "topics": [],                    # one line each (Settings > Topics); the monthly plan is written from them
             "publishing": {
                 "approval": "manual", "dry_run": True,
-                "visibility": "public",          # what the video is once it goes live: public | unlisted | private
+                "visibility": "unlisted",        # owner, 2026-11-18: uploaded unlisted, made public by hand on YouTube; public | unlisted | private
                 "category_id": "28",             # YouTube's own category number (28 = Science & Technology)
                 "made_for_kids": False,
             },
