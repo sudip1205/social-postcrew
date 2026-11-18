@@ -80,6 +80,47 @@ class FactoryPlanTests(unittest.TestCase):
             factory_plans.remove(ws, a["id"])
             self.assertEqual([p["id"] for p in factory_plans.view(ws)["plans"]], [b["id"]])
 
+    def _approved(self, ws, root, look):
+        item = factory_plans.add_own(ws, "What a bloom filter is")
+        ep = root / "episodes" / "bloom"
+        ep.mkdir(parents=True)
+        (ep / "script.json").write_text(json.dumps({"style": look, "beats": [{"say": "One."}, {"say": "Two."}]}))
+        voice_desk._save_desk(ep, {"slug": "bloom", "script": "approved", "voice": {"state": "approved"},
+                                   "writer": {"slug": "bloom", "style": "iso" if look in ("iso", "blue") else look, **({"look": look} if look in ("iso", "blue") else {})}})
+        factory_plans._update(ws, item["id"], state="script", slug="bloom")
+        return item
+
+    def test_approved_plans_are_ready_to_make_in_a_look_that_keeps_the_voice(self):
+        with TempWorkspace() as ws, fake_factory(ws, desk=True) as (root, calls):
+            item = self._approved(ws, root, "iso")
+            ready = factory_plans.ready(ws)
+            self.assertEqual([r["id"] for r in ready], [item["id"]])
+            self.assertEqual(ready[0]["look"], "iso")
+            self.assertTrue(all(l["ok"] for l in ready[0]["looks"]))
+            seen = []
+            factory_plans.make(ws, item["id"], "blue", runner=lambda ws_, options, fmt: seen.append(options) or {"ok": True, "run_id": "r1"})
+            wait(item["id"])
+            self.assertEqual(seen[0]["restyle"], "blue")                 # drawn again in the new look
+            self.assertNotIn("writer", seen[0]["kept"])                 # ... by the writer, which keeps the approved words
+            self.assertEqual(factory_plans.get(ws, item["id"])["made_look"], "blue")
+
+    def test_the_same_look_uses_the_approved_script_as_it_is(self):
+        with TempWorkspace() as ws, fake_factory(ws, desk=True) as (root, calls):
+            item = self._approved(ws, root, "blue")
+            seen = []
+            factory_plans.make(ws, item["id"], "blue", runner=lambda ws_, options, fmt: seen.append(options) or {"ok": True, "run_id": "r1"})
+            wait(item["id"])
+            self.assertIn("writer", seen[0]["kept"])
+            self.assertNotIn("restyle", seen[0])
+
+    def test_a_scene_script_cannot_be_switched_to_a_canvas_look(self):
+        with TempWorkspace() as ws, fake_factory(ws, desk=True) as (root, calls):
+            item = self._approved(ws, root, "signal")
+            looks = {l["id"]: l["ok"] for l in factory_plans.ready(ws)[0]["looks"]}
+            self.assertEqual(looks, {"signal": True, "iso": False, "blue": False})
+            with self.assertRaises(ValueError):
+                factory_plans.make(ws, item["id"], "iso")
+
     def test_a_topic_is_needed(self):
         with TempWorkspace() as ws:
             with self.assertRaises(ValueError):
@@ -88,3 +129,30 @@ class FactoryPlanTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RestyleTests(unittest.TestCase):
+    def test_a_redraw_keeps_every_approved_word_and_the_desk_approvals(self):
+        from types import SimpleNamespace
+        from postcrew.agents.shorts import ShortsWriter
+        with TempWorkspace() as ws, fake_factory(ws, desk=True) as (root, calls):
+            ep = root / "episodes" / "bloom"
+            ep.mkdir(parents=True)
+            (ep / "script.json").write_text(json.dumps({"style": "iso", "hook_options": ["a", "b", "c"], "beats": [{"say": "One."}, {"say": "Two."}]}))
+            voice_desk._save_desk(ep, {"slug": "bloom", "script": "approved", "voice": {"state": "approved"}, "writer": {"look": "iso"}})
+            w = ShortsWriter()
+
+            def plan_iso(ctx, root_, ep_, slug, subject, topic, guidance=None, look="iso"):
+                self.assertIn("do not change", guidance[0])
+                (ep_ / "script.json").write_text(json.dumps({"style": "blue", "beats": [{"say": "One, edited."}, {"say": "Two."}]}))
+                return {"slug": slug, "episode": str(ep_), "title": "t", "look": look, "style": "iso"}
+            w._plan_iso = plan_iso
+            ctx = SimpleNamespace(ws=ws, outputs={"topic": {"topic": "Bloom"}}, options={})
+            out = w._restyle(ctx, root, "bloom", "blue")
+            script = json.loads((ep / "script.json").read_text())
+            self.assertEqual([b["say"] for b in script["beats"]], ["One.", "Two."])
+            self.assertEqual(script["style"], "blue")
+            self.assertEqual(script["hook_options"], ["a", "b", "c"])
+            d = voice_desk.desk(ep)
+            self.assertEqual((d["script"], d["voice"]["state"], d["writer"]["look"]), ("approved", "approved", "blue"))
+            self.assertTrue(out["reused"])

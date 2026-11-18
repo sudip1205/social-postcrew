@@ -84,7 +84,16 @@ def view(ws):
     return {"messages": st["messages"], "session": bool(st.get("session_id")), "busy": busy(), "factory": str(root),
             "found": (root / "package.json").exists(), "videos": videos(ws), "skill": skill_files(ws),
             "skill_version": skill_version(root) if (root / "package.json").exists() else {}, "plans": plans(ws), "styles": factory_styles.options(ws),
-            "references": factory_refs.listing(ws)}
+            "references": factory_refs.listing(ws), "ready": _ready(ws)}
+
+
+def _ready(ws):
+    """Factory plans whose script and voice are approved, for the Use a plan list (made from there in the look you pick)."""
+    from . import factory_plans
+    try:
+        return factory_plans.ready(ws)
+    except Exception:
+        return []
 
 
 def plans(ws):

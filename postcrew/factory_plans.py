@@ -205,7 +205,52 @@ def _slug_of(ws, res):
 
 
 # ---------- 3. the video: by hand, once the script and the voice are approved ----------
-def make(ws, pid, runner=None):
+# The looks a video can be made in from the Factory's "Use a plan" list (owner, 2026-11-18: "select approved plan script from the drop
+# down to create a video and select style also"). Isometric and Signal (blue) are both canvas looks with the same narration beats, so an
+# approved script and voice made for one can be drawn again in the other; the other looks write a different kind of script.
+LOOKS = {"iso": "Isometric Pastel", "blue": "Signal (blue)"}
+
+
+def look_of(d, ep=None):
+    """The look an episode's script was written in: "iso", "blue", or another factory style ("3d", "signal", "story", ...)."""
+    import json
+    w = (d or {}).get("writer") or {}
+    if w.get("look"):
+        return w["look"]
+    try:
+        style = json.loads((ep / "script.json").read_text()).get("style") if ep else None
+    except (OSError, ValueError):
+        style = None
+    return style or w.get("style") or ""
+
+
+def looks_for(current):
+    """The looks this script can be made in, each {id, label, ok, why}."""
+    out = [{"id": k, "label": v, "ok": current in LOOKS, "why": "" if current in LOOKS else "needs a script written in this look (Write again with it ticked)"}
+           for k, v in LOOKS.items()]
+    if current and current not in LOOKS:
+        out.insert(0, {"id": current, "label": f"{current.capitalize()} (as written)", "ok": True, "why": ""})
+    return out
+
+
+def ready(ws):
+    """Plans whose script and voice are approved: they can be made now, in their own look or one that keeps the same narration."""
+    from . import voice_desk
+    out = []
+    for i in load(ws)["items"]:
+        if i.get("state") != "script" or not i.get("slug") or (_jobs.get(i["id"]) or {}).get("done", "x") is None:
+            continue
+        ep = voice_desk._root(ws) / "episodes" / i["slug"]
+        d = voice_desk.desk(ep)
+        if d.get("script") != "approved" or (d.get("voice") or {}).get("state") != "approved":
+            continue
+        cur = look_of(d, ep)
+        out.append({"id": i["id"], "title": i.get("title") or d.get("title") or i["slug"], "format": i.get("format", "short"), "look": cur,
+                    "voice": (d.get("voice") or {}).get("mode") or "", "looks": looks_for(cur)})
+    return out
+
+
+def make(ws, pid, look=None, runner=None):
     from . import voice_desk
     item = get(ws, pid)
     if not item.get("slug"):
@@ -216,8 +261,17 @@ def make(ws, pid, runner=None):
         raise ValueError("approve the script and the voice first")
     if item.get("state") == "making":
         raise ValueError("the video is already being made")
-    _update(ws, pid, state="making", error=None)
-    options = {"kept": {"topic": _topic_out(item), "writer": d["writer"]}, "kept_from": "your approved script", "plan_id": pid}
+    cur, look = look_of(d, ep), str(look or "").strip()
+    if look and look != cur:
+        if look not in LOOKS or cur not in LOOKS:
+            raise ValueError(f"this script was written for the {cur or 'other'} look: write it again with that look ticked to make it in another one")
+    else:
+        look = ""
+    _update(ws, pid, state="making", error=None, made_look=look or cur)
+    if look:   # draw it again in the other canvas look; the approved words and voice stay (ShortsWriter.run, options.restyle)
+        options = {"kept": {"topic": _topic_out(item)}, "kept_from": "your approved script", "plan_id": pid, "restyle": look, "slug": item["slug"]}
+    else:
+        options = {"kept": {"topic": _topic_out(item), "writer": d["writer"]}, "kept_from": "your approved script", "plan_id": pid}
 
     def go():
         try:

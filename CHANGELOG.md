@@ -3,6 +3,7 @@
 ## 0.2.0: YouTube, per-app settings and a faster Studio
 
 ### New
+- **Make an approved plan from the Factory's Use a plan list, in the look you pick.** Plans whose script and voice you approved are listed first under "Ready to make". Pick one, pick the look, and press Make video. Isometric and Signal (blue) speak the same beats, so switching between them draws the picture again and keeps your approved words and voice. The other looks need a script written in them, so they show as unavailable.
 - **dip_puck speaks slower: about 140 words a minute.** Speed is now 0.72, measured at 141 words a minute; it read at 181 at the old speed. Script lengths are lowered to match, so Shorts still land at 65–75 s and never pass 90 s: 105–185 words (Isometric and blue 105–180, aim 130–155; 3D 80–145).
 - **Your voice is cleaned properly, and there is an American version.**
   - **Every word written down as said.** Speech-to-text now writes every word exactly as said, using the large Whisper model on the lab's GPU. The old one hid repeats, restarts and "um"s, so they were never cut.

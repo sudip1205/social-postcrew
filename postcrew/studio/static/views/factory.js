@@ -180,6 +180,18 @@ function fcPlay(src) {
   const dlg = $("#fc-player"); dlg.querySelector("video").src = src; dlg.showModal(); dlg.querySelector("video").play();
 }
 
+let FC_READY = [];
+function fcReadyPick() {   // an approved plan is picked: choose its look and make the video (owner, 2026-11-18)
+  const v = $("#fc-plan").value, box = $("#fc-make");
+  const x = v.startsWith("ready:") ? FC_READY.find(r => r.id === v.slice(6)) : null;
+  box.classList.toggle("hidden", !x);
+  if (!x) return;
+  const look = $("#fc-look"), keep = look.dataset.plan === x.id ? look.value : x.look;
+  look.innerHTML = x.looks.map(l => `<option value="${esc(l.id)}" ${l.ok ? "" : "disabled"} title="${esc(l.why)}">${esc(l.label)}${l.id === x.look ? " (as written)" : l.ok ? " (redrawn, same words and voice)" : " (needs a new script)"}</option>`).join("");
+  look.dataset.plan = x.id;
+  look.value = x.looks.some(l => l.id === keep && l.ok) ? keep : x.look;
+}
+
 let FC_REFS = [];
 function fcDrawRefs(refs) {
   if (refs) FC_REFS = refs; else refs = FC_REFS;
@@ -257,11 +269,16 @@ function fcDraw(d) {
   $("#fc-send").disabled = d.busy;
   $("#fc-stop").classList.toggle("hidden", !d.busy);
   if (!document.activeElement?.closest?.("#fc-videos")) fcDrawVideos(d);   // never redraw the list while you are typing in it
-  const sel = $("#fc-plan"), was = sel.value;
-  if (sel.dataset.ids !== (d.plans || []).map(x => x.id).join(",")) {
-    sel.innerHTML = `<option value="">${(d.plans || []).length ? "Pick one of your plans…" : "No plans waiting in Manual run"}</option>` +
-      (d.plans || []).map(x => `<option value="${esc(x.id)}">${esc(x.title)} · ${esc(x.format)}${x.files ? ` · ${x.files} file${x.files > 1 ? "s" : ""}` : ""}</option>`).join("");
-    sel.dataset.ids = (d.plans || []).map(x => x.id).join(","); sel.value = was;
+  const sel = $("#fc-plan"), was = sel.value, ready = d.ready || [], manual = d.plans || [];
+  FC_READY = ready;
+  const ids = JSON.stringify([ready.map(x => [x.id, x.look]), manual.map(x => x.id)]);
+  if (sel.dataset.ids !== ids) {
+    const lookName = (x) => (x.looks.find(l => l.id === x.look) || {}).label || x.look || "look not known";
+    sel.innerHTML = `<option value="">${ready.length || manual.length ? "Pick a plan…" : "No approved scripts or Manual run plans yet"}</option>` +
+      (ready.length ? `<optgroup label="Ready to make: script and voice approved">${ready.map(x => `<option value="ready:${esc(x.id)}">${esc(x.title)} · ${esc(lookName(x))}</option>`).join("")}</optgroup>` : "") +
+      (manual.length ? `<optgroup label="Manual run plans: send to the chat">${manual.map(x => `<option value="${esc(x.id)}">${esc(x.title)} · ${esc(x.format)}${x.files ? ` · ${x.files} file${x.files > 1 ? "s" : ""}` : ""}</option>`).join("")}</optgroup>` : "");
+    sel.dataset.ids = ids; sel.value = [...sel.options].some(o => o.value === was) ? was : "";
+    fcReadyPick();
   }
   if (d.references) fcDrawRefs(d.references);
   $("#fc-skillver").textContent = d.skill_version?.fingerprint ? `version ${d.skill_version.fingerprint}, changed ${ago(d.skill_version.changed)}` : "";
@@ -300,8 +317,13 @@ async function renderFactory() {
         <div id="fc-log" class="flex-1 overflow-y-auto p-5 space-y-3 bg-slate-50/50 rounded-t-xl"></div>
         <div class="p-3 border-t border-slate-200 flex flex-col gap-2">
           <div class="flex items-center gap-2">
-            <label class="text-xs font-semibold text-slate-600 flex items-center gap-1 shrink-0" for="fc-plan">${icon("assignment", "text-sm text-slate-400")}<span>${tip("Use a plan", "One of your own YouTube plans from Manual run: its words, how you want it made, the problem read from your files, and the files themselves go into the message. Moving its video to the Queue marks the plan as made.")}</span></label>
+            <label class="text-xs font-semibold text-slate-600 flex items-center gap-1 shrink-0" for="fc-plan">${icon("assignment", "text-sm text-slate-400")}<span>${tip("Use a plan", "Ready to make: a Factory plan whose script and voice you approved. Pick it, pick the look, and Make video. Manual run plans: your own YouTube plans; their words, how you want it made and your files go into the chat message.")}</span></label>
             <select id="fc-plan" class="flex-1 min-w-0 text-xs border border-slate-300 rounded-md px-2 py-1.5 bg-white"></select>
+          </div>
+          <div id="fc-make" class="hidden flex flex-wrap items-center gap-2 rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-2">
+            <label class="text-xs font-semibold text-emerald-800 flex items-center gap-1 shrink-0" for="fc-look">${icon("palette", "text-sm")}<span>${tip("Look", "The look to make this video in. Isometric and Signal (blue) speak the same beats, so the approved script and your approved voice stay and only the picture is drawn again. The other looks need a script written in them: Write again in Factory > Plans with that look ticked.")}</span></label>
+            <select id="fc-look" class="flex-1 min-w-0 text-xs border border-emerald-300 rounded-md px-2 py-1.5 bg-white"></select>
+            <button id="fc-makego" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50 disabled:cursor-not-allowed">${icon("movie", "text-sm")}<span>Make video</span></button>
           </div>
           <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5">
             <span class="text-xs font-semibold text-slate-600 flex items-center gap-1 shrink-0">${icon("palette", "text-sm text-slate-400")}<span>${tip("Looks", "The looks a video may use. Several ticked: Claude mixes them scene by scene. Story is used in Shorts only, VS Code in long algorithm videos only. The crew's own videos use the same choice.")}</span></span>
@@ -369,11 +391,23 @@ async function renderFactory() {
   };
   $("#fc-send").onclick = send;
   $("#fc-plan").onchange = async e => {
-    if (!e.target.value) return;
+    fcReadyPick();
+    if (!e.target.value || e.target.value.startsWith("ready:")) return;
     const cur = $("#fc-text").value.trim();
     if (cur && !confirm("Replace what you have typed with this plan?")) { e.target.value = ""; return; }
     try { const r = await api(`/api/factory/plan?id=${encodeURIComponent(e.target.value)}`); $("#fc-text").value = r.text; $("#fc-text").focus(); }
     catch (err) { toast(err.message, true); }
+  };
+  $("#fc-makego").onclick = async e => {
+    const b = e.currentTarget, id = $("#fc-plan").value.slice(6), look = $("#fc-look").value;
+    const x = FC_READY.find(r => r.id === id); if (!x) return;
+    b.disabled = true;
+    try {
+      await post("/api/factory-plans/make", { id, look: look === x.look ? "" : look });
+      toast(look === x.look ? "Making the video: it goes to the Queue when done" : "Drawing it again in the new look, then making the video (your words and voice stay)");
+      $("#fc-plan").value = ""; fcReadyPick(); fcPoll(); if (typeof vdOpen === "function") vdOpen();
+    } catch (err) { toast(err.message, true); }
+    b.disabled = false;
   };
   $("#fc-text").onkeydown = e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } };
   $("#fc-stop").onclick = async () => { try { fcDraw(await post("/api/factory/stop")); } catch (e) { toast(e.message, true); } };
