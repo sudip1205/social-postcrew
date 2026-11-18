@@ -158,3 +158,27 @@ class RestyleTests(unittest.TestCase):
             d = voice_desk.desk(ep)
             self.assertEqual((d["script"], d["voice"]["state"], d["writer"]["look"]), ("approved", "approved", "blue"))
             self.assertTrue(out["reused"])
+
+
+class RecoveryAndLookTests(unittest.TestCase):
+    def test_a_plan_cut_off_by_a_restart_goes_back_with_the_reason(self):
+        with TempWorkspace() as ws:
+            item = factory_plans.add_own(ws, "Playlists with linked lists")
+            factory_plans._update(ws, item["id"], state="writing")
+            factory_plans._jobs.pop(item["id"], None)
+            notes = factory_plans.recover(ws)
+            got = factory_plans.get(ws, item["id"])
+            self.assertEqual(got["state"], "planned")
+            self.assertIn("restarted", got["error"])
+            self.assertEqual(len(notes), 1)
+
+    def test_signal_ticked_alone_makes_an_iso_script_in_blue(self):
+        from postcrew import factory_styles
+        with TempWorkspace() as ws, fake_factory(ws, desk=True) as (root, calls):
+            item = FactoryPlanTests._approved(self, ws, root, "iso")
+            factory_styles.save(ws, ["signal"])
+            self.assertEqual(factory_plans.ready(ws)[0]["want"], "blue")
+            seen = []
+            factory_plans.make(ws, item["id"], runner=lambda ws_, options, fmt: seen.append(options) or {"ok": True, "run_id": "r"})
+            wait(item["id"])
+            self.assertEqual(seen[0]["restyle"], "blue")

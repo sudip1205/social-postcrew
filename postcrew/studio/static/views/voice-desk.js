@@ -225,7 +225,7 @@ function vdDetail(p) {
     </div>
     <div class="lg:col-span-2 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3">
       <p class="text-sm text-slate-700">${icon("movie", "text-slate-500 align-middle")} ${making ? "Making the video now. It appears in the Queue when it is done."
-        : ready ? `Script and voice approved. It is made in the style its script was written in${ep.style ? ` (${esc(ep.style)})` : ""}.` : "Approve the script and the voice, then make the video."}</p>
+        : ready ? `Script and voice approved. It is made in ${p.want && VD_LOOK[p.want === "blue" ? "signal" : p.want] ? `the ${esc(VD_LOOK[p.want === "blue" ? "signal" : p.want])} look (the Looks ticked below)` : "the look its script was written in"}${ep.style ? `; written in ${esc(ep.style)}` : ""}.` : "Approve the script and the voice, then make the video."}</p>
       ${button("primary", "play_arrow", making ? "Making…" : "Make the video", `${makeAttr} ${ready && !making ? "" : "disabled"}`)}
     </div>
   </div>`;

@@ -18,7 +18,7 @@ import threading
 import uuid
 from datetime import date, datetime, timezone
 
-from . import platforms
+from . import factory_styles, platforms
 
 STATE = "factory-plans"
 PLATFORM = "youtube"
@@ -233,6 +233,28 @@ def looks_for(current):
     return out
 
 
+def busy():
+    return any(j.get("done") is None for j in _jobs.values())
+
+
+def recover(ws):
+    """At start: a plan left "writing" or "making" by a restart has no job any more. Put it back where it was, with the reason."""
+    notes = []
+    for i in load(ws)["items"]:
+        if i.get("state") in ("writing", "making") and (_jobs.get(i["id"]) or {}).get("done", "x") is not None:
+            back = "planned" if i["state"] == "writing" else "script"
+            what = "writing its script" if i["state"] == "writing" else "making its video"
+            _update(ws, i["id"], state=back, error=f"the Studio restarted while {what}: press {'Write script' if back == 'planned' else 'Make the video'} again")
+            notes.append(f"Factory plan {i['id']} ({i.get('title', '')[:50]}) was interrupted while {what}: back to {back}")
+    return notes
+
+
+def ticked_look(ws):
+    """The canvas look the ticked Looks ask for: Signal ticked alone = "blue", Isometric = "iso"; None for any other choice."""
+    t = factory_styles.ticked(ws)
+    return {("signal",): "blue", ("iso",): "iso"}.get(tuple(t))
+
+
 def ready(ws):
     """Plans whose script and voice are approved: they can be made now, in their own look or one that keeps the same narration."""
     from . import voice_desk
@@ -246,6 +268,7 @@ def ready(ws):
             continue
         cur = look_of(d, ep)
         out.append({"id": i["id"], "title": i.get("title") or d.get("title") or i["slug"], "format": i.get("format", "short"), "look": cur,
+                    "want": (ticked_look(ws) if cur in LOOKS else None) or cur,
                     "voice": (d.get("voice") or {}).get("mode") or "", "looks": looks_for(cur)})
     return out
 
@@ -262,6 +285,8 @@ def make(ws, pid, look=None, runner=None):
     if item.get("state") == "making":
         raise ValueError("the video is already being made")
     cur, look = look_of(d, ep), str(look or "").strip()
+    if not look and cur in LOOKS:   # no look picked: the Looks ticked in the Factory (owner, 2026-11-18: "single blue" made it isometric)
+        look = ticked_look(ws) or ""
     if look and look != cur:
         if look not in LOOKS or cur not in LOOKS:
             raise ValueError(f"this script was written for the {cur or 'other'} look: write it again with that look ticked to make it in another one")
@@ -301,6 +326,8 @@ def view(ws):
         if i.get("slug"):
             try:
                 row["episode"] = voice_desk.episode(ws, i["slug"])
+                cur = look_of(voice_desk.desk(voice_desk._root(ws) / "episodes" / i["slug"]), voice_desk._root(ws) / "episodes" / i["slug"])
+                row["want"] = (ticked_look(ws) if cur in LOOKS else None) or cur
             except ValueError:
                 row["episode"] = None
         out.append(row)

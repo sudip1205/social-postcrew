@@ -79,7 +79,7 @@ class Studio:
         now = crew.local_now(cfg)
         target = crew.target_date(cfg, now)
         return {"version": __version__, "workspace": str(self.ws.root), "running": crew.is_running(), "planning": self.planning,
-                "analyzing": self.motion.busy,
+                "analyzing": self.motion.busy, "factory": factory_plans.busy() or voice_desk.busy(),
                 "platform": platform,
                 "platforms": [{"id": p, "label": platforms.label(p), "enabled": platforms.is_enabled(full, p)}
                               for p in platforms.PLATFORM_IDS],
@@ -1160,6 +1160,11 @@ def serve(ws, port=8765, scheduler=True, host="127.0.0.1", token=None):
     token = None if local else access_token(ws, token)
     studio = Studio(ws, port, token)
     studio.resume_plan_jobs()
+    try:   # work a restart cut off: say so, and let it be started again (owner, 2026-11-18: a plan hung on "writing")
+        for note in factory_plans.recover(ws) + crew.mark_interrupted(ws):
+            print(note, flush=True)
+    except Exception:
+        traceback.print_exc()
     httpd = ThreadingHTTPServer((host, port), make_handler(studio))
     if scheduler:
         Scheduler(ws).start()

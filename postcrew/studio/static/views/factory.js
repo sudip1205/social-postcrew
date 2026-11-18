@@ -188,8 +188,10 @@ function fcReadyPick() {   // an approved plan is picked: choose its look and ma
   if (!x) return;
   const look = $("#fc-look"), keep = look.dataset.plan === x.id ? look.value : x.look;
   look.innerHTML = x.looks.map(l => `<option value="${esc(l.id)}" ${l.ok ? "" : "disabled"} title="${esc(l.why)}">${esc(l.label)}${l.id === x.look ? " (as written)" : l.ok ? " (redrawn, same words and voice)" : " (needs a new script)"}</option>`).join("");
+  if (look.dataset.plan !== x.id) look.dataset.picked = "";
   look.dataset.plan = x.id;
-  look.value = x.looks.some(l => l.id === keep && l.ok) ? keep : x.look;
+  const want = look.dataset.plan === x.id && look.dataset.picked ? keep : x.want || x.look;   // the Looks you ticked, unless you picked another
+  look.value = x.looks.some(l => l.id === want && l.ok) ? want : x.look;
 }
 
 let FC_REFS = [];
@@ -271,7 +273,7 @@ function fcDraw(d) {
   if (!document.activeElement?.closest?.("#fc-videos")) fcDrawVideos(d);   // never redraw the list while you are typing in it
   const sel = $("#fc-plan"), was = sel.value, ready = d.ready || [], manual = d.plans || [];
   FC_READY = ready;
-  const ids = JSON.stringify([ready.map(x => [x.id, x.look]), manual.map(x => x.id)]);
+  const ids = JSON.stringify([ready.map(x => [x.id, x.look, x.want]), manual.map(x => x.id)]);
   if (sel.dataset.ids !== ids) {
     const lookName = (x) => (x.looks.find(l => l.id === x.look) || {}).label || x.look || "look not known";
     sel.innerHTML = `<option value="">${ready.length || manual.length ? "Pick a plan…" : "No approved scripts or Manual run plans yet"}</option>` +
@@ -398,12 +400,13 @@ async function renderFactory() {
     try { const r = await api(`/api/factory/plan?id=${encodeURIComponent(e.target.value)}`); $("#fc-text").value = r.text; $("#fc-text").focus(); }
     catch (err) { toast(err.message, true); }
   };
+  $("#fc-look").onchange = e => { e.target.dataset.picked = "1"; };
   $("#fc-makego").onclick = async e => {
     const b = e.currentTarget, id = $("#fc-plan").value.slice(6), look = $("#fc-look").value;
     const x = FC_READY.find(r => r.id === id); if (!x) return;
     b.disabled = true;
     try {
-      await post("/api/factory-plans/make", { id, look: look === x.look ? "" : look });
+      await post("/api/factory-plans/make", { id, look });
       toast(look === x.look ? "Making the video: it goes to the Queue when done" : "Drawing it again in the new look, then making the video (your words and voice stay)");
       $("#fc-plan").value = ""; fcReadyPick(); fcPoll(); if (typeof vdOpen === "function") vdOpen();
     } catch (err) { toast(err.message, true); }

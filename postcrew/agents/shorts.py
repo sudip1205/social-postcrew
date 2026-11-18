@@ -88,7 +88,9 @@ def iso_check(root, ep):
         got = json.loads((Path(ep) / "build-iso" / "check.json").read_text()).get("problems") or []
     except (OSError, ValueError):
         got = []
-    return got or [((r.stderr or r.stdout or "").strip().splitlines() or [f"the check failed (exit {r.returncode})"])[-1]]
+    out = (r.stderr or r.stdout or "").strip().splitlines()
+    err = [x.strip() for x in out if re.match(r"\s*(\w*Error|Error)\b|\s*throw\b", x)] or [x for x in out if x.strip() and not x.startswith("Node.js v")]
+    return got or [f"the storyboard check crashed: {(err or [f'exit {r.returncode}'])[0][:300]}"]
 
 WORDS_PER_SECOND_3D = 2.0  # 2026-11-18: dip_puck at ~140 wpm (was 2.5); long videos: about 90% of the target length after beat pauses (measured 2026-11-14)
 

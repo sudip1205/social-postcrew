@@ -985,3 +985,8 @@ def make(ws, slug, runner=None):
     return episode(ws, slug)
 
 
+
+
+def busy():
+    """A voice being processed or generated, or a video being made from the desk (a restart would cut it off)."""
+    return any(j.get("done") is None for j in _jobs.values())

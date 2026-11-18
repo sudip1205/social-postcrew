@@ -90,6 +90,22 @@ def is_running():
     return _running.locked()
 
 
+def mark_interrupted(ws):
+    """At start (no run can be in progress yet): a run still marked running was cut off by a restart. Say so, so it can be run again."""
+    import json
+    notes = []
+    for st in sorted(ws.runs_dir.glob("*/status.json"))[-60:]:
+        try:
+            d = json.loads(st.read_text())
+        except (OSError, ValueError):
+            continue
+        if d.get("state") == "running" and not is_running():
+            d.update(state="interrupted", result="the Studio restarted while this run was working: run it again", finished_at=d.get("finished_at"))
+            st.write_text(json.dumps(d, indent=2, ensure_ascii=False) + "\n")
+            notes.append(f"Run {st.parent.name} was interrupted by a restart")
+    return notes
+
+
 def list_runs(ws, limit=50):
     import json
     out = []
