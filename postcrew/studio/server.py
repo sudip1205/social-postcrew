@@ -1046,6 +1046,7 @@ def make_handler(studio):
                     ("POST", "/api/voice-desk/voice"): lambda: voice_desk.choose(ws, self.body().get("slug"), self.body().get("mode")),
                     ("POST", "/api/voice-desk/reopen"): lambda: voice_desk.reopen_voice(ws, self.body().get("slug")),
                     ("POST", "/api/voice-desk/make"): lambda: voice_desk.make(ws, self.body().get("slug")),
+                    ("POST", "/api/voice-desk/delete"): lambda: voice_desk.delete(ws, self.body().get("slug")),
                     ("POST", "/api/factory/voice/clear"): lambda: factory_voice.clear(ws, self.body().get("slug"), self.body().get("scene")),
                     ("POST", "/api/factory/voice/render"): lambda: factory_voice.render(ws, self.body().get("slug")),
                     ("POST", "/api/factory/references/link"): lambda: factory_refs.add_link(ws, self.body().get("url"), self.body().get("comment")),

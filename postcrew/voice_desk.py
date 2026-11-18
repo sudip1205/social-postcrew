@@ -214,6 +214,26 @@ def view(ws):
                 enabled=enabled(cfg))
 
 
+def delete(ws, slug):
+    """Delete a waiting script that is not one of your plans (Factory chat, a manual run): its episode moves to episodes/.deleted/ (so it
+    can still be got back by hand) and it is never used again."""
+    ep = _ep(ws, slug)
+    d = desk(ep)
+    if (_jobs.get(slug) or {}).get("done") is None and _jobs.get(slug):
+        raise ValueError("this script is being worked on: delete it when that is finished")
+    if (d.get("run") or {}).get("state") == "making":
+        raise ValueError("its video is being made")
+    with _lock:
+        st = index(ws)
+        st["days"] = {k: v for k, v in (st.get("days") or {}).items() if v != slug}
+        ws.save_state(STATE, st)
+    bin_ = ep.parent / ".deleted"
+    bin_.mkdir(exist_ok=True)
+    dest = bin_ / f"{slug}-{int(time.time())}"
+    shutil.move(str(ep), str(dest))
+    return {"ok": True}
+
+
 def chat_episodes(ws, days=7):
     """Scripts written in the Factory chat in the last days and not made yet: they wait for your voice too."""
     root = _root(ws)

@@ -85,7 +85,7 @@ function vdRow(p) {
         ${p.error ? `<p class="text-xs text-rose-700 mt-0.5">${esc(p.error)}</p>` : ""}
       </div>
       ${chip(st, word, "sm")}
-      ${p.other ? "" : button("secondary", "delete", "Delete", `data-vd-remove="${p.id}" title="Delete this plan from the Factory" ${p.state === "writing" || p.state === "making" ? "disabled" : ""}`)}
+      ${button("secondary", "delete", "Delete", `${p.other ? `data-vd-remove-ep="${esc(p.slug)}"` : `data-vd-remove="${p.id}"`} title="Delete it from the Factory" ${p.state === "writing" || p.state === "making" || (vdBusy(p.episode?.job) && p.episode.job.what === "video") ? "disabled" : ""}`)}
       ${icon(open ? "expand_less" : "expand_more", "text-slate-400")}
     </div>` + (open ? vdDetail(p) : "");
 }
@@ -197,14 +197,15 @@ function vdWire(root) {
     const id = b.dataset.vdScript, instr = root.querySelector(`[data-vd-instr="${id}"]`)?.value || "";
     go(() => post("/api/factory-plans/script", { id, instructions: instr }), "Writing the script. It appears here when it is written.");
   }));
-  root.querySelectorAll("[data-vd-remove]").forEach(b => b.addEventListener("click", () => {
+  root.querySelectorAll("[data-vd-remove],[data-vd-remove-ep]").forEach(b => b.addEventListener("click", () => {
     if (b.dataset.armed !== "1") {   // no browser dialogs: a second click confirms
       b.dataset.armed = "1"; b.querySelector("span:last-child").textContent = "Click again to delete";
       setTimeout(() => { if (b.isConnected) { b.dataset.armed = ""; b.querySelector("span:last-child").textContent = "Delete"; } }, 4000);
       return;
     }
-    VD_OPEN.delete(b.dataset.vdRemove);
-    go(() => post("/api/factory-plans/remove", { id: b.dataset.vdRemove }), "Plan deleted.");
+    const ep = b.dataset.vdRemoveEp;
+    VD_OPEN.delete(ep || b.dataset.vdRemove);
+    go(() => ep ? post("/api/voice-desk/delete", { slug: ep }) : post("/api/factory-plans/remove", { id: b.dataset.vdRemove }), ep ? "Script deleted." : "Plan deleted.");
   }));
   root.querySelectorAll("[data-vd-edit]").forEach(b => b.addEventListener("click", () => { VD_EDIT.add(b.dataset.vdEdit); vdDraw(); }));
   root.querySelectorAll("[data-vd-cancel]").forEach(b => b.addEventListener("click", () => { VD_EDIT.delete(b.dataset.vdCancel); vdDraw(); }));

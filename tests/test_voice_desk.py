@@ -135,6 +135,11 @@ class DeskRunTests(unittest.TestCase):
             v = voice_desk.view(ws)
             self.assertEqual(v["plans"], [])
             self.assertEqual(len(v["others"]), 1)
+            slug = v["others"][0]["slug"]
+            voice_desk.delete(ws, slug)                               # Delete: gone from the desk, kept in episodes/.deleted
+            self.assertEqual(voice_desk.view(ws)["others"], [])
+            self.assertNotIn(slug, (voice_desk.index(ws).get("days") or {}).values())
+            self.assertEqual(len(list((voice_desk._root(ws) / "episodes" / ".deleted").iterdir())), 1)
 
 @unittest.skipUnless(HAVE_FFMPEG, "ffmpeg is needed")
 class ProcessTests(unittest.TestCase):
