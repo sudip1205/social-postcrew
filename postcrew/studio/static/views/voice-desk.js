@@ -16,8 +16,13 @@ async function vdOpen() {
   vdTimer = setInterval(() => { if (!document.getElementById("vd-root")) return clearInterval(vdTimer); vdLoad(); }, 5000);
 }
 
-async function vdLoad() {
-  try { VD = await api("/api/voice-desk"); vdDraw(); }
+let vdLast = "";
+async function vdLoad(force) {
+  try {
+    const d = await api("/api/voice-desk"), key = JSON.stringify(d);
+    if (!force && key === vdLast && document.getElementById("vd-root")?.childElementCount) return;   // nothing changed: no redraw, no flicker
+    vdLast = key; VD = d; vdDraw();
+  }
   catch (e) { const r = document.getElementById("vd-root"); if (r) r.innerHTML = `<p class="p-5 text-sm text-rose-700">${esc(e.message)}</p>`; }
 }
 
@@ -40,7 +45,12 @@ function vdDraw() {
   if (!root || !VD) return;
   const a = document.activeElement;
   if (a && root.contains(a) && (a.tagName === "TEXTAREA" || a.tagName === "INPUT" && a.type === "text")) return;   // never redraw over your typing
+  if ([...root.querySelectorAll("audio")].some(x => !x.paused)) return;   // never cut off a recording you are listening to
+  // keep where you were: the page scroll and every scrolled list (the script lines) survive the redraw
+  const pageY = window.scrollY, lists = {};
+  root.querySelectorAll("[data-vd-scroll]").forEach(el => { lists[el.dataset.vdScroll] = el.scrollTop; });
   const pl = VD.planning;
+  root.style.minHeight = root.offsetHeight + "px";
   root.innerHTML = `
     <div class="px-5 py-4 border-b border-slate-200">
       <div class="flex items-center gap-3 mb-3">
@@ -71,6 +81,9 @@ function vdDraw() {
     ${VD.others?.length ? `<p class="px-5 pt-4 pb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 border-t border-slate-200">Other scripts waiting for your voice (Factory chat, manual runs)</p>
       <div class="divide-y divide-slate-100 border-t border-slate-100">${VD.others.map(ep => vdRow({ id: "", title: ep.title, topic: "", state: "script", slug: ep.slug, episode: ep, other: true })).join("")}</div>` : ""}`;
   vdWire(root);
+  root.querySelectorAll("[data-vd-scroll]").forEach(el => { if (lists[el.dataset.vdScroll] != null) el.scrollTop = lists[el.dataset.vdScroll]; });
+  root.style.minHeight = "";
+  if (Math.abs(window.scrollY - pageY) > 1) window.scrollTo(0, pageY);
 }
 
 function vdRow(p) {
@@ -137,7 +150,7 @@ function vdDetail(p) {
         <span class="text-[11px] text-slate-500">${ep.words} words${ep.style ? ` · ${esc(ep.style)}` : ""}</span>
       </div>
       <p class="text-xs text-slate-500 mb-2">Read it aloud in one take, line by line. Retakes are fine: say the line again and the last take is kept.</p>
-      <ol class="space-y-2 max-h-80 overflow-y-auto pr-1">${lines}</ol>
+      <ol data-vd-scroll="${esc(ep.slug)}" class="space-y-2 max-h-80 overflow-y-auto pr-1">${lines}</ol>
       ${!editing && ep.hook_options?.length > 1 ? `<div class="mt-3 rounded-lg bg-violet-50/60 border border-violet-100 p-3">
         <p class="text-xs font-semibold text-violet-800 mb-1">${tip("Catch lines", "The opening line decides if a viewer keeps watching. The Script Writer wrote these options; the first line of the script is the one it picked.")}</p>
         <ul class="space-y-1">${ep.hook_options.map((h, k) => { const cls = h === ep.lines[0] ? "text-slate-900 font-medium" : "text-slate-700"; return `<li class="flex items-start gap-2 text-sm ${cls}">
@@ -183,7 +196,7 @@ function vdDetail(p) {
 }
 
 function vdWire(root) {
-  const go = async (fn, ok) => { try { await fn(); if (ok) toast(ok); } catch (e) { toast(e.message, true); } await vdLoad(); };
+  const go = async (fn, ok) => { try { await fn(); if (ok) toast(ok); } catch (e) { toast(e.message, true); } await vdLoad(true); };
   const val = id => root.querySelector(id)?.value || "";
   root.querySelector("#vd-plan")?.addEventListener("click", () => {
     const topic = val("#vd-topic").trim();
