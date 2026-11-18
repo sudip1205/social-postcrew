@@ -57,6 +57,8 @@ class FactoryPlanTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 factory_plans.make(ws, item["id"])                                      # not approved yet
             voice_desk.approve_script(ws, item["slug"])
+            from tests.test_voice_desk import _fake_generate
+            _fake_generate(ws, item["slug"], "am_puck")      # the AI voice is generated and listened to before it is approved
             voice_desk.choose(ws, item["slug"], "am_puck")
             self.assertEqual(factory_plans.get(ws, item["id"])["state"], "script")      # approving makes nothing by itself
             n_claude = sum(1 for c in calls if "claude" in c[0][0])
@@ -67,7 +69,7 @@ class FactoryPlanTests(unittest.TestCase):
             self.assertEqual(sum(1 for c in calls if "claude" in c[0][0]), n_claude)     # the approved script was used as it is
             self.assertTrue(any(c[0][:3] == ["npm", "run", "make"] for c in calls))
             self.assertEqual(len(ws.queue()), 1)
-            self.assertEqual(json.loads((ep / "script.json").read_text())["voice"], "am_puck")
+            self.assertEqual(json.loads((ep / "script.json").read_text())["voice_kokoro"], "am_puck")   # the approved take, read by am_puck
             self.assertEqual(factory_plans.view(ws)["plans"], [])
 
     def test_a_plan_can_be_deleted_but_not_while_it_is_worked_on(self):

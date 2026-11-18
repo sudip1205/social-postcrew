@@ -51,7 +51,8 @@ def settings(cfg):
     return {"enabled": d.get("enabled", True),
             "seedvc_dir": d.get("seedvc_dir", "~/voicelab/seed-vc"), "target": d.get("target", "~/voicelab/refs/am_puck.wav"),   # the timbre dip_puck was trained on (measured: as close to dip_puck as a dip_puck clip)
             "steps": int(d.get("diffusion_steps", 40)), "cfg_rate": float(d.get("cfg_rate", 0.7)),
-            "whisper_python": d.get("whisper_python", "~/voicelab/f5env/bin/python"), "tts_url": d.get("tts_url", "http://127.0.0.1:8882")}
+            "whisper_python": d.get("whisper_python", "~/voicelab/f5env/bin/python"), "tts_url": d.get("tts_url", "http://127.0.0.1:8882"),
+            "am_url": d.get("am_url", "http://127.0.0.1:8880")}   # Kokoro, for am_puck
 
 
 def _cfg(ws):
@@ -241,8 +242,10 @@ def episode(ws, slug):
     return {"slug": slug, "title": d.get("title") or script.get("title") or script.get("topic") or slug, "topic": d.get("topic", ""),
             "style": script.get("style") or "", "lines": lines(script), "hook_options": [str(h) for h in script.get("hook_options") or [] if str(h).strip()][:5], "outro": bool(script.get("beats")), "script": d.get("script", "draft"),
             "voice": v, "report": rep, "job": _jobs.get(slug), "run": d.get("run"),
-            "audio": {k: f"{slug}/voice-take/{f}" for k, f in (("converted", "take-converted.wav"), ("american", "take-american.wav"), ("cleaned", "take.wav"))
+            "audio": {k: f"{slug}/voice-take/{f}" for k, f in (("converted", "take-converted.wav"), ("american", "take-american.wav"), ("cleaned", "take.wav"), ("ai", "take-ai.wav"))
                       if (take / f).exists()},
+            "ai_lines": [f"{slug}/voice-take/scenes-ai/scene{i}.wav" if (take / "scenes-ai" / f"scene{i}.wav").exists() else None
+                         for i in range(len(lines(script)))],
             "words": sum(len(x.split()) for x in lines(script)[:-1 if script.get("beats") else None])}
 
 
@@ -265,9 +268,14 @@ def save_lines(ws, slug, new_lines):
     d = _adopt(ep)
     if new != old[:n]:
         d["script"] = "draft"
-        if (d.get("voice") or {}).get("mode") == "own":   # a recording of the old words no longer matches
+        v = d.get("voice") or {}
+        if v.get("mode") == "own":   # a recording of the old words no longer matches
             d["voice"] = {"state": "none", "note": "the script changed: record it again"}
             _clear_scene_files(ep)
+        elif v.get("mode") in AI_VOICES and (ep / "voice-take" / "scenes-ai").exists():   # read the changed lines again, at once
+            _save_desk(ep, d)
+            changed = [i for i, (a, b) in enumerate(zip(old, new)) if a != b]
+            return generate(ws, slug, v["mode"], redo=changed or None)
     _save_desk(ep, d)
     return episode(ws, slug)
 
@@ -551,10 +559,10 @@ def _join(files_gaps, out_wav, tmpd):
     _ffmpeg("-f", "concat", "-safe", "0", "-i", str(lst), "-ar", "48000", "-ac", "1", "-c:a", "pcm_s16le", str(out_wav))
 
 
-def tts(cfg, text, out_wav, voice="dip_puck"):
-    """The channel voice reads one sentence (the lab's dip_puck server)."""
+def tts(cfg, text, out_wav, voice="dip_puck", url=None):
+    """The channel voice reads one sentence (the lab's dip_puck server; url: another Kokoro-compatible server)."""
     import urllib.request
-    s = settings(cfg)
+    s = dict(settings(cfg), tts_url=url or settings(cfg)["tts_url"])
     req = urllib.request.Request(s["tts_url"].rstrip("/") + "/v1/audio/speech",
                                  json.dumps({"model": "kokoro", "input": text, "voice": voice, "response_format": "wav"}).encode(),
                                  {"Content-Type": "application/json"})
@@ -752,26 +760,28 @@ def process(ws, slug, converter=convert, words_of=None, speaker=None):
 
 
 def choose(ws, slug, mode):
-    """Approve the voice: own (your processed recording) or skip to dip_puck / am_puck."""
+    """Approve the voice: own (your processed recording), or the dip_puck / am_puck take generated for you to listen to first."""
     if mode not in MODES:
         raise ValueError("voice must be one of: " + ", ".join(MODES))
     ep = _ep(ws, slug)
     d = _adopt(ep)
     script = _read(ep / "script.json", {})
+    v = d.get("voice") or {}
+    ai = mode in AI_VOICES
+    staged = ep / "voice-take" / ("scenes-ai" if ai else "scenes" if mode == "own" else "scenes-us")
+    if ai and (v.get("mode") != mode or v.get("state") not in ("ready", "approved") or not staged.exists()):
+        raise ValueError(f"generate the {mode} voice first and listen to it")
+    if not ai and (v.get("state") not in ("ready", "approved") or not staged.exists()):
+        raise ValueError("upload your recording first, and wait for it to be processed")
     _clear_scene_files(ep)
-    if mode in ("own", "own_us"):
-        staged = ep / "voice-take" / ("scenes" if mode == "own" else "scenes-us")
-        if (d.get("voice") or {}).get("state") not in ("ready", "approved") or not staged.exists():
-            raise ValueError("upload your recording first, and wait for it to be processed")
-        (ep / "voice").mkdir(exist_ok=True)
-        for f in staged.iterdir():
-            shutil.copy2(f, ep / "voice" / f.name)
-        if script.get("voice") != "own":
-            script["voice_kokoro"] = script.get("voice") if script.get("voice") in ("dip_puck", "am_puck") else "dip_puck"
-        script["voice"] = "own"   # lines not found in the recording are read by voice_kokoro
-    else:
-        script["voice"] = mode
-        script.pop("voice_kokoro", None)
+    (ep / "voice").mkdir(exist_ok=True)
+    for f in staged.iterdir():   # the video uses exactly the take you heard
+        shutil.copy2(f, ep / "voice" / f.name)
+    if ai:
+        script["voice_kokoro"] = mode
+    elif script.get("voice") != "own":
+        script["voice_kokoro"] = script.get("voice") if script.get("voice") in ("dip_puck", "am_puck") else "dip_puck"
+    script["voice"] = "own"   # lines not in the take are read by voice_kokoro
     _write(ep / "script.json", script)
     d["voice"] = dict(d.get("voice") or {}, state="approved", mode=mode, approved=time.time())
     _save_desk(ep, d)
@@ -799,12 +809,151 @@ def _render_chat(ws, slug):
     _save_desk(ep, d)
 
 
+# ---------- dip_puck / am_puck: generated at once, listened to, regenerated from your feedback (owner, 2026-11-18) ----------
+AI_VOICES = ("dip_puck", "am_puck")
+LINE_GAP = 0.6   # between lines in the preview (and the gap the video leaves between beats)
+
+
+def generate(ws, slug, voice, feedback="", redo=None):
+    """Make the voice now so you can listen before approving: every line read by `voice`. With feedback, it is regenerated: the feedback
+    is turned into concrete changes (pace, pauses, how a word is said, which lines to read again) and only those lines are read again."""
+    if voice not in AI_VOICES:
+        raise ValueError("voice must be dip_puck or am_puck")
+    ep = _ep(ws, slug)
+    d = _adopt(ep)
+    if vd_busy(slug):
+        raise ValueError("the voice is already being made: wait for it")
+    feedback = str(feedback or "").strip()[:2000]
+    old = d.get("voice") or {}
+    prev = old.get("ai") if old.get("mode") == voice else None
+    d["voice"] = {"state": "processing", "mode": voice, "ai": prev or {}, "note": ""}
+    _clear_scene_files(ep)
+    _save_desk(ep, d)
+    _start(slug, "voice", lambda: _generate(ws, ep, voice, feedback, prev, redo))
+    return episode(ws, slug)
+
+
+def vd_busy(slug):
+    j = _jobs.get(slug)
+    return bool(j and j.get("done") is None)
+
+
+def _generate(ws, ep, voice, feedback, prev, redo):
+    cfg = _cfg(ws)
+    try:
+        script = _read(ep / "script.json", {})
+        texts = lines(script)
+        ai = dict(prev or {})
+        ai.setdefault("speed", 1.0)
+        ai.setdefault("pause", 0.35)
+        ai.setdefault("say", {})
+        ai.setdefault("feedback", [])
+        redo_lines = set(range(len(texts)))
+        if feedback or redo:
+            change = _feedback_to_changes(ws, cfg, texts, feedback, ai) if feedback else {}
+            ai["speed"] = min(1.25, max(0.75, float(change.get("speed") or ai["speed"])))
+            ai["pause"] = min(1.2, max(0.1, float(change.get("pause") or ai["pause"])))
+            for w, how in (change.get("say") or {}).items():
+                if str(w).strip() and str(how).strip():
+                    ai["say"][str(w).strip()] = str(how).strip()
+            asked = {int(i) - 1 for i in (change.get("lines") or []) if str(i).isdigit()} | {int(i) for i in (redo or [])}
+            asked = {i for i in asked if 0 <= i < len(texts)}
+            same_feel = change.get("speed") in (None, prev and prev.get("speed")) and change.get("pause") in (None, prev and prev.get("pause"))
+            if prev and asked and same_feel and not change.get("say"):
+                redo_lines = asked   # only the lines you named
+            ai["feedback"] = (ai["feedback"] + [{"text": feedback, "changes": change, "at": time.time()}])[-10:] if feedback else ai["feedback"]
+        take = ep / "voice-take"
+        staged = take / "scenes-ai"
+        staged.mkdir(parents=True, exist_ok=True)
+        tmpd = take / "tmp-ai"
+        shutil.rmtree(tmpd, ignore_errors=True)
+        tmpd.mkdir()
+        allf = []
+        for i, text in enumerate(texts):
+            clip = staged / f"scene{i}.wav"
+            if i in redo_lines or not clip.exists():
+                parts, words, t = [], [], 0.0
+                for n, sent in enumerate(_sentences(text)):
+                    raw = tmpd / f"l{i}s{n}.wav"
+                    _ai_tts(cfg, voice, _respell(sent, ai["say"]), raw)
+                    if abs(ai["speed"] - 1.0) > 0.01:
+                        fast = tmpd / f"l{i}s{n}f.wav"
+                        _ffmpeg("-i", str(raw), "-af", f"atempo={ai['speed']:.3f}", "-c:a", "pcm_s16le", str(fast))
+                        raw = fast
+                    secs = _secs(raw) or 1.0
+                    words += [{"w": w["w"], "s": round(w["s"] + t, 3), "e": round(w["e"] + t, 3)} for w in _even_words(sent, secs)]
+                    parts.append((raw, ai["pause"]))
+                    t += secs + ai["pause"]
+                if parts:
+                    parts[-1] = (parts[-1][0], 0)
+                _join(parts, clip, tmpd)
+                _write(staged / f"scene{i}.words.json", words)
+            allf.append((clip, LINE_GAP))
+        _join(allf, take / "take-ai.wav", tmpd)
+        shutil.rmtree(tmpd, ignore_errors=True)
+        ai.update(voice=voice, made=time.time(), redone=sorted(i + 1 for i in redo_lines) if len(redo_lines) < len(texts) else [],
+                  seconds=round(sum(_secs(f) or 0 for f, _ in allf), 1))
+        d = desk(ep)
+        d["voice"] = {"state": "ready", "mode": voice, "ai": ai}
+        _save_desk(ep, d)
+    except Exception as e:
+        d = desk(ep)
+        d["voice"] = {"state": "failed", "mode": voice, "error": f"{e}"[:400], "ai": prev or {}}
+        _save_desk(ep, d)
+        raise
+
+
+def _ai_tts(cfg, voice, text, out):
+    if voice == "dip_puck":
+        return tts(cfg, text, out, voice)
+    tts(cfg, text, out, voice, url=settings(cfg)["am_url"])
+
+
+def _respell(text, say):
+    for w, how in (say or {}).items():
+        text = re.sub(rf"(?<![\w-]){re.escape(w)}(?![\w-])", how, text, flags=re.I)
+    return text
+
+
+FEEDBACK_SCHEMA = {"type": "object", "properties": {
+    "speed": {"type": ["number", "null"], "description": "new tempo factor for the whole voice, 1.0 = as generated (0.75-1.25), null = keep"},
+    "pause": {"type": ["number", "null"], "description": "seconds of pause between sentences (0.1-1.2), null = keep"},
+    "say": {"type": "object", "additionalProperties": {"type": "string"},
+            "description": "words or abbreviations said wrong -> how to write them so the voice says them right, e.g. {\"SQL\": \"sequel\", \"O(n)\": \"O of n\"}"},
+    "lines": {"type": "array", "items": {"type": "integer"}, "description": "1-based line numbers to read again (empty = all of them)"},
+    "summary": {"type": "string", "description": "one sentence: what will change"}},
+    "required": ["lines", "summary"]}
+
+
+def _feedback_to_changes(ws, cfg, texts, feedback, ai):
+    """The owner's words about the voice -> concrete changes the voice can make."""
+    from .llm import make_backend, LLMError
+    system = ("You turn a YouTube creator's feedback on an AI narration voice into concrete changes. The voice is a text-to-speech model; "
+              "it can only be changed by: tempo (speed factor), the pause between sentences, rewriting how a word is spelled so it is "
+              "pronounced right (a respelling sent to the voice; the script itself does not change), and reading some lines again "
+              "(each new reading sounds a little different). Change only what the feedback asks for.")
+    prompt = (f"Current settings: speed {ai.get('speed', 1.0)}, pause {ai.get('pause', 0.35)} s, respellings {json.dumps(ai.get('say') or {})}.\n\n"
+              "The lines:\n" + "\n".join(f"{i + 1}. {t}" for i, t in enumerate(texts)) + f"\n\nThe owner's feedback:\n{feedback}")
+    try:
+        llm = make_backend(cfg, ws.secrets())
+        return llm.call("writer", system, prompt, FEEDBACK_SCHEMA, tools=(), cwd=str(_root(ws))).data or {}
+    except (LLMError, Exception) as e:
+        low = feedback.lower()   # without the model: the common asks still work
+        out = {"lines": [int(n) for n in re.findall(r"line\s*(\d+)", low)], "summary": f"model unavailable ({str(e)[:80]})"}
+        if re.search(r"slow", low):
+            out["speed"] = round(float(ai.get("speed", 1.0)) - 0.08, 2)
+        elif re.search(r"fast|quick", low):
+            out["speed"] = round(float(ai.get("speed", 1.0)) + 0.08, 2)
+        return out
+
+
 def reopen_voice(ws, slug):
     """Take the voice approval back (to upload again or pick another voice)."""
     ep = _ep(ws, slug)
     d = desk(ep)
-    has_take = (ep / "voice-take" / "scenes").exists()
-    d["voice"] = dict(d.get("voice") or {}, state="ready" if has_take and (d.get("voice") or {}).get("mode") == "own" else "none")
+    mode = (d.get("voice") or {}).get("mode")
+    has_take = (ep / "voice-take" / ("scenes-ai" if mode in AI_VOICES else "scenes")).exists()
+    d["voice"] = dict(d.get("voice") or {}, state="ready" if has_take and mode in ("own", "own_us") + AI_VOICES else "none")
     _clear_scene_files(ep)
     _save_desk(ep, d)
     return episode(ws, slug)

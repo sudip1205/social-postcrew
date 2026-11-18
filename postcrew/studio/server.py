@@ -975,7 +975,7 @@ def make_handler(studio):
                 if method == "GET" and p.startswith("/voice-desk/"):   # your processed take, to listen to before approving it
                     root = voice_desk._root(ws) / "episodes"
                     rel = p[len("/voice-desk/"):]
-                    if not re.fullmatch(r"[a-z0-9][a-z0-9-]{1,80}/voice-take/take(-converted|-american)?\.wav", rel):
+                    if not re.fullmatch(r"[a-z0-9][a-z0-9-]{1,80}/voice-take/(take(-converted|-american|-ai)?|scenes-ai/scene[0-9]{1,3})\.wav", rel):
                         return self.send(404, {"error": "not found"})
                     return self.media(root / rel, root)
                 if p == "/api/factory/voice/upload" and method == "POST":   # your own recording for a Factory video (raw body)
@@ -1044,6 +1044,8 @@ def make_handler(studio):
                     ("POST", "/api/voice-desk/lines"): lambda: voice_desk.save_lines(ws, self.body().get("slug"), self.body().get("lines")),
                     ("POST", "/api/voice-desk/approve-script"): lambda: voice_desk.approve_script(ws, self.body().get("slug"), self.body().get("approved", True)),
                     ("POST", "/api/voice-desk/voice"): lambda: voice_desk.choose(ws, self.body().get("slug"), self.body().get("mode")),
+                    ("POST", "/api/voice-desk/generate"): lambda: voice_desk.generate(ws, self.body().get("slug"), self.body().get("voice"),
+                                                                       self.body().get("feedback", ""), self.body().get("redo")),
                     ("POST", "/api/voice-desk/reopen"): lambda: voice_desk.reopen_voice(ws, self.body().get("slug")),
                     ("POST", "/api/voice-desk/make"): lambda: voice_desk.make(ws, self.body().get("slug")),
                     ("POST", "/api/voice-desk/delete"): lambda: voice_desk.delete(ws, self.body().get("slug")),

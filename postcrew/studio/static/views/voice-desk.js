@@ -8,6 +8,32 @@ const VD_VOICE = {
   approved: ["approved", "Voice approved"], failed: ["failed", "Voice failed"],
 };
 const VD_MODE = { own: "Your voice, matched to dip_puck", own_us: "American: dip_puck with your pauses", dip_puck: "dip_puck (AI voice)", am_puck: "am_puck (Kokoro AI voice)" };
+function vdAiVoice(ep, v) {   // dip_puck / am_puck, generated at once: listen, approve, or say what to change (owner, 2026-11-18)
+  const ai = v.ai || {}, last = (ai.feedback || []).slice(-1)[0];
+  const rows = ep.lines.map((t, i) => `<li class="flex items-center gap-2 py-1">
+      <label class="flex items-center gap-1.5 text-xs text-slate-500 shrink-0 w-14" title="Read this line again">
+        <input type="checkbox" class="rounded border-slate-300 text-violet-600" data-vd-redo="${i}" ${v.state === "approved" ? "disabled" : ""}><span>${i + 1}</span></label>
+      <span class="flex-1 text-xs text-slate-700 truncate" title="${esc(t)}">${esc(t)}</span>
+      ${ep.ai_lines?.[i] ? `<audio controls preload="none" class="h-7 w-48 shrink-0" src="/voice-desk/${ep.ai_lines[i]}?v=${ai.made || 0}"></audio>` : ""}</li>`).join("");
+  return `<div class="space-y-3 mb-3" data-vd-ai="${ep.slug}">
+    <div class="flex flex-wrap items-center gap-2">
+      <span class="text-xs text-slate-500">Whole voice, ${esc(v.mode)} · ${ai.seconds || "?"} s${ai.speed && ai.speed !== 1 ? ` · pace ×${ai.speed}` : ""}</span>
+      <audio controls preload="none" class="h-8" src="/voice-desk/${ep.audio.ai}?v=${ai.made || 0}"></audio>
+      ${v.state === "ready" ? button("approve", "check", "Approve this voice", `data-vd-voice="${v.mode}" data-slug="${ep.slug}"`) : ""}
+    </div>
+    ${last ? `<p class="text-xs text-slate-500">Last feedback: “${esc(last.text.slice(0, 160))}”${last.changes?.summary ? ` → ${esc(last.changes.summary)}` : ""}${ai.redone?.length ? ` · lines ${ai.redone.join(", ")} read again` : ""}</p>` : ""}
+    <details class="rounded-lg border border-slate-200">
+      <summary class="cursor-pointer px-3 py-2 text-xs font-semibold text-slate-700">Listen line by line</summary>
+      <ol data-vd-scroll="ai-${esc(ep.slug)}" class="px-3 pb-2 max-h-72 overflow-y-auto divide-y divide-slate-100">${rows}</ol>
+    </details>
+    ${v.state === "ready" ? `<div class="rounded-lg bg-slate-50 border border-slate-200 p-3 space-y-2">
+      <p class="text-xs font-semibold text-slate-700">${tip("Not right?", "Say what is wrong: too fast, a word said wrong (e.g. say SQL as sequel), longer pauses, or which lines sound off. It is turned into changes and only those lines are read again. Or edit the words in the script: the changed lines are read again by themselves.")}</p>
+      <textarea data-vd-feedback rows="2" class="w-full text-sm rounded-lg border-slate-300 focus:border-violet-500 focus:ring-violet-500" placeholder="e.g. a bit slower; line 3 sounds flat; say 'LRU' as L R U"></textarea>
+      ${button("secondary", "refresh", "Regenerate with feedback", `data-vd-regen="${v.mode}" data-slug="${ep.slug}"`)}
+    </div>` : ""}
+  </div>`;
+}
+
 const VD_LOOK = { iso: "Isometric", signal: "Signal (blue)", story: "Story", code: "VS Code", "3d": "3D" };
 
 async function vdOpen() {
@@ -130,6 +156,7 @@ function vdDetail(p) {
   const editing = VD_EDIT.has(ep.slug), n = ep.lines.length - (ep.outro ? 1 : 0);
   const v = ep.voice || {}, rep = ep.report;
   const [vs, vw] = VD_VOICE[v.state] || VD_VOICE.none;
+  const aiMode = v.mode === "dip_puck" || v.mode === "am_puck";
   const lines = ep.lines.map((t, i) => {
     const outro = ep.outro && i === n;
     return `<li class="flex gap-3"><span class="w-6 text-right text-xs text-slate-400 pt-1">${i + 1}</span>${editing && !outro
@@ -168,7 +195,10 @@ function vdDetail(p) {
         ${v.state === "approved" ? `<span class="text-[11px] text-slate-500">${esc(VD_MODE[v.mode] || v.mode)}</span>` : ""}
       </div>
       ${v.state === "failed" || ep.job?.error ? `<p class="text-sm text-rose-700 mb-2">${esc(v.error || ep.job.error)}</p>` : ""}
-      ${v.state === "processing" ? `<p class="text-sm text-slate-600 mb-2">${icon("progress_activity", "text-sm animate-spin align-middle")} Finding your words, cleaning the take and matching it to dip_puck. Under a minute.</p>` : ""}
+      ${v.state === "processing" ? `<p class="text-sm text-slate-600 mb-2">${icon("progress_activity", "text-sm animate-spin align-middle")} ${aiMode
+        ? `${esc(v.mode)} is reading the script${v.ai?.feedback?.length ? " again with your feedback" : ""}. About a minute.`
+        : "Finding your words, cleaning the take and matching it to dip_puck. Under a minute."}</p>` : ""}
+      ${aiMode && v.state !== "processing" && ep.audio?.ai ? vdAiVoice(ep, v) : ""}
       ${rep && (v.mode === "own" || v.mode === "own_us") && v.state !== "processing" ? `
         <div class="text-xs text-slate-600 space-y-1 mb-3">
           <p>${rep.kept_lines} of ${rep.lines} lines found · ${rep.seconds} s · ${rep.huge_gaps_shortened} long gap(s) shortened</p>
@@ -188,9 +218,9 @@ function vdDetail(p) {
         <label class="${BTN.secondary} cursor-pointer ${upOff}">${icon("upload")}<span>${(v.mode === "own" || v.mode === "own_us") && v.state !== "none" ? "Upload again" : "Upload your recording"}</span>
           <input type="file" accept="audio/*,video/*,.wav,.mp3,.m4a,.aac,.ogg,.opus,.webm,.flac,.mp4,.mov,.caf,.aiff" class="hidden" data-vd-upload="${ep.slug}"></label>
         ${v.state === "approved" ? button("secondary", "undo", "Change voice", `data-vd-reopen="${ep.slug}"`) : ""}
-        ${v.state !== "approved" ? `<span class="text-xs text-slate-500 ml-2">or skip your voice:</span>`
-          + button("secondary", "smart_toy", "Use dip_puck", `data-vd-voice="dip_puck" data-slug="${ep.slug}"`)
-          + button("secondary", "smart_toy", "Use am_puck", `data-vd-voice="am_puck" data-slug="${ep.slug}"`) : ""}
+        ${v.state !== "approved" && v.state !== "processing" ? `<span class="text-xs text-slate-500 ml-2">or skip your voice:</span>`
+          + button("secondary", "smart_toy", aiMode && v.mode === "dip_puck" ? "Generate dip_puck again" : "Generate with dip_puck", `data-vd-gen="dip_puck" data-slug="${ep.slug}"`)
+          + button("secondary", "smart_toy", aiMode && v.mode === "am_puck" ? "Generate am_puck again" : "Generate with am_puck", `data-vd-gen="am_puck" data-slug="${ep.slug}"`) : ""}
       </div>
     </div>
     <div class="lg:col-span-2 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3">
@@ -246,7 +276,16 @@ function vdWire(root) {
   }));
   root.querySelectorAll("[data-vd-approve]").forEach(b => b.addEventListener("click", () => go(() => post("/api/voice-desk/approve-script", { slug: b.dataset.vdApprove }), "Script approved.")));
   root.querySelectorAll("[data-vd-unapprove]").forEach(b => b.addEventListener("click", () => go(() => post("/api/voice-desk/approve-script", { slug: b.dataset.vdUnapprove, approved: false }))));
-  root.querySelectorAll("[data-vd-voice]").forEach(b => b.addEventListener("click", () => go(() => post("/api/voice-desk/voice", { slug: b.dataset.slug, mode: b.dataset.vdVoice }), `Voice approved: ${VD_MODE[b.dataset.vdVoice]}.`)));
+  root.querySelectorAll("[data-vd-voice]").forEach(b => b.addEventListener("click", () => go(() => post("/api/voice-desk/voice", { slug: b.dataset.slug, mode: b.dataset.vdVoice }), `Voice approved: ${VD_MODE[b.dataset.vdVoice]}. The plan can now be made.`)));
+  root.querySelectorAll("[data-vd-gen]").forEach(b => b.addEventListener("click", () => go(() => post("/api/voice-desk/generate", { slug: b.dataset.slug, voice: b.dataset.vdGen }),
+    `${b.dataset.vdGen} is reading the script. Listen to it here in about a minute.`)));
+  root.querySelectorAll("[data-vd-regen]").forEach(b => b.addEventListener("click", () => {
+    const slug = b.dataset.slug, box = b.closest("[data-vd-ai]");
+    const feedback = box.querySelector("[data-vd-feedback]").value.trim();
+    const redo = [...box.querySelectorAll("[data-vd-redo]:checked")].map(x => +x.dataset.vdRedo);
+    if (!feedback && !redo.length) return toast("Write what to change, or tick the lines to read again.", true);
+    go(() => post("/api/voice-desk/generate", { slug, voice: b.dataset.vdRegen, feedback, redo }), "Regenerating with your feedback. About a minute.");
+  }));
   root.querySelectorAll("[data-vd-reopen]").forEach(b => b.addEventListener("click", () => go(() => post("/api/voice-desk/reopen", { slug: b.dataset.vdReopen }))));
   root.querySelectorAll("[data-vd-make]").forEach(b => b.addEventListener("click", () => go(() => post("/api/factory-plans/make", { id: b.dataset.vdMake }), "Making the video. It appears in the Queue when it is done.")));
   root.querySelectorAll("[data-vd-make-ep]").forEach(b => b.addEventListener("click", () => go(() => post("/api/voice-desk/make", { slug: b.dataset.vdMakeEp }), "Making the video.")));

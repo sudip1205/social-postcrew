@@ -109,9 +109,10 @@ class DeskRunTests(unittest.TestCase):
             slug = voice_desk.index(ws)["days"][DAY.isoformat()]
             with mock.patch.object(voice_desk, "_start"):   # the run started on approval is run below, in the foreground
                 voice_desk.approve_script(ws, slug)
+                _fake_generate(ws, slug, "am_puck")
                 ep = voice_desk.choose(ws, slug, "am_puck")
             self.assertEqual(ep["voice"]["state"], "approved")
-            self.assertEqual(json.loads((root / "episodes" / slug / "script.json").read_text())["voice"], "am_puck")
+            self.assertEqual([json.loads((root / "episodes" / slug / "script.json").read_text())[k] for k in ("voice", "voice_kokoro")], ["own", "am_puck"])
             n_claude = sum(1 for c in calls if "claude" in c[0][0])
             res = run_crew(ws, DAY, "short-tip", platform="youtube")
             self.assertTrue(res["ok"], res)
@@ -127,6 +128,7 @@ class DeskRunTests(unittest.TestCase):
             started = []
             with mock.patch.object(voice_desk, "_start", side_effect=lambda s, what, fn: started.append((s, what))):
                 voice_desk.approve_script(ws, slug)
+                _fake_generate(ws, slug, "dip_puck")
                 voice_desk.choose(ws, slug, "dip_puck")
                 self.assertEqual(started, [])
                 voice_desk.make(ws, slug)
@@ -208,6 +210,83 @@ class ProcessTests(unittest.TestCase):
             w1 = json.loads((ep / "voice" / "scene1.words.json").read_text())
             self.assertEqual([w["w"] for w in w1], "Throw away the left half.".split())
             self.assertLess(w1[0]["s"], 0.2)                        # timed from the start of its own clip
+
+
+def _fake_generate(ws, slug, voice):
+    """A generated AI voice without the voice server or ffmpeg (it must be generated before it can be approved)."""
+    import wave
+    ep = voice_desk._ep(ws, slug)
+    staged = ep / "voice-take" / "scenes-ai"
+    staged.mkdir(parents=True, exist_ok=True)
+    for i in range(len(voice_desk.lines(json.loads((ep / "script.json").read_text())))):
+        with wave.open(str(staged / f"scene{i}.wav"), "wb") as w:
+            w.setnchannels(1); w.setsampwidth(2); w.setframerate(48000); w.writeframes(b"\0\0" * 4800)
+    d = voice_desk._adopt(ep)
+    d["voice"] = {"state": "ready", "mode": voice, "ai": {}}
+    voice_desk._save_desk(ep, d)
+
+
+class AiVoiceTests(unittest.TestCase):
+    """dip_puck / am_puck are generated at once, listened to, regenerated from feedback, then approved (owner, 2026-11-18)."""
+    def _ep(self, ws):
+        root = ws.root / "shorts-factory"
+        (root / "episodes").mkdir(parents=True)
+        (root / "package.json").write_text("{}")
+        cfg = ws.config()
+        cfg["platforms"]["youtube"]["video"]["factory_path"] = str(root)
+        ws.save_config(cfg)
+        ep = root / "episodes" / "bloom"
+        ep.mkdir()
+        (ep / "script.json").write_text(json.dumps({"style": "iso", "beats": [{"say": "Start in the middle."}, {"say": "Say SQL. Then stop."}]}))
+        return ep
+
+    def test_generate_listen_feedback_and_approve(self):
+        spoken = []
+        def fake_tts(cfg, voice, text, out):
+            spoken.append(text)
+            subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "sine=f=330:d=0.8", "-ar", "48000", "-ac", "1", str(out)], check=True)
+        sync = lambda slug, what, fn: fn()
+        with TempWorkspace() as ws, mock.patch.object(voice_desk, "_ai_tts", fake_tts), mock.patch.object(voice_desk, "_start", sync):
+            ep = self._ep(ws)
+            with self.assertRaises(ValueError):          # nothing to approve before it is generated
+                voice_desk.choose(ws, "bloom", "dip_puck")
+            out = voice_desk.generate(ws, "bloom", "dip_puck")
+            self.assertEqual(voice_desk.desk(ep)["voice"]["state"], "ready")
+            self.assertTrue((ep / "voice-take" / "take-ai.wav").exists())
+            self.assertEqual(spoken[:3], ["Start in the middle.", "Say SQL.", "Then stop."])   # sentence by sentence
+            self.assertGreater(len(spoken), 3)                                                  # ... and the outro
+            spoken.clear()
+            change = {"say": {"SQL": "sequel"}, "lines": [2], "summary": "say SQL as sequel"}
+            with mock.patch.object(voice_desk, "_feedback_to_changes", return_value=change):
+                voice_desk.generate(ws, "bloom", "dip_puck", feedback="say SQL as sequel")
+            self.assertIn("Say sequel.", spoken)
+            ai = voice_desk.desk(ep)["voice"]["ai"]
+            self.assertEqual(ai["say"], {"SQL": "sequel"})
+            self.assertEqual(ai["feedback"][-1]["text"], "say SQL as sequel")
+            first = (ep / "voice-take" / "scenes-ai" / "scene0.wav").stat().st_mtime_ns
+            spoken.clear()
+            with mock.patch.object(voice_desk, "_feedback_to_changes", return_value={"lines": [2], "summary": "line 2 again"}):
+                voice_desk.generate(ws, "bloom", "dip_puck", feedback="line 2 sounds flat")
+            self.assertEqual(spoken, ["Say sequel.", "Then stop."])   # only line 2, still with the respelling
+            self.assertEqual((ep / "voice-take" / "scenes-ai" / "scene0.wav").stat().st_mtime_ns, first)
+            voice_desk.choose(ws, "bloom", "dip_puck")
+            self.assertTrue((ep / "voice" / "scene1.wav").exists())   # the video uses the take you heard
+            s = json.loads((ep / "script.json").read_text())
+            self.assertEqual((s["voice"], s["voice_kokoro"]), ("own", "dip_puck"))
+            self.assertEqual(voice_desk.desk(ep)["voice"]["state"], "approved")
+
+    def test_an_edited_line_is_read_again_by_itself(self):
+        spoken = []
+        def fake_tts(cfg, voice, text, out):
+            spoken.append(text)
+            subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "sine=f=330:d=0.5", "-ar", "48000", "-ac", "1", str(out)], check=True)
+        with TempWorkspace() as ws, mock.patch.object(voice_desk, "_ai_tts", fake_tts), mock.patch.object(voice_desk, "_start", lambda s, w, fn: fn()):
+            ep = self._ep(ws)
+            voice_desk.generate(ws, "bloom", "am_puck")
+            spoken.clear()
+            voice_desk.save_lines(ws, "bloom", ["Start right in the middle.", "Say SQL. Then stop."])
+            self.assertEqual(spoken, ["Start right in the middle."])
+            self.assertEqual(voice_desk.desk(ep)["voice"]["state"], "ready")
 
 
 if __name__ == "__main__":

@@ -3,6 +3,7 @@
 ## 0.2.0: YouTube, per-app settings and a faster Studio
 
 ### New
+- **dip_puck and am_puck are generated as soon as you pick them, and approved only after you listen.** In Factory > Plans, "Generate with dip_puck" reads the script straight away. You can play the whole voice or each line, then approve it. If it is not right, write feedback (e.g. "a bit slower", "say LRU as L R U", "line 3 sounds flat") or tick lines, and press Regenerate. Only the lines that need it are read again. Editing a script line rereads just that line. The video uses exactly the take you approved, and the plan only shows under Ready to make once that voice is approved.
 - **Make an approved plan from the Factory's Use a plan list, in the look you pick.** Plans whose script and voice you approved are listed first under "Ready to make". Pick one, pick the look, and press Make video. Isometric and Signal (blue) speak the same beats, so switching between them draws the picture again and keeps your approved words and voice. The other looks need a script written in them, so they show as unavailable.
 - **dip_puck speaks slower: about 140 words a minute.** Speed is now 0.72, measured at 141 words a minute; it read at 181 at the old speed. Script lengths are lowered to match, so Shorts still land at 65–75 s and never pass 90 s: 105–185 words (Isometric and blue 105–180, aim 130–155; 3D 80–145).
 - **Your voice is cleaned properly, and there is an American version.**
