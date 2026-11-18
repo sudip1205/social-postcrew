@@ -3,7 +3,7 @@
 ## 0.2.0: YouTube, per-app settings and a faster Studio
 
 ### New
-- **dip_puck speaks a little slower:** speed 0.92 instead of 1.0, about 8% slower. Script lengths are lowered to match, so Shorts still land at 65–75 s and never pass 90 s: 140–240 words (Isometric and blue 140–230, aim 155–190; 3D 100–175).
+- **dip_puck speaks slower: about 140 words a minute.** Speed is now 0.72, measured at 141 words a minute; it read at 181 at the old speed. Script lengths are lowered to match, so Shorts still land at 65–75 s and never pass 90 s: 105–185 words (Isometric and blue 105–180, aim 130–155; 3D 80–145).
 - **Your voice is cleaned properly, and there is an American version.**
   - **Every word written down as said.** Speech-to-text now writes every word exactly as said, using the large Whisper model on the lab's GPU. The old one hid repeats, restarts and "um"s, so they were never cut.
   - **The best take of each sentence is chosen.** Retakes are compared, the clean one wins, and the last take wins when they are equally good. Stutters, fillers and false starts are cut. A second listening pass on each cleaned sentence catches repeats Whisper missed in the long take.

@@ -50,7 +50,7 @@ SKILL_RULE = (f"BEFORE writing anything, read the current skill from disk: {SKIL
               f"Every video must differ from the recent ones (the owner will monetise the channel; YouTube refuses template look-alikes): "
               f"run `npm run variety` in shorts-factory/ first and follow {SKILL}/references/variety.md (shape, hook, voice, speed, scene "
               f"order, opening, title, sign-off), then run `npm run variety -- episodes/<slug>` and fix the script until it prints ok. "
-              f"Owner rules (2026-11-15): a Short runs 50 TO 90 SECONDS, 140-240 words of narration (count them), one idea explained properly "
+              f"Owner rules (2026-11-15): a Short runs 50 TO 90 SECONDS, 105-185 words of narration (count them), one idea explained properly "
               f"(what it is, why it matters, how it works, an example); and it is a "
               f"VISUAL explainer of what the thing is and how it works, never a coding build: code scenes only in an algorithm problem, "
               f"which sets \"kind\": \"algorithm\" in script.json. The look follows the LOOKS line below: Signal (blue) is the default; the Story "
@@ -73,8 +73,8 @@ def skill_version(root):
 
 
 # 3D look (video-engine): the channel voice (dip_puck) reads ~2.9 words/s, and each beat adds ~0.6 s of breathing room
-SHORT_MIN_WORDS_3D, SHORT_MAX_WORDS_3D = 100, 175   # 2026-11-18: dip_puck 8% slower, was 110-190;   # owner, 2026-11-15: a Short runs 50-90 s; video-engine speaks ~2.45 words/s with its beat gaps, + the ~9 s outro
-SHORT_MIN_WORDS_ISO, SHORT_MAX_WORDS_ISO = 140, 230   # 2026-11-18: dip_puck 8% slower (speed 0.92), was 150-250;   # Isometric Pastel Shorts, 50-90 s (owner, 2026-11-15): ~3.2 words/s with the beat gaps, + the ~5 s outro
+SHORT_MIN_WORDS_3D, SHORT_MAX_WORDS_3D = 80, 145   # 2026-11-18: dip_puck at ~140 wpm (speed 0.72), was 110-190;   # owner, 2026-11-15: a Short runs 50-90 s; video-engine speaks ~2.45 words/s with its beat gaps, + the ~9 s outro
+SHORT_MIN_WORDS_ISO, SHORT_MAX_WORDS_ISO = 105, 180   # 2026-11-18: dip_puck at ~140 wpm (speed 0.72), was 150-250;   # Isometric Pastel Shorts, 50-90 s (owner, 2026-11-15): ~3.2 words/s with the beat gaps, + the ~5 s outro
 
 
 def iso_check(root, ep):
@@ -90,7 +90,7 @@ def iso_check(root, ep):
         got = []
     return got or [((r.stderr or r.stdout or "").strip().splitlines() or [f"the check failed (exit {r.returncode})"])[-1]]
 
-WORDS_PER_SECOND_3D = 2.5  # long videos: about 90% of the target length after beat pauses (measured 2026-11-14)
+WORDS_PER_SECOND_3D = 2.0  # 2026-11-18: dip_puck at ~140 wpm (was 2.5); long videos: about 90% of the target length after beat pauses (measured 2026-11-14)
 
 
 def engine_dir(cfg):
@@ -177,7 +177,7 @@ def story_problems(script):
     return out
 
 
-SHORT_MIN_WORDS, SHORT_MAX_WORDS = 140, 240   # 2026-11-18: dip_puck 8% slower (speed 0.92), was 150-260;   # owner, 2026-11-15: a Short runs 50-90 s; ~3.1 words/s with the scene gaps (factory pipeline/rules.mjs)
+SHORT_MIN_WORDS, SHORT_MAX_WORDS = 105, 185   # 2026-11-18: dip_puck at ~140 wpm (speed 0.72), was 150-260;   # owner, 2026-11-15: a Short runs 50-90 s; ~3.1 words/s with the scene gaps (factory pipeline/rules.mjs)
 CODE_SCENES = {"code", "codeviz", "code-zoom", "run", "terminal", "editor"}
 
 
@@ -390,7 +390,7 @@ class ShortsWriter(Agent):
             ("Recent videos (do not repeat): " + "; ".join(_recent(ctx))) if _recent(ctx) else "",
             "",
             f"Format: {'16:9 long video (1920x1080)' if long else '9:16 Short (1080x1920, vertical)'}. Word budget (hard): at most {budget} spoken words"
-            + ("" if long else f" and at least {SHORT_MIN_WORDS_ISO}; aim for 155-190 words in 12-15 beats (about 65-75 s, the owner's house standard), one idea explained properly (what it is, why it matters, how it works, a worked example)") + ". "
+            + ("" if long else f" and at least {SHORT_MIN_WORDS_ISO}; aim for 130-155 words in 12-15 beats (about 65-75 s, the owner's house standard), one idea explained properly (what it is, why it matters, how it works, a worked example)") + ". "
             "The like / comment / share / subscribe outro is added after your last beat automatically: do not write one.",
             f"Read {kit}/STYLE.md (the rules, below), then the two house-standard Shorts in {root}/styles/iso-pastel/examples/ (database-scaling, how-llms-work: "
             f"match their structure and timing exactly{', in the Tech Glow look instead of pastel' if look == 'blue' else ', and their look'}; change only the topic) "
