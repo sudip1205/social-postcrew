@@ -43,7 +43,7 @@ def fake_factory(ws, fail_render=False, write=True, desk=False):
             ep = root / "episodes" / slug
             ep.mkdir(parents=True, exist_ok=True)
             if write:
-                (ep / "script.json").write_text(json.dumps({"style": "story", "analogy": {"world": "Max shelves every book by what it is about in his library"},
+                (ep / "script.json").write_text(json.dumps({"style": "story", "hook_options": ["Ever wondered why?", "Two", "Three"], "analogy": {"world": "Max shelves every book by what it is about in his library"},
                                                          "scenes": [{"type": "story", "text": "Ever wondered why?", "beats": [{"do": "walk", "who": "max"}]},
                                                                     {"type": "map", "text": "Follow. " + " ".join(["Each word sits near the words it means."] * 20), "pairs": [{"tech": "Embedding"}]}]}))
                 (ep / "youtube.json").write_text(json.dumps({"title": "Why it works", "description": "A short explainer.", "tags": ["python", "tips"]}))
@@ -240,7 +240,7 @@ class ThreeDLookTests(unittest.TestCase):
             def fake_claude(ctx, prompt, tools, cwd, add_dirs=()):
                 self.assertIn("=== STYLE.md (styles/iso-pastel) ===", prompt); self.assertIn("1080x1920", prompt)
                 self.assertTrue(any("make-iso.mjs . --check" in t for t in tools)); self.assertEqual(Path(cwd), ep)
-                (ep / "script.json").write_text(json.dumps({"style": "iso", "beats": [{"say": "One app, one database. " * 20}, {"say": "Then it slows down. " * 20}]}))
+                (ep / "script.json").write_text(json.dumps({"style": "iso", "hook_options": ["One", "Two", "Three"], "beats": [{"say": "One app, one database. Why does it crash?"}, {"say": "One app, one database. " * 20}, {"say": "Then it slows down. " * 20}]}))
                 (ep / "explainer.js").write_text("function explainer(ctx, W, H_, t) {}\nfunction scoreSound(k) {}")
                 (ep / "youtube.json").write_text(json.dumps({"title": "Database Scaling", "description": "d", "tags": ["db"]}))
                 return {}
@@ -249,7 +249,7 @@ class ThreeDLookTests(unittest.TestCase):
             with mock.patch.object(w, "_claude", side_effect=fake_claude), mock.patch("postcrew.agents.shorts.skill_version", return_value={}), \
                  mock.patch("postcrew.agents.shorts.iso_check", return_value=[]):
                 out = w._plan_iso(ctx, root, ep, "e1", "Database Scaling", {"angle": "one to many"})
-            self.assertEqual((out["title"], out["style"], out["scene_count"], out["words"]), ("Database Scaling", "iso", 2, 160))
+            self.assertEqual((out["title"], out["style"], out["scene_count"], out["words"]), ("Database Scaling", "iso", 3, 168))
             self.assertEqual(w.validate(ctx, out), [])
 
     def test_signal_alone_is_written_for_the_tech_glow_engine(self):
@@ -265,7 +265,7 @@ class ThreeDLookTests(unittest.TestCase):
                 self.assertIn("Tech Glow", prompt); self.assertIn("=== STYLE.md (styles/tech-glow) ===", prompt)
                 self.assertIn("examples/binary-search", prompt); self.assertIn("glow3d.js", prompt)   # the published Short + 3D objects (2026-11-17)
                 ep.mkdir(parents=True, exist_ok=True)
-                (ep / "script.json").write_text(json.dumps({"style": "blue", "beats": [{"say": "Binary search halves the range. " * 32}]}))
+                (ep / "script.json").write_text(json.dumps({"style": "blue", "hook_options": ["One", "Two", "Three"], "beats": [{"say": "Find one number in a million?"}, {"say": "Binary search halves the range. " * 32}]}))
                 (ep / "explainer.js").write_text("function explainer(){}\nfunction scoreSound(k){}")
                 (ep / "youtube.json").write_text(json.dumps({"title": "Binary Search", "description": "d", "tags": []}))
                 return {}
@@ -288,3 +288,19 @@ class ThreeDLookTests(unittest.TestCase):
                "storyboard_errors": ["beat 2: anchor \"@heap\" is not a word of say"]}
         p = shorts.ShortsWriter().validate(mock.Mock(), out)
         self.assertTrue(any("@heap" in x for x in p)); self.assertTrue(any("200 words" in x for x in p))
+
+
+class HookTests(unittest.TestCase):
+    """Owner, 2026-11-17: every script opens with a catch line (retention is bad)."""
+
+    def test_a_good_catch_line_passes(self):
+        s = {"beats": [{"say": "You hit Back and the last page comes right back. How does your browser remember?"}], "hook_options": ["a", "b", "c"]}
+        self.assertEqual(shorts.hook_problems(s), [])
+
+    def test_a_lecture_opener_a_long_hook_or_no_options_is_sent_back(self):
+        self.assertTrue(shorts.hook_problems({"beats": [{"say": "In this video we learn linked lists."}], "hook_options": ["a", "b", "c"]}))
+        self.assertTrue(shorts.hook_problems({"beats": [{"say": " ".join(["word"] * 30)}], "hook_options": ["a", "b", "c"]}))
+        self.assertTrue(shorts.hook_problems({"beats": [{"say": "You hit Back. How?"}]}))
+
+    def test_every_look_gets_the_opening_rule(self):
+        self.assertIn("CATCH LINE", shorts.HOOK_RULE)

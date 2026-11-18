@@ -265,7 +265,7 @@ def episode(ws, slug):
     rep = _read(ep / "voice-take" / "report.json", None)
     take = ep / "voice-take"
     return {"slug": slug, "title": d.get("title") or script.get("title") or script.get("topic") or slug, "topic": d.get("topic", ""),
-            "style": script.get("style") or "", "lines": lines(script), "outro": bool(script.get("beats")), "script": d.get("script", "draft"),
+            "style": script.get("style") or "", "lines": lines(script), "hook_options": [str(h) for h in script.get("hook_options") or [] if str(h).strip()][:5], "outro": bool(script.get("beats")), "script": d.get("script", "draft"),
             "voice": v, "report": rep, "job": _jobs.get(slug), "run": d.get("run"),
             "audio": {k: f"{slug}/voice-take/{f}" for k, f in (("converted", "take-converted.wav"), ("cleaned", "take.wav"))
                       if (take / f).exists()},

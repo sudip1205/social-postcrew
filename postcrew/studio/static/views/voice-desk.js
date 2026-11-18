@@ -138,6 +138,11 @@ function vdDetail(p) {
       </div>
       <p class="text-xs text-slate-500 mb-2">Read it aloud in one take, line by line. Retakes are fine: say the line again and the last take is kept.</p>
       <ol class="space-y-2 max-h-80 overflow-y-auto pr-1">${lines}</ol>
+      ${!editing && ep.hook_options?.length > 1 ? `<div class="mt-3 rounded-lg bg-violet-50/60 border border-violet-100 p-3">
+        <p class="text-xs font-semibold text-violet-800 mb-1">${tip("Catch lines", "The opening line decides if a viewer keeps watching. The Script Writer wrote these options; the first line of the script is the one it picked.")}</p>
+        <ul class="space-y-1">${ep.hook_options.map((h, k) => { const cls = h === ep.lines[0] ? "text-slate-900 font-medium" : "text-slate-700"; return `<li class="flex items-start gap-2 text-sm ${cls}">
+          <span class="flex-1">${esc(h)}</span>${h === ep.lines[0] ? chip("approved", "In use", "sm") : button("secondary", "swap_horiz", "Use this", `data-vd-hook="${ep.slug}" data-k="${k}"`)}</li>`; }).join("")}</ul>
+      </div>` : ""}
       <div class="flex flex-wrap gap-2 mt-3">
         ${editing ? button("primary", "save", "Save lines", `data-vd-save="${ep.slug}"`) + button("secondary", "close", "Cancel", `data-vd-cancel="${ep.slug}"`)
           : button("secondary", "edit", "Edit lines", `data-vd-edit="${ep.slug}"`)
@@ -207,7 +212,13 @@ function vdWire(root) {
     VD_OPEN.delete(ep || b.dataset.vdRemove);
     go(() => ep ? post("/api/voice-desk/delete", { slug: ep }) : post("/api/factory-plans/remove", { id: b.dataset.vdRemove }), ep ? "Script deleted." : "Plan deleted.");
   }));
-  root.querySelectorAll("[data-vd-edit]").forEach(b => b.addEventListener("click", () => { VD_EDIT.add(b.dataset.vdEdit); vdDraw(); }));
+  root.querySelectorAll("[data-vd-hook]").forEach(b => b.addEventListener("click", () => {
+    const all = [...(VD.plans || []), ...(VD.others || []).map(e => ({ episode: e }))];
+    const ep = all.map(p => p.episode).find(e => e && e.slug === b.dataset.vdHook); if (!ep) return;
+    const n = ep.lines.length - (ep.outro ? 1 : 0), lines = ep.lines.slice(0, n); lines[0] = ep.hook_options[+b.dataset.k];
+    go(() => post("/api/voice-desk/lines", { slug: ep.slug, lines }), "Catch line changed. Approve the script again when it reads right.");
+  }));
+    root.querySelectorAll("[data-vd-edit]").forEach(b => b.addEventListener("click", () => { VD_EDIT.add(b.dataset.vdEdit); vdDraw(); }));
   root.querySelectorAll("[data-vd-cancel]").forEach(b => b.addEventListener("click", () => { VD_EDIT.delete(b.dataset.vdCancel); vdDraw(); }));
   root.querySelectorAll("[data-vd-save]").forEach(b => b.addEventListener("click", () => {
     const slug = b.dataset.vdSave, lines = [...b.closest(".rounded-lg").querySelectorAll("[data-vd-line]")].map(t => t.value);

@@ -25,6 +25,25 @@ WRITER_TOOLS = ["Read", "Write", "Edit", "Glob", "Grep", "WebSearch", "WebFetch"
 SKILL = ".claude/skills/explainer-short-style"
 # Said to Claude on every run, so a scheduled video always follows the skill as it is NOW (changed from the Studio's Factory chat or by hand):
 # the skill is read from disk at the start of each run, never remembered from an earlier one.
+# Owner, 2026-11-17: "Start the script with some catch line to grab attention of the viewer. Then start describing. Come to the solution, but
+# make it interesting. Try to build a connection with the viewer so that they watch the full video. My video retention is bad."
+HOOK_RULE = (
+    "OPENING AND RETENTION (owner rule, 2026-11-17, every look): the owner's retention is bad, so the script must grab and keep attention.\n"
+    "1. Beat 1 is a CATCH LINE of at most 14 words: a moment the viewer has seen or felt themselves (or a surprising number, or a mistake they "
+    "make) plus a question or surprise they now want answered. It must make sense to someone who has never heard the topic's name. Never start "
+    "with the topic's name, a definition, 'In this video', 'Today' or 'Have you ever wondered'. Good: 'You hit Back and the last page comes right "
+    "back. How does your browser remember?' Bad: 'Your browser's Back button just worked. A plain linked list could not do that.' (a claim "
+    "nobody asked about, which needs the answer to make sense).\n"
+    "2. Beat 2 connects: talk to the viewer ('you', 'your'), why it matters to them and where they will meet it, and open a loop (what they will "
+    "know by the end) that stays open until near the end.\n"
+    "3. Then build up: the problem shown happening, the obvious first attempt and why it fails, then the idea, one step per beat. Re-hook every "
+    "15-20 s with a turn ('But here's the problem…', 'Now watch what happens when…', 'This is the part most people get wrong'); never three "
+    "plain explaining beats in a row.\n"
+    "4. Pay off: answer the hook's question explicitly, calling back to its words. End with the takeaway and an easy comment question (a choice of two).\n"
+    "5. Write 3 different catch lines of different kinds and put them in script.json as \"hook_options\" (the chosen one first). Read beat 1 as "
+    "a stranger scrolling past: would you stop, and would you understand it? If not, rewrite it."
+)
+
 SKILL_RULE = (f"BEFORE writing anything, read the current skill from disk: {SKILL}/SKILL.md in full (including its Owner rules log at the "
               f"bottom), then every file in {SKILL}/references/ that SKILL.md points to for this kind of video, and CLAUDE.md. These files "
               f"change often: their newest rules win over anything in the example episodes. "
@@ -166,6 +185,26 @@ def _said(sc):
     return str(sc.get("text") or sc.get("say") or sc.get("narration") or sc.get("voice") or "")
 
 
+BAD_OPENERS = re.compile(r"^\s*(in this (video|short)|today\b|have you ever wondered|let'?s (learn|talk|look)|welcome\b|hey\b|hi\b|so,? today|what is (a|an|the)\b)", re.I)
+
+
+def hook_problems(script):
+    """The opening line (owner, 2026-11-17: retention is bad): short, not a lecture opener, with options to choose from."""
+    beats = script.get("beats") or script.get("scenes") or []
+    if not beats:
+        return []
+    first = str(beats[0].get("say") or beats[0].get("text") or "").strip()
+    words, out = len(first.split()), []
+    if BAD_OPENERS.search(first):
+        out.append(f"the catch line (beat 1) opens like a lecture: \"{first[:80]}\". Open with a moment the viewer knows, a surprising number "
+                   "or a mistake they make, plus a question (OPENING AND RETENTION)")
+    if words > 22:
+        out.append(f"the catch line (beat 1) has {words} words: at most 14-16 words for the hook, then connect in beat 2")
+    if len([h for h in script.get("hook_options") or [] if str(h).strip()]) < 3:
+        out.append("script.json needs \"hook_options\": 3 different catch lines (the chosen one first), as OPENING AND RETENTION says")
+    return out
+
+
 class ShortsWriter(Agent):
     id = "writer"
     title = "Script Writer"
@@ -212,6 +251,7 @@ class ShortsWriter(Agent):
             ("Recent videos (do not repeat): " + "; ".join(_recent(ctx))) if _recent(ctx) else "",
             "",
             SKILL_RULE,
+            HOOK_RULE,
             factory_styles.instruction(factory_styles.ticked(ctx.ws)),
             "Follow CLAUDE.md and the explainer-short-style skill exactly, as for any video in this workspace. Use the existing episodes as",
             "examples of the files. Write ONLY these two files:",
@@ -291,6 +331,7 @@ class ShortsWriter(Agent):
             ("Owner's plan for this video:\n" + json.dumps(topic["owner_plan"], ensure_ascii=False, indent=1)) if topic.get("owner_plan") else "",
             ("Recent videos (do not repeat): " + "; ".join(_recent(ctx))) if _recent(ctx) else "",
             "",
+            HOOK_RULE,
             f"Format: {'16:9 long video' if long else '9:16 Short (vertical)'}, target {seconds} s. Word budget (hard): at most {budget} spoken words"
             + (f" and at least {int(budget * .85)}" if long else "")
             + (f" and at least {int(budget * .85)}" if long else f" and at least {SHORT_MIN_WORDS_3D}") + ("" if long else ", one idea explained properly (what it is, why it matters, how it works, a worked example), 12-18 beats; the Short must run 50-90 s with the channel voice") + ". "
@@ -372,6 +413,8 @@ class ShortsWriter(Agent):
             ("\nThe files are already written. Do NOT start over: edit them only where needed to fix these problems, then check again:\n- "
              + "\n- ".join(guidance)) if fixing else "",
             "",
+            HOOK_RULE,
+            "",
             f"=== STYLE.md (styles/{kit.name}) ===",
             (kit / "STYLE.md").read_text(),
         ] if x is not None)
@@ -391,6 +434,11 @@ class ShortsWriter(Agent):
 
     def validate(self, ctx, out):
         p = []
+        if not out.get("reused"):   # a script already approved on the Voice desk is not sent back
+            try:
+                p += hook_problems(json.loads((Path(out.get("episode") or "") / "script.json").read_text()))
+            except (OSError, ValueError):
+                pass
         if not out.get("title"):
             p.append("youtube.json has no title")
         if not out.get("scene_count"):
