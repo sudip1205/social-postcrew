@@ -268,6 +268,7 @@ def save_lines(ws, slug, new_lines):
     d = _adopt(ep)
     if new != old[:n]:
         d["script"] = "draft"
+        d.pop("approved_beats", None)   # the lines a redraw in another look must keep are these new ones
         v = d.get("voice") or {}
         if v.get("mode") == "own":   # a recording of the old words no longer matches
             d["voice"] = {"state": "none", "note": "the script changed: record it again"}

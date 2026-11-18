@@ -448,20 +448,33 @@ class ShortsWriter(Agent):
             before = json.loads((ep / "script.json").read_text())
         except (OSError, ValueError) as e:
             raise AgentError(f"the approved script is missing: {e}", fatal=True)
-        says = [str(b.get("say") or "") for b in before.get("beats") or []]
+        d0 = voice_desk.desk(ep)
+        says = (d0.get("approved_beats") or [str(b.get("say") or "") for b in before.get("beats") or []])   # never a failed attempt's lines
         if not says:
             raise AgentError("the approved script has no beats to draw again", fatal=True)
+        if d0 and not d0.get("approved_beats"):
+            d0["approved_beats"] = says
+            voice_desk._save_desk(ep, d0)
         keep = {k: before[k] for k in ("hook_options", "topic", "format") if k in before}
         name = "Signal (blue), Tech Glow" if look == "blue" else "Isometric Pastel"
         notes = [f"REDRAW IN THE {name.upper()} LOOK. script.json and its {len(says)} beats are APPROVED by the owner and already voiced: do not "
                  f"change, add, remove or reorder any beat or any word of \"say\". Only set \"style\" in script.json to \"{look}\", and rewrite "
                  f"explainer.js (and scoreSound) from scratch in the {name} look, one panel per beat, following the STYLE.md and examples below."]
         topic = dict((ctx.outputs.get("topic") or {}))
-        out = self._plan_iso(ctx, root, ep, slug, topic.get("topic") or before.get("topic") or "", topic, notes + list(guidance or []), look=look)
-        after = json.loads((ep / "script.json").read_text())
-        beats = after.get("beats") or []
-        if len(beats) != len(says):
-            raise AgentError(f"the redraw changed the number of beats ({len(says)} -> {len(beats)}): the approved voice would not fit")
+        notes.append(f"The length is fixed by the approved voice (the check times it by voice/scene*.wav): never cut, merge or split beats to "
+                     f"change the length. There must be exactly {len(says)} beats.")
+        approved = dict(before, **keep, beats=[dict(b, say=t) for b, t in zip((before.get("beats") or []) + [{}] * len(says), says)])
+        (ep / "script.json").write_text(json.dumps(approved, ensure_ascii=False, indent=2) + "\n")   # start from the approved lines
+        try:
+            out = self._plan_iso(ctx, root, ep, slug, topic.get("topic") or before.get("topic") or "", topic, notes + list(guidance or []), look=look)
+            after = json.loads((ep / "script.json").read_text())
+            beats = after.get("beats") or []
+            if len(beats) != len(says):
+                raise AgentError(f"the redraw changed the number of beats ({len(says)} -> {len(beats)}): keep all {len(says)} approved beats, "
+                                 "one panel each; only explainer.js changes")
+        except Exception:
+            (ep / "script.json").write_text(json.dumps(approved, ensure_ascii=False, indent=2) + "\n")   # a failed attempt never keeps its lines
+            raise
         for b, say in zip(beats, says):   # the approved words win, whatever was edited
             b["say"] = say
         after.update(keep, style=look)

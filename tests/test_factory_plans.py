@@ -220,3 +220,26 @@ class PublishAndDeleteTests(unittest.TestCase):
             self.assertEqual(ws.queue(), [])
             self.assertEqual(factory_plans.get(ws, item["id"])["state"], "published")
             self.assertFalse((root / "out" / "bloom-hyperframes.mp4").exists())
+
+
+class RestyleFailureTests(unittest.TestCase):
+    def test_a_failed_redraw_leaves_the_approved_lines(self):
+        from types import SimpleNamespace
+        from postcrew.agents.base import AgentError
+        from postcrew.agents.shorts import ShortsWriter
+        with TempWorkspace() as ws, fake_factory(ws, desk=True) as (root, calls):
+            ep = root / "episodes" / "bloom"
+            ep.mkdir(parents=True)
+            (ep / "script.json").write_text(json.dumps({"style": "iso", "beats": [{"say": "One."}, {"say": "Two."}, {"say": "Three."}]}))
+            voice_desk._save_desk(ep, {"slug": "bloom", "script": "approved", "voice": {"state": "approved"}, "writer": {"look": "iso"}})
+            w = ShortsWriter()
+            def cut(ctx, root_, ep_, slug, subject, topic, guidance=None, look="iso"):
+                (ep_ / "script.json").write_text(json.dumps({"style": "blue", "beats": [{"say": "One and two."}]}))
+                return {"slug": slug}
+            w._plan_iso = cut
+            ctx = SimpleNamespace(ws=ws, outputs={"topic": {}}, options={})
+            with self.assertRaises(AgentError):
+                w._restyle(ctx, root, "bloom", "blue")
+            beats = [b["say"] for b in json.loads((ep / "script.json").read_text())["beats"]]
+            self.assertEqual(beats, ["One.", "Two.", "Three."])
+            self.assertEqual(voice_desk.desk(ep)["approved_beats"], ["One.", "Two.", "Three."])
