@@ -3,6 +3,7 @@
 ## 0.2.0: YouTube, per-app settings and a faster Studio
 
 ### New
+- **The blue look follows your published Binary Search Short and uses 3D objects.** That Short is now the blue look's reference example, with its frames, its code and notes on what to copy and what to do better (no empty frames). A new kit, `glow3d.js`, draws the same glowing glass 3D objects: pillars and 3D bar charts, blocks, cylinders (databases, queues), stacked plates (layers, caches) and glowing links with light pulses. The Script Writer has to use them whenever the subject has something countable, stackable, stored or connected.
 - **YouTube is made by hand, from Factory › Plans.** Nothing is planned or made automatically any more. The scheduler skips YouTube; the old automatic mode is still there behind `video.automatic`.
   1. **Plan:** type a topic, optionally say what you want, pick how many plans and Short or Long, then press **Plan**. The Planner researches the topic on YouTube and writes plans the same way as the monthly ones, with the research numbers.
   2. **The list keeps every plan.** A plan leaves only when its video is made, or when you remove it.

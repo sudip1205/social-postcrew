@@ -263,6 +263,7 @@ class ThreeDLookTests(unittest.TestCase):
             ep = root / "episodes" / "e1"
             def fake_claude(ctx, prompt, tools, cwd, add_dirs=()):
                 self.assertIn("Tech Glow", prompt); self.assertIn("=== STYLE.md (styles/tech-glow) ===", prompt)
+                self.assertIn("examples/binary-search", prompt); self.assertIn("glow3d.js", prompt)   # the published Short + 3D objects (2026-11-17)
                 ep.mkdir(parents=True, exist_ok=True)
                 (ep / "script.json").write_text(json.dumps({"style": "blue", "beats": [{"say": "Binary search halves the range. " * 32}]}))
                 (ep / "explainer.js").write_text("function explainer(){}\nfunction scoreSound(k){}")

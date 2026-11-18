@@ -354,7 +354,12 @@ class ShortsWriter(Agent):
             f"Read {kit}/STYLE.md (the rules, below), then the two house-standard Shorts in {root}/styles/iso-pastel/examples/ (database-scaling, how-llms-work: "
             f"match their structure and timing exactly{', in the Tech Glow look instead of pastel' if look == 'blue' else ', and their look'}; change only the topic) "
             f"and {kit}/reference.js (the style itself). "
-            f"{kit}/kit.js has the drawing helpers you may call (box, cylinder, tag, numberTag, arrow, shade, poly).",
+            + (f"THE BLUE LOOK'S REFERENCE is the owner's published Short in {kit}/examples/binary-search/ (README.md, frames.png, explainer.js): match its look, "
+               f"and show the idea as glowing glass 3D objects with {kit}/glow3d.js (iso3d, floor3d, bars3d, prism3d, cyl3d, stack3d, link3d, label3d) "
+               "whenever the subject has anything countable, stackable, stored or connected (owner, 2026-11-17: 'add 3D bars or objects when possible'). "
+               "Most beats show a 3D object; no beat is an empty frame. "
+               f"{kit}/kit.js has the 2D helpers (card, tile, pill, eyebrow, gtext, connector, background, bloom)."
+               if look == "blue" else f"{kit}/kit.js has the drawing helpers you may call (box, cylinder, tag, numberTag, arrow, shade, poly)."),
             "Write ONLY these files in this folder:",
             '  script.json   {"style": "' + look + '", "topic": "...", "format": "' + ("long" if long else "short") + '", "beats": [{"say": "..."}, ...]}',
             "  explainer.js  function explainer(ctx, W, H_, t) { ... }  and  function scoreSound(k) { ... }",

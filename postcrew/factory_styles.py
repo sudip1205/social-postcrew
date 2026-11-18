@@ -6,7 +6,8 @@ only those, as the skill's references/mixing-styles.md says, and `npm run make` 
 """
 STYLES = {
     "signal": {"label": "Signal (blue)", "icon": "insights",
-               "what": "the blue look: ticked on its own, the Tech Glow engine (navy glow, icon tiles, light-pulse connectors; owner, 2026-11-15); "
+               "what": "the blue look: ticked on its own, the Tech Glow engine (navy glow, icon tiles, light-pulse connectors; owner, 2026-11-15) with "
+                       "glowing glass 3D bars and objects, like the published Binary Search Short (owner, 2026-11-17); "
                        "mixed with Story or VS Code, the blue diagram boards (Shorts and long videos)"},
     "story": {"label": "Story (cast)", "icon": "groups", "what": "the cast acting out an everyday story in a fitting set (Shorts only)"},
     "code": {"label": "VS Code", "icon": "code", "what": "real VS Code, the code typed and run, the camera zooming on it (long algorithm videos only)"},
