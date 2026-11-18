@@ -70,6 +70,16 @@ class FactoryPlanTests(unittest.TestCase):
             self.assertEqual(json.loads((ep / "script.json").read_text())["voice"], "am_puck")
             self.assertEqual(factory_plans.view(ws)["plans"], [])
 
+    def test_a_plan_can_be_deleted_but_not_while_it_is_worked_on(self):
+        with TempWorkspace() as ws:
+            a = factory_plans.add_own(ws, "What a bloom filter is")
+            b = factory_plans.add_own(ws, "How a CDN caches pages")
+            factory_plans._update(ws, b["id"], state="writing")
+            with self.assertRaises(ValueError):
+                factory_plans.remove(ws, b["id"])
+            factory_plans.remove(ws, a["id"])
+            self.assertEqual([p["id"] for p in factory_plans.view(ws)["plans"]], [b["id"]])
+
     def test_a_topic_is_needed(self):
         with TempWorkspace() as ws:
             with self.assertRaises(ValueError):

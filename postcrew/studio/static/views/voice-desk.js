@@ -85,6 +85,7 @@ function vdRow(p) {
         ${p.error ? `<p class="text-xs text-rose-700 mt-0.5">${esc(p.error)}</p>` : ""}
       </div>
       ${chip(st, word, "sm")}
+      ${p.other ? "" : button("secondary", "delete", "Delete", `data-vd-remove="${p.id}" title="Delete this plan from the Factory" ${p.state === "writing" || p.state === "making" ? "disabled" : ""}`)}
       ${icon(open ? "expand_less" : "expand_more", "text-slate-400")}
     </div>` + (open ? vdDetail(p) : "");
 }
@@ -105,7 +106,6 @@ function vdPlanCard(p) {
       <p class="text-xs text-slate-500 mt-1">The script is written in the Looks ticked in the Factory chat below.</p>
       <div class="flex flex-wrap gap-2 mt-3">
         ${button("primary", "edit_note", busy ? "Writing…" : p.episode ? "Write the script again" : "Write the script", `data-vd-script="${p.id}" ${busy || p.state === "making" ? "disabled" : ""}`)}
-        ${button("secondary", "delete", "Remove plan", `data-vd-remove="${p.id}" ${busy || p.state === "making" ? "disabled" : ""}`)}
       </div>
       ${busy ? `<p class="mt-2 text-sm text-slate-600">${icon("progress_activity", "text-sm animate-spin align-middle")} The Script Writer is writing it. A few minutes.</p>` : ""}
     </div>`;
@@ -198,8 +198,13 @@ function vdWire(root) {
     go(() => post("/api/factory-plans/script", { id, instructions: instr }), "Writing the script. It appears here when it is written.");
   }));
   root.querySelectorAll("[data-vd-remove]").forEach(b => b.addEventListener("click", () => {
-    if (b.dataset.armed !== "1") { b.dataset.armed = "1"; b.querySelector("span:last-child").textContent = "Click again to remove"; return; }   // no browser dialogs
-    go(() => post("/api/factory-plans/remove", { id: b.dataset.vdRemove }), "Plan removed.");
+    if (b.dataset.armed !== "1") {   // no browser dialogs: a second click confirms
+      b.dataset.armed = "1"; b.querySelector("span:last-child").textContent = "Click again to delete";
+      setTimeout(() => { if (b.isConnected) { b.dataset.armed = ""; b.querySelector("span:last-child").textContent = "Delete"; } }, 4000);
+      return;
+    }
+    VD_OPEN.delete(b.dataset.vdRemove);
+    go(() => post("/api/factory-plans/remove", { id: b.dataset.vdRemove }), "Plan deleted.");
   }));
   root.querySelectorAll("[data-vd-edit]").forEach(b => b.addEventListener("click", () => { VD_EDIT.add(b.dataset.vdEdit); vdDraw(); }));
   root.querySelectorAll("[data-vd-cancel]").forEach(b => b.addEventListener("click", () => { VD_EDIT.delete(b.dataset.vdCancel); vdDraw(); }));

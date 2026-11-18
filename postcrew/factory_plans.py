@@ -138,6 +138,10 @@ def add_own(ws, title, angle="", fmt="short"):
 
 
 def remove(ws, pid):
+    """Delete a plan from the Factory (its written script stays in the factory's episodes folder, unused)."""
+    item = get(ws, pid)
+    if item.get("state") in ("writing", "making"):
+        raise ValueError("this plan is being worked on: delete it when the script or the video is finished")
     with _lock:
         st = load(ws)
         st["items"] = [i for i in st["items"] if i["id"] != pid]
