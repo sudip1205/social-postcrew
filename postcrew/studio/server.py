@@ -975,7 +975,7 @@ def make_handler(studio):
                 if method == "GET" and p.startswith("/voice-desk/"):   # your processed take, to listen to before approving it
                     root = voice_desk._root(ws) / "episodes"
                     rel = p[len("/voice-desk/"):]
-                    if not re.fullmatch(r"[a-z0-9][a-z0-9-]{1,80}/voice-take/take(-converted)?\.wav", rel):
+                    if not re.fullmatch(r"[a-z0-9][a-z0-9-]{1,80}/voice-take/take(-converted|-american)?\.wav", rel):
                         return self.send(404, {"error": "not found"})
                     return self.media(root / rel, root)
                 if p == "/api/factory/voice/upload" and method == "POST":   # your own recording for a Factory video (raw body)

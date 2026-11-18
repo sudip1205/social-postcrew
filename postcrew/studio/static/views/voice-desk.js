@@ -7,7 +7,7 @@ const VD_VOICE = {
   none: ["pending", "No voice yet"], processing: ["running", "Processing your voice"], ready: ["awaiting_approval", "Listen and approve"],
   approved: ["approved", "Voice approved"], failed: ["failed", "Voice failed"],
 };
-const VD_MODE = { own: "Your voice (matched to dip_puck)", dip_puck: "dip_puck (AI voice)", am_puck: "am_puck (Kokoro AI voice)" };
+const VD_MODE = { own: "Your voice, matched to dip_puck", own_us: "American: dip_puck with your pauses", dip_puck: "dip_puck (AI voice)", am_puck: "am_puck (Kokoro AI voice)" };
 const VD_LOOK = { iso: "Isometric", signal: "Signal (blue)", story: "Story", code: "VS Code", "3d": "3D" };
 
 async function vdOpen() {
@@ -169,18 +169,24 @@ function vdDetail(p) {
       </div>
       ${v.state === "failed" || ep.job?.error ? `<p class="text-sm text-rose-700 mb-2">${esc(v.error || ep.job.error)}</p>` : ""}
       ${v.state === "processing" ? `<p class="text-sm text-slate-600 mb-2">${icon("progress_activity", "text-sm animate-spin align-middle")} Finding your words, cleaning the take and matching it to dip_puck. Under a minute.</p>` : ""}
-      ${rep && v.mode === "own" && v.state !== "processing" ? `
+      ${rep && (v.mode === "own" || v.mode === "own_us") && v.state !== "processing" ? `
         <div class="text-xs text-slate-600 space-y-1 mb-3">
           <p>${rep.kept_lines} of ${rep.lines} lines found · ${rep.seconds} s · ${rep.huge_gaps_shortened} long gap(s) shortened</p>
           ${rep.removed?.length ? `<p>Cut (not in the script, or an earlier take): <span class="text-slate-500">${rep.removed.slice(0, 8).map(x => `“${esc(x.slice(0, 60))}”`).join(", ")}${rep.removed.length > 8 ? " …" : ""}</span></p>` : ""}
           ${rep.missing?.length ? `<p class="text-amber-800">Not found in the recording (dip_puck reads these): ${rep.missing.map(m => `line ${m.line}`).join(", ")}</p>` : ""}
+          ${rep.fixed?.length ? `<div class="text-amber-800"><p>Mispronounced or not finished, and not said again correctly: dip_puck reads these. Record them again if you want your voice there.</p>
+            <ul class="list-disc ml-5">${rep.fixed.map(f => `<li>line ${f.line}: “${esc(f.script)}” (${esc((f.words || []).join(", "))})</li>`).join("")}</ul></div>` : ""}
           ${ep.outro && !rep.outro_recorded ? `<p class="text-slate-500">The outro was not recorded: dip_puck reads it.</p>` : ""}
         </div>
-        <div class="space-y-1 mb-3">${listen("converted", "Matched to dip_puck")}${listen("cleaned", "Cleaned, your own voice")}</div>` : ""}
+        <div class="space-y-2 mb-3">
+          <div class="flex flex-wrap items-center gap-2">${listen("american", "American: dip_puck, your pauses (recommended)")}${v.state === "ready" && ep.audio?.american ? button("approve", "check", "Approve this", `data-vd-voice="own_us" data-slug="${ep.slug}"`) : ""}</div>
+          <div class="flex flex-wrap items-center gap-2">${listen("converted", "Your voice, matched to dip_puck")}${v.state === "ready" ? button("approve", "check", "Approve this", `data-vd-voice="own" data-slug="${ep.slug}"`) : ""}</div>
+          ${listen("cleaned", "Cleaned, your own voice")}
+        </div>
+        <p class="text-xs text-slate-500 mb-2">${tip("Which one?", "American: dip_puck reads the script, with your pauses between sentences and your way of saying abbreviations (prev → previous): clear, the channel's American sound. Matched: your own recording, cleaned and converted to dip_puck's tone: your delivery, but your accent stays and some words blur.")} Both are cleaned: retakes, stutters, fillers and false starts are cut.</p>` : ""}
       <div class="flex flex-wrap items-center gap-2">
-        <label class="${BTN.secondary} cursor-pointer ${upOff}">${icon("upload")}<span>${v.mode === "own" && v.state !== "none" ? "Upload again" : "Upload your recording"}</span>
+        <label class="${BTN.secondary} cursor-pointer ${upOff}">${icon("upload")}<span>${(v.mode === "own" || v.mode === "own_us") && v.state !== "none" ? "Upload again" : "Upload your recording"}</span>
           <input type="file" accept="audio/*,video/*,.wav,.mp3,.m4a,.aac,.ogg,.opus,.webm,.flac,.mp4,.mov,.caf,.aiff" class="hidden" data-vd-upload="${ep.slug}"></label>
-        ${v.state === "ready" && v.mode === "own" ? button("approve", "check", "Approve my voice", `data-vd-voice="own" data-slug="${ep.slug}"`) : ""}
         ${v.state === "approved" ? button("secondary", "undo", "Change voice", `data-vd-reopen="${ep.slug}"`) : ""}
         ${v.state !== "approved" ? `<span class="text-xs text-slate-500 ml-2">or skip your voice:</span>`
           + button("secondary", "smart_toy", "Use dip_puck", `data-vd-voice="dip_puck" data-slug="${ep.slug}"`)

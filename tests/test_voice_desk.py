@@ -12,7 +12,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from helpers import TempWorkspace  # noqa: E402
 from test_shorts import DAY, fake_factory  # noqa: E402
 
-from postcrew import voice_desk  # noqa: E402
+from postcrew import voice_clean, voice_desk  # noqa: E402
 from postcrew.crew import run_crew  # noqa: E402
 
 HAVE_FFMPEG = bool(shutil.which("ffmpeg"))
@@ -28,36 +28,63 @@ def said(text, start=0.0, per=0.3, gap=0.05):
 
 
 class CleaningTests(unittest.TestCase):
-    def test_numbers_in_words_match_digits(self):
+    """Patterns from the owner's real take (2026-11-17, the linked-list Short)."""
+
+    def keep(self, words, texts):
+        out, removed = voice_clean.clean(words, texts)
+        return [o.get("said") for o in out], removed, out
+
+    def test_numbers_and_ordinals_match_their_words(self):
         self.assertEqual(voice_desk.tokens("Index forty-five holds 45."), ["index", "forty", "five", "holds", "forty", "five"])
-        self.assertEqual(voice_desk.tokens("3,000 requests"), ["three", "thousand", "requests"])
+        self.assertEqual([t for t, _ in voice_clean.tokens("3rd type")], ["third", "type"])
 
-    def test_a_retake_keeps_the_last_take_and_false_starts_are_cut(self):
-        lines = ["Start in the middle. Index seven holds thirty-four.", "Throw away the left half."]
-        words = (said("Start in the middle.", 0) + said("Index seven holds thirty five", 1.5) + said("sorry again", 3.2)
-                 + said("Index seven holds 34.", 4.2) + said("Throw away the left half.", 6.0))
-        sents = voice_desk.align(words, lines)
-        self.assertEqual([s.get("missing", False) for s in sents], [False, False, False])
-        second = sents[1]
-        self.assertEqual(" ".join(w["w"] for w in words[second["i"]:second["j"]]), "Index seven holds 34.")   # the last take
-        plan, removed, _ = voice_desk.plan_cuts(words, sents)
-        self.assertTrue(any("sorry again" in r for r in removed))
-        self.assertTrue(any("thirty five" in r for r in removed))   # the slipped first take
-        self.assertEqual([line for line, _ in plan], [0, 1])
+    def test_a_restarted_sentence_keeps_only_the_last_take(self):
+        words = said("A single linked list, a single linked list is a chain of nodes.")
+        kept, removed, _ = self.keep(words, ["A singly linked list is a chain of nodes."])
+        self.assertEqual(kept, ["a single linked list is a chain of nodes."])
+        self.assertEqual(removed, ["A single linked list,"])
 
-    def test_a_huge_gap_inside_a_sentence_is_shortened_but_normal_pauses_are_kept(self):
-        words = said("Every check throws away", 0) + said("at least half.", 1.2 + 3.0)   # a 3 s hesitation in the middle
-        words += said("Sixteen, eight, three, one.", 5.6, per=0.5)                        # slow on purpose: kept as it was
-        sents = voice_desk.align(words, ["Every check throws away at least half. Sixteen, eight, three, one."])
-        plan, _, shortened = voice_desk.plan_cuts(words, sents)
-        segs = plan[0][1]
-        self.assertEqual(segs[0][2], voice_desk.KEEP_GAP)          # the hesitation became a short pause
-        self.assertGreaterEqual(shortened, 1)
-        self.assertAlmostEqual(segs[1][2], words[7]["s"] - words[6]["e"], places=2)   # the pause between sentences as it was
+    def test_a_retake_after_a_mispronounced_word_wins(self):
+        words = said("Delete is a big win. With the node in hand, its neighbors lived around it. "
+                     "Delete is a big win. With the node in hand, its neighbors link around it.")
+        kept, removed, out = self.keep(words, ["Delete is the big win. With the node in hand, its neighbors link around it."])
+        self.assertTrue(kept[-1].endswith("neighbors link around it."))
+        self.assertTrue(any("lived" in r for r in removed))
+        self.assertEqual([o["bad"] for o in out], [[], []])
+
+    def test_stutters_fillers_and_a_false_start_are_cut(self):
+        words = said("Walk forward from, um, walk forward from A, fine. But from from C, there is no way back.")
+        kept, removed, _ = self.keep(words, ["Walk forward from A, fine. But from C, there is no way back."])
+        self.assertEqual(kept, ["walk forward from A, fine.", "But from C, there is no way back."])
+
+    def test_a_mispronounced_word_never_said_again_is_marked_for_dip_puck(self):
+        words = said("The fix: a second pointer on every node, prev. That makes it a double latest.")
+        _, _, out = self.keep(words, ["The fix: a second pointer on every node, prev. That makes it a doubly linked list."])
+        self.assertEqual(out[0]["bad"], [])
+        self.assertTrue(out[1]["bad"])                       # "latest" for "linked list"
+
+    def test_the_american_version_reads_the_script_with_your_abbreviations(self):
+        words = said("The fix: a second pointer on every node, previous. That makes it a doubly linked list.")
+        _, _, out = self.keep(words, ["The fix: a second pointer on every node, prev. That makes it a doubly linked list."])
+        self.assertEqual(out[0]["spoken"], "The fix: a second pointer on every node, previous.")
+        self.assertEqual(out[1]["spoken"], "That makes it a doubly linked list.")
+
+    def test_own_wording_of_small_words_is_not_a_mistake(self):
+        words = said("Delete is a big win.")
+        _, _, out = self.keep(words, ["Delete is the big win."])
+        self.assertEqual(out[0]["bad"], [])
+
+    def test_the_second_pass_finds_repeats_whisper_missed_in_the_long_take(self):
+        ws_ = said("single must single must first walk from the head to find to find who points at it")
+        cuts = voice_desk.repeats(ws_)
+        self.assertEqual(len(cuts), 2)
+        self.assertEqual(cuts[0], (ws_[0]["s"], ws_[2]["s"]))                      # the first "single must"
+        ws_ = said("if this was helpful if this was useful please like")
+        self.assertEqual(voice_desk.repeats(ws_), [(ws_[0]["s"], ws_[4]["s"])])   # a restart that changed its last word
 
     def test_a_line_that_was_not_recorded_is_reported_missing(self):
-        sents = voice_desk.align(said("Line one is here."), ["Line one is here.", "Completely different words now."])
-        self.assertTrue(sents[1]["missing"])
+        _, _, out = self.keep(said("Line one is here."), ["Line one is here.", "Completely different words now."])
+        self.assertTrue(out[1]["missing"])
 
 
 @mock.patch("postcrew.agents.credentials.check_claude", new=lambda *a, **k: {"state": "ok", "message": "Claude Code is ready"})
@@ -161,13 +188,17 @@ class ProcessTests(unittest.TestCase):
             subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "sine=f=220:d=6", "-ar", "48000", str(ep / "voice-take" / "upload.wav")], check=True)
             words = said("Start in the middle.", 0.2) + said("um", 1.6) + said("Throw away the left half.", 2.5)
             conv = lambda cfg, src, out: shutil.copy(src, out)   # Seed-VC stand-in: same length, same audio
-            voice_desk.process(ws, slug, converter=conv, words_of=lambda f: words)
+            def speak(text, out):   # dip_puck stand-in: a short tone per sentence
+                subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "sine=f=330:d=1.2", "-ar", "48000", "-ac", "1", str(out)], check=True)
+            voice_desk.process(ws, slug, converter=conv, words_of=lambda f: words, speaker=speak)
             rep = json.loads((ep / "voice-take" / "report.json").read_text())
             self.assertEqual(rep["kept_lines"], 2)
             self.assertEqual(rep["removed"], ["um"])
             self.assertFalse(rep["outro_recorded"])                 # the outro line is read by dip_puck
             self.assertEqual(voice_desk.desk(ep)["voice"]["state"], "ready")
             self.assertTrue((ep / "voice-take" / "scenes" / "scene1.wav").exists())
+            self.assertTrue((ep / "voice-take" / "scenes-us" / "scene1.wav").exists())     # the American version too
+            self.assertTrue((ep / "voice-take" / "take-american.wav").exists())
             with mock.patch.object(voice_desk, "_start"):
                 voice_desk.choose(ws, slug, "own")
             self.assertTrue((ep / "voice" / "scene0.wav").exists())

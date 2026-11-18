@@ -3,6 +3,13 @@
 ## 0.2.0: YouTube, per-app settings and a faster Studio
 
 ### New
+- **Your voice is cleaned properly, and there is an American version.**
+  - **Every word written down as said.** Speech-to-text now writes every word exactly as said, using the large Whisper model on the lab's GPU. The old one hid repeats, restarts and "um"s, so they were never cut.
+  - **The best take of each sentence is chosen.** Retakes are compared, the clean one wins, and the last take wins when they are equally good. Stutters, fillers and false starts are cut. A second listening pass on each cleaned sentence catches repeats Whisper missed in the long take.
+  - **Mispronounced words are caught.** A sentence you said wrong ("lived" for "link") and never said again correctly is read by dip_puck, and the report names it so you can re-record it.
+  - **Two versions to choose from:**
+    - **American** (recommended): dip_puck reads the script with your pauses between sentences and your way of saying abbreviations.
+    - **Matched:** your own recording converted to dip_puck's tone. It keeps your delivery, but conversion can't change an accent and some words blur.
 - **Every script opens with a catch line, to keep viewers watching.**
   - **The order:** a moment the viewer knows plus a question in the first 4 s, then "you" and why it matters, with a promise of what they'll know by the end. Then the problem, the first attempt and why it fails, a fresh turn every 15–20 s, and finally the answer, calling back to the opening.
   - **Automatic check:** the Script Writer writes 3 catch lines. A script is sent back if its first line opens like a lecture ("In this video…", "Today…"), runs past about 20 words, or comes without the 3 options.

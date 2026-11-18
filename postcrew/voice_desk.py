@@ -19,8 +19,8 @@ Since 2026-11-17 the scripts come from your Factory plans (factory_plans.py); no
 
 State: episodes/<slug>/desk.json in the Shorts factory; the index (day -> slug) of manual runs in workspace state "voice-desk".
 """
-import difflib
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -29,14 +29,17 @@ import time
 from datetime import date, timedelta
 from pathlib import Path
 
-from . import factory_voice
+from . import factory_voice, voice_clean
 from .factory_voice import AUDIO_EXT, CTA_LINE, LIMIT, CHUNK, _ffmpeg, _secs, _tok, _words, _has_whisper
 
 STATE = "voice-desk"
-MODES = ("own", "dip_puck", "am_puck")   # own: your recording (converted); the others: that voice reads the script
+MODES = ("own", "own_us", "dip_puck", "am_puck")   # own: your recording matched to dip_puck; own_us: dip_puck reads your words; the others: that voice reads the script
 HUGE_GAP = 1.2   # s: a pause inside a sentence longer than this is a hesitation, cut to KEEP_GAP
 KEEP_GAP = 0.45
 MAX_GAP = 0.9    # s: the longest pause kept between two sentences
+CHUNK_S = 12.0   # s: the longest piece Seed-VC converts at once
+UNHEARD_S = 0.35   # s: this much sound between two words that no word covers is a repeat Whisper did not write
+CUT_GAP = 0.18   # s: the pause left where words were cut out (a restart, a stutter)
 PAD_IN, PAD_OUT = 0.06, 0.16   # s of audio kept before a sentence's first word and after its last
 _jobs = {}       # slug -> {"what", "started", "error", "done"}: background work (voice processing, a run)
 _lock = threading.Lock()
@@ -46,8 +49,9 @@ _lock = threading.Lock()
 def settings(cfg):
     d = ((cfg.get("video") or {}).get("voice_desk") or {})
     return {"enabled": d.get("enabled", True),
-            "seedvc_dir": d.get("seedvc_dir", "~/voicelab/seed-vc"), "target": d.get("target", "~/voicelab/refs/am_puck.wav"),
-            "steps": int(d.get("diffusion_steps", 40)), "cfg_rate": float(d.get("cfg_rate", 0.7))}
+            "seedvc_dir": d.get("seedvc_dir", "~/voicelab/seed-vc"), "target": d.get("target", "~/voicelab/refs/am_puck.wav"),   # the timbre dip_puck was trained on (measured: as close to dip_puck as a dip_puck clip)
+            "steps": int(d.get("diffusion_steps", 40)), "cfg_rate": float(d.get("cfg_rate", 0.7)),
+            "whisper_python": d.get("whisper_python", "~/voicelab/f5env/bin/python"), "tts_url": d.get("tts_url", "http://127.0.0.1:8882")}
 
 
 def _cfg(ws):
@@ -114,38 +118,8 @@ def _sentences(text):
     return [s.strip() for s in re.split(r"(?<=[.!?])\s+", text.strip()) if s.strip()]
 
 
-_ONES = "zero one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen".split()
-_TENS = "_ _ twenty thirty forty fifty sixty seventy eighty ninety".split()
+tokens = lambda text: [t for t, _ in voice_clean.tokens(text)]   # kept for callers of the old helper
 
-
-def _num(n):
-    """An integer in words, as tokens (Whisper writes "45" where the script says "forty-five")."""
-    if n < 20:
-        return [_ONES[n]]
-    if n < 100:
-        return [_TENS[n // 10]] + ([_ONES[n % 10]] if n % 10 else [])
-    for size, word in ((10**9, "billion"), (10**6, "million"), (1000, "thousand"), (100, "hundred")):
-        if n >= size:
-            return _num(n // size) + [word] + (_num(n % size) if n % size else [])
-    return []
-
-
-def tokens(text):
-    """Words to compare: lower case, numbers in words, hyphens split ("forty-five" = "45" = forty five)."""
-    out = []
-    for w in re.split(r"[\s\-–—/]+", str(text)):
-        raw = w.replace(",", "") if re.fullmatch(r"\d{1,3}(,\d{3})+", w.strip(".!?;:")) else w
-        m = re.fullmatch(r"\W*(\d+)(?:\.(\d+))?(%|x|k)?\W*", raw, re.I)
-        if m and len(m.group(1)) <= 12:
-            out += _num(int(m.group(1)))
-            if m.group(2):
-                out += ["point"] + [_ONES[int(c)] for c in m.group(2)]
-            out += {"%": ["percent"], "x": ["x"], "k": ["thousand"]}.get((m.group(3) or "").lower(), [])
-            continue
-        t = _tok(w)
-        if t:
-            out.append(t)
-    return out
 
 
 # ---------- the run's side: reuse a written script, and wait for the voice ----------
@@ -267,7 +241,7 @@ def episode(ws, slug):
     return {"slug": slug, "title": d.get("title") or script.get("title") or script.get("topic") or slug, "topic": d.get("topic", ""),
             "style": script.get("style") or "", "lines": lines(script), "hook_options": [str(h) for h in script.get("hook_options") or [] if str(h).strip()][:5], "outro": bool(script.get("beats")), "script": d.get("script", "draft"),
             "voice": v, "report": rep, "job": _jobs.get(slug), "run": d.get("run"),
-            "audio": {k: f"{slug}/voice-take/{f}" for k, f in (("converted", "take-converted.wav"), ("cleaned", "take.wav"))
+            "audio": {k: f"{slug}/voice-take/{f}" for k, f in (("converted", "take-converted.wav"), ("american", "take-american.wav"), ("cleaned", "take.wav"))
                       if (take / f).exists()},
             "words": sum(len(x.split()) for x in lines(script)[:-1 if script.get("beats") else None])}
 
@@ -374,118 +348,238 @@ def _start(slug, what, fn):
     threading.Thread(target=go, daemon=True, name=f"voice-desk-{what}").start()
 
 
-# ---------- cleaning: the script's sentences found in what was heard ----------
-def _match(sent_tokens, heard_tokens, start, stop):
-    """The best span of heard_tokens[start:stop] for one sentence: (ratio, i, j)."""
-    n = len(sent_tokens)
-    best = (0.0, start, start)
-    if not n:
-        return best
-    for i in range(start, max(start, stop - max(1, n // 2)) + 1):
-        if heard_tokens[i:i + 1] and heard_tokens[i] not in sent_tokens[:3] and i != start:
-            continue   # a span starts on one of the sentence's first words (fast, and a retake starts the same way)
-        for L in range(max(1, n - 2), n + 4):
-            j = min(len(heard_tokens), i + L)
-            r = difflib.SequenceMatcher(None, sent_tokens, heard_tokens[i:j], autojunk=False).ratio()
-            if r > best[0] + 1e-9:
-                best = (r, i, j)
-    return best
+# ---------- cleaning (voice_clean.py) and the two voices made from it ----------
+def _whisper(cfg, args):
+    """Run whisper_words.py with the lab's GPU Python (large-v3), else the Python that has faster-whisper (CPU). None when neither works."""
+    py = Path(settings(cfg)["whisper_python"]).expanduser()
+    env = dict(os.environ)
+    if py.exists():
+        libs = sorted(str(p) for p in py.parent.parent.glob("lib/python3*/site-packages/nvidia/*/lib"))
+        if libs:
+            env["LD_LIBRARY_PATH"] = ":".join(libs + [env.get("LD_LIBRARY_PATH", "")])
+        r = subprocess.run([str(py), str(Path(__file__).with_name("whisper_words.py"))] + args, capture_output=True, text=True, timeout=1800, env=env)
+        if r.returncode == 0:
+            return json.loads(r.stdout or "null")
+    if not _has_whisper():
+        return None
+    r = subprocess.run([factory_voice._whisper_py["p"], str(Path(__file__).with_name("whisper_words.py"))] + args, capture_output=True,
+                       text=True, timeout=3600)
+    return json.loads(r.stdout or "null") if r.returncode == 0 else None
 
 
-def align(words, texts):
-    """Every sentence of every line found in the heard words, keeping the last take of a line said more than once.
-    Returns (sentences, report): sentences = [{"line", "text", "i", "j", "score"} | {"line", "text", "missing": True}]."""
-    # one token stream for what was heard, each token knowing its word (a "45" is two tokens, both of that word)
-    heard, owner = [], []
-    for k, w in enumerate(words):
-        for t in tokens(w["w"]):
-            heard.append(t)
-            owner.append(k)
-    owner.append(len(words))
-    out, p = [], 0
-    H = len(heard)
-    for li, text in enumerate(texts):
-        for s in _sentences(text):
-            toks = tokens(s)
-            n = len(toks)
-            if not n:
-                continue
-            r, i, j = _match(toks, heard, p, min(H, p + 4 * n + 40))
-            if r < 0.5:
-                out.append({"line": li, "text": s, "missing": True})
-                continue
-            while True:   # a retake: the same sentence said again soon after, keep the last good one
-                r2, i2, j2 = _match(toks, heard, j, min(H, j + 3 * n + 15))
-                if r2 >= max(0.72, r - 0.1) and i2 >= j:
-                    r, i, j = r2, i2, j2
-                else:
+def _verbatim_words(cfg, wav):
+    """Every word as it was SAID (repeats, restarts, fillers), with large-v3 on the GPU when the lab's GPU Python is there."""
+    got = _whisper(cfg, [str(wav)])
+    return got if got is not None else _words(wav)
+
+
+def repeats(words):
+    """Adjacent repeats in a clip's words: the earlier copy of each ("single must single must first" -> the first "single must").
+    Returns [(start, end)] of the stretches to cut."""
+    toks = [_tok(w["w"]) for w in words]
+    cut, i = [], 0
+    while i < len(toks):
+        hit = 0
+        for n in (5, 4, 3, 2, 1):   # the longest repeat first
+            if i + 2 * n <= len(toks) and toks[i:i + n] == toks[i + n:i + 2 * n] and all(toks[i:i + n]):
+                hit = n
+                break
+        if not hit:   # a restart that changes a word: "if this was helpful if this was useful" -> the first try goes
+            for n in (4, 3, 2):
+                for gap in (1, 2):
+                    j = i + n + gap
+                    if j + n <= len(toks) and toks[i:i + n] == toks[j:j + n] and all(toks[i:i + n]):
+                        hit = j - i
+                        break
+                if hit:
                     break
-            wi, wj = owner[i], owner[j - 1] + 1   # back to whole words
-            out.append({"line": li, "text": s, "i": wi, "j": wj, "score": round(r, 2)})
-            p = j
+        if hit:
+            cut.append((words[i]["s"], words[i + hit]["s"]))
+            i += hit
+        else:
+            i += 1
+    return cut
+
+
+def _second_pass(cfg, clips):
+    """Listen to each cleaned sentence again (short audio: Whisper writes repeats it missed in the long take) and cut what is said
+    twice. clips: [sentence dict with "file", "words", "secs"]."""
+    got = _whisper(cfg, ["--many"] + [str(c["file"]) for c in clips]) or {}
+    fixed = 0
+    for c in clips:
+        ws_ = got.get(str(c["file"])) or []
+        cuts = repeats(ws_)
+        if not cuts:
+            continue
+        keep, t = [], 0.0
+        for a, b in cuts:
+            if a - t > 0.05:
+                keep.append((t, a))
+            t = b
+        keep.append((t, c["secs"] + 0.05))
+        tmp = c["file"].with_name(c["file"].stem + "-2.wav")
+        filt = "".join(f"[0:a]atrim={a:.3f}:{b:.3f},asetpts=PTS-STARTPTS,afade=t=in:d=0.01[k{n}];" for n, (a, b) in enumerate(keep))
+        filt += "".join(f"[k{n}]" for n in range(len(keep))) + f"concat=n={len(keep)}:v=0:a=1[out]"
+        _ffmpeg("-i", str(c["file"]), "-filter_complex", filt, "-map", "[out]", "-ac", "1", "-ar", "48000", "-c:a", "pcm_s16le", str(tmp))
+        tmp.replace(c["file"])
+        removed = sum(b - a for a, b in cuts)
+        new_words, shift = [], 0.0
+        for w in c["words"]:   # re-time the words: everything after a cut moves back
+            shift = sum(b - a for a, b in cuts if b <= w["s"] + 0.02)
+            if any(a - 0.02 <= w["s"] < b - 0.02 for a, b in cuts):
+                continue
+            new_words.append({"w": w["w"], "s": round(w["s"] - shift, 3), "e": round(w["e"] - shift, 3)})
+        c["words"], c["secs"] = new_words, max(0.1, c["secs"] - removed)
+        c["repeats_cut"] = [" ".join(x["w"] for x in ws_ if a - 0.01 <= x["s"] < b) for a, b in cuts]
+        fixed += len(cuts)
+    return fixed
+
+
+def silences(wav, floor_db=-38, min_s=0.18):
+    """Where the recording is silent: [(start, end)] (ffmpeg silencedetect)."""
+    r = subprocess.run(["ffmpeg", "-hide_banner", "-i", str(wav), "-af", f"silencedetect=n={floor_db}dB:d={min_s}", "-f", "null", "-"],
+                       capture_output=True, text=True, timeout=600)
+    out, start = [], None
+    for line in r.stderr.splitlines():
+        m = re.search(r"silence_start: ([\d.]+)", line)
+        if m:
+            start = float(m.group(1))
+        m = re.search(r"silence_end: ([\d.]+)", line)
+        if m and start is not None:
+            out.append((start, float(m.group(1))))
+            start = None
     return out
 
 
-def plan_cuts(words, sents):
-    """The pieces of the recording to keep, per line: [(line, [(start, end, gap_after)...])], and what was cut."""
-    pieces, removed, used = {}, [], set()
-    prev_j = 0
-    kept = [s for s in sents if not s.get("missing")]
-    for k, s in enumerate(kept):
-        if s["i"] > prev_j:
-            removed.append(" ".join(w["w"] for w in words[prev_j:s["i"]]))
-        used.update(range(s["i"], s["j"]))
-        prev_j = s["j"]
-        ws_ = words[s["i"]:s["j"]]
-        # inside the sentence: keep every pause, except a huge one (a hesitation), which becomes KEEP_GAP
-        segs, a = [], ws_[0]["s"]
-        for x in range(1, len(ws_)):
-            gap = ws_[x]["s"] - ws_[x - 1]["e"]
-            if gap > HUGE_GAP:
-                segs.append([a, ws_[x - 1]["e"], KEEP_GAP])
-                a = ws_[x]["s"]
-        segs.append([a, ws_[-1]["e"], None])
-        pieces.setdefault(s["line"], []).append({"segs": segs, "first": ws_[0]["s"], "last": ws_[-1]["e"], "i": s["i"], "j": s["j"]})
-    if prev_j < len(words):
-        removed.append(" ".join(w["w"] for w in words[prev_j:]))
-    plan, shortened = [], 0
-    for line, sl in sorted(pieces.items()):
-        segs = []
-        for k, piece in enumerate(sl):
-            if k:   # between two sentences of one line: the pause as it was, up to MAX_GAP (contiguous takes only)
-                before = sl[k - 1]
-                gap = piece["first"] - before["last"]
-                contiguous = piece["i"] == before["j"]
-                g = gap if contiguous and gap <= MAX_GAP else min(MAX_GAP, max(0.35, gap if contiguous else 0.5))
-                shortened += g < gap - 0.05
-                segs[-1][2] = g
-            segs += [list(x) for x in piece["segs"]]
-        shortened += sum(1 for sg in segs if sg[2] == KEEP_GAP)
-        plan.append((line, segs))
-    return plan, [r for r in removed if r.strip()], shortened
+def fit_to_sound(words, quiet):
+    """Whisper folds a pause into the word next to it ("points" 7 s long, "step" 3.7 s): each word is trimmed to the sound it overlaps
+    most, and never longer than it can be said. Without this a cut keeps a long silence or slices a word in half."""
+    for w in words:
+        s, e = w["s"], w["e"]
+        pieces, t = [], s
+        for a, b in quiet:   # the sounding parts of [s, e]
+            if b <= t or a >= e:
+                continue
+            if a > t:
+                pieces.append((t, a))
+            t = max(t, b)
+        if t < e:
+            pieces.append((t, e))
+        if pieces:   # Whisper glues a word to the pause BEFORE it: the word is the last sounding part (unless that is only a click)
+            real = [p for p in pieces if p[1] - p[0] >= 0.12]
+            s, e = (real or pieces)[-1] if real else max(pieces, key=lambda p: p[1] - p[0])
+        most = 0.25 + 0.1 * len(re.sub(r"[^A-Za-z0-9]", "", w["w"]))
+        if e - s > most:   # still too long: keep the end near the next sound, the start where the sound starts
+            e = s + most
+        w["s"], w["e"] = round(s, 3), round(max(e, s + 0.05), 3)
+    for a, b in zip(words, words[1:]):   # no overlaps
+        if b["s"] < a["e"]:
+            b["s"] = a["e"]
+            b["e"] = max(b["e"], b["s"] + 0.05)
 
 
-def _render_line(src, segs, words, out_wav):
-    """One line's clip: its kept pieces, with the planned pauses between them (silence), and its words re-timed to the clip."""
-    parts, filt, t, new_words = [], [], 0.0, []
-    for k, (a, b, gap) in enumerate(segs):
+def _sound_between(quiet, a, b):
+    """Seconds of sound (not silence) between a and b."""
+    if b <= a:
+        return 0.0
+    return (b - a) - sum(max(0.0, min(b, y) - max(a, x)) for x, y in quiet)
+
+
+def _runs(words, keep, quiet=()):
+    """The kept words as pieces of audio: [(start, end, pause after)]. A pause between kept neighbours stays as it was (a huge one is
+    shortened); where words were cut between two kept words, the pause becomes short. Sound between two kept neighbours that no word
+    covers is speech Whisper did not write down (it drops some repeats: "single must, single must"): it is cut too."""
+    runs, shortened = [], 0
+    for n, k in enumerate(keep):
+        w = words[k]
+        if not runs:
+            runs.append([w["s"], w["e"], None])
+            continue
+        prev = keep[n - 1]
+        gap = w["s"] - words[prev]["e"]
+        hidden = _sound_between(quiet, words[prev]["e"] + 0.04, w["s"] - 0.04) if quiet else 0.0
+        if k == prev + 1 and gap <= HUGE_GAP and hidden < UNHEARD_S:
+            runs[-1][1] = w["e"]   # said straight on: one piece, its pause untouched
+            continue
+        if k == prev + 1 and hidden >= UNHEARD_S:   # unwritten speech in between: cut it, short pause
+            runs[-1][2] = CUT_GAP
+            shortened += 1
+            runs.append([w["s"], w["e"], None])
+            continue
+        if k == prev + 1:
+            runs[-1][2] = KEEP_GAP; shortened += 1
+        else:   # words cut in between (a restart, a stutter, a filler)
+            runs[-1][2] = max(0.08, min(CUT_GAP, words[prev + 1]["s"] - words[prev]["e"]))
+        runs.append([w["s"], w["e"], None])
+    return runs, shortened
+
+
+def _render(src, runs, words_in, out_wav):
+    """One sentence's clip from its pieces (10 ms fades at every cut, no clicks) and its words re-timed to the clip."""
+    parts, filt, t, out_words = [], [], 0.0, []
+    for k, (a, b, gap) in enumerate(runs):
         s0, s1 = max(0.0, a - PAD_IN), b + PAD_OUT
-        filt.append(f"[0:a]atrim={s0:.3f}:{s1:.3f},asetpts=PTS-STARTPTS[p{k}]")
+        d = s1 - s0
+        filt.append(f"[0:a]atrim={s0:.3f}:{s1:.3f},asetpts=PTS-STARTPTS,afade=t=in:d=0.01,afade=t=out:st={max(0.0, d - 0.012):.3f}:d=0.012[p{k}]")
         parts.append(f"[p{k}]")
-        for w in words:
-            if a - 1e-3 <= w["s"] and w["e"] <= b + 1e-3:
-                new_words.append({"w": w["w"], "s": round(t + (w["s"] - s0), 3), "e": round(t + (w["e"] - s0), 3)})
-        t += s1 - s0
+        out_words += [{"w": w["w"], "s": round(t + w["s"] - s0, 3), "e": round(t + w["e"] - s0, 3)} for w in words_in if a - 1e-3 <= w["s"] and w["e"] <= b + 1e-3]
+        t += d
         if gap:
-            filt.append(f"anullsrc=r=48000:cl=mono,atrim=0:{max(0.01, gap - PAD_IN - PAD_OUT):.3f}[g{k}]")
+            filt.append(f"anullsrc=r=48000:cl=mono,atrim=0:{gap:.3f}[g{k}]")
             parts.append(f"[g{k}]")
-            t += max(0.01, gap - PAD_IN - PAD_OUT)
+            t += gap
     filt.append("".join(parts) + f"concat=n={len(parts)}:v=0:a=1[out]")
     _ffmpeg("-i", str(src), "-filter_complex", ";".join(filt), "-map", "[out]", "-ac", "1", "-ar", "48000", "-c:a", "pcm_s16le", str(out_wav))
-    return new_words, t
+    return out_words, t
 
 
-# ---------- matching the channel voice: Seed-VC to the am_puck timbre ----------
+def _silence(path, secs):
+    _ffmpeg("-f", "lavfi", "-i", "anullsrc=r=48000:cl=mono", "-t", f"{max(0.01, secs):.3f}", "-c:a", "pcm_s16le", str(path))
+
+
+def _join(files_gaps, out_wav, tmpd):
+    """Clips with a pause after each: [(file, pause)] -> one wav."""
+    listing = []
+    for n, (f, gap) in enumerate(files_gaps):
+        listing.append(f"file '{Path(f).resolve()}'")
+        if gap:
+            g = tmpd / f"gap{n}.wav"
+            _silence(g, gap)
+            listing.append(f"file '{g.resolve()}'")
+    lst = tmpd / f"{Path(out_wav).stem}.txt"
+    lst.write_text("\n".join(listing) + "\n")
+    _ffmpeg("-f", "concat", "-safe", "0", "-i", str(lst), "-ar", "48000", "-ac", "1", "-c:a", "pcm_s16le", str(out_wav))
+
+
+def tts(cfg, text, out_wav, voice="dip_puck"):
+    """The channel voice reads one sentence (the lab's dip_puck server)."""
+    import urllib.request
+    s = settings(cfg)
+    req = urllib.request.Request(s["tts_url"].rstrip("/") + "/v1/audio/speech",
+                                 json.dumps({"model": "kokoro", "input": text, "voice": voice, "response_format": "wav"}).encode(),
+                                 {"Content-Type": "application/json"})
+    raw = Path(out_wav).with_suffix(".raw.wav")
+    try:
+        raw.write_bytes(urllib.request.urlopen(req, timeout=300).read())
+    except OSError as e:
+        raise ValueError(f"the dip_puck voice server did not answer ({s['tts_url']}): {e}")
+    _ffmpeg("-i", str(raw), "-ac", "1", "-ar", "48000", "-af", "silenceremove=start_periods=1:start_threshold=-45dB,areverse,"
+            "silenceremove=start_periods=1:start_threshold=-45dB,areverse", "-c:a", "pcm_s16le", str(out_wav))
+    raw.unlink(missing_ok=True)
+
+
+def _even_words(text, secs):
+    ws = [w for w in str(text).split() if w]
+    tot = sum(len(w) + 1 for w in ws) or 1
+    out, t = [], 0.0
+    for w in ws:
+        d = secs * (len(w) + 1) / tot
+        out.append({"w": w, "s": round(t, 3), "e": round(t + d * 0.9, 3)})
+        t += d
+    return out
+
+
+# ---------- matching the channel voice: Seed-VC to the dip_puck timbre ----------
 def _converter_ok(cfg):
     s = settings(cfg)
     d = Path(s["seedvc_dir"]).expanduser()
@@ -506,68 +600,149 @@ def convert(cfg, src, out_wav, runner=subprocess.run):
     got = sorted(tmp.glob("*.wav"), key=lambda p: p.stat().st_mtime)
     if r.returncode or not got:
         raise ValueError("Seed-VC could not convert the recording: " + ((r.stderr or r.stdout or "").strip().splitlines() or ["no output"])[-1][:300])
-    _ffmpeg("-i", str(got[-1]), "-ac", "1", "-ar", "48000", "-af", "loudnorm=I=-16:TP=-1.5:LRA=11", "-c:a", "pcm_s16le", str(out_wav))
+    _ffmpeg("-i", str(got[-1]), "-ac", "1", "-ar", "48000", "-c:a", "pcm_s16le", str(out_wav))
     shutil.rmtree(tmp, ignore_errors=True)
 
 
-def process(ws, slug, converter=convert, words_of=None):
-    """Clean the uploaded take and match it to the channel voice; the result waits for your approval."""
+def process(ws, slug, converter=convert, words_of=None, speaker=None):
+    """Clean the uploaded take, then make it two ways for you to choose (both wait for your approval):
+    matched  = your own recording, cleaned, converted to the dip_puck timbre (your delivery, your accent);
+    american = dip_puck reads the script's sentences with your pauses between them and your reading of abbreviations (the channel's
+               American sound; measured 2026-11-17: converting your recording keeps your accent and blurs words, this does not).
+    A sentence you mispronounced (and did not say again correctly) is read by dip_puck in both."""
     ep = _ep(ws, slug)
     take = ep / "voice-take"
     raw = next(iter(sorted(take.glob("upload.*"))), None)
     if not raw:
         raise ValueError("no recording uploaded")
-    d = desk(ep)
+    cfg = _cfg(ws)
+    speak = speaker or (lambda text, out: tts(cfg, text, out))
     try:
         script = _read(ep / "script.json", {})
         texts = lines(script)
         full = take / "take-original.wav"
         _ffmpeg("-i", str(raw), "-ac", "1", "-ar", "48000", "-af", "highpass=f=70", "-c:a", "pcm_s16le", str(full))
-        heard = (words_of or _words)(full) or []
+        heard = (words_of or (lambda f: _verbatim_words(cfg, f)))(full) or []
         if len(heard) < 10:
             raise ValueError(f"only {len(heard)} words were heard in the recording: is it the whole script?")
-        sents = align(heard, texts)
-        plan, removed, shortened = plan_cuts(heard, sents)
-        missing = [s for s in sents if s.get("missing")]
-        outro_missing = bool(script.get("beats")) and all(s.get("missing") for s in sents if s["line"] == len(texts) - 1)
-        # the cleaned take: every line's clip, joined with a short gap, converted in ONE pass (the model loads once), then cut again
-        clips, lens, line_words, join = [], [], {}, 0.6
-        tmpd = take / "lines"
+        quiet = silences(full)
+        fit_to_sound(heard, quiet)
+        sents, removed = voice_clean.clean(heard, texts)
+        tmpd = take / "work"
         shutil.rmtree(tmpd, ignore_errors=True)
         tmpd.mkdir()
-        for line, segs in plan:
-            f = tmpd / f"line{line}.wav"
-            line_words[line], n = _render_line(full, segs, heard, f)
-            clips.append((line, f))
-            lens.append(_secs(f) or n)
-        if not clips:
+        shortened, own, fixed = 0, [], []
+        said_lines = {s["line"] for s in sents if not s["missing"]}
+        for n, s in enumerate(sents):   # each sentence: your clip, or dip_puck when it was mispronounced or not said
+            s["n"] = n
+            if s["missing"] and s["line"] not in said_lines:
+                s["kind"] = "none"   # a whole line not recorded (the outro, usually): the factory's dip_puck reads it
+                continue
+            if s["missing"] or s["bad"]:
+                s["kind"] = "ai"
+                if not s["missing"]:
+                    fixed.append({"line": s["line"] + 1, "said": s.get("said", ""), "script": s["text"],
+                                  "words": [f"{a or '(not said)'} → {b}" for a, b in s["bad"]][:4]})
+                continue
+            s["kind"] = "own"
+            runs, sh = _runs(heard, s["keep"], quiet)
+            shortened += sh
+            s["file"] = tmpd / f"s{n}.wav"
+            s["words"], s["secs"] = _render(full, runs, [heard[k] for k in s["keep"]], s["file"])
+            own.append(s)
+        second = 0
+        if own and not words_of:   # (tests pass words_of: no Whisper there)
+            for _ in range(2):   # a cut can bring two copies together: listen once more
+                n_cut = _second_pass(cfg, own)
+                second += n_cut
+                if not n_cut:
+                    break
+        if not own and not any(s["kind"] == "ai" and not s["missing"] for s in sents):
             raise ValueError("none of the script's lines was found in the recording")
-        listing = tmpd / "list.txt"
-        gapf = tmpd / "gap.wav"
-        _ffmpeg("-f", "lavfi", "-i", "anullsrc=r=48000:cl=mono", "-t", str(join), "-c:a", "pcm_s16le", str(gapf))
-        listing.write_text("".join(f"file '{f.name}'\nfile 'gap.wav'\n" for _, f in clips))
-        cleaned = take / "take.wav"
-        _ffmpeg("-f", "concat", "-safe", "0", "-i", str(listing), "-c:a", "pcm_s16le", str(cleaned))
-        converted = take / "take-converted.wav"
-        converter(_cfg(ws), cleaned, converted)
-        total_in, total_out = _secs(cleaned), _secs(converted)
-        k = (total_out / total_in) if total_in and total_out else 1.0   # Seed-VC keeps the length; scale if it drifted a little
-        staged = take / "scenes"
-        shutil.rmtree(staged, ignore_errors=True)
-        staged.mkdir()
-        t = 0.0
-        for (line, _), n in zip(clips, lens):
-            _ffmpeg("-ss", f"{t * k:.3f}", "-t", f"{n * k:.3f}", "-i", str(converted), "-c:a", "pcm_s16le", str(staged / f"scene{line}.wav"))
-            _write(staged / f"scene{line}.words.json", [{"w": w["w"], "s": round(w["s"] * k, 3), "e": round(w["e"] * k, 3)} for w in line_words[line]])
-            t += n + join
+        # the pause after each sentence: as you left it (up to MAX_GAP); between lines the factory adds its own
+        for a, b in zip(sents, sents[1:]):
+            a["pause"] = 0.0
+            if a["line"] == b["line"]:
+                g = 0.45
+                if a.get("keep") and b.get("keep"):
+                    g = heard[b["keep"][0]]["s"] - heard[a["keep"][-1]]["e"]
+                a["pause"] = min(MAX_GAP, max(0.25, g))
+        if sents:
+            sents[-1]["pause"] = 0.0
+        # dip_puck for the sentences it must read (both versions use them)
+        for s in sents:
+            if s["kind"] == "ai":
+                s["ai_file"] = tmpd / f"ai{s['n']}.wav"
+                speak(s["text"], s["ai_file"])
+                s["ai_secs"] = _secs(s["ai_file"]) or 1.0
+        # 1. matched: your clips converted with Seed-VC in short pieces (CHUNK_S): on one long take it loses words after a minute
+        #    (measured 2026-11-17: "Delete is a big win" came out as "Big Hit is a big weed"), then cut again
+        sep, groups, cur = 0.6, [], []
+        for s in own:
+            if cur and sum(x["secs"] + sep for x in cur) + s["secs"] > CHUNK_S:
+                groups.append(cur); cur = []
+            cur.append(s)
+        if cur:
+            groups.append(cur)
+        for g, group in enumerate(groups):
+            joined, conv = tmpd / f"own{g}.wav", tmpd / f"own{g}-converted.wav"
+            _join([(s["file"], sep) for s in group], joined, tmpd)
+            converter(cfg, joined, conv)
+            k = (_secs(conv) / _secs(joined)) if _secs(joined) and _secs(conv) else 1.0
+            t = 0.0
+            for s in group:
+                s["conv"] = tmpd / f"c{s['n']}.wav"
+                _ffmpeg("-ss", f"{t * k:.3f}", "-t", f"{s['secs'] * k:.3f}", "-i", str(conv), "-c:a", "pcm_s16le", str(s["conv"]))
+                s["conv_words"] = [{"w": w["w"], "s": round(w["s"] * k, 3), "e": round(w["e"] * k, 3)} for w in s["words"]]
+                t += s["secs"] + sep
+        # 2. american: dip_puck reads what you said, sentence by sentence
+        for s in sents:
+            if s["kind"] == "own":
+                s["us_file"] = tmpd / f"us{s['n']}.wav"
+                speak(s["spoken"], s["us_file"])
+                s["us_secs"] = _secs(s["us_file"]) or 1.0
+        out = {}
+        for mode, folder in (("own", "scenes"), ("own_us", "scenes-us")):
+            staged = take / folder
+            shutil.rmtree(staged, ignore_errors=True)
+            staged.mkdir()
+            allf = []
+            for line in sorted(said_lines):
+                parts, words, t = [], [], 0.0
+                for s in [x for x in sents if x["line"] == line]:
+                    if s["kind"] == "ai":
+                        f, ws_ = s["ai_file"], _even_words(s["text"], s["ai_secs"])
+                    elif mode == "own":
+                        f, ws_ = s["conv"], s["conv_words"]
+                    else:
+                        f, ws_ = s["us_file"], _even_words(s["spoken"], s["us_secs"])
+                    words += [{"w": w["w"], "s": round(w["s"] + t, 3), "e": round(w["e"] + t, 3)} for w in ws_]
+                    parts.append((f, s["pause"]))
+                    t += (_secs(f) or 0) + s["pause"]
+                clip = staged / f"scene{line}.wav"
+                _join(parts, clip, tmpd)
+                _write(staged / f"scene{line}.words.json", words)
+                allf.append((clip, 0.6))
+            prev = take / ("take-converted.wav" if mode == "own" else "take-american.wav")
+            _join(allf, prev, tmpd)
+            out[mode] = round(sum(_secs(f) or 0 for f, _ in allf), 1)
+        cleaned = take / "take.wav"   # your own voice, cleaned (to compare)
+        if own:
+            _join([(s["file"], s.get("pause") or 0.6) for s in own], cleaned, tmpd)
         shutil.rmtree(tmpd, ignore_errors=True)
-        rep = {"heard_words": len(heard), "kept_lines": len(clips), "lines": len(texts), "removed": removed[:40],
-               "missing": [{"line": s["line"] + 1, "text": s["text"]} for s in missing if not (outro_missing and s["line"] == len(texts) - 1)],
-               "outro_recorded": not outro_missing, "huge_gaps_shortened": shortened, "seconds": round(sum(lens) * k, 1),
-               "voiced_by_ai": sorted({s["line"] + 1 for s in missing}), "done": time.time()}
+        missing = [s for s in sents if s["missing"]]
+        outro_line = len(texts) - 1 if script.get("beats") else None
+        outro_missing = outro_line is not None and all(s["missing"] for s in sents if s["line"] == outro_line)
+        rep = {"heard_words": len(heard), "kept_lines": len({s["line"] for s in sents if s["kind"] == "own"}), "lines": len(texts),
+               "removed": ([r for r in removed if r.strip()] + [x for s in own for x in s.get("repeats_cut", [])])[:60], "fixed": fixed,
+               "second_pass_cuts": second,
+               "missing": [{"line": s["line"] + 1, "text": s["text"]} for s in missing if not (outro_missing and s["line"] == outro_line)],
+               "outro_recorded": not outro_missing, "huge_gaps_shortened": shortened, "seconds": out.get("own"), "seconds_us": out.get("own_us"),
+               "voiced_by_ai": sorted({s["line"] + 1 for s in sents if s["kind"] == "ai"}), "done": time.time()}
         _write(take / "report.json", rep)
         d = desk(ep)
         d["voice"] = dict(d.get("voice") or {}, state="ready", mode="own")
+        d["voice"].pop("error", None)
         _save_desk(ep, d)
     except Exception as e:
         d = desk(ep)
@@ -584,8 +759,8 @@ def choose(ws, slug, mode):
     d = _adopt(ep)
     script = _read(ep / "script.json", {})
     _clear_scene_files(ep)
-    if mode == "own":
-        staged = ep / "voice-take" / "scenes"
+    if mode in ("own", "own_us"):
+        staged = ep / "voice-take" / ("scenes" if mode == "own" else "scenes-us")
         if (d.get("voice") or {}).get("state") not in ("ready", "approved") or not staged.exists():
             raise ValueError("upload your recording first, and wait for it to be processed")
         (ep / "voice").mkdir(exist_ok=True)
