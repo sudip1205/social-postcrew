@@ -3,6 +3,8 @@
 ## 0.2.0: YouTube, per-app settings and a faster Studio
 
 ### New
+- **Publish to YouTube from the Factory.** Each video has a Publish to YouTube button: it uploads now, unlisted, with the title, description and tags you checked. There is no Queue step. A copy a plan's run left in the Queue is used and removed.
+- **Deleting a video in the Factory puts its plan back.** The script and voice stay approved, so you can make it again in the look you pick.
 - **Make video follows the Looks you ticked** (Signal alone = blue). **Plans no longer hang** after a restart, and lab updates wait for running work.
 - **YouTube videos are uploaded unlisted.** You make them public on YouTube yourself. Settings > YouTube > Visibility can still change it.
 - **dip_puck and am_puck are generated as soon as you pick them, and approved only after you listen.** In Factory > Plans, "Generate with dip_puck" reads the script straight away. You can play the whole voice or each line, then approve it. If it is not right, write feedback (e.g. "a bit slower", "say LRU as L R U", "line 3 sounds flat") or tick lines, and press Regenerate. Only the lines that need it are read again. Editing a script line rereads just that line. The video uses exactly the take you approved, and the plan only shows under Ready to make once that voice is approved.

@@ -182,3 +182,41 @@ class RecoveryAndLookTests(unittest.TestCase):
             factory_plans.make(ws, item["id"], runner=lambda ws_, options, fmt: seen.append(options) or {"ok": True, "run_id": "r"})
             wait(item["id"])
             self.assertEqual(seen[0]["restyle"], "blue")
+
+
+class PublishAndDeleteTests(unittest.TestCase):
+    """Owner, 2026-11-18: publish from the Factory (no Queue step); deleting a plan's video puts the plan back to make again."""
+    def _made(self, ws, root):
+        from postcrew import factory_chat
+        item = FactoryPlanTests._approved(self, ws, root, "iso")
+        factory_plans._update(ws, item["id"], state="made")
+        ep = root / "episodes" / "bloom"
+        (ep / "youtube.json").write_text(json.dumps({"title": "Bloom filters in 70 seconds", "description": "Why.", "tags": ["cs"]}))
+        d = voice_desk.desk(ep); d["run"] = {"id": "run-7", "state": "done"}; voice_desk._save_desk(ep, d)
+        (root / "out").mkdir(exist_ok=True)
+        (root / "out" / "bloom-hyperframes.mp4").write_bytes(b"mp4")
+        ws.save_queue([{"id": "q1", "platform": "youtube", "status": "awaiting_approval", "run_id": "run-7", "youtube": {"title": "Old"}}])
+        return item, factory_chat
+
+    def test_deleting_the_video_puts_the_plan_back_and_drops_its_queue_copy(self):
+        with TempWorkspace() as ws, fake_factory(ws, desk=True) as (root, calls):
+            item, factory_chat = self._made(ws, root)
+            factory_chat.delete_video(ws, "bloom")
+            self.assertEqual(factory_plans.get(ws, item["id"])["state"], "script")
+            self.assertEqual(ws.queue(), [])
+            self.assertEqual([r["id"] for r in factory_plans.ready(ws)], [item["id"]])   # make it again, in the look you pick
+
+    def test_publish_uses_the_queue_copy_and_marks_the_plan_published(self):
+        with TempWorkspace() as ws, fake_factory(ws, desk=True) as (root, calls):
+            item, factory_chat = self._made(ws, root)
+            sent = []
+            def fake_publish(ws_, post):
+                sent.append(post)
+                return dict(post, status="published", url="https://youtu.be/x")
+            with mock.patch("postcrew.agents.publisher.publish_post", fake_publish):
+                factory_chat.publish_video(ws, "bloom", title="Bloom filters, fast", description="Why.", tags="cs, data")
+            self.assertEqual(sent[0]["id"], "q1")
+            self.assertEqual(sent[0]["youtube"]["title"], "Bloom filters, fast")
+            self.assertEqual(ws.queue(), [])
+            self.assertEqual(factory_plans.get(ws, item["id"])["state"], "published")
+            self.assertFalse((root / "out" / "bloom-hyperframes.mp4").exists())

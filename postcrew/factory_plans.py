@@ -249,6 +249,35 @@ def recover(ws):
     return notes
 
 
+def _by_slug(ws, slug):
+    return next((i for i in load(ws)["items"] if slug and i.get("slug") == slug), None)
+
+
+def unmake(ws, slug):
+    """Its video was deleted in the Factory: the plan is ready to be made again (script and voice stay approved), and the copy waiting
+    in the Queue goes."""
+    from . import voice_desk
+    ep = voice_desk._root(ws) / "episodes" / slug
+    d = voice_desk.desk(ep)
+    run_id = (d.get("run") or {}).get("id")
+    ws.save_queue([p for p in ws.queue() if not (p.get("platform") == "youtube" and p.get("status") not in ("published", "publishing")
+                                                 and (p.get("factory_slug") == slug or (run_id and p.get("run_id") == run_id)))])
+    if d:
+        d.pop("run", None)
+        voice_desk._save_desk(ep, d)
+    item = _by_slug(ws, slug)
+    if item and item.get("state") in ("made", "making", "script"):
+        _update(ws, item["id"], state="script", error=None)
+    return item
+
+
+def mark_published(ws, slug, post):
+    item = _by_slug(ws, slug)
+    if item:
+        _update(ws, item["id"], state="published", published={"at": _now(), "url": post.get("url") or post.get("video_url"),
+                                                             "visibility": post.get("privacy") or post.get("visibility")})
+
+
 def ticked_look(ws):
     """The canvas look the ticked Looks ask for: Signal ticked alone = "blue", Isometric = "iso"; None for any other choice."""
     t = factory_styles.ticked(ws)
@@ -319,7 +348,7 @@ def view(ws):
     from . import voice_desk
     out, made = [], 0
     for i in load(ws)["items"]:
-        if i.get("state") == "made":
+        if i.get("state") in ("made", "published"):
             made += 1
             continue
         row = dict(i, job=_jobs.get(i["id"]))

@@ -347,13 +347,56 @@ def _rendered(ws, slug):
 
 
 def delete_video(ws, slug):
-    """Delete an episode's rendered files from out/. The episode's script stays, so it can be made again."""
+    """Delete an episode's rendered files from out/. The episode's script stays, so it can be made again: a video made from a Factory plan
+    goes back to that plan, script and voice still approved, to be made again in the look you pick (owner, 2026-11-18). Its copy
+    waiting in the Queue goes too."""
+    from . import factory_plans
     gone = _rendered(ws, slug)
     if not gone:
         raise ValueError("that video is already gone")
     for f in gone:
         f.unlink()
+    factory_plans.unmake(ws, slug)
     return view(ws)
+
+
+def _queued_post(ws, slug):
+    """The Queue's post for this episode (a plan's run, or queued from here), if one is waiting."""
+    from . import voice_desk
+    run_id = ((voice_desk.desk(factory_dir(_cfg(ws)) / "episodes" / slug).get("run") or {}).get("id"))
+    for p in ws.queue():
+        if p.get("platform") == "youtube" and p.get("status") not in ("published", "publishing") and (
+                p.get("factory_slug") == slug or (run_id and p.get("run_id") == run_id) or p.get("run_id") == f"factory-chat-{slug}"):
+            return p
+    return None
+
+
+def publish_video(ws, slug, title=None, description=None, tags=None):
+    """Publish a Factory video to YouTube now, from the Factory (owner, 2026-11-18: "publish it from factory, no need to move to the
+    queue"). It goes up with the YouTube visibility in Settings (unlisted). A copy the crew run left in the Queue is used and leaves it."""
+    from datetime import date as date_cls
+    from .agents.publisher import publish_post
+    from . import factory_plans, rewards
+    post = _queued_post(ws, slug)
+    if post and (title is not None or description is not None or tags is not None):
+        if isinstance(tags, str):
+            tags = [t.strip() for t in tags.split(",") if t.strip()]
+        yt = post.setdefault("youtube", {})
+        yt.update({k: v for k, v in (("title", (title or "").strip() or None), ("description", description), ("tags", tags)) if v is not None})
+        post["topic"], post["text"] = yt.get("title", post.get("topic")), yt.get("description", post.get("text"))
+    if not post:
+        post = queue_video(ws, slug, date_cls.today().isoformat(), title, description, tags)["post"]
+    post = dict(post, status="approved", factory_slug=slug)
+    ws.save_queue([post if p["id"] == post["id"] else p for p in ws.queue()])
+    out = publish_post(ws, dict(post))
+    if out.get("status") == "published":
+        rewards.record(ws, out, "published")
+        ws.save_queue([p for p in ws.queue() if p["id"] != post["id"]])
+        _move_out(ws, slug)
+        factory_plans.mark_published(ws, slug, out)
+    elif out.get("status") not in ("dry_run",):
+        raise ValueError(out.get("error") or f"YouTube did not take it ({out.get('status')})")
+    return {"post": out, **view(ws)}
 
 
 def _move_out(ws, slug):

@@ -50,8 +50,7 @@ function fcVideo(v) {
       <div class="text-sm font-semibold text-slate-900 line-clamp-2" title="${esc(v.title)}">${esc(v.title)}</div>
       <div class="text-[11px] text-slate-500">${esc(ago(v.made))} · ${v.mb} MB</div>
       <div class="flex flex-wrap items-center gap-1.5 mt-auto">
-        ${v.has_meta ? `<input type="date" class="text-xs border border-slate-300 rounded-md px-2 py-1" value="${today}" min="${today}" data-fc-date="${esc(v.slug)}">
-          <button class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold" data-fc-queue="${esc(v.slug)}">${icon("playlist_add", "text-sm")}<span>Move to Queue</span></button>`
+        ${v.has_meta ? `<button class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold disabled:opacity-50" data-fc-publish="${esc(v.slug)}" title="Uploads it to YouTube now, with the visibility in Settings (unlisted): make it public on YouTube when you want">${icon("publish", "text-sm")}<span>Publish to YouTube</span></button>`
           : `<span class="text-[11px] text-amber-700">${tip("No youtube.json", "Ask Claude to write the title, description and tags for this episode; then it can be queued.")}</span>`}
         ${v.own_voice ? `<button class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold" data-fc-voice="${esc(v.slug)}">${icon("mic", "text-sm")}<span>My voice${v.own_voice.own ? ` ${v.own_voice.own}/${v.own_voice.scenes}` : ""}</span></button>` : ""}
         <button class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 text-xs font-semibold" data-fc-delete="${esc(v.slug)}" data-fc-title="${esc(v.title)}">${icon("delete", "text-sm")}<span>Delete</span></button>
@@ -65,7 +64,7 @@ function fcVideo(v) {
             <textarea rows="5" class="mt-0.5 w-full text-xs border border-slate-300 rounded-md px-2 py-1 resize-y" maxlength="5000" data-fc-field="description">${esc(v.description)}</textarea></label>
           <label class="block"><span class="text-[11px] font-semibold text-slate-600">Tags <span class="font-normal text-slate-400">(comma separated)</span></span>
             <input class="mt-0.5 w-full text-xs border border-slate-300 rounded-md px-2 py-1" data-fc-field="tags" value="${esc(v.tags.join(", "))}"></label>
-          <p class="text-[11px] text-slate-400">Saved to the episode's youtube.json when you move it to the Queue; you can still change them in the Queue before it is published.</p>
+          <p class="text-[11px] text-slate-400">Used when you press Publish to YouTube, and saved to the episode's youtube.json.</p>
         </div></details>` : ""}
     </div></li>`;
 }
@@ -249,19 +248,21 @@ function fcDrawVideos(d) {
   document.querySelectorAll("[data-fc-voice]").forEach(b => b.onclick = () => fcVoiceOpen(b.dataset.fcVoice));
   document.querySelectorAll("[data-fc-play]").forEach(b => b.onclick = () => fcPlay(`/factory-out/${encodeURIComponent(b.dataset.fcPlay)}`));
   document.querySelectorAll("[data-fc-delete]").forEach(b => b.onclick = async () => {
-    if (!confirm(`Delete the video "${b.dataset.fcTitle}"? Its script stays, so Claude can make it again.`)) return;
-    try { const r = await post("/api/factory/delete", { slug: b.dataset.fcDelete }); document.activeElement?.blur?.(); fcDraw(r); toast("Video deleted"); }
+    if (!confirm(`Delete the video "${b.dataset.fcTitle}"? Its script and voice stay: a plan's video goes back to Factory > Plans, to make again in the look you pick.`)) return;
+    try { const r = await post("/api/factory/delete", { slug: b.dataset.fcDelete }); document.activeElement?.blur?.(); fcDraw(r); toast("Video deleted: its plan is ready to make again");
+      if (typeof vdOpen === "function") vdOpen(); }
     catch (e) { toast(e.message, true); }
   });
-  document.querySelectorAll("[data-fc-queue]").forEach(b => b.onclick = async () => {
-    const slug = b.dataset.fcQueue, date = document.querySelector(`[data-fc-date="${CSS.escape(slug)}"]`).value;
-    const box = document.querySelector(`[data-fc-meta="${CSS.escape(slug)}"]`), body = { slug, date };
+  document.querySelectorAll("[data-fc-publish]").forEach(b => b.onclick = async () => {
+    const slug = b.dataset.fcPublish, box = document.querySelector(`[data-fc-meta="${CSS.escape(slug)}"]`), body = { slug };
     if (box) box.querySelectorAll("[data-fc-field]").forEach(f => body[f.dataset.fcField] = f.value);
-    b.disabled = true;
+    if (!confirm(`Publish "${body.title || slug}" to YouTube now? It goes up with the visibility in Settings (unlisted).`)) return;
+    b.disabled = true; b.querySelector("span:last-child").textContent = "Uploading…";
     try {
-      const r = await post("/api/factory/queue", body); FC_OPEN.delete(slug); document.activeElement?.blur?.(); fcDraw(r);
-      toast(`Moved to the Queue for ${date}: approve it there`);
-    } catch (e) { toast(e.message, true); b.disabled = false; }
+      const r = await post("/api/factory/publish", body); FC_OPEN.delete(slug); document.activeElement?.blur?.(); fcDraw(r);
+      toast(r.post?.status === "published" ? "Published to YouTube (unlisted): make it public there when you are ready" : "Practice mode: not uploaded (turn it off in Settings)");
+      if (typeof vdOpen === "function") vdOpen();
+    } catch (e) { toast(e.message, true); b.disabled = false; b.querySelector("span:last-child").textContent = "Publish to YouTube"; }
   });
 }
 
