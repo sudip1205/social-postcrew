@@ -3,6 +3,12 @@
 ## 0.2.0: YouTube, per-app settings and a faster Studio
 
 ### New
+- **YouTube is made by hand, from Factory › Plans.** Nothing is planned or made automatically any more. The scheduler skips YouTube; the old automatic mode is still there behind `video.automatic`.
+  1. **Plan:** type a topic, optionally say what you want, pick how many plans and Short or Long, then press **Plan**. The Planner researches the topic on YouTube and writes plans the same way as the monthly ones, with the research numbers.
+  2. **The list keeps every plan.** A plan leaves only when its video is made, or when you remove it.
+  3. **Write the script** for a plan, with your own instructions. It is written in the Looks ticked in the Factory.
+  4. **Record and approve:** upload your recording for that script, or skip to dip_puck or am_puck. Then approve the script and the voice.
+  5. **Make the video:** this button makes it in the style its script was written in and puts it in the Queue.
 - **Factory › Voice: approve the script and your voice before any video is made.** A new section at the top of the Factory page lists the next 7 scheduled days.
   - **Scripts are written ahead.** Each day's script is written ahead, once a day automatically or with **Write the next scripts**. Read it, edit any line, then **Approve script**. **Write again** takes notes for the writer.
   - **Upload one recording of the whole script.** Retakes are fine: the last take of a line is kept. Words that are not in the script are cut (false starts, "sorry, again"), and so are earlier takes. A hesitation longer than 1.2 s inside a sentence is shortened. Your other pauses, your pronunciation and how you say abbreviations stay as recorded.

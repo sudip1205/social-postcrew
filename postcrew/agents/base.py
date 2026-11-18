@@ -26,7 +26,7 @@ class AgentError(RuntimeError):
 
 
 class AgentWait(AgentError):
-    """Not a failure: the step needs the owner first (a YouTube video waits for the approved script and voice, Factory > Voice).
+    """Not a failure: the step needs the owner first (a YouTube video waits for the approved script and voice, Factory > Plans).
     The run ends as "waiting"; nothing is retried and no one is asked to diagnose it."""
 
     def __init__(self, message):

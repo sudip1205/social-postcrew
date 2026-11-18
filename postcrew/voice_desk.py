@@ -1,15 +1,11 @@
-"""Voice desk (Studio > Factory > Voice): the next days' YouTube scripts, written ahead, each waiting for your voice (owner, 2026-11-16).
+"""Voice desk: every YouTube script waits for the owner's two approvals, the script and the voice, before its video is made (owner, 2026-11-16).
+Since 2026-11-17 the scripts come from your Factory plans (factory_plans.py); nothing is made automatically.
 
-    "Create a section on factory where next 7 days video scripts would be available. I'll create the voice and upload for each of them
-     ... match with dip_puck and create the voice for the video. Remove wrong lines, huge gap etc. But for the sentences keep the pause as
-     it is and the pronunciation of the words and abbreviations. If the voice found for a script then only make the video when normal run
-     happens. For factory manual run create the script first and ask for voice upload ... I should have option to skip my voice and use
-     am_puck directly. basically I'll approve script and voice before making the video."
+    "I'll create the voice and upload for each of them ... match with dip_puck and create the voice for the video. Remove wrong lines,
+     huge gap etc. But for the sentences keep the pause as it is and the pronunciation of the words and abbreviations. ... I should have
+     option to skip my voice and use am_puck directly. basically I'll approve script and voice before making the video."
 
-How it works:
-- A YouTube run writes the script (Script Writer) and then stops at the Render step, WAITING, until the script and the voice are both
-  approved here. Written ahead (the next `days_ahead` scheduled days) or by a run, the episode is recorded in the desk; the scheduled run
-  for that day reuses the script (nothing is written twice) and renders only once the voice is approved.
+- A script is written by a crew run that stops at the Render step, WAITING (AgentWait), until the script and the voice are approved here.
 - Your recording of the whole script is cleaned and matched to the channel voice:
     1. faster-whisper finds every word and when it was said;
     2. each sentence of the script is matched to what was heard; a line said again (a retake) keeps its LAST take, and words that are
@@ -19,8 +15,9 @@ How it works:
        data), so it sounds like the channel voice but keeps your timing, pauses and pronunciation (nothing is re-synthesised);
     5. it is cut into one clip per line (episodes/<slug>/voice/scene<i>.wav + words), which the factory uses in place of the AI voice.
 - Or skip your voice: dip_puck (the trained voice) or Kokoro am_puck reads the script.
+- The video is made only when you press Make the video (factory_plans.make, or make() here for a script from the chat or a manual run).
 
-State: episodes/<slug>/desk.json in the Shorts factory; the index (day -> slug) in workspace state "voice-desk".
+State: episodes/<slug>/desk.json in the Shorts factory; the index (day -> slug) of manual runs in workspace state "voice-desk".
 """
 import difflib
 import json
@@ -43,13 +40,12 @@ MAX_GAP = 0.9    # s: the longest pause kept between two sentences
 PAD_IN, PAD_OUT = 0.06, 0.16   # s of audio kept before a sentence's first word and after its last
 _jobs = {}       # slug -> {"what", "started", "error", "done"}: background work (voice processing, a run)
 _lock = threading.Lock()
-_writer = {"busy": False, "day": None, "error": None, "done": []}
 
 
 # ---------- settings and places ----------
 def settings(cfg):
     d = ((cfg.get("video") or {}).get("voice_desk") or {})
-    return {"enabled": d.get("enabled", True), "days_ahead": int(d.get("days_ahead", 7)), "auto_write": d.get("auto_write", True),
+    return {"enabled": d.get("enabled", True),
             "seedvc_dir": d.get("seedvc_dir", "~/voicelab/seed-vc"), "target": d.get("target", "~/voicelab/refs/am_puck.wav"),
             "steps": int(d.get("diffusion_steps", 40)), "cfg_rate": float(d.get("cfg_rate", 0.7))}
 
@@ -176,7 +172,7 @@ def record(ctx, out):
     d = {"day": ctx.day.isoformat(), "category": ctx.category, "label": ctx.cat.get("label", ""), "slug": out["slug"],
          "topic": (ctx.outputs.get("topic") or {}).get("topic") or out.get("title", ""), "title": out.get("title", ""),
          "writer": {k: v for k, v in out.items() if not str(k).startswith("_")}, "written": time.time(), "script": "draft",
-         "voice": {"state": "none"}, "history": (old.get("history") or [])[-10:]}
+         "voice": {"state": "none"}, "history": (old.get("history") or [])[-10:], "plan_id": (ctx.options or {}).get("plan_id")}
     if old.get("written"):
         d["history"].append({"written": old["written"], "script": old.get("script"), "voice": (old.get("voice") or {}).get("state")})
     shutil.rmtree(ep / "voice-take", ignore_errors=True)   # a take of the old script does not fit the new one
@@ -192,12 +188,12 @@ def gate(ctx, slug):
     ep = _root(ctx.ws) / "episodes" / slug
     d = desk(ep)
     if not d:   # an episode the desk never saw (written before the desk existed): put it there and wait like the others
-        return "the script is waiting for you in Factory > Voice: approve it and upload your voice (or skip to the AI voice)"
+        return "the script is waiting for you in Factory > Plans: approve it and upload your voice (or skip to the AI voice)"
     if d.get("script") != "approved":
-        return "waiting for you to approve the script in Factory > Voice"
+        return "waiting for you to approve the script in Factory > Plans"
     v = d.get("voice") or {}
     if v.get("state") != "approved":
-        return "waiting for your voice in Factory > Voice: upload it and approve it (or skip to dip_puck or am_puck)"
+        return "waiting for your voice in Factory > Plans: upload it and approve it (or skip to dip_puck or am_puck)"
     return None
 
 
@@ -211,26 +207,11 @@ def mark_run(ws, slug, run_id, state):
 
 # ---------- the Studio's side ----------
 def view(ws):
-    from . import crew, platforms
-    from .agents.planner import planned_for
+    """Factory > Plans: your plans (factory_plans.py), and other scripts waiting for your voice (Factory chat, manual runs)."""
+    from . import factory_plans
     cfg = _cfg(ws)
-    s = settings(cfg)
-    days, seen = [], set()
-    today = crew.local_now(cfg).date()
-    start = crew.target_date(cfg)
-    idx = index(ws).get("days") or {}
-    for d, slot in platforms.upcoming(cfg["schedule"], start, s["days_ahead"]):
-        seen.add(d.isoformat())
-        days.append(_day(ws, cfg, d, slot.get("category"), idx.get(d.isoformat()), planned_for))
-    for iso, slug in sorted(idx.items()):   # earlier days still waiting for you (a run stopped at the voice)
-        if iso in seen or iso < (today - timedelta(days=7)).isoformat():
-            continue
-        row = _day(ws, cfg, date.fromisoformat(iso), None, slug, planned_for)
-        if row.get("episode") and not row.get("made"):
-            days.append(row)
-    days.sort(key=lambda r: r["day"])
-    return {"enabled": s["enabled"], "days_ahead": s["days_ahead"], "auto_write": s["auto_write"], "days": days, "chat": chat_episodes(ws),
-            "writer": dict(_writer), "whisper": _has_whisper(), "converter": _converter_ok(cfg), "modes": list(MODES)}
+    return dict(factory_plans.view(ws), others=chat_episodes(ws, 14), whisper=_has_whisper(), converter=_converter_ok(cfg), modes=list(MODES),
+                enabled=enabled(cfg))
 
 
 def chat_episodes(ws, days=7):
@@ -242,7 +223,7 @@ def chat_episodes(ws, days=7):
         return out
     for ep in sorted(eps.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True):
         f = ep / "script.json"
-        if not f.exists() or f.stat().st_mtime < cut or desk(ep).get("day"):
+        if not f.exists() or f.stat().st_mtime < cut or desk(ep).get("plan_id"):
             continue
         if (root / "out" / f"{ep.name}-hyperframes.mp4").exists() and not desk(ep):
             continue   # made before the desk existed
@@ -254,18 +235,6 @@ def chat_episodes(ws, days=7):
             continue
     return out[:12]
 
-
-def _day(ws, cfg, d, category, slug, planned_for):
-    from . import crew
-    iso = d.isoformat()
-    post = crew.post_for(ws, iso, "youtube")
-    category = category or (desk(_root(ws) / "episodes" / slug).get("category") if slug else None)
-    plan = planned_for(ws, d, category, "youtube") if category else None
-    row = {"day": iso, "weekday": d.strftime("%A"), "category": category, "label": (cfg["categories"].get(category) or {}).get("label", category or ""),
-           "planned": (plan or {}).get("topic") or "", "made": bool(post), "post_status": (post or {}).get("status")}
-    if slug and (_root(ws) / "episodes" / slug / "script.json").exists():
-        row["episode"] = episode(ws, slug)
-    return row
 
 
 def episode(ws, slug):
@@ -326,7 +295,6 @@ def approve_script(ws, slug, approved=True):
     d = _adopt(ep)
     d["script"] = "approved" if approved else "draft"
     _save_desk(ep, d)
-    _go_on(ws, slug, d)
     return episode(ws, slug)
 
 
@@ -612,24 +580,14 @@ def choose(ws, slug, mode):
     _write(ep / "script.json", script)
     d["voice"] = dict(d.get("voice") or {}, state="approved", mode=mode, approved=time.time())
     _save_desk(ep, d)
-    _go_on(ws, slug, d)
     return episode(ws, slug)
 
-
-def _go_on(ws, slug, d, runner=None):
-    """A run already stopped at the voice for this script (a manual run, or the day's run came first): with both approved, the video
-    is made now. A script written ahead waits for its day's scheduled run."""
-    from . import crew
-    if d.get("script") == "approved" and (d.get("voice") or {}).get("state") == "approved" and (d.get("run") or {}).get("state") == "waiting":
-        if not crew.is_running() and not (_jobs.get(slug) and _jobs[slug].get("done") is None):
-            d["run"] = dict(d["run"], state="making")
-            _save_desk(_root(ws) / "episodes" / slug, d)
-            _make_now(ws, slug, d, runner)
 
 
 def _make_now(ws, slug, d, runner=None):
     if d.get("day"):
-        _start(slug, "video", lambda: (runner or _run)(ws, d["day"]))
+        _start(slug, "video", lambda: (runner or _run)(ws, d["day"], {"kept": {"writer": d["writer"]}, "kept_from": "your approved script"},
+                                                       d.get("category")))
     else:   # from the Factory chat: render it; it appears in the Factory's video list, to queue from there
         _start(slug, "video", lambda: _render_chat(ws, slug))
 
@@ -658,12 +616,12 @@ def reopen_voice(ws, slug):
 
 
 # ---------- runs: write ahead, write again, make the video ----------
-def _run(ws, day, options=None):
+def _run(ws, day, options=None, category=None):
     from . import crew
     res = None
     for _ in range(720):   # one crew run at a time: wait up to an hour for the one in progress
         if not crew.is_running():
-            res = crew.run_crew(ws, day, platform="youtube", options=options or {})
+            res = crew.run_crew(ws, day, category, platform="youtube", options=options or {})
             if "in progress" not in str(res.get("reason") or ""):
                 return res
         time.sleep(5)
@@ -683,74 +641,3 @@ def make(ws, slug, runner=None):
     return episode(ws, slug)
 
 
-def write(ws, day, notes=None, runner=None):
-    """Write (or write again) the script for one scheduled day, in the background. The run stops at the voice step."""
-    from . import crew
-    if _writer["busy"]:
-        raise ValueError(f"already writing the script for {_writer['day']}: wait for it")
-    date.fromisoformat(day)
-    if crew.is_running():
-        raise ValueError("a crew run is in progress: try again when it finishes")
-    opts = {"rewrite": True, "notes": [str(n) for n in (notes or []) if str(n).strip()][:6]} if notes is not None else {}
-    if date.fromisoformat(day) > crew.target_date(_cfg(ws)):
-        opts["ahead"] = True   # a later day: its scheduled run makes the video
-    _write_days(ws, [day], opts, runner)
-    return {"writer": dict(_writer)}
-
-
-def missing_days(ws):
-    """The next scheduled days with no script on the desk and no post made yet."""
-    from . import crew, platforms
-    cfg = _cfg(ws)
-    idx = index(ws).get("days") or {}
-    out = []
-    for d, slot in platforms.upcoming(cfg["schedule"], crew.target_date(cfg), settings(cfg)["days_ahead"]):
-        iso = d.isoformat()
-        slug = idx.get(iso)
-        if slug and (_root(ws) / "episodes" / slug / "script.json").exists():
-            continue
-        if crew.post_for(ws, iso, "youtube"):
-            continue
-        out.append(iso)
-    return out
-
-
-def write_ahead(ws, runner=None):
-    """Write every missing script of the next days (Factory > Voice > Write the next days, and once a day from the scheduler)."""
-    days = missing_days(ws)
-    if days and not _writer["busy"]:
-        _write_days(ws, days, {"ahead": True}, runner)
-    return {"writer": dict(_writer), "days": days}
-
-
-def _write_days(ws, days, opts, runner):
-    _writer.update(busy=True, day=days[0], error=None, done=[])
-
-    def go():
-        try:
-            for day in days:
-                _writer["day"] = day
-                res = (runner or _run)(ws, day, opts)
-                if res and not res.get("ok") and not res.get("waiting"):
-                    _writer["error"] = f"{day}: {res.get('reason') or 'the run failed'}"[:400]
-                _writer["done"] = _writer["done"] + [day]
-        except Exception as e:
-            _writer["error"] = f"{type(e).__name__}: {e}"[:400]
-        finally:
-            _writer["busy"] = False
-
-    threading.Thread(target=go, daemon=True, name="voice-desk-writer").start()
-
-
-def auto_write_due(ws, today_iso):
-    """The scheduler's once-a-day write-ahead (settings: video.voice_desk.auto_write)."""
-    cfg = _cfg(ws)
-    s = settings(cfg)
-    if not (s["enabled"] and s["auto_write"]):
-        return False
-    st = index(ws)
-    if st.get("auto_written") == today_iso:
-        return False
-    st["auto_written"] = today_iso
-    ws.save_state(STATE, st)
-    return bool(write_ahead(ws)["days"])

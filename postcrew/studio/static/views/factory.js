@@ -442,7 +442,7 @@ async function renderFactory() {
   fcDraw(d);
   fcStyles(d.styles);
   fcPoll();
-  if (typeof vdOpen === "function") vdOpen();   // Factory > Voice (views/voice-desk.js)
+  if (typeof vdOpen === "function") vdOpen();   // Factory > Plans (views/voice-desk.js)
 }
 
 VIEWS.factory = renderFactory;

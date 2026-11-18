@@ -183,7 +183,7 @@ class ShortsWriter(Agent):
             kept = voice_desk.reuse(ctx)
             if kept:
                 return kept
-        notes = [str(n) for n in (ctx.options or {}).get("notes") or []]   # Factory > Voice > Write again, with your notes
+        notes = [str(n) for n in (ctx.options or {}).get("notes") or []]   # Factory > Plans > Write again, with your notes
         out = self._write(ctx, root, (list(guidance or []) + notes) or guidance)
         voice_desk.record(ctx, out)
         return out

@@ -82,6 +82,10 @@ def tick(ws, now=None, runner=run_crew, publisher=publish_due, checker=run_check
         # the monthly plan: written once for each month, on the 1st (or the first tick after it, when the app was off or had no
         # topics yet). Topics changed later in the month are used for the next month's plan.
         month = month_key(pnow.date())
+        if pid == "youtube" and not (pcfg.get("video") or {}).get("automatic", False):
+            # YouTube is made by hand from the Factory (plan, script, your voice, Make the video): no automatic plans or videos (owner, 2026-11-17)
+            gates.append((pnow, _earliest(sched)))
+            continue
         if (pn["enabled"] and _passed(pnow, pn["time"]) and ps.get("planned_month") != month and topics_of(pcfg)):
             ps["planned_month"] = month
             ws.save_state(name, ps)
@@ -113,15 +117,6 @@ def tick(ws, now=None, runner=run_crew, publisher=publish_due, checker=run_check
         ran = _catch_up(ws, runner)
         if ran:
             did.append(ran)
-    # Factory > Voice: once a day, the scripts of the next days are written ahead, so you can record your voice for them (owner, 2026-11-16)
-    if ("youtube" in platforms.enabled(cfg) and runner is run_crew and not any(d.startswith(("generate", "catch up")) for d in did)
-            and not is_running()):
-        from . import voice_desk
-        try:
-            if voice_desk.auto_write_due(ws, today):
-                did.append("write scripts ahead")
-        except Exception:
-            traceback.print_exc()
 
     last = st.get("published_check")
     utc = now.astimezone(timezone.utc)
@@ -213,6 +208,8 @@ def _catch_up(ws, runner):
         if pid not in platforms.enabled(ws.config()):
             continue
         pcfg = platforms.view(ws.config(), pid)
+        if pid == "youtube" and not (pcfg.get("video") or {}).get("automatic", False):
+            continue   # YouTube is made by hand from the Factory (owner, 2026-11-17)
         day = date.fromisoformat(iso)
         if not category_for(pcfg, day) or _day_done(ws, pid, iso):
             continue

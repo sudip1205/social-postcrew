@@ -33,7 +33,7 @@ from ..agents.frames import HyperFramesAgent, RemotionAgent, RemotionFramesAgent
 from ..agents.hooks import HooksAgent
 from ..agents.graphics import GraphicsAgent
 from ..agents.video_review import VideoReviewAgent
-from .. import attachments, engage, factory_chat, factory_refs, factory_styles, factory_voice, rewards, voice_desk, yt_analytics
+from .. import attachments, engage, factory_chat, factory_refs, factory_styles, factory_plans, factory_voice, rewards, voice_desk, yt_analytics
 from ..agents.direction import CreativeDirectorAgent
 from ..agents.quality import QualityDirectorAgent
 from ..agents.voice import VoiceAgent
@@ -969,7 +969,7 @@ def make_handler(studio):
                 if p == "/api/manual/plan/attach" and method == "POST":   # a PDF or image for your own plan (raw body)
                     return self.send(200, {"source": attachments.save_upload(ws, studio._view(q.get("platform"))[0], q.get("id", ""), q.get("name", ""),
                                                                               self.rfile, int(self.headers.get("Content-Length") or 0))})
-                if p == "/api/voice-desk/upload" and method == "POST":   # your recording of a whole script (raw body), Factory > Voice
+                if p == "/api/voice-desk/upload" and method == "POST":   # your recording of a whole script (raw body), Factory > Plans
                     return self.send(200, voice_desk.upload(ws, q.get("slug"), q.get("name", ""), self.rfile,
                                                             int(self.headers.get("Content-Length") or 0)))
                 if method == "GET" and p.startswith("/voice-desk/"):   # your processed take, to listen to before approving it
@@ -1031,10 +1031,16 @@ def make_handler(studio):
                     ("POST", "/api/factory/reset"): lambda: factory_chat.reset(ws),
                     ("GET", "/api/factory/plan"): lambda: factory_chat.plan_prompt(ws, q.get("id")),
                     ("GET", "/api/factory/voice"): lambda: factory_voice.view(ws, q.get("slug")),
-                    # Factory > Voice: the next days' scripts, your voice for each, and your approvals (owner, 2026-11-16)
+                    # Factory > Plans: the next days' scripts, your voice for each, and your approvals (owner, 2026-11-16)
                     ("GET", "/api/voice-desk"): lambda: voice_desk.view(ws),
-                    ("POST", "/api/voice-desk/write-ahead"): lambda: voice_desk.write_ahead(ws),
-                    ("POST", "/api/voice-desk/write"): lambda: voice_desk.write(ws, self.body().get("day", ""), self.body().get("notes")),
+                    # Factory plans: topic -> researched plans -> script with your instructions -> your voice -> Make the video (owner, 2026-11-17)
+                    ("POST", "/api/factory-plans/plan"): lambda: factory_plans.plan(ws, self.body().get("topic"), self.body().get("count", 3),
+                                                                                    self.body().get("hint", ""), self.body().get("format", "short")),
+                    ("POST", "/api/factory-plans/add"): lambda: factory_plans.add_own(ws, self.body().get("title"), self.body().get("angle", ""),
+                                                                                   self.body().get("format", "short")),
+                    ("POST", "/api/factory-plans/script"): lambda: factory_plans.write_script(ws, self.body().get("id"), self.body().get("instructions", "")),
+                    ("POST", "/api/factory-plans/make"): lambda: factory_plans.make(ws, self.body().get("id")),
+                    ("POST", "/api/factory-plans/remove"): lambda: factory_plans.remove(ws, self.body().get("id")),
                     ("POST", "/api/voice-desk/lines"): lambda: voice_desk.save_lines(ws, self.body().get("slug"), self.body().get("lines")),
                     ("POST", "/api/voice-desk/approve-script"): lambda: voice_desk.approve_script(ws, self.body().get("slug"), self.body().get("approved", True)),
                     ("POST", "/api/voice-desk/voice"): lambda: voice_desk.choose(ws, self.body().get("slug"), self.body().get("mode")),

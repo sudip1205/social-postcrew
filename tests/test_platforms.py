@@ -133,6 +133,9 @@ class SchedulerPerAppTests(unittest.TestCase):
     def test_each_enabled_app_generates_on_its_own_schedule(self):
         with TempWorkspace() as ws:
             with_youtube(ws, generate_time="20:00", lead_days=1)
+            cfg = ws.config()
+            cfg["platforms"]["youtube"]["video"]["automatic"] = True   # the old automatic mode, still there behind a switch
+            ws.save_config(cfg)
             tz = ZoneInfo(ws.config()["schedule"]["timezone"])
             calls = []
             kw = dict(runner=lambda ws_, d, platform="linkedin": calls.append((platform, d.isoformat())),
@@ -145,6 +148,22 @@ class SchedulerPerAppTests(unittest.TestCase):
             self.assertIn(("youtube", "2026-10-13"), calls)
             scheduler.tick(ws, datetime(2026, 10, 12, 20, 6, tzinfo=tz), **kw)
             self.assertEqual(calls.count(("youtube", "2026-10-13")), 1)
+
+    def test_youtube_makes_nothing_by_itself_unless_switched_on(self):
+        """Owner, 2026-11-17: YouTube is made by hand from the Factory; no automatic plans or videos."""
+        with TempWorkspace() as ws:
+            with_youtube(ws, generate_time="20:00", lead_days=1)
+            cfg = ws.config()
+            cfg["platforms"]["youtube"]["video"]["automatic"] = False
+            ws.save_config(cfg)
+            tz = ZoneInfo(ws.config()["schedule"]["timezone"])
+            calls = []
+            kw = dict(runner=lambda ws_, d, platform="linkedin": calls.append((platform, d.isoformat())),
+                      publisher=lambda ws_: [], checker=lambda ws_: None,
+                      planner=lambda ws_, d, platform="linkedin": calls.append(("plan", platform)))
+            scheduler.tick(ws, datetime(2026, 10, 12, 20, 5, tzinfo=tz), **kw)
+            self.assertIn(("linkedin", "2026-10-13"), calls)
+            self.assertFalse([c for c in calls if "youtube" in c])
 
     def test_a_switched_off_app_is_never_scheduled(self):
         with TempWorkspace() as ws:

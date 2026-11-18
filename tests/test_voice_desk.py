@@ -92,15 +92,17 @@ class DeskRunTests(unittest.TestCase):
             self.assertTrue(any(c[0][:3] == ["npm", "run", "make"] for c in calls))
             self.assertEqual(len(ws.queue()), 1)
 
-    def test_approving_the_voice_of_a_waiting_run_makes_the_video(self):
+    def test_approving_never_makes_the_video_by_itself(self):
+        """Owner, 2026-11-17: the video is made only when you press Make the video."""
         with TempWorkspace() as ws, fake_factory(ws, desk=True):
             run_crew(ws, DAY, "short-tip", platform="youtube")
             slug = voice_desk.index(ws)["days"][DAY.isoformat()]
             started = []
             with mock.patch.object(voice_desk, "_start", side_effect=lambda s, what, fn: started.append((s, what))):
                 voice_desk.approve_script(ws, slug)
-                self.assertEqual(started, [])                       # the voice is still missing
                 voice_desk.choose(ws, slug, "dip_puck")
+                self.assertEqual(started, [])
+                voice_desk.make(ws, slug)
             self.assertEqual(started, [(slug, "video")])
 
     def test_editing_a_line_needs_a_new_approval_and_a_new_recording(self):
@@ -127,13 +129,12 @@ class DeskRunTests(unittest.TestCase):
             self.assertEqual(len(prompts), 2)
             self.assertIn("make the hook about a bank queue", prompts[1])
 
-    def test_the_desk_lists_the_next_scheduled_days(self):
+    def test_the_desk_lists_your_plans_and_other_waiting_scripts(self):
         with TempWorkspace() as ws, fake_factory(ws, desk=True), mock.patch.object(voice_desk, "_has_whisper", return_value=True):
+            run_crew(ws, DAY, "short-tip", platform="youtube")   # a manual run: no plan, so it shows under the other scripts
             v = voice_desk.view(ws)
-            self.assertTrue(v["enabled"])
-            self.assertLessEqual(len(v["days"]), 7)
-            self.assertTrue(all("day" in r and "label" in r for r in v["days"]))
-
+            self.assertEqual(v["plans"], [])
+            self.assertEqual(len(v["others"]), 1)
 
 @unittest.skipUnless(HAVE_FFMPEG, "ffmpeg is needed")
 class ProcessTests(unittest.TestCase):

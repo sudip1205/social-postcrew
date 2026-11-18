@@ -147,7 +147,7 @@ class Supervisor:
             try:
                 out = agent.run(ctx, guidance[step])
                 problems = agent.validate(ctx, out)
-            except AgentWait as e:   # the owner's turn (Factory > Voice): the run stops here, waiting, and is started again later
+            except AgentWait as e:   # the owner's turn (Factory > Plans): the run stops here, waiting, and is started again later
                 run.step(step, "waiting", summary=str(e), errors=[])
                 run.event(step, "waiting", str(e))
                 for s in self.order[i + 1:]:
