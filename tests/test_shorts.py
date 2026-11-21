@@ -27,7 +27,7 @@ def fake_factory(ws, fail_render=False, write=True, desk=False):
     (root / "episodes").mkdir(parents=True)
     (root / "package.json").write_text("{}")
     from postcrew import factory_styles
-    factory_styles.save(ws, ["signal", "code"])   # this fake factory makes HyperFrames Signal episodes (Signal alone uses the Tech Glow canvas engine since 2026-11-15)
+    ws.save_state(factory_styles.STATE, {"styles": ["signal", "code"]})   # a retired mix, saved before 2026-11-21; this fake factory makes HyperFrames Signal episodes (Signal alone uses the Tech Glow canvas engine since 2026-11-15)
     cfg = ws.config()
     cfg["platforms"]["youtube"]["video"]["factory_path"] = str(root)
     cfg["platforms"]["youtube"]["enabled"] = True
@@ -166,16 +166,35 @@ class FactoryStylesTests(unittest.TestCase):
     """Owner, 2026-11-12: the looks ticked in the Factory are saved and go to the Script Writer and the Factory chat."""
 
     def test_ticked_looks_are_saved_and_explained(self):
+        """Owner, 2026-11-21: only two looks, Signal (blue) and Isometric, one at a time; Isometric has a variation."""
         from postcrew import factory_styles as fs
         with TempWorkspace() as ws:
             self.assertEqual(fs.ticked(ws), ["iso"])   # Isometric Pastel by default (owner, 2026-11-15; was the blue look)
-            self.assertEqual(fs.save(ws, ["code", "signal", "nope"]), ["signal", "code"])
-            self.assertEqual([o["id"] for o in fs.options(ws) if o["on"]], ["signal", "code"])
+            self.assertEqual([o["id"] for o in fs.options(ws)], ["signal", "iso"])
+            self.assertEqual(fs.save(ws, ["code", "signal", "nope"]), ["signal"])   # the retired looks are not saved
+            self.assertEqual([o["id"] for o in fs.options(ws) if o["on"]], ["signal"])
+            for bad in ([], ["3d"], ["signal", "iso"]):
+                with self.assertRaises(ValueError):
+                    fs.save(ws, bad)
+            self.assertEqual(fs.variant(ws), "pastel")
+            fs.save(ws, ["iso"], "night")
+            iso = [o for o in fs.options(ws) if o["id"] == "iso"][0]
+            self.assertEqual(iso["variant"], "night"); self.assertIn("sky", [v["id"] for v in iso["variants"]])
+            line = fs.instruction(fs.ticked(ws), fs.variant(ws))
+            self.assertIn('"variant": "night"', line); self.assertIn("VARIANTS.md", line)
+            self.assertIn("pick the variant", fs.variant_line("auto").lower())
             with self.assertRaises(ValueError):
-                fs.save(ws, [])
-            line = fs.instruction(fs.ticked(ws))
-            self.assertIn("Signal (blue)", line); self.assertIn("VS Code", line); self.assertIn("\"styles\": [\"signal\", \"code\"]", line)
-            self.assertIn("mixing-styles.md", line)
+                fs.save(ws, ["iso"], "neon-pink")
+
+    def test_a_colon_in_the_narration_is_sent_back_and_read_as_a_stop(self):
+        """Owner, 2026-11-21: never use ':' in a script, the voice does not stop on it."""
+        from postcrew.agents.shorts import colon_problems
+        from postcrew.voice_desk import speakable, _sentences
+        self.assertEqual(colon_problems({"beats": [{"say": "At 10:30 it starts."}, {"say": "Fine; really."}]}), [])
+        p = colon_problems({"beats": [{"say": "One."}, {"say": "Worst case: 100 drops."}]})
+        self.assertEqual(len(p), 1); self.assertIn("beats 2", p[0])
+        self.assertEqual(_sentences(speakable("Strategy one: walk up.")), ["Strategy one.", "Walk up."])
+        self.assertEqual(speakable("Ratio 2:1 at 10:30."), "Ratio 2:1 at 10:30.")
 
 
 class ThreeDLookTests(unittest.TestCase):
@@ -185,10 +204,10 @@ class ThreeDLookTests(unittest.TestCase):
     def test_3d_is_ticked_alone_and_tells_the_factory_to_use_the_3d_pipeline(self):
         from postcrew import factory_styles as fs
         with TempWorkspace() as ws:
-            self.assertEqual(fs.save(ws, ["3d"]), ["3d"])
+            ws.save_state(fs.STATE, {"styles": ["3d"]})   # retired 2026-11-21: a state saved before still reads
             self.assertTrue(fs.is_3d(fs.ticked(ws)))
             with self.assertRaises(ValueError):
-                fs.save(ws, ["signal", "3d"])
+                fs.save(ws, ["3d"])
             line = fs.instruction(["3d"])
             self.assertIn('"style": "3d"', line); self.assertIn("video-engine", line); self.assertIn("scene.js", line)
             self.assertFalse(fs.is_3d(["signal"]))
@@ -201,7 +220,7 @@ class ThreeDLookTests(unittest.TestCase):
     def test_the_script_writer_writes_the_storyboard_program_for_video_engine(self):
         from postcrew import factory_styles as fs
         with TempWorkspace() as ws, tempfile.TemporaryDirectory() as d:
-            fs.save(ws, ["3d"])
+            ws.save_state(fs.STATE, {"styles": ["3d"]})   # retired 2026-11-21; a saved state still reads
             ve, root, ep = self._engine(d), Path(d), Path(d) / "episodes" / "e1"
             beats = [{"say": "How does a hash map find your key so fast? " * 8}, {"say": "It turns the key into a number. " * 8}]
             def fake_claude(ctx, prompt, tools, cwd, add_dirs=()):
@@ -225,7 +244,7 @@ class ThreeDLookTests(unittest.TestCase):
         with TempWorkspace() as ws:
             self.assertEqual(fs.save(ws, ["iso"]), ["iso"])
             self.assertTrue(fs.is_iso(fs.ticked(ws))); self.assertFalse(fs.is_3d(fs.ticked(ws)))
-            for mix in (["signal", "iso"], ["iso", "3d"]):
+            for mix in (["signal", "iso"],):   # one look at a time (retired ids are simply dropped)
                 with self.assertRaises(ValueError):
                     fs.save(ws, mix)
             line = fs.instruction(["iso"])

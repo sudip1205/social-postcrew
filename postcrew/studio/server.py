@@ -1025,7 +1025,7 @@ def make_handler(studio):
                     ("POST", "/api/runs/rerun"): lambda: studio.rerun(self.body()),
                     ("GET", "/api/missed"): lambda: studio.missed(),
                     ("GET", "/api/factory"): lambda: factory_chat.view(ws),
-                    ("POST", "/api/factory/styles"): lambda: {"styles": factory_styles.save(ws, self.body().get("styles"))},
+                    ("POST", "/api/factory/styles"): lambda: {"styles": factory_styles.save(ws, self.body().get("styles"), self.body().get("variant")), "variant": factory_styles.variant(ws)},
                     ("POST", "/api/factory/send"): lambda: factory_chat.send(ws, self.body().get("text")),
                     ("POST", "/api/factory/stop"): lambda: factory_chat.stop(ws),
                     ("POST", "/api/factory/reset"): lambda: factory_chat.reset(ws),

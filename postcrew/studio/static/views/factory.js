@@ -26,15 +26,16 @@ function fcStyles(list) {
   if (!box || !list || box.dataset.drawn === JSON.stringify(list)) return;
   box.dataset.drawn = JSON.stringify(list);
   box.innerHTML = list.map((s) => `<label class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-xs font-semibold cursor-pointer ${s.on ? "bg-violet-50 border-violet-300 text-violet-800" : "bg-white border-slate-300 text-slate-500"}" title="${esc(s.what)}">
-      <input type="checkbox" class="accent-violet-600" data-fc-style="${esc(s.id)}" ${s.on ? "checked" : ""}>${icon(s.icon, "text-sm")}<span>${esc(s.label)}</span></label>`).join("");
+      <input type="checkbox" class="accent-violet-600" data-fc-style="${esc(s.id)}" ${s.on ? "checked" : ""}>${icon(s.icon, "text-sm")}<span>${esc(s.label)}</span></label>${s.variants ? `<select data-fc-variant class="${s.on ? "" : "hidden "}px-2 py-1 rounded-md border border-violet-300 bg-white text-xs font-semibold text-violet-800" title="${esc((s.variants.find((v) => v.id === s.variant) || {}).what || "")}">${s.variants.map((v) => `<option value="${esc(v.id)}" ${v.id === s.variant ? "selected" : ""}>${esc(v.label)}</option>`).join("")}</select>` : ""}`).join("");
 }
 
 async function fcSaveStyles() {
   const on = [...document.querySelectorAll("[data-fc-style]")].filter((x) => x.checked).map((x) => x.dataset.fcStyle);
   if (!on.length) { toast("Tick at least one look.", true); fcStyles(JSON.parse($("#fc-styles").dataset.drawn || "[]")); $("#fc-styles").dataset.drawn = ""; return; }
   try {
-    const r = await post("/api/factory/styles", { styles: on });
-    const list = JSON.parse($("#fc-styles").dataset.drawn || "[]").map((s) => ({ ...s, on: r.styles.includes(s.id) }));
+    const variant = ($("[data-fc-variant]") || {}).value || "";   // the Isometric variation (owner, 2026-11-21)
+    const r = await post("/api/factory/styles", { styles: on, variant });
+    const list = JSON.parse($("#fc-styles").dataset.drawn || "[]").map((s) => ({ ...s, on: r.styles.includes(s.id), ...(s.variants ? { variant: r.variant } : {}) }));
     $("#fc-styles").dataset.drawn = ""; fcStyles(list);
   } catch (e) { toast(e.message, true); }
 }
@@ -470,11 +471,10 @@ async function renderFactory() {
   };
   $("#fc-player").addEventListener("close", () => { const v = $("#fc-player video"); v.pause(); v.removeAttribute("src"); v.load(); });
   $("#fc-styles").addEventListener("change", (e) => {
+    if (e.target.matches("[data-fc-variant]")) return fcSaveStyles();
     if (!e.target.matches("[data-fc-style]")) return;
-    if (e.target.checked) {   // 3D makes the whole video by itself: ticking it unticks the others, ticking another unticks 3D
-      const SOLOS = ["3d", "iso"], solo = SOLOS.includes(e.target.dataset.fcStyle);   // each makes the whole video by itself
-      document.querySelectorAll("[data-fc-style]").forEach((x) => { if (x !== e.target && (solo || SOLOS.includes(x.dataset.fcStyle))) x.checked = false; });
-    }
+    // owner, 2026-11-21: only two looks, Signal (blue) and Isometric; each makes the whole video by itself, so they are never mixed
+    if (e.target.checked) document.querySelectorAll("[data-fc-style]").forEach((x) => { if (x !== e.target) x.checked = false; });
     fcSaveStyles();
   });
   fcDraw(d);

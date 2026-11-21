@@ -230,7 +230,7 @@ def _turn(ws, text, root, runner):
     try:
         p = runner(cmd, cwd=str(root.parent), stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         _proc["p"] = p
-        p.stdin.write(text + "\n\n(" + factory_styles.instruction(factory_styles.ticked(ws)) + ")")
+        p.stdin.write(text + "\n\n(" + factory_styles.instruction(factory_styles.ticked(ws), factory_styles.variant(ws)) + ")")
         p.stdin.close()
         steps, edits = [], {}
         for line in p.stdout:

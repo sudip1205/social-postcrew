@@ -119,6 +119,13 @@ def _sentences(text):
     return [s.strip() for s in re.split(r"(?<=[.!?])\s+", text.strip()) if s.strip()]
 
 
+def speakable(text):
+    """A colon the voice would run straight through becomes a full stop, so it pauses there (owner, 2026-11-21: "use ; or full stop,
+    because : is not stopping on voice"). Times and ratios (10:30, 2:1) are kept."""
+    out = re.sub(r"(?<!\d)\s*:\s*(?!\d)(\S?)", lambda m: ". " + m.group(1).upper(), str(text or ""))
+    return re.sub(r"[ \t]{2,}", " ", re.sub(r"\.\s*\.", ".", out)).strip()
+
+
 tokens = lambda text: [t for t, _ in voice_clean.tokens(text)]   # kept for callers of the old helper
 
 
@@ -874,7 +881,7 @@ def _generate(ws, ep, voice, feedback, prev, redo):
             clip = staged / f"scene{i}.wav"
             if i in redo_lines or not clip.exists():
                 parts, words, t = [], [], 0.0
-                for n, sent in enumerate(_sentences(text)):
+                for n, sent in enumerate(_sentences(speakable(text))):
                     raw = tmpd / f"l{i}s{n}.wav"
                     _ai_tts(cfg, voice, _respell(sent, ai["say"]), raw)
                     if abs(ai["speed"] - 1.0) > 0.01:

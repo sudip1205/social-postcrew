@@ -44,6 +44,24 @@ HOOK_RULE = (
     "a stranger scrolling past: would you stop, and would you understand it? If not, rewrite it."
 )
 
+# Owner, 2026-11-21: "during script writing never use :, use ; instead or fullstop. Because : is not stopping on voice."
+SPEECH_RULE = (
+    "NARRATION PUNCTUATION (owner rule, 2026-11-21, every look): never put a colon (:) in anything the voice reads (beats' \"say\", scene "
+    "text). The voice runs straight through a colon without stopping. Use a full stop, or a semicolon, instead: 'Worst case: 100 drops' -> "
+    "'Worst case. 100 drops.'; 'Strategy one: walk up' -> 'Strategy one. Walk up.'. Clock times and ratios are written in words ('ten thirty', "
+    "'two to one').")
+
+
+def colon_problems(script):
+    """Lines the voice reads that contain a colon (owner, 2026-11-21: the voice does not stop on it)."""
+    items = script.get("beats") or script.get("scenes") or []
+    bad = [i + 1 for i, b in enumerate(items) if re.search(r"(?<!\d):(?!\d)", _said(b) if "say" not in b else str(b.get("say") or ""))]
+    if not bad:
+        return []
+    return [f"{'beats' if script.get('beats') else 'scenes'} {', '.join(map(str, bad[:12]))} have a colon (:) in the narration: the voice "
+            "does not stop on it. Use a full stop or a semicolon instead (NARRATION PUNCTUATION)"]
+
+
 SKILL_RULE = (f"BEFORE writing anything, read the current skill from disk: {SKILL}/SKILL.md in full (including its Owner rules log at the "
               f"bottom), then every file in {SKILL}/references/ that SKILL.md points to for this kind of video, and CLAUDE.md. These files "
               f"change often: their newest rules win over anything in the example episodes. "
@@ -256,7 +274,8 @@ class ShortsWriter(Agent):
             "",
             SKILL_RULE,
             HOOK_RULE,
-            factory_styles.instruction(factory_styles.ticked(ctx.ws)),
+            SPEECH_RULE,
+            factory_styles.instruction(factory_styles.ticked(ctx.ws), factory_styles.variant(ctx.ws)),
             "Follow CLAUDE.md and the explainer-short-style skill exactly, as for any video in this workspace. Use the existing episodes as",
             "examples of the files. Write ONLY these two files:",
             f"  shorts-factory/episodes/{slug}/script.json   (the scenes and narration)",
@@ -336,6 +355,7 @@ class ShortsWriter(Agent):
             ("Recent videos (do not repeat): " + "; ".join(_recent(ctx))) if _recent(ctx) else "",
             "",
             HOOK_RULE,
+            SPEECH_RULE,
             f"Format: {'16:9 long video' if long else '9:16 Short (vertical)'}, target {seconds} s. Word budget (hard): at most {budget} spoken words"
             + (f" and at least {int(budget * .85)}" if long else "")
             + (f" and at least {int(budget * .85)}" if long else f" and at least {SHORT_MIN_WORDS_3D}") + ("" if long else ", one idea explained properly (what it is, why it matters, how it works, a worked example), 12-18 beats; the Short must run 50-90 s with the channel voice") + ". "
@@ -372,6 +392,7 @@ class ShortsWriter(Agent):
         (explainer.js) in the style of the owner's reference prompt (shorts-factory/styles/iso-pastel), then runs the storyboard check
         (free: key frames + automatic checks) and looks at the storyboard until it is clean. make-iso.mjs then voices and records it."""
         kit = root / "styles" / ("tech-glow" if look == "blue" else "iso-pastel")
+        variant = factory_styles.variant(ctx.ws) if look == "iso" else ""   # the Isometric variation (owner, 2026-11-21)
         name = "Signal (blue), Tech Glow" if look == "blue" else "Isometric Pastel"
         if not (kit / "STYLE.md").exists():
             raise AgentError(f"the Isometric Pastel kit is not at {kit}: update the Shorts factory", fatal=True)
@@ -405,8 +426,12 @@ class ShortsWriter(Agent):
                "Most beats show a 3D object; no beat is an empty frame. "
                f"{kit}/kit.js has the 2D helpers (card, tile, pill, eyebrow, gtext, connector, background, bloom)."
                if look == "blue" else f"{kit}/kit.js has the drawing helpers you may call (box, cylinder, tag, numberTag, arrow, shade, poly)."),
+            (f"THE CAMERA AND THE OBJECTS (owner, 2026-11-21: 'more camera angles'): film the world with {kit}/camera.js (camAt + SHOT presets, "
+             f"at least 5 different angles in a Short, a new angle at least every 2 beats) and draw real things with {kit}/objects.js "
+             f"(OBJ.*; catalog {kit}/library-pastel.png); copy {kit}/examples/camera-demo/. " + factory_styles.variant_line(variant)
+             + f" The variations are in {kit}/VARIANTS.md; colours come from isoPal() and the paper from THEME.backdrop().") if look == "iso" else "",
             "Write ONLY these files in this folder:",
-            '  script.json   {"style": "' + look + '", "topic": "...", "format": "' + ("long" if long else "short") + '", "beats": [{"say": "..."}, ...]}',
+            '  script.json   {"style": "' + look + '"' + (', "variant": "' + (variant if variant != "auto" else "<from VARIANTS.md>") + '"' if look == "iso" else "") + ', "topic": "...", "format": "' + ("long" if long else "short") + '", "beats": [{"say": "..."}, ...]}',
             "  explainer.js  function explainer(ctx, W, H_, t) { ... }  and  function scoreSound(k) { ... }",
             f"  youtube.json  {{\"title\", \"description\", \"tags\": [...], \"privacyStatus\": \"private\", \"video\": \"../../out/{slug}-hyperframes.mp4\", \"captions\": \"../../out/{slug}.srt\"}}",
             f"Then run `{check_cmd}` (free: no voice, no render). It writes build-iso/storyboard.png and lists problems. Fix every problem, "
@@ -418,6 +443,7 @@ class ShortsWriter(Agent):
              + "\n- ".join(guidance)) if fixing else "",
             "",
             HOOK_RULE,
+            SPEECH_RULE,
             "",
             f"=== STYLE.md (styles/{kit.name}) ===",
             (kit / "STYLE.md").read_text(),
@@ -492,7 +518,8 @@ class ShortsWriter(Agent):
         p = []
         if not out.get("reused"):   # a script already approved on the Voice desk is not sent back
             try:
-                p += hook_problems(json.loads((Path(out.get("episode") or "") / "script.json").read_text()))
+                sc = json.loads((Path(out.get("episode") or "") / "script.json").read_text())
+                p += hook_problems(sc) + colon_problems(sc)
             except (OSError, ValueError):
                 pass
         if not out.get("title"):
