@@ -436,7 +436,7 @@ class ShortsWriter(Agent):
             f"Format: {'16:9 long video (1920x1080)' if long else '9:16 Short (1080x1920, vertical)'}. Word budget (hard): at most {budget} spoken words"
             + ("" if long else f" and at least {SHORT_MIN_WORDS_ISO}; aim for 130-155 words in 12-15 beats (about 65-75 s, the owner's house standard), one idea explained properly (what it is, why it matters, how it works, a worked example)") + ". "
             "The like / comment / share / subscribe outro is added after your last beat automatically: do not write one.",
-            f"Read {kit}/STYLE.md (the rules, below), then the two house-standard Shorts in {root}/styles/iso-pastel/examples/ (database-scaling, how-llms-work: "
+            f"Read {kit}/STYLE.md (the rules, below), then the owner's published Shorts in {root}/styles/iso-pastel/examples/channel/ and examples/database-scaling/ ("
             f"match their structure and timing exactly{', in the Tech Glow look instead of pastel' if look == 'blue' else ', and their look'}; change only the topic) "
             f"and {kit}/reference.js (the style itself). "
             + (f"THE BLUE LOOK'S REFERENCE is the owner's published Short in {kit}/examples/binary-search/ (README.md, frames.png, explainer.js): match its look, "
@@ -445,11 +445,13 @@ class ShortsWriter(Agent):
                "Most beats show a 3D object; no beat is an empty frame. "
                f"{kit}/kit.js has the 2D helpers (card, tile, pill, eyebrow, gtext, connector, background, bloom)."
                if look == "blue" else f"{kit}/kit.js has the drawing helpers you may call (box, cylinder, tag, numberTag, arrow, shade, poly)."),
-            (f"THE CAMERA (owner, 2026-11-21: 'do it our old way, smooth transition, no cut screen'): ONE fixed isometric angle that glides "
-             f"(pan + zoom, H.ease.inOut, ~1 s moves at beat starts, then hold) along one world, exactly like the two house examples; never "
-             f"turn, tilt, orbit, cut or blur. Draw real things with {kit}/objects.js (OBJ.*; catalog {kit}/library-pastel.png). "
-             + factory_styles.variant_line(variant)
-             + f" The variations are in {kit}/VARIANTS.md; colours come from isoPal() and the paper from THEME.backdrop().") if look == "iso" else "",
+            (f"THE OWNER'S CHANNEL STYLE (owner, 2026-11-21: 'bring back my old isometric style, follow these videos from my channel'): "
+             f"read at least two of the published Shorts in {kit}/examples/channel/ (frames.jpg AND explainer.js: monty-hall, double-booking, "
+             f"rain-water, saga, linked-lists, chatbot) and build this one the same way: big hand-drawn hero objects for the topic (box/cylinder/"
+             f"shade) filling 60-75% of the width, makeIso scale 90-130 while explaining, 2-4 zones on one diagonal slab with trees, the camera "
+             f"holding a zone for several beats and gliding ~1 s (H.ease.inOut) to the next, a wide pull-out only at the start and the end, big "
+             f"2D cards in the top third. One fixed angle, never a cut. objects.js is optional background detail only. "
+             + factory_styles.variant_line(variant)) if look == "iso" else "",
             "Write ONLY these files in this folder:",
             '  script.json   {"style": "' + look + '"' + (', "variant": "' + (variant if variant != "auto" else "<from VARIANTS.md>") + '"' if look == "iso" else "") + ', "topic": "...", "format": "' + ("long" if long else "short") + '", "beats": [{"say": "..."}, ...]}',
             "  explainer.js  function explainer(ctx, W, H_, t) { ... }  and  function scoreSound(k) { ... }",
