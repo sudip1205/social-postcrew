@@ -445,9 +445,10 @@ class ShortsWriter(Agent):
                "Most beats show a 3D object; no beat is an empty frame. "
                f"{kit}/kit.js has the 2D helpers (card, tile, pill, eyebrow, gtext, connector, background, bloom)."
                if look == "blue" else f"{kit}/kit.js has the drawing helpers you may call (box, cylinder, tag, numberTag, arrow, shade, poly)."),
-            (f"THE CAMERA AND THE OBJECTS (owner, 2026-11-21: 'more camera angles'): film the world with {kit}/camera.js (camAt + SHOT presets, "
-             f"at least 5 different angles in a Short, a new angle at least every 2 beats) and draw real things with {kit}/objects.js "
-             f"(OBJ.*; catalog {kit}/library-pastel.png); copy {kit}/examples/camera-demo/. " + factory_styles.variant_line(variant)
+            (f"THE CAMERA (owner, 2026-11-21: 'do it our old way, smooth transition, no cut screen'): ONE fixed isometric angle that glides "
+             f"(pan + zoom, H.ease.inOut, ~1 s moves at beat starts, then hold) along one world, exactly like the two house examples; never "
+             f"turn, tilt, orbit, cut or blur. Draw real things with {kit}/objects.js (OBJ.*; catalog {kit}/library-pastel.png). "
+             + factory_styles.variant_line(variant)
              + f" The variations are in {kit}/VARIANTS.md; colours come from isoPal() and the paper from THEME.backdrop().") if look == "iso" else "",
             "Write ONLY these files in this folder:",
             '  script.json   {"style": "' + look + '"' + (', "variant": "' + (variant if variant != "auto" else "<from VARIANTS.md>") + '"' if look == "iso" else "") + ', "topic": "...", "format": "' + ("long" if long else "short") + '", "beats": [{"say": "..."}, ...]}',
