@@ -749,3 +749,15 @@ class VisualExplainerNicheTests(unittest.TestCase):
             self.assertTrue(any("coding build" in e for e in monthly.MonthPlanner.problems({"title": t}, [], youtube=True)), t)
         for t in ["What Is an API Gateway and How It Works", "How a Rate Limiter Decides Who Waits", "Two Sum: Solve It in Python"]:
             self.assertFalse(any("coding build" in e for e in monthly.MonthPlanner.problems({"title": t}, [], youtube=True)), t)
+
+
+class NoCodeUnlessAskedTests(unittest.TestCase):
+    """Owner, 2026-11-22: plans and scripts never bring in Python/Java/code/simulations unless the owner asked."""
+
+    def test_a_plan_with_code_is_sent_back_unless_the_owner_asked_for_it(self):
+        from postcrew.monthly import code_problem
+        p = {"title": "Active-Passive Failover: Simulate a Server Dying in Python", "angle": "a tiny Python simulation prints the timeline"}
+        self.assertTrue(code_problem(p, "active active failover"))
+        self.assertIsNone(code_problem(p, "failover, show it in python"))
+        self.assertIsNone(code_problem({"title": "Active-Active Explained: Two Live Servers", "angle": "on diagrams"}, "failover"))
+        self.assertTrue(code_problem({"title": "Token Bucket", "angle": "build it, then load-tested with a demo"}, "rate limiter"))

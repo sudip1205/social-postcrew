@@ -45,6 +45,11 @@ HOOK_RULE = (
     "a stranger scrolling past: would you stop, and would you understand it? If not, rewrite it."
 )
 
+NO_CODE_RULE = (
+    "NO CODE UNLESS ASKED (owner rule, 2026-11-22: 'stop doing things automatically in python if not asked ... only need explanatory script; "
+    "if I need I'll ask to do with python or java'): unless the owner's plan or instructions explicitly ask for code or name a language, the "
+    "video shows NO code, names no programming language, and runs no simulation or program: explain what the thing is and how it works with "
+    "pictures, tables and a little math. Ignore 'Python' in old titles and examples.")
 # Owner, 2026-11-21: "during script writing never use :, use ; instead or fullstop. Because : is not stopping on voice."
 SPEECH_RULE = (
     "NARRATION PUNCTUATION (owner rule, 2026-11-21, every look): never put a colon (:) in anything the voice reads (beats' \"say\", scene "
@@ -293,6 +298,7 @@ class ShortsWriter(Agent):
             HOOK_RULE,
             SPEECH_RULE,
             TAG_RULE,
+            NO_CODE_RULE,
             factory_styles.instruction(factory_styles.ticked(ctx.ws), factory_styles.variant(ctx.ws)),
             "Follow CLAUDE.md and the explainer-short-style skill exactly, as for any video in this workspace. Use the existing episodes as",
             "examples of the files. Write ONLY these two files:",
@@ -375,6 +381,7 @@ class ShortsWriter(Agent):
             HOOK_RULE,
             SPEECH_RULE,
             TAG_RULE,
+            NO_CODE_RULE,
             f"Format: {'16:9 long video' if long else '9:16 Short (vertical)'}, target {seconds} s. Word budget (hard): at most {budget} spoken words"
             + (f" and at least {int(budget * .85)}" if long else "")
             + (f" and at least {int(budget * .85)}" if long else f" and at least {SHORT_MIN_WORDS_3D}") + ("" if long else ", one idea explained properly (what it is, why it matters, how it works, a worked example), 12-18 beats; the Short must run 50-90 s with the channel voice") + ". "
@@ -467,6 +474,7 @@ class ShortsWriter(Agent):
             HOOK_RULE,
             SPEECH_RULE,
             TAG_RULE,
+            NO_CODE_RULE,
             "",
             f"=== STYLE.md (styles/{kit.name}) ===",
             (kit / "STYLE.md").read_text(),

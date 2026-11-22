@@ -60,6 +60,26 @@ NOT_NICHE = re.compile(r"(how to|ways? to|steps? to|tips?|framework|strategy|gui
 # a coding build ("Build an API Gateway in Python") is not made either (owner, 2026-11-12): "What an API gateway is and how it works" is. Algorithms may show code.
 CODING_BUILD = re.compile(r"\b(build|implement|write|code|coding|create)\b[^.?!]{0,50}\b(in|with|using) (python|go|golang|java|javascript|node(\.js)?|typescript|rust|c\+\+|c#)\b", re.I)
 
+# Owner, 2026-11-22: "for my plan stop doing things automatically in python if not asked ... Only need explanatory script. If I need I'll ask
+# to do with python or java." A YouTube plan never brings in code, a programming language, a simulation or a demo unless the owner asked.
+CODE_WORDS = re.compile(r"\b(python|java|javascript|typescript|golang|rust|c\+\+|c#|kotlin|swift|node\.?js|sql query|code|coding|coded|"
+                        r"script(ed|ing)?|program(med|ming)?|simulat\w*|demo|implement\w*|lines of|run it|load-tested|built and tested)\b", re.I)
+NO_CODE_RULE = ("NO CODE UNLESS ASKED (owner rule, 2026-11-22): the owner wants visual explanatory videos. Unless THE OWNER'S TOPIC or WHAT "
+                "THE OWNER ASKED FOR names a programming language or asks for code, a plan must not mention or use any programming language "
+                "(Python, Java, ...), code, a simulation, a demo, an implementation or running anything: the title, angle, context, example and "
+                "takeaway explain what the thing is and how it works with pictures, step by step. Ignore 'in Python' in the trending videos "
+                "and in the already-published titles.")
+
+
+def code_problem(p, asked):
+    """A plan that brings in code or a language the owner did not ask for (None when fine)."""
+    if CODE_WORDS.search(asked or ""):
+        return None
+    hit = CODE_WORDS.search(" ".join(str(p.get(k) or "") for k in ("title", "angle", "context", "example", "takeaway")))
+    return (f"it brings in code (\"{hit.group(0)}\") but the owner did not ask for code: make it a visual explanation of what it is and how "
+            "it works, with no programming language, code, simulation or demo (NO CODE UNLESS ASKED)") if hit else None
+
+
 TREND = {
     "type": "object",
     "properties": {
@@ -253,6 +273,7 @@ class MonthPlanner(Agent):
                       + (_research_block(research) if videos else "")
                       + (f"\n\nWHAT THE OWNER ASKED FOR: {hint}" if hint else "")
                       + ("\n\n" + _tag_rule() if ctx.platform != LINKEDIN else "")
+                      + ("\n\n" + NO_CODE_RULE if ctx.platform != LINKEDIN else "")
                       + ("\n\nAlready planned or published (never repeat these or the same idea in other words):\n"
                          + "\n".join(f"- {t}" for t in taken[-120:]) if taken else "")
                       + guidance_block(guidance))
@@ -267,6 +288,8 @@ class MonthPlanner(Agent):
             guidance = []
             for p in data.get("plans", []):
                 problems = self.problems(p, taken + [g["title"] for g in got], youtube=ctx.platform != LINKEDIN)
+                if ctx.platform != LINKEDIN and code_problem(p, f"{topic} {hint}"):
+                    problems.append(code_problem(p, f"{topic} {hint}"))
                 if problems:
                     guidance.append(f"'{p.get('title', '?')}': " + "; ".join(problems))
                     continue
