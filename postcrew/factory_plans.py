@@ -14,6 +14,7 @@ The steps of one plan (state):
   made     -> the video is in the Queue; only now does the plan leave the list
 Nothing else removes a plan, except your own Remove.
 """
+import json
 import threading
 import uuid
 from datetime import date, datetime, timezone
@@ -137,6 +138,45 @@ def add_own(ws, title, angle="", fmt="short"):
     return item
 
 
+TAGS_SYSTEM = ("You write YouTube tags for one planned video of a channel that makes animated visual explainers (Shorts and long videos) "
+               "about how technology, algorithms and everyday science work. Tags decide who the video reaches: use what people really search.")
+
+
+def set_tags(ws, pid, tags=None, llm=None):
+    """The plan's YouTube tags (owner, 2026-11-21): save yours, or with none given the Planner writes them from the plan and its research.
+    A script already written for the plan gets them too (youtube.json starts from the plan's tags)."""
+    from . import yt_tags
+    item = get(ws, pid)
+    if tags is None:
+        from .llm import make_backend
+        r = item.get("research") or {}
+        prompt = "\n".join(x for x in [
+            f"Title: {item.get('title')}", f"What the viewer learns: {item.get('angle')}", f"Context: {item.get('context', '')}",
+            f"Example: {item.get('example', '')}", f"Broad topic: {item.get('topic', '')}",
+            ("Top videos on it: " + "; ".join(v.get("title", "") for v in r.get("videos") or [])) if r.get("videos") else "",
+            ("Search phrases: " + ", ".join(item.get("search_queries") or [])) if item.get("search_queries") else "",
+            "", yt_tags.TAG_RULE] if x is not None)
+        schema = {"type": "object", "properties": {"tags": yt_tags.TAGS_SCHEMA}, "required": ["tags"], "additionalProperties": False}
+        data = (llm or make_backend(_cfg(ws), ws.secrets())).call("planner", TAGS_SYSTEM, prompt, schema, tools=()).data or {}
+        tags = data.get("tags")
+    if isinstance(tags, str):
+        tags = tags.split(",")
+    got = yt_tags.clean(tags)
+    if not got:
+        raise ValueError("no usable tags: write them separated by commas")
+    item = _update(ws, pid, tags=got)
+    if item.get("slug"):   # the written script's youtube.json follows the plan
+        from . import voice_desk
+        f = voice_desk._root(ws) / "episodes" / item["slug"] / "youtube.json"
+        try:
+            meta = json.loads(f.read_text())
+            meta["tags"] = yt_tags.merge(got, meta.get("tags"))
+            f.write_text(json.dumps(meta, ensure_ascii=False, indent=2) + "\n")
+        except (OSError, ValueError):
+            pass
+    return item
+
+
 def remove(ws, pid):
     """Delete a plan from the Factory (its written script stays in the factory's episodes folder, unused)."""
     item = get(ws, pid)
@@ -151,7 +191,7 @@ def remove(ws, pid):
 
 # ---------- 2. the script: a crew run that writes it and stops before the video ----------
 def _topic_out(item):
-    owner = {k: item[k] for k in ("title", "angle", "context", "example", "takeaway") if item.get(k)}
+    owner = {k: item[k] for k in ("title", "angle", "context", "example", "takeaway", "tags") if item.get(k)}
     if item.get("instructions"):
         owner["instructions for the script"] = item["instructions"]
     return {"topic": item["title"], "angle": item.get("angle") or item["title"], "why_now": "your Factory plan", "planned": "factory",

@@ -1041,6 +1041,7 @@ def make_handler(studio):
                     ("POST", "/api/factory-plans/script"): lambda: factory_plans.write_script(ws, self.body().get("id"), self.body().get("instructions", "")),
                     ("POST", "/api/factory-plans/make"): lambda: factory_plans.make(ws, self.body().get("id"), self.body().get("look")),
                     ("POST", "/api/factory-plans/remove"): lambda: factory_plans.remove(ws, self.body().get("id")),
+                    ("POST", "/api/factory-plans/tags"): lambda: factory_plans.set_tags(ws, self.body().get("id"), self.body().get("tags")),
                     ("POST", "/api/voice-desk/lines"): lambda: voice_desk.save_lines(ws, self.body().get("slug"), self.body().get("lines")),
                     ("POST", "/api/voice-desk/approve-script"): lambda: voice_desk.approve_script(ws, self.body().get("slug"), self.body().get("approved", True)),
                     ("POST", "/api/voice-desk/voice"): lambda: voice_desk.choose(ws, self.body().get("slug"), self.body().get("mode")),

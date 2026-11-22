@@ -129,6 +129,16 @@ function vdRow(p) {
     </div>` + (open ? vdDetail(p) : "");
 }
 
+// the plan's YouTube tags (owner, 2026-11-21: "tag it properly based on the topic; list out tags during topic plan")
+function vdTags(p) {
+  const tags = p.tags || [];
+  return `<div class="mt-3"><div class="flex items-center gap-2 mb-1"><span class="text-xs font-medium text-slate-600">${tip("YouTube tags", "Who the video reaches: written by the Planner from what the top videos on this topic use and what people search. The video's youtube.json starts from them.")}${tags.length ? ` (${tags.length})` : ""}</span>
+    <button class="ml-auto text-[11px] font-semibold text-violet-700 hover:underline" data-vd-tags-write="${esc(p.id)}">${tags.length ? "Write again" : "Write tags"}</button></div>
+    ${tags.length ? `<div class="flex flex-wrap gap-1 mb-1.5">${tags.map((t) => `<span class="px-2 py-0.5 rounded-full bg-slate-100 text-[11px] text-slate-700">${esc(t)}</span>`).join("")}</div>` : `<p class="text-[11px] text-slate-500 mb-1.5">No tags yet: plans written before 2026-11-21 have none.</p>`}
+    <div class="flex gap-1.5"><input class="flex-1 min-w-0 rounded-md border border-slate-300 px-2 py-1 text-xs" data-vd-tags-in="${esc(p.id)}" value="${esc(tags.join(", "))}" placeholder="tags, separated by commas">
+    <button class="px-2.5 py-1 rounded-md border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-100" data-vd-tags-save="${esc(p.id)}">Save</button></div></div>`;
+}
+
 function vdPlanCard(p) {
   const r = p.research || {};
   const field = (k, label) => p[k] ? `<p class="text-sm text-slate-700"><span class="text-xs font-semibold text-slate-500">${label}:</span> ${esc(p[k])}</p>` : "";
@@ -140,6 +150,7 @@ function vdPlanCard(p) {
       ${r.trend_score != null || r.why ? `<div class="mt-2 text-xs text-slate-600 space-y-0.5">
         ${r.trend_score != null ? `<p>${tip("Research", "Read from YouTube when the plan was written: how this subject is doing right now.")}: trend ${r.trend_score}/100${r.label ? ` (${esc(r.label)})` : ""}${r.views_per_day != null ? ` · ${Number(r.views_per_day).toLocaleString()} views/day` : ""}${r.engagement_pct != null ? ` · ${r.engagement_pct}% like` : ""}</p>` : ""}
         ${r.why ? `<p>${esc(r.why)}</p>` : ""}${r.gap ? `<p>Gap to fill: ${esc(r.gap)}</p>` : ""}</div>` : ""}
+      ${vdTags(p)}
       <label class="block mt-3"><span class="block text-xs font-medium text-slate-600 mb-1">Instructions for the script (optional)</span>
         <textarea data-vd-instr="${p.id}" rows="3" class="w-full text-sm rounded-lg border-slate-300 focus:border-violet-500 focus:ring-violet-500" placeholder="e.g. open with a bank queue analogy, keep it near 70 s, show the code for the loop">${esc(p.instructions || "")}</textarea></label>
       <p class="text-xs text-slate-500 mt-1">The script is written in the Looks ticked in the Factory chat below.</p>
@@ -260,6 +271,14 @@ function vdWire(root) {
     const ep = b.dataset.vdRemoveEp;
     VD_OPEN.delete(ep || b.dataset.vdRemove);
     go(() => ep ? post("/api/voice-desk/delete", { slug: ep }) : post("/api/factory-plans/remove", { id: b.dataset.vdRemove }), ep ? "Script deleted." : "Plan deleted.");
+  }));
+  root.querySelectorAll("[data-vd-tags-write]").forEach(b => b.addEventListener("click", () => {
+    b.disabled = true; b.textContent = "Writing…";
+    go(() => post("/api/factory-plans/tags", { id: b.dataset.vdTagsWrite }), "Tags written.");
+  }));
+  root.querySelectorAll("[data-vd-tags-save]").forEach(b => b.addEventListener("click", () => {
+    const inp = root.querySelector(`[data-vd-tags-in="${b.dataset.vdTagsSave}"]`);
+    go(() => post("/api/factory-plans/tags", { id: b.dataset.vdTagsSave, tags: inp ? inp.value : "" }), "Tags saved.");
   }));
   root.querySelectorAll("[data-vd-hook]").forEach(b => b.addEventListener("click", () => {
     const all = [...(VD.plans || []), ...(VD.others || []).map(e => ({ episode: e }))];

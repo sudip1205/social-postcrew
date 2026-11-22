@@ -243,3 +243,36 @@ class RestyleFailureTests(unittest.TestCase):
             beats = [b["say"] for b in json.loads((ep / "script.json").read_text())["beats"]]
             self.assertEqual(beats, ["One.", "Two.", "Three."])
             self.assertEqual(voice_desk.desk(ep)["approved_beats"], ["One.", "Two.", "Three."])
+
+
+class PlanTagsTests(unittest.TestCase):
+    """Owner, 2026-11-21: YouTube tags written with every plan, listed on it, editable, and carried into youtube.json."""
+
+    def test_tags_are_cleaned_merged_and_kept_within_youtubes_limit(self):
+        from postcrew import yt_tags
+        self.assertEqual(yt_tags.clean(["#Egg Drop", "egg drop", ' "dp" ', "", "x" * 40]), ["egg drop", "dp"])
+        many = [f"tag number {i}" for i in range(80)]
+        self.assertLessEqual(yt_tags._size(yt_tags.clean(many)), yt_tags.MAX_CHARS)
+        self.assertEqual(yt_tags.merge(["a b", "c"], ["c", "d"]), ["a b", "c", "d"])
+        self.assertEqual(yt_tags.competitors([{"tags": ["Wifi", "router"]}, {"tags": ["wifi"]}])[0], "wifi")
+        self.assertTrue(yt_tags.problems(["one", "two"]))
+        self.assertEqual(yt_tags.problems([f"egg drop {i}" for i in range(12)]), [])
+
+    def test_a_plans_tags_can_be_saved_or_written_and_reach_the_script(self):
+        from postcrew import factory_plans, voice_desk
+        from types import SimpleNamespace
+        import tempfile
+        with TempWorkspace() as ws, tempfile.TemporaryDirectory() as d, mock.patch.object(voice_desk, "_root", return_value=Path(d)):
+            item = factory_plans.add_own(ws, "The egg drop puzzle", "2 eggs, 100 floors")
+            self.assertEqual(factory_plans.set_tags(ws, item["id"], "Egg Drop, #dynamic programming, egg drop")["tags"],
+                             ["egg drop", "dynamic programming"])
+            fake = SimpleNamespace(call=lambda *a, **k: SimpleNamespace(data={"tags": [f"egg drop puzzle {i}" for i in range(15)]}))
+            ep = voice_desk._root(ws) / "episodes" / "egg"; ep.mkdir(parents=True)
+            (ep / "youtube.json").write_text(json.dumps({"title": "t", "tags": ["old tag"]}))
+            factory_plans._update(ws, item["id"], slug="egg")
+            got = factory_plans.set_tags(ws, item["id"], llm=fake)["tags"]
+            self.assertEqual(len(got), 15)
+            tags = json.loads((ep / "youtube.json").read_text())["tags"]
+            self.assertEqual(tags[0], "egg drop puzzle 0"); self.assertEqual(tags[-1], "old tag")
+            with self.assertRaises(ValueError):
+                factory_plans.set_tags(ws, item["id"], " , #")

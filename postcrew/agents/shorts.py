@@ -19,6 +19,7 @@ from pathlib import Path
 from .base import Agent, AgentError, AgentWait
 from .. import factory_styles
 from ..llm import agent_settings
+from ..yt_tags import TAG_RULE, merge as merge_tags, problems as tag_problems
 
 SLUG = re.compile(r"^[a-z0-9][a-z0-9-]{1,60}$")
 WRITER_TOOLS = ["Read", "Write", "Edit", "Glob", "Grep", "WebSearch", "WebFetch", "Skill", "Bash(npm run variety:*)", "Bash(python3 algo/*)", "Bash(python3 -I algo/*)"]
@@ -225,6 +226,21 @@ def hook_problems(script):
     return out
 
 
+def apply_plan_tags(ctx, out):
+    """youtube.json's tags start from the plan's (owner, 2026-11-21): the plan's tags first, then the writer's own, within YouTube's limit."""
+    plan = (ctx.outputs.get("topic") or {}).get("owner_plan") or {}
+    f = Path(out.get("episode") or "") / "youtube.json"
+    try:
+        meta = json.loads(f.read_text())
+    except (OSError, ValueError):
+        return
+    tags = merge_tags(plan.get("tags"), meta.get("tags"))
+    if tags != meta.get("tags"):
+        meta["tags"] = tags
+        f.write_text(json.dumps(meta, ensure_ascii=False, indent=2) + "\n")
+    out["tags"] = tags
+
+
 class ShortsWriter(Agent):
     id = "writer"
     title = "Script Writer"
@@ -246,6 +262,7 @@ class ShortsWriter(Agent):
                 return kept
         notes = [str(n) for n in (ctx.options or {}).get("notes") or []]   # Factory > Plans > Write again, with your notes
         out = self._write(ctx, root, (list(guidance or []) + notes) or guidance)
+        apply_plan_tags(ctx, out)
         voice_desk.record(ctx, out)
         return out
 
@@ -275,6 +292,7 @@ class ShortsWriter(Agent):
             SKILL_RULE,
             HOOK_RULE,
             SPEECH_RULE,
+            TAG_RULE,
             factory_styles.instruction(factory_styles.ticked(ctx.ws), factory_styles.variant(ctx.ws)),
             "Follow CLAUDE.md and the explainer-short-style skill exactly, as for any video in this workspace. Use the existing episodes as",
             "examples of the files. Write ONLY these two files:",
@@ -356,6 +374,7 @@ class ShortsWriter(Agent):
             "",
             HOOK_RULE,
             SPEECH_RULE,
+            TAG_RULE,
             f"Format: {'16:9 long video' if long else '9:16 Short (vertical)'}, target {seconds} s. Word budget (hard): at most {budget} spoken words"
             + (f" and at least {int(budget * .85)}" if long else "")
             + (f" and at least {int(budget * .85)}" if long else f" and at least {SHORT_MIN_WORDS_3D}") + ("" if long else ", one idea explained properly (what it is, why it matters, how it works, a worked example), 12-18 beats; the Short must run 50-90 s with the channel voice") + ". "
@@ -444,6 +463,7 @@ class ShortsWriter(Agent):
             "",
             HOOK_RULE,
             SPEECH_RULE,
+            TAG_RULE,
             "",
             f"=== STYLE.md (styles/{kit.name}) ===",
             (kit / "STYLE.md").read_text(),
@@ -524,6 +544,8 @@ class ShortsWriter(Agent):
                 pass
         if not out.get("title"):
             p.append("youtube.json has no title")
+        if not out.get("reused") and out.get("slug") and tag_problems(out.get("tags")):   # not worth a rewrite: logged for the owner
+            ctx and ctx.run.event(self.id, "warning", "youtube.json: " + "; ".join(tag_problems(out.get("tags"))), level="warning")
         if not out.get("scene_count"):
             p.append("script.json has no scenes")
         if out.get("style") == "iso":

@@ -3,6 +3,7 @@
 ## 0.2.0: YouTube, per-app settings and a faster Studio
 
 ### New
+- **YouTube tags on every plan.** The Planner now writes 15-25 tags with each plan, starting from the tags the top videos on the topic really use, and the plan card lists them (edit and Save, or Write again; older plans get a Write tags button). The script's youtube.json starts from the plan's tags, so the upload sends them; the writer follows the same tag rules when there is no plan.
 - **Two looks in the Factory: Signal (blue) or Isometric, one at a time.** Story, VS Code and 3D are retired. Isometric has a **variation** picker: Pastel (the house look), Night Lab, Cream Blueprint, Sky Toy, Studio Build, Ink, Maker Bench, or Auto (the writer picks by topic).
 - **No colons in narration.** The Script Writer is told to use a full stop or semicolon, a script with a colon is sent back, and the voice reads any colon left as a full stop so it always pauses.
 - **Publish to YouTube from the Factory.** Each video has a Publish to YouTube button: it uploads now, unlisted, with the title, description and tags you checked. There is no Queue step. A copy a plan's run left in the Queue is used and removed.

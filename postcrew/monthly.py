@@ -78,8 +78,9 @@ def schema_for(platform):
     if platform == LINKEDIN:
         return SCHEMA
     item = dict(SCHEMA["properties"]["plans"]["items"])
-    item["properties"] = dict(item["properties"], trend=TREND)
-    item["required"] = item["required"] + ["trend"]
+    from .yt_tags import TAGS_SCHEMA
+    item["properties"] = dict(item["properties"], trend=TREND, tags=TAGS_SCHEMA)   # tags: owner, 2026-11-21
+    item["required"] = item["required"] + ["trend", "tags"]
     return dict(SCHEMA, properties={"plans": dict(SCHEMA["properties"]["plans"], items=item)})
 
 
@@ -196,8 +197,20 @@ def _research_block(research):
     m = research.get("metrics") or {}
     return ("\n\nWHAT IS WORKING ON YOUTUBE RIGHT NOW FOR THIS TOPIC (real numbers read from YouTube today; ids are for the 'evidence' field):\n"
             + trends.brief_videos(research["videos"]) + "\n"
+            + (("Tags those videos use (most common first; start the plan's tags from the ones that fit it): "
+                + ", ".join(_competitor_tags(research["videos"])) + "\n") if _competitor_tags(research["videos"]) else "")
             + (f"Overall: median {m.get('median_views', 0):,} views per video, {m.get('views_per_day', 0):,} views per day, "
                f"{m.get('engagement_pct')}% of viewers like, trend {m.get('trend_score')}/100 ({m.get('label')}).\n" if m else ""))
+
+
+def _tag_rule():
+    from .yt_tags import TAG_RULE
+    return TAG_RULE
+
+
+def _competitor_tags(videos):
+    from .yt_tags import competitors
+    return competitors(videos)
 
 
 def _plan_research(trend, research, ids):
@@ -239,6 +252,7 @@ class MonthPlanner(Agent):
             prompt = (f"THE OWNER'S TOPIC: {topic}\n\nWrite {min(left, 8)} plan(s) about it."
                       + (_research_block(research) if videos else "")
                       + (f"\n\nWHAT THE OWNER ASKED FOR: {hint}" if hint else "")
+                      + ("\n\n" + _tag_rule() if ctx.platform != LINKEDIN else "")
                       + ("\n\nAlready planned or published (never repeat these or the same idea in other words):\n"
                          + "\n".join(f"- {t}" for t in taken[-120:]) if taken else "")
                       + guidance_block(guidance))
@@ -257,6 +271,9 @@ class MonthPlanner(Agent):
                     guidance.append(f"'{p.get('title', '?')}': " + "; ".join(problems))
                     continue
                 plan = {k: (p[k].strip() if isinstance(p[k], str) else p[k]) for k in SCHEMA["properties"]["plans"]["items"]["required"]}
+                if ctx.platform != LINKEDIN:   # YouTube tags, listed on the plan (owner, 2026-11-21)
+                    from .yt_tags import merge
+                    plan["tags"] = merge(p.get("tags"), p.get("search_queries"))   # the search phrases are good tags too
                 if videos:
                     plan["research"] = _plan_research(p.get("trend") or {}, research, ids)
                 elif ctx.platform != LINKEDIN:   # YouTube did not answer: the plan says so instead of showing made-up numbers
@@ -282,6 +299,7 @@ class MonthPlanner(Agent):
         for key in ("angle", "context", "example", "takeaway"):
             if not (p.get(key) or "").strip():
                 out.append(f"{key} is empty")
+
         dup = repeat_problem(title, "", [{"topic": t} for t in taken])
         if dup:
             out.append(dup + "; write a different plan")
