@@ -138,8 +138,12 @@ def main():
             sys.exit(0)   # nothing changed and the lab is current (or unreachable): stay quiet
     if lab_head() == head:
         say("ship: " + "; ".join(notes + ["the lab is already up to date"]))
-    if lab_busy():
-        say("ship: " + "; ".join(notes + ["the lab was NOT updated: a crew run or a plan generation is in progress there (the update restarts the server). It updates after the next change"]))
+    if lab_busy():   # never restart under a running job; but never leave the fix undeployed either (2026-11-23: a video was
+        # made with the old code because the update was skipped while the lab was busy): the lab updates itself once it is idle
+        cp = run(["scp", "-q", str(ROOT / "scripts/hooks/lab-update-when-idle.sh"), f"{LAB}:/tmp/postcrew-update-when-idle.sh"], 60)
+        if cp.returncode == 0:
+            ssh("pkill -f postcrew-update-when-idle.sh 2>/dev/null; nohup bash /tmp/postcrew-update-when-idle.sh >/dev/null 2>&1 &", 30)
+        say("ship: " + "; ".join(notes + ["the lab is busy (a video or a plan is being made), so it was not restarted now: it updates itself as soon as that job ends"]))
     u = ssh("~/.local/bin/postcrew-lab update 2>&1 | tail -4", 400)
     if "updated" not in u.stdout and "up to date" not in u.stdout:
         say("ship: " + "; ".join(notes) + f"; the lab update FAILED: {(u.stdout + u.stderr).strip()[-400:]}", 0)
