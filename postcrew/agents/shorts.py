@@ -54,7 +54,7 @@ NO_CODE_RULE = (
 LABEL_RULE = (
     "LABELS (owner rule, 2026-11-22: texts were blocking each other while big parts of the screen stayed empty). Name every object with "
     "label(ctx, P(x, y, z), text, {k, dot, bg, col, sub, fs}), the point ON the object: the shell puts the label in free space and draws an "
-    "arrow to the object. Never place two chips, pills or cards on the same spot, never a chip on the header or the captions, never a card "
+    "arrow to the object, and the label keeps that place for its whole life; so never draw a later card where a label sits. Never place two chips, pills or cards on the same spot, never a chip on the header or the captions, never a card "
     "over a chip; use the empty floor, sky and margins. The storyboard check fails when texts overlap.")
 
 SPEECH_RULE = (
