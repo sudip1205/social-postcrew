@@ -527,6 +527,10 @@ class ShortsWriter(Agent):
         notes = [f"REDRAW IN THE {name.upper()} LOOK. script.json and its {len(says)} beats are APPROVED by the owner and already voiced: do not "
                  f"change, add, remove or reorder any beat or any word of \"say\". Only set \"style\" in script.json to \"{look}\", and rewrite "
                  f"explainer.js (and scoreSound) from scratch in the {name} look, one panel per beat, following the STYLE.md and examples below."]
+        if (before.get("style") or "iso") == look:   # the same look, drawn again to today's rules (owner, 2026-11-22: labels)
+            notes.append("WHY THIS REDRAW: the old explainer.js was drawn before the owner's label rules. Follow STYLE.md rule 6 exactly: "
+                         "every object that has a name gets it printed on itself with nameOn(...) on a face the viewer sees (no floating "
+                         "name chips, no arrows to names); only states and values float with label(...); no two texts ever overlap.")
         topic = dict((ctx.outputs.get("topic") or {}))
         notes.append(f"The length is fixed by the approved voice (the check times it by voice/scene*.wav): never cut, merge or split beats to "
                      f"change the length. There must be exactly {len(says)} beats.")

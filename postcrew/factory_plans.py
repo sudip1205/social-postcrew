@@ -15,6 +15,7 @@ The steps of one plan (state):
 Nothing else removes a plan, except your own Remove.
 """
 import json
+from pathlib import Path
 import threading
 import uuid
 from datetime import date, datetime, timezone
@@ -342,6 +343,17 @@ def ready(ws):
     return out
 
 
+def stale_drawing(ep):
+    """An Isometric animation drawn before the owner's label rules (2026-11-22: texts blocked each other; names must be printed on the
+    objects with nameOn, states float with label()). Make video then draws it again in the same look; the approved words and voice stay.
+    (2026-11-23: a video made from a script written that morning still had the old floating, overlapping chips.)"""
+    f = Path(ep) / "explainer.js"
+    try:
+        return f.exists() and "nameOn(" not in f.read_text()
+    except OSError:
+        return False
+
+
 def make(ws, pid, look=None, runner=None):
     from . import voice_desk
     item = get(ws, pid)
@@ -361,6 +373,8 @@ def make(ws, pid, look=None, runner=None):
             raise ValueError(f"this script was written for the {cur or 'other'} look: write it again with that look ticked to make it in another one")
     else:
         look = ""
+    if not look and cur == "iso" and stale_drawing(ep):   # drawn before the label rules (owner, 2026-11-22): draw it again, same look
+        look = cur
     _update(ws, pid, state="making", error=None, made_look=look or cur)
     if look:   # draw it again in the other canvas look; the approved words and voice stay (ShortsWriter.run, options.restyle)
         options = {"kept": {"topic": _topic_out(item)}, "kept_from": "your approved script", "plan_id": pid, "restyle": look, "slug": item["slug"]}

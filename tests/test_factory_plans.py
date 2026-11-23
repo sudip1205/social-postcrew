@@ -115,6 +115,27 @@ class FactoryPlanTests(unittest.TestCase):
             self.assertIn("writer", seen[0]["kept"])
             self.assertNotIn("restyle", seen[0])
 
+    def test_an_iso_drawing_from_before_the_label_rules_is_drawn_again(self):
+        # owner 2026-11-22/23: names printed on objects; a video made from an older drawing still had overlapping floating chips
+        with TempWorkspace() as ws, fake_factory(ws, desk=True) as (root, calls):
+            item = self._approved(ws, root, "iso")
+            (root / "episodes" / "bloom" / "explainer.js").write_text("function explainer(ctx){ tag(ctx, 1, 2, 'Server 1'); }")
+            seen = []
+            factory_plans.make(ws, item["id"], "iso", runner=lambda ws_, options, fmt: seen.append(options) or {"ok": True, "run_id": "r1"})
+            wait(item["id"])
+            self.assertEqual(seen[0]["restyle"], "iso")                  # same look, drawn again to the new rules
+            self.assertNotIn("writer", seen[0]["kept"])
+
+    def test_an_iso_drawing_with_printed_names_is_used_as_it_is(self):
+        with TempWorkspace() as ws, fake_factory(ws, desk=True) as (root, calls):
+            item = self._approved(ws, root, "iso")
+            (root / "episodes" / "bloom" / "explainer.js").write_text("function explainer(ctx){ nameOn(ctx, P, [0,0,0,2,2,2], 'Server 1'); }")
+            seen = []
+            factory_plans.make(ws, item["id"], "iso", runner=lambda ws_, options, fmt: seen.append(options) or {"ok": True, "run_id": "r1"})
+            wait(item["id"])
+            self.assertNotIn("restyle", seen[0])
+            self.assertIn("writer", seen[0]["kept"])
+
     def test_a_scene_script_cannot_be_switched_to_a_canvas_look(self):
         with TempWorkspace() as ws, fake_factory(ws, desk=True) as (root, calls):
             item = self._approved(ws, root, "signal")
