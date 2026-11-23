@@ -3,6 +3,7 @@
 ## 0.2.0: YouTube, per-app settings and a faster Studio
 
 ### New
+- **The video check now catches chips covering chips.** A status pill sitting on part of another (like "1 s down" over "missed 1 of 3") sends the video back to be redrawn before it can be made.
 - **Fixes reach the lab even when it is busy.** If the lab is making a video when a change ships, it now updates itself as soon as that job ends, instead of waiting for the next change.
 - **Make video redraws older Isometric scripts with the new label rules.** A script whose animation was drawn before names were printed on objects is drawn again when you press Make video, so overlapping floating labels can't come back. Your approved words and voice are kept.
 - **Object names are printed on the object in Isometric videos.** Every named thing (servers, load balancers, databases, people, anything) carries its name on its own surface: "Server 1" sits on the server's own side as an inset nameplate in perspective, with no arrow, so it moves with the object and never jumps. Only states and values (down, 100% load) float.
