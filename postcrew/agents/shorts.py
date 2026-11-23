@@ -51,6 +51,12 @@ NO_CODE_RULE = (
     "video shows NO code, names no programming language, and runs no simulation or program: explain what the thing is and how it works with "
     "pictures, tables and a little math. Ignore 'Python' in old titles and examples.")
 # Owner, 2026-11-21: "during script writing never use :, use ; instead or fullstop. Because : is not stopping on voice."
+LABEL_RULE = (
+    "LABELS (owner rule, 2026-11-22: texts were blocking each other while big parts of the screen stayed empty). Name every object with "
+    "label(ctx, P(x, y, z), text, {k, dot, bg, col, sub, fs}), the point ON the object: the shell puts the label in free space and draws an "
+    "arrow to the object. Never place two chips, pills or cards on the same spot, never a chip on the header or the captions, never a card "
+    "over a chip; use the empty floor, sky and margins. The storyboard check fails when texts overlap.")
+
 SPEECH_RULE = (
     "NARRATION PUNCTUATION (owner rule, 2026-11-21, every look): never put a colon (:) in anything the voice reads (beats' \"say\", scene "
     "text). The voice runs straight through a colon without stopping. Use a full stop, or a semicolon, instead: 'Worst case: 100 drops' -> "
@@ -475,6 +481,7 @@ class ShortsWriter(Agent):
             SPEECH_RULE,
             TAG_RULE,
             NO_CODE_RULE,
+            LABEL_RULE,
             "",
             f"=== STYLE.md (styles/{kit.name}) ===",
             (kit / "STYLE.md").read_text(),
