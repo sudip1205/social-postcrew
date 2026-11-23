@@ -3,7 +3,7 @@
 ## 0.2.0: YouTube, per-app settings and a faster Studio
 
 ### New
-- **Object names are printed on the object in Isometric videos.** "Server 1" now sits on the server's own side as an inset nameplate in perspective, with no arrow, so it moves with the object and never jumps. Only states and values (down, 100% load) float.
+- **Object names are printed on the object in Isometric videos.** Every named thing (servers, load balancers, databases, people, anything) carries its name on its own surface: "Server 1" sits on the server's own side as an inset nameplate in perspective, with no arrow, so it moves with the object and never jumps. Only states and values (down, 100% load) float.
 - **Labels never block each other in Isometric videos.** Names and values are now placed automatically in the empty space next to their object (open floor, sky, margins) with an arrow pointing to it, never on the title, the captions or another label, and once a label appears it stays in that spot for its whole life: only new labels look for space around it. The storyboard check sends a video back when two texts overlap or a card hides a label.
 - **No code unless you ask.** Plans and scripts no longer bring in Python, Java, code, simulations or demos on their own: they are visual explanations. Name a language or ask for code in the topic or the plan's notes when you want it.
 - **YouTube tags on every plan.** The Planner now writes 15-25 tags with each plan, starting from the tags the top videos on the topic really use, and the plan card lists them (edit and Save, or Write again; older plans get a Write tags button). The script's youtube.json starts from the plan's tags, so the upload sends them; the writer follows the same tag rules when there is no plan.
