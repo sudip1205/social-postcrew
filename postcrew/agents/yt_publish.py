@@ -17,10 +17,10 @@ from .publisher import post_details, scheduled_at
 LABEL = "YouTube"
 
 
-def enqueue_youtube(ws, cfg, run_id, day, category, outputs, review):
+def enqueue_youtube(ws, cfg, run_id, day, category, outputs, review, editing=False):
     """Queue the finished video. cfg: the app's view of the config. outputs: the run's accepted outputs."""
     if "slug" in (outputs.get("writer") or {}):   # made by the Shorts factory (agents/shorts.py)
-        return _enqueue_short(ws, cfg, run_id, day, category, outputs)
+        return _enqueue_short(ws, cfg, run_id, day, category, outputs, editing)
     script, video, voice = outputs["writer"], outputs["media"], outputs.get("voice") or {}
     try:   # the scenes as they were drawn (after the Storyboard Artist and any redraw): the model a video you approve leaves (rewards.py)
         (ws.runs_dir / run_id / "script.final.json").write_text(json.dumps(script, indent=1, default=str))
@@ -88,8 +88,10 @@ def _unique_pid(ws, media_dir, pid):
         pid, n = f"{base}-{n}", n + 1
     return pid
 
-def _enqueue_short(ws, cfg, run_id, day, category, outputs):
-    """Queue a Short the factory made: its video, thumbnail and youtube.json (title, description, tags)."""
+def _enqueue_short(ws, cfg, run_id, day, category, outputs, editing=False):
+    """Queue a Short the factory made: its video, thumbnail and youtube.json (title, description, tags).
+    editing: made from a Factory plan, it waits in the Factory's video editor (status "editing", never uploaded) until the owner
+    approves it there (owner, 2026-11-23: "at the end if I approve then only it will be ready for upload")."""
     w, video = outputs["writer"], outputs["media"]
     platform = cfg.get("platform", "youtube")
     pid = f"{day.isoformat()}-{platform}-{category}"
@@ -110,7 +112,7 @@ def _enqueue_short(ws, cfg, run_id, day, category, outputs):
         "id": pid, "platform": platform, "run_id": run_id, "date": day.isoformat(), "category": category,
         "topic": w["title"], "text": w["description"], "first_comment": "",
         "media": str(dest.relative_to(ws.root)), "media_kind": "video", **({"poster_image": str(thumb.relative_to(ws.root))} if thumb else {}),
-        "status": "awaiting_approval" if mode == "manual" else "queued",
+        "status": "editing" if editing else "awaiting_approval" if mode == "manual" else "queued",
         "scheduled_at": scheduled_at(cfg, day) if mode != "immediate" else datetime.now(timezone.utc).isoformat(),
         "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "review": {},
         **({"plan_id": plan_id} if plan_id else {}),

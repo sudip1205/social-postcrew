@@ -59,6 +59,7 @@ function vdState(p) {
   const ep = p.episode, v = ep?.voice || {};
   if (p.state === "writing") return ["running", "Writing the script"];
   if (p.state === "making") return ["running", "Making the video"];
+  if (p.state === "editing") return ["awaiting_approval", "Edit and approve the video"];   // the video editor (owner, 2026-11-23)
   if (!ep) return ["idle", "Planned"];
   if (ep.script !== "approved") return ["awaiting_approval", "Approve the script"];
   if (v.state === "processing") return ["running", "Processing your voice"];
@@ -237,12 +238,14 @@ function vdDetail(p) {
     <div class="lg:col-span-2 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3">
       <p class="text-sm text-slate-700">${icon("movie", "text-slate-500 align-middle")} ${making ? "Making the video now. It appears in the Queue when it is done."
         : ready ? `Script and voice approved. It is made in ${p.want && VD_LOOK[p.want === "blue" ? "signal" : p.want] ? `the ${esc(VD_LOOK[p.want === "blue" ? "signal" : p.want])} look (the Looks ticked below)` : "the look its script was written in"}${ep.style ? `; written in ${esc(ep.style)}` : ""}.` : "Approve the script and the voice, then make the video."}</p>
+      ${p.state === "editing" ? button("approve", "movie_edit", "Edit video", `data-vd-edit="${esc(ep.slug)}"`) : ""}
       ${button("primary", "play_arrow", making ? "Making…" : "Make the video", `${makeAttr} ${ready && !making ? "" : "disabled"}`)}
     </div>
   </div>`;
 }
 
 function vdWire(root) {
+  root.querySelectorAll("[data-vd-edit]").forEach(b => b.addEventListener("click", () => edOpen(b.dataset.vdEdit)));   // views/editor.js
   const go = async (fn, ok) => { try { await fn(); if (ok) toast(ok); } catch (e) { toast(e.message, true); } await vdLoad(true); };
   const val = id => root.querySelector(id)?.value || "";
   root.querySelector("#vd-plan")?.addEventListener("click", () => {

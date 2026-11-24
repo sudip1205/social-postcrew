@@ -97,3 +97,15 @@ undo
 save
 mic
 travel_explore
+skip_next
+skip_previous
+visibility_off
+visibility
+movie_edit
+add_photo_alternate
+pan_tool
+auto_awesome
+play_circle
+chevron_left
+chevron_right
+build

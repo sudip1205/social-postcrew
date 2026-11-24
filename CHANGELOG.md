@@ -3,6 +3,13 @@
 ## 0.2.0: YouTube, per-app settings and a faster Studio
 
 ### New
+
+- **Video editor in the Factory.** After Make video, an Isometric or Signal video waits in Factory > Plans > Edit video and is
+  never uploaded from there on its own. The editor plays the video live, frame by frame, with its sections (one per script line)
+  on a timeline. Edit by hand: click a text on the picture to change its words or hide it, or drag a floating label to a new
+  place, and see the change at once. Edit with AI: pick frames and tick sections, say what should change, and the AI redraws just
+  that part and checks it. Every AI change can be undone. Render the video records the changes with the approved voice, and only
+  Approve video makes it ready for upload. The Queue shows these videos as "In the video editor".
 - **The video check now catches chips covering chips.** A status pill sitting on part of another (like "1 s down" over "missed 1 of 3") sends the video back to be redrawn before it can be made.
 - **Fixes reach the lab even when it is busy.** If the lab is making a video when a change ships, it now updates itself as soon as that job ends, instead of waiting for the next change.
 - **Make video redraws older Isometric scripts with the new label rules.** A script whose animation was drawn before names were printed on objects is drawn again when you press Make video, so overlapping floating labels can't come back. Your approved words and voice are kept.

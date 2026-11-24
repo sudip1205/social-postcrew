@@ -33,7 +33,7 @@ from ..agents.frames import HyperFramesAgent, RemotionAgent, RemotionFramesAgent
 from ..agents.hooks import HooksAgent
 from ..agents.graphics import GraphicsAgent
 from ..agents.video_review import VideoReviewAgent
-from .. import attachments, engage, factory_chat, factory_refs, factory_styles, factory_plans, factory_voice, rewards, voice_desk, yt_analytics
+from .. import attachments, engage, factory_chat, factory_edit, factory_refs, factory_styles, factory_plans, factory_voice, rewards, voice_desk, yt_analytics
 from ..agents.direction import CreativeDirectorAgent
 from ..agents.quality import QualityDirectorAgent
 from ..agents.voice import VoiceAgent
@@ -79,7 +79,7 @@ class Studio:
         now = crew.local_now(cfg)
         target = crew.target_date(cfg, now)
         return {"version": __version__, "workspace": str(self.ws.root), "running": crew.is_running(), "planning": self.planning,
-                "analyzing": self.motion.busy, "factory": factory_plans.busy() or voice_desk.busy(),
+                "analyzing": self.motion.busy, "factory": factory_plans.busy() or voice_desk.busy() or factory_edit.busy(),
                 "platform": platform,
                 "platforms": [{"id": p, "label": platforms.label(p), "enabled": platforms.is_enabled(full, p)}
                               for p in platforms.PLATFORM_IDS],
@@ -496,6 +496,8 @@ class Studio:
         post = next((p for p in posts if p["id"] == pid), None)
         if not post:
             raise KeyError(pid)
+        if post.get("status") == "editing" and action in ("approve", "publish_now"):
+            raise ValueError("this video is still in the Factory's video editor: approve it there (Factory > Plans > Edit video)")
         if action == "approve":
             if post["status"] not in ("awaiting_approval", "queued", "failed", "dry_run"):
                 raise ValueError(f"cannot approve a {post['status']} post")
@@ -775,8 +777,10 @@ def make_handler(studio):
             self.send_header("Content-Length", str(len(body)))
             self.send_header("Cache-Control", "no-store")
             self.send_header("X-Content-Type-Options", "nosniff")
-            self.send_header("X-Frame-Options", "DENY")
+            self.send_header("X-Frame-Options", (headers or {}).get("X-Frame-Options", "DENY"))
             for k, v in (headers or {}).items():
+                if k == "X-Frame-Options":
+                    continue
                 self.send_header(k, v)
             self.end_headers()
             if self.command != "HEAD":
@@ -922,6 +926,19 @@ def make_handler(studio):
                     from ..agents.shorts import factory_dir
                     out = factory_dir(platforms.view(ws.config(), "youtube")) / "out"
                     return self.media(out / p[len("/factory-out/"):], out)
+                if method == "GET" and p.startswith("/factory-files/"):   # the video editor's animation page loads the kit and the episode's drawing
+                    try:
+                        f, froot = factory_edit.file_path(ws, p[len("/factory-files/"):])
+                    except KeyError:
+                        return self.send(404, {"error": "not found"})
+                    return self.file(f, froot)
+                m = re.match(r"^/factory-edit/([A-Za-z0-9._-]+)/page\.html$", p)
+                if method == "GET" and m:   # the episode's own animation, live, for the video editor (owner, 2026-11-23)
+                    try:
+                        return self.send(200, body=factory_edit.page(ws, m.group(1)).encode(), ctype="text/html; charset=utf-8",
+                                         headers={"X-Frame-Options": "SAMEORIGIN"})
+                    except ValueError as e:
+                        return self.send(404, {"error": str(e)})
                 if method == "GET" and p == "/oauth/start":
                     try:
                         return self.send(302, {}, headers={"Location": studio.oauth_start()})
@@ -1040,6 +1057,15 @@ def make_handler(studio):
                                                                                    self.body().get("format", "short")),
                     ("POST", "/api/factory-plans/script"): lambda: factory_plans.write_script(ws, self.body().get("id"), self.body().get("instructions", "")),
                     ("POST", "/api/factory-plans/make"): lambda: factory_plans.make(ws, self.body().get("id"), self.body().get("look")),
+                    ("GET", "/api/factory-edit"): lambda: factory_edit.view(ws, q.get("slug")),
+                    ("POST", "/api/factory-edit/edits"): lambda: factory_edit.save_edits(ws, self.body().get("slug"), self.body().get("edits")),
+                    ("POST", "/api/factory-edit/ask"): lambda: factory_edit.ask(ws, self.body().get("slug"), self.body().get("command"),
+                                                                              self.body().get("frames"), self.body().get("sections")),
+                    ("POST", "/api/factory-edit/undo"): lambda: factory_edit.undo(ws, self.body().get("slug")),
+                    ("POST", "/api/factory-edit/prepare"): lambda: factory_edit.prepare(ws, self.body().get("slug")),
+                    ("POST", "/api/factory-edit/render"): lambda: factory_edit.render(ws, self.body().get("slug")),
+                    ("POST", "/api/factory-edit/approve"): lambda: factory_edit.approve(ws, self.body().get("slug")),
+                    ("POST", "/api/factory-edit/reopen"): lambda: factory_edit.reopen(ws, self.body().get("slug")),
                     ("POST", "/api/factory-plans/remove"): lambda: factory_plans.remove(ws, self.body().get("id")),
                     ("POST", "/api/factory-plans/tags"): lambda: factory_plans.set_tags(ws, self.body().get("id"), self.body().get("tags")),
                     ("POST", "/api/voice-desk/lines"): lambda: voice_desk.save_lines(ws, self.body().get("slug"), self.body().get("lines")),

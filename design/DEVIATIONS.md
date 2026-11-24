@@ -179,3 +179,8 @@ No Stitch screen exists for either view. Both are derived from the shell, design
   - an open row has two cards: 1. Script (lines, Edit lines, Approve script, Write again with notes) and 2. Voice (Upload your recording, the cleaning report, audio players, Approve my voice, Use dip_puck, Use am_puck);
   - a footer with **Make the video now**.
 
+
+## Factory > Plans > Edit video (views/editor.js)
+No Stitch screen (2026-11-23, owner asked for a video editor). Built from the shell, design.md and ui.js buttons, like Crew and
+Credentials: a full-screen dialog with the live picture and timeline, the sections list, and the Edit by hand / Edit with AI panel.
+The Approve video button adds disabled styling (BTN.approve has none) so it reads as off until the video is rendered again.

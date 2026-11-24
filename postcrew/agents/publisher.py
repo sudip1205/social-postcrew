@@ -256,6 +256,16 @@ def publish_due(ws, now=None, client_factory=LinkedIn, log=print, sleep=time.sle
     return results
 
 
+def _editable(ctx):
+    """A Factory plan's Isometric / Signal video (its animation is episodes/<slug>/explainer.js): it waits in the Factory's video
+    editor until the owner approves it there (owner, 2026-11-23). Other videos are queued for approval as before."""
+    if not (ctx.options or {}).get("plan_id"):
+        return False
+    from .shorts import factory_dir
+    slug = (ctx.outputs.get("writer") or {}).get("slug")
+    return bool(slug) and (factory_dir(ctx.cfg) / "episodes" / slug / "explainer.js").exists()
+
+
 class PublisherAgent(Agent):
     id = "publisher"
     title = "Publisher"
@@ -266,8 +276,13 @@ class PublisherAgent(Agent):
     def run(self, ctx, guidance):
         if ctx.platform == "youtube":
             from .yt_publish import enqueue_youtube
+            editing = _editable(ctx)   # a Factory plan's video: first the owner's video editor (2026-11-23)
             post = enqueue_youtube(ctx.ws, ctx.cfg, ctx.run.status["run_id"], ctx.day, ctx.category, ctx.outputs,
-                                   ctx.outputs.get("editor") or {})
+                                   ctx.outputs.get("editor") or {}, editing=editing)
+            if post.get("status") == "editing":
+                notify(ctx.ws, "Video ready to edit", f"{post['topic']}: look at it in Factory > Plans > Edit video, change what you want, "
+                       "then approve it there to make it ready for upload")
+                return {"post_id": post["id"], "status": "editing", "scheduled_at": post["scheduled_at"], "mode": "editor"}
         else:
             post = enqueue(ctx.ws, ctx.cfg, ctx.run.status["run_id"], ctx.day, ctx.category, ctx.outputs["formatter"],
                            ctx.outputs["editor"])
@@ -288,4 +303,4 @@ class PublisherAgent(Agent):
 
     def summary(self, out):
         return {"queued": f"queued for {out.get('scheduled_at', '')[:16]}Z",
-                "awaiting_approval": "waiting for your approval"}.get(out["status"], out["status"])
+                "awaiting_approval": "waiting for your approval", "editing": "waiting in the Factory's video editor"}.get(out["status"], out["status"])

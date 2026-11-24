@@ -7,7 +7,7 @@ const qTone = v => v >= 85 ? ["text-emerald-600", "bg-emerald-500", "text-emeral
 const qSlot = p => p.scheduled_at || p.date || "";
 const qSlotText = p => { const s = qSlot(p); if (!s) return ""; const d = new Date(s);
   return isNaN(d) ? s : s.length > 10 ? fmtTime(s) : d.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" }); };
-const qKind = p => p.status === "awaiting_approval" ? "awaiting" : p.status === "failed" ? "failed" : p.status === "vetoed" ? "vetoed" : "scheduled";
+const qKind = p => p.status === "awaiting_approval" || p.status === "editing" ? "awaiting" : p.status === "failed" ? "failed" : p.status === "vetoed" ? "vetoed" : "scheduled";
 const qDisabled = `disabled title="Coming soon"`;
 
 function qScorePanel(p) {
@@ -121,7 +121,9 @@ function qCard(p) {
     : (p.status === "awaiting_approval" ? act("approve", "check_circle", "Approve", "inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs active:scale-95 transition-all", "text-[17px]") : "")
       + act("edit", "edit_note", "Edit draft", "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-medium text-xs active:scale-95 transition-all", "text-[17px] text-slate-500")
       + act("veto", "cancel", "Veto", "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-50 border border-rose-200 hover:bg-rose-100 text-rose-700 font-medium text-xs active:scale-95 transition-all", "text-[17px] text-rose-600");
-  const right = p.status === "vetoed" ? "" : act("publish_now", "send", "Publish now", "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-200/70 text-xs font-medium transition-colors", "text-[16px] text-slate-500")
+  const right = p.status === "vetoed" ? ""
+    : p.status === "editing" ? `<span class="inline-flex items-center gap-1.5 text-xs text-slate-600">${icon("movie_edit", "text-[16px] text-violet-600")}<span>${tip("In the video editor", "Made from a Factory plan: watch and change it in Factory > Plans > Edit video. It is ready for upload only when you approve it there.")}</span></span>`
+    : act("publish_now", "send", "Publish now", "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-200/70 text-xs font-medium transition-colors", "text-[16px] text-slate-500")
     + `<button class="p-1.5 rounded-lg hover:bg-slate-200/70 text-slate-500 transition-colors" type="button" ${qDisabled}>${icon("more_vert", "text-[18px]")}</button>`;
   return `<article class="bg-white rounded-xl border border-slate-200 border-l-[6px] ${app.border} shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden" id="post-${esc(p.id)}">
     <div class="px-6 py-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3 bg-gradient-to-r ${yt ? "from-red-50/20" : "from-blue-50/25"} to-white">
@@ -202,7 +204,7 @@ async function renderQueue() {
   const plat = p => p.platform || "linkedin", f = Q.filter || S.platform;
   const count = fn => queue.filter(fn).length;
   const filters = { all: () => true, linkedin: p => plat(p) === "linkedin", youtube: p => plat(p) === "youtube",
-    awaiting: p => p.status === "awaiting_approval", scheduled: p => ["queued", "scheduled", "approved"].includes(p.status), failed: p => p.status === "failed" };
+    awaiting: p => p.status === "awaiting_approval" || p.status === "editing", scheduled: p => ["queued", "scheduled", "approved"].includes(p.status), failed: p => p.status === "failed" };
   const q = Q.search.trim().toLowerCase();
   let list = queue.filter(filters[f] || filters.all).filter(p => !q || `${p.topic} ${p.text} ${p.category}`.toLowerCase().includes(q));
   list.sort(Q.sort === "score" ? (a, b) => (b.review?.overall ?? -1) - (a.review?.overall ?? -1)

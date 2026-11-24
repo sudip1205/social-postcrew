@@ -2,6 +2,7 @@ account_tree
 add
 add_comment
 add_link
+add_photo_alternate
 alarm
 alt_route
 apps
@@ -118,6 +119,7 @@ notifications
 open_in_new
 outbox
 palette
+pan_tool
 pause
 pause_circle
 payments
@@ -153,6 +155,8 @@ search
 send
 settings
 shield
+skip_next
+skip_previous
 smart_display
 smart_toy
 sort
@@ -183,5 +187,6 @@ view_in_ar
 view_timeline
 view_week
 visibility
+visibility_off
 volume_up
 warning

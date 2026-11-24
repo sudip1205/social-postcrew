@@ -10,8 +10,10 @@ The steps of one plan (state):
   planned  -> the Planner researched the topic on YouTube (trends.niche_research) and wrote it, like the monthly plans
   writing  -> the Script Writer is writing its script (a crew run that stops before the video: the Render step waits)
   script   -> its script is on the Voice desk (voice_desk.py): approve the script, upload your voice (or skip to dip_puck / am_puck)
-  making   -> you pressed Make the video: the crew renders it in the style the script was written in, and queues it
-  made     -> the video is in the Queue; only now does the plan leave the list
+  making   -> you pressed Make the video: the crew renders it in the style the script was written in
+  editing  -> the video editor (factory_edit.py, owner 2026-11-23): watch it frame by frame, change it by hand or with an AI command,
+              render it again; nothing is uploaded until you Approve the video there
+  made     -> approved: the video is in the Queue, ready for upload; only now does the plan leave the list
 Nothing else removes a plan, except your own Remove.
 """
 import json
@@ -307,7 +309,7 @@ def unmake(ws, slug):
         d.pop("run", None)
         voice_desk._save_desk(ep, d)
     item = _by_slug(ws, slug)
-    if item and item.get("state") in ("made", "making", "script"):
+    if item and item.get("state") in ("made", "making", "script", "editing"):
         _update(ws, item["id"], state="script", error=None)
     return item
 
@@ -386,7 +388,9 @@ def make(ws, pid, look=None, runner=None):
             res = (runner or _run)(ws, options, item.get("format", "short"))
             if res and res.get("ok"):
                 post = res.get("post") or {}
-                _update(ws, pid, state="made", made_at=_now(), post_id=post.get("id"), video_run=res.get("run_id"))
+                # it waits in the video editor until the owner approves it there (owner, 2026-11-23); an older queue path goes straight to made
+                _update(ws, pid, state="editing" if post.get("status") == "editing" else "made", made_at=_now(), post_id=post.get("id") or post.get("post_id"),
+                        video_run=res.get("run_id"))
                 voice_desk.mark_run(ws, item["slug"], res.get("run_id"), "made")
             else:
                 _update(ws, pid, state="script", error=(res or {}).get("reason") or "the video was not made", video_run=(res or {}).get("run_id"))
