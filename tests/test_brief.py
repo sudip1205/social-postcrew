@@ -96,10 +96,18 @@ class SysflowSpec(unittest.TestCase):
         self.assertTrue(any("label" in p for p in problems), problems)
 
 
+
+
+# LinkedIn gets a still image (owner, 2026-11-24), not the system-flow animation
+STILL = {"layout": "points", "title": "How the [[token exchange]] works",
+         "items": [{"head": "The app asks", "body": "It sends its own token."}, {"head": "The server checks", "body": "It trades it for a narrower one."},
+                   {"head": "The API trusts", "body": "Only the narrow token reaches it."}]}
+
+
 @mock.patch.object(cred_mod, "check_claude", return_value={"state": "ok", "message": "logged in"})
 class BriefedRun(unittest.TestCase):
     @unittest.skipUnless(SAMPLE and shutil.which("ffmpeg"), "needs ffmpeg and the sample spec")
-    def test_planned_brief_reaches_writer_and_editor_and_builds_the_animation(self, _):
+    def test_planned_brief_reaches_writer_and_editor_and_builds_the_image(self, _):
         post_text = ("Why an AI agent needs its own token\n\n" + (
             "Picture a refund agent. A Customer asks for a refund, the Support agent calls the API Gateway with one "
             "broad admin token, and the Orders DB trusts it. An Attacker who plants a prompt gets every order refunded. "
@@ -116,7 +124,7 @@ class BriefedRun(unittest.TestCase):
                                                  "rejected": [], "brief": b})
             self.assertTrue(load_plan(ws)[SATURDAY.isoformat()]["brief"])
             llm = ScriptedLLM({"topic": [{"topic": "x" * 6, "angle": "a", "why_now": "w", "search_queries": []}],
-                               "research": [research()], "writer": [writer(post_text, "")], "media": [SAMPLE],
+                               "research": [research()], "writer": [writer(post_text, "")], "media": [STILL],
                                "editor": [review()]})
             res = run_crew(ws, SATURDAY, "briefed", llm=llm, fetch=fake_fetch())
             self.assertTrue(res["ok"], res)
@@ -124,15 +132,15 @@ class BriefedRun(unittest.TestCase):
             self.assertIn("OWNER'S BRIEF", wprompt)
             self.assertIn("CTX-ABOUT-TYPE", wprompt)
             self.assertNotIn("characters.\n", wprompt.split("Length:")[1].split("\n")[0].replace("3000 characters at most).", ""))
-            self.assertEqual(ws.queue()[0]["media_kind"], "video")
+            self.assertEqual(ws.queue()[0]["media_kind"], "image")   # LinkedIn gets images, never videos (owner, 2026-11-24)
             self.assertIn("Picture", wprompt)
             self.assertIn("before-after".replace("-", " ").title().split()[0], wprompt.title())
             eprompt = next(c for c in llm.calls if c["agent"] == "editor")
             self.assertIn("<owner_brief>", eprompt["prompt"])
             self.assertIn("THE OWNER WROTE A BRIEF", eprompt["system"])
             post = ws.queue()[0]
-            self.assertEqual(post["media_kind"], "video")
-            self.assertTrue(post["media"].endswith(".mp4"))
+            self.assertEqual(post["media_kind"], "image")
+            self.assertTrue(post["media"].endswith(".png"))
 
     def test_brief_is_ignored_when_the_category_says_off(self, _):
         with TempWorkspace() as ws:

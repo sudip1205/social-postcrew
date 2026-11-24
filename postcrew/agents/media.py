@@ -1,12 +1,14 @@
-"""Media agent: designs and renders the visual. Posters are a JSON spec drawn by Pillow (1080x1350 PNG);
-algorithm posts get an MP4 where the Java line being executed is highlighted as the data moves."""
+"""Media agent: designs and renders the visual, a still 1080x1350 image (owner, 2026-11-24: "for linkedin post do not create
+movies. create images instead ... create a own attractive style"). The image is a JSON spec drawn in the Signal Board style by
+render/card.py (headless Chrome); without Chrome the older Pillow poster (render/poster.py) is the fallback. The algorithm
+animation, the animated poster and the system-flow animation are no longer made for LinkedIn."""
 import json
-import shutil
+import subprocess
 from urllib.parse import urlparse
 
 from .. import brief as briefmod
 from ..checks import check_code, number_problems, poster_number_problems
-from ..render import animate, poster, sysflow, tracers
+from ..render import card, poster, sysflow
 from .base import Agent, AgentError, guidance_block
 
 ITEM = {"type": "object", "properties": {k: {"type": "string"} for k in ("head", "body", "label", "sub", "tag", "via")},
@@ -62,22 +64,36 @@ class MediaAgent(Agent):
 
     def run(self, ctx, guidance):
         handle = ctx.profile.get("handle", "")
-        if ctx.cat["media"] == "animation":
-            algo = ctx.outputs["topic"].get("algo")
-            if algo not in tracers.TRACERS:
-                raise AgentError(f"unknown algorithm {algo!r}", fatal=True)
-            if not shutil.which("ffmpeg"):
-                raise AgentError("ffmpeg is not installed (macOS: brew install ffmpeg; Debian/Ubuntu: "
-                                 "sudo apt install ffmpeg)", fatal=True)
-            path = ctx.run.dir / f"animation-{algo}.mp4"
-            try:
-                info = animate.render_animation(algo, path, handle)
-            except animate.AnimationError as e:
-                raise AgentError(str(e), fatal=True)
-            return {"kind": "video", "path": str(path), "seconds": info.get("seconds"),
-                    "shown_text": animate.animation_text(algo), "spec": {"algo": algo}}
-        if briefmod.media_mode(ctx.cat, briefmod.of(ctx)) == "sysflow":
-            return self._sysflow(ctx, guidance, handle)
+        if card.available():
+            return self._card(ctx, guidance, handle)
+        ctx.run.event(self.id, "fallback", "Chrome is not installed, so this post gets the plain poster instead of the Signal Board image",
+                      level="warning")
+        return self._poster(ctx, guidance, handle)
+
+    def _card(self, ctx, guidance, handle):
+        system = self.prompt(ctx, "card", kicker=KICKER_RULE, icons=", ".join(card.ICONS))
+        prev = (ctx.previous.get("media") or {}).get("spec", {})
+        prompt = (f"THE POST (the image must agree with it and add no new claims):\n{ctx.outputs['writer']['text']}"
+                  + "\n\nEvery fact, name and number on the image must appear in the post above, worded the same way "
+                    "(same qualifiers, same figures). Leave out anything the post does not say."
+                  + (f"\n\nYOUR PREVIOUS IMAGE SPEC (revise it to match the post and fix what was wrong):\n{json.dumps(prev, ensure_ascii=False)}"
+                     if prev.get("layout") in card.LAYOUTS else "")
+                  + guidance_block(guidance))
+        spec = self.ask(ctx, system, prompt, card.SCHEMA)
+        spec["kicker"] = kicker_for(ctx, spec)
+        source = source_footer(ctx.outputs.get("research"), ctx.outputs["writer"].get("first_comment", ""))
+        out = {"kind": "image", "path": None, "spec": spec, "shown_text": card.shown_text(spec), "style": "signal-board"}
+        bad = card.validate_spec(spec)
+        if bad:
+            return dict(out, render_error="; ".join(bad))
+        path = ctx.run.dir / "image.png"
+        try:
+            card.render_card(spec, path, handle, source)
+        except (card.CardError, OSError, subprocess.SubprocessError, ValueError, TypeError, KeyError) as e:
+            return dict(out, render_error=str(e))
+        return dict(out, path=str(path))
+
+    def _poster(self, ctx, guidance, handle):
         layouts = list(poster.LAYOUTS)   # the style is chosen from the post: code for code, steps for how-tos...
         system = self.prompt(ctx, layouts=", ".join(layouts), kicker=KICKER_RULE)
         prompt = (f"Allowed layouts: {layouts}\nKicker (pill text): {KICKER_RULE}\n\n"
@@ -96,50 +112,15 @@ class MediaAgent(Agent):
             poster.render_poster(spec, path, handle)
         except (poster.PosterError, ValueError, KeyError, TypeError) as e:
             return {"kind": "image", "path": None, "spec": spec, "shown_text": "", "render_error": str(e)}
-        out = {"kind": "image", "path": str(path), "spec": spec, "shown_text": poster.poster_text(spec)}
-        if ctx.cat["media"] == "video":   # the same poster, built up piece by piece
-            if not shutil.which("ffmpeg"):
-                ctx.run.event(self.id, "fallback", "ffmpeg is not installed, so this post gets the poster image "
-                              "instead of the animated video (macOS: brew install ffmpeg; Debian/Ubuntu: "
-                              "sudo apt install ffmpeg)", level="warning")
-                return out
-            video = ctx.run.dir / "poster.mp4"
-            try:
-                info = animate.render_poster_video(spec, video, handle)
-            except (animate.AnimationError, poster.PosterError) as e:
-                raise AgentError(str(e), fatal=True)
-            out.update(kind="video", path=str(video), poster=str(path), seconds=info["seconds"])
-        return out
-
-    def _sysflow(self, ctx, guidance, handle):
-        if not shutil.which("ffmpeg"):
-            raise AgentError("ffmpeg is not installed (macOS: brew install ffmpeg; Debian/Ubuntu: "
-                             "sudo apt install ffmpeg)", fatal=True)
-        ob = briefmod.of(ctx)
-        system = self.prompt(ctx, "sysflow", kicker=KICKER_RULE)
-        prompt = (f"THE POST (the animation must agree with it and add no new claims):\n{ctx.outputs['writer']['text']}\n\n"
-                  f"Kicker (pill text): {KICKER_RULE}\n\n" + briefmod.media_block(ob)
-                  + (f"\n\nYOUR PREVIOUS SPEC (revise it):\n{json.dumps(ctx.previous['media'].get('spec', {}).get('sysflow', {}), ensure_ascii=False)}"
-                     if (ctx.previous.get("media") or {}).get("spec", {}).get("sysflow") else "")
-                  + guidance_block(guidance))
-        spec = self.ask(ctx, system, prompt, sysflow.SCHEMA)
-        spec["kicker"] = kicker_for(ctx, spec)
-        bad = sysflow.validate_spec(spec)
-        shown = sysflow.shown_text(spec)
-        if bad:
-            return {"kind": "video", "path": None, "spec": {"sysflow": spec}, "shown_text": shown,
-                    "render_error": "; ".join(bad)}
-        path, still = ctx.run.dir / "system-flow.mp4", ctx.run.dir / "system-flow.png"
-        try:
-            info = sysflow.render_sysflow(spec, path, handle, still_path=still)
-        except sysflow.SysflowError as e:
-            raise AgentError(str(e), fatal=True)
-        return {"kind": "video", "path": str(path), "poster": str(still), "seconds": info["seconds"],
-                "spec": {"sysflow": spec}, "shown_text": shown}
+        return {"kind": "image", "path": str(path), "spec": spec, "shown_text": poster.poster_text(spec)}
 
     def validate(self, ctx, out):
         if "sysflow" in out.get("spec", {}):
             return self._validate_sysflow(ctx, out)
+        if out.get("kind") == "video":   # an older run's video: LinkedIn gets images now (owner, 2026-11-24)
+            return ["LinkedIn posts get a still image, not a video: design the image"]
+        if out.get("style") == "signal-board":
+            return self._validate_card(ctx, out)
         if out.get("render_error"):
             return [f"the poster did not render: {out['render_error']}. Shorten the text or use fewer items"]
         problems = []
@@ -162,6 +143,21 @@ class MediaAgent(Agent):
                          for p in number_problems("", out.get("shown_text", ""), verified)]
         return problems
 
+    def _validate_card(self, ctx, out):
+        if out.get("render_error"):
+            return [f"the image did not render: {out['render_error']}"]
+        spec, problems = out["spec"], []
+        if spec.get("layout") == "code":
+            err = check_code(spec.get("code") or "", spec.get("language"))
+            if err:
+                problems.append(f"the code on the image does not parse: {err}")
+        problems += poster_number_problems(ctx.outputs["writer"]["text"], out.get("shown_text", ""))
+        if ctx.cat.get("fact_check"):
+            research = ctx.outputs.get("research") or {}
+            verified = [dict(s, page=research.get("_pages", {}).get(s["url"], "")) for s in research.get("verified", [])]
+            problems += [p.replace("are not in", "on the image are not in") for p in number_problems("", out.get("shown_text", ""), verified)]
+        return [p.replace("the poster", "the image") for p in problems]
+
     def _validate_sysflow(self, ctx, out):
         if out.get("render_error"):
             return [f"the animation spec is not valid: {out['render_error']}"]
@@ -181,6 +177,8 @@ class MediaAgent(Agent):
                                      "the animation's titles and captions show numbers the post does not") for e in extra]
 
     def summary(self, out):
+        if out.get("style") == "signal-board":
+            return f"image ({out.get('spec', {}).get('layout', '?')}, Signal Board)"
         if "sysflow" in out.get("spec", {}):
             s = out["spec"]["sysflow"]
             return f"system animation ({len(s.get('systems', []))} components, {out.get('seconds', 0):.0f}s)"

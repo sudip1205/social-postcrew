@@ -4,6 +4,12 @@
 
 ### New
 
+- **LinkedIn posts get images, never videos.** The Visual Designer now makes one still 1080x1350 image per post in Postcrew's own
+  "Signal Board" style: a dark editorial card, a kicker, a bold headline whose key words glow in an accent colour, one picture of
+  the idea, and a takeaway bar. It picks the layout that shows the idea: big numbers, a comparison table, a step flow, a bar chart,
+  a hub of grouped parts, key points, or a code snippet. The body text grows to fill the card and shrinks when it is full.
+  The algorithm animation, the animated poster and the system-flow animation are no longer made for LinkedIn.
+
 - **Video editor in the Factory.** After Make video, an Isometric or Signal video waits in Factory > Plans > Edit video and is
   never uploaded from there on its own. The editor plays the video live, frame by frame, with its sections (one per script line)
   on a timeline. Edit by hand: click a text on the picture to change its words or hide it, or drag a floating label to a new

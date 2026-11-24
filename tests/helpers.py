@@ -1,3 +1,4 @@
+import os
 """Test doubles: a scripted LLM, a fake web, and a fake LinkedIn. No network, no tokens spent."""
 import copy
 import shutil
@@ -9,6 +10,7 @@ from postcrew.llm import LLMError, LLMResult
 from postcrew import monthly as _monthly
 from postcrew import trends as _trends
 from postcrew.workspace import Workspace
+os.environ.setdefault("POSTCREW_CARDS", "off")   # the scripted Visual Designer writes poster specs (render/card.py)
 
 _trends.fetch = lambda url, timeout=25: ""   # tests never touch YouTube: niche research then finds nothing and the plans are written without numbers
 REAL_PER_TOPIC = _monthly.per_topic
