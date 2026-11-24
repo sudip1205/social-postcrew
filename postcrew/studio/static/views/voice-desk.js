@@ -2,6 +2,7 @@
 // and Write the script with your instructions; record your voice for it (or skip to dip_puck / am_puck); approve both; Make the video.
 // Backend: postcrew/factory_plans.py and postcrew/voice_desk.py. Built from the Factory page's components (ui.js: chip, button, icon, tip).
 let VD = null, vdTimer = null;
+const VD_THEME = {};   // the theme picked for a plan before Make the video (owner, 2026-11-24)
 const VD_OPEN = new Set(), VD_EDIT = new Set();
 const VD_VOICE = {
   none: ["pending", "No voice yet"], processing: ["running", "Processing your voice"], ready: ["awaiting_approval", "Listen and approve"],
@@ -59,7 +60,8 @@ function vdState(p) {
   const ep = p.episode, v = ep?.voice || {};
   if (p.state === "writing") return ["running", "Writing the script"];
   if (p.state === "making") return ["running", "Making the video"];
-  if (p.state === "editing") return ["awaiting_approval", "Edit and approve the video"];   // the video editor (owner, 2026-11-23)
+  if (p.state === "editing") return ["awaiting_approval", "Edit and approve the video"];
+  if (p.state === "made") return ["approved", "Approved: ready for upload"];   // the video editor (owner, 2026-11-23)
   if (!ep) return ["idle", "Planned"];
   if (ep.script !== "approved") return ["awaiting_approval", "Approve the script"];
   if (v.state === "processing") return ["running", "Processing your voice"];
@@ -125,6 +127,7 @@ function vdRow(p) {
         ${p.error ? `<p class="text-xs text-rose-700 mt-0.5">${esc(p.error)}</p>` : ""}
       </div>
       ${chip(st, word, "sm")}
+      ${p.editable ? button("approve", "movie_edit", "Edit video", `data-vd-edit="${esc(p.slug)}"`) : ""}
       ${button("secondary", "delete", "Delete", `${p.other ? `data-vd-remove-ep="${esc(p.slug)}"` : `data-vd-remove="${p.id}"`} title="Delete it from the Factory" ${p.state === "writing" || p.state === "making" || (vdBusy(p.episode?.job) && p.episode.job.what === "video") ? "disabled" : ""}`)}
       ${icon(open ? "expand_less" : "expand_more", "text-slate-400")}
     </div>` + (open ? vdDetail(p) : "");
@@ -238,7 +241,9 @@ function vdDetail(p) {
     <div class="lg:col-span-2 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3">
       <p class="text-sm text-slate-700">${icon("movie", "text-slate-500 align-middle")} ${making ? "Making the video now. It appears in the Queue when it is done."
         : ready ? `Script and voice approved. It is made in ${p.want && VD_LOOK[p.want === "blue" ? "signal" : p.want] ? `the ${esc(VD_LOOK[p.want === "blue" ? "signal" : p.want])} look (the Looks ticked below)` : "the look its script was written in"}${ep.style ? `; written in ${esc(ep.style)}` : ""}.` : "Approve the script and the voice, then make the video."}</p>
-      ${p.state === "editing" ? button("approve", "movie_edit", "Edit video", `data-vd-edit="${esc(ep.slug)}"`) : ""}
+      ${p.editable ? button("approve", "movie_edit", "Edit video", `data-vd-edit="${esc(ep.slug)}" title="Watch it frame by frame and change it by hand or with AI"`) : ""}
+      ${!p.other && p.theme && (VD.themes || []).length && !p.editable ? `<label class="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600">${icon("palette", "text-sm text-slate-400")}<span>${tip("Theme", "The look of the Isometric video: its colours, set and captions. You can change it later in Edit video.")}</span>
+        <select data-vd-theme="${p.id}" class="rounded-lg border-slate-300 text-sm py-1.5" ${making ? "disabled" : ""}>${VD.themes.map(t => `<option value="${t.id}" title="${esc(t.what)}" ${(VD_THEME[p.id] || p.theme) === t.id ? "selected" : ""}>${esc(t.label)}</option>`).join("")}</select></label>` : ""}
       ${button("primary", "play_arrow", making ? "Making…" : "Make the video", `${makeAttr} ${ready && !making ? "" : "disabled"}`)}
     </div>
   </div>`;
@@ -309,7 +314,11 @@ function vdWire(root) {
     go(() => post("/api/voice-desk/generate", { slug, voice: b.dataset.vdRegen, feedback, redo }), "Regenerating with your feedback. About a minute.");
   }));
   root.querySelectorAll("[data-vd-reopen]").forEach(b => b.addEventListener("click", () => go(() => post("/api/voice-desk/reopen", { slug: b.dataset.vdReopen }))));
-  root.querySelectorAll("[data-vd-make]").forEach(b => b.addEventListener("click", () => go(() => post("/api/factory-plans/make", { id: b.dataset.vdMake }), "Making the video. It appears in the Queue when it is done.")));
+  root.querySelectorAll("[data-vd-theme]").forEach(sel => sel.addEventListener("change", () => { VD_THEME[sel.dataset.vdTheme] = sel.value; }));
+  root.querySelectorAll("[data-vd-make]").forEach(b => b.addEventListener("click", () => {
+    const p = VD.plans.find(x => x.id === b.dataset.vdMake) || {}, theme = p.theme ? (VD_THEME[p.id] || p.theme) : undefined;
+    go(() => post("/api/factory-plans/make", { id: b.dataset.vdMake, theme }), "Making the video. When it is done, press Edit video on this plan to look at it, change it and approve it.");
+  }));
   root.querySelectorAll("[data-vd-make-ep]").forEach(b => b.addEventListener("click", () => go(() => post("/api/voice-desk/make", { slug: b.dataset.vdMakeEp }), "Making the video.")));
   root.querySelectorAll("[data-vd-upload]").forEach(inp => inp.addEventListener("change", async () => {
     const f = inp.files?.[0]; if (!f) return;

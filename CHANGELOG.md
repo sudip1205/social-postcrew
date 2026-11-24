@@ -4,6 +4,11 @@
 
 ### New
 
+- **Pick the theme at Make video, change it in the editor.** An Isometric plan has a Theme list (Pastel, Night Lab, Cream
+  Blueprint, Sky Toy, Studio Build, Ink, Maker Bench) next to Make the video. The video editor has the same list: the drawing stays,
+  its colours and set change. An Edit video button sits on the plan row, and an approved video stays on the list until it is
+  uploaded, so it can always be opened and changed again.
+
 - **LinkedIn posts get images, never videos.** The Visual Designer now makes one still 1080x1350 image per post in Postcrew's own
   "Signal Board" style: a dark editorial card, a kicker, a bold headline whose key words glow in an accent colour, one picture of
   the idea, and a takeaway bar. It picks the layout that shows the idea: big numbers, a comparison table, a step flow, a bar chart,

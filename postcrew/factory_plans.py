@@ -356,7 +356,32 @@ def stale_drawing(ep):
         return False
 
 
-def make(ws, pid, look=None, runner=None):
+def themes():
+    """The Isometric themes the owner can pick at Make video and in the video editor (owner, 2026-11-24)."""
+    from .factory_styles import VARIANTS
+    return [{"id": k, "label": v["label"], "what": v["what"]} for k, v in VARIANTS.items() if k != "auto"]
+
+
+def set_theme(ep, theme):
+    """An Isometric video's theme lives in its script.json ("variant"); the drawing stays, its colours and set change."""
+    import json
+    from .factory_styles import VARIANTS
+    theme = str(theme or "").strip()
+    if not theme:
+        return None
+    if theme not in VARIANTS or theme == "auto":
+        raise ValueError(f"unknown theme {theme!r}")
+    f = Path(ep) / "script.json"
+    script = json.loads(f.read_text())
+    if script.get("style", "iso") != "iso":
+        raise ValueError("themes are for Isometric videos")
+    if script.get("variant") != theme:
+        script["variant"] = theme
+        f.write_text(json.dumps(script, indent=1, ensure_ascii=False))
+    return theme
+
+
+def make(ws, pid, look=None, runner=None, theme=None):
     from . import voice_desk
     item = get(ws, pid)
     if not item.get("slug"):
@@ -377,9 +402,12 @@ def make(ws, pid, look=None, runner=None):
         look = ""
     if not look and cur == "iso" and stale_drawing(ep):   # drawn before the label rules (owner, 2026-11-22): draw it again, same look
         look = cur
-    _update(ws, pid, state="making", error=None, made_look=look or cur)
+    if theme and (look or cur) == "iso":   # the theme picked at Make video (owner, 2026-11-24)
+        set_theme(ep, theme)
+    _update(ws, pid, state="making", error=None, made_look=look or cur, **({"theme": theme} if theme else {}))
     if look:   # draw it again in the other canvas look; the approved words and voice stay (ShortsWriter.run, options.restyle)
-        options = {"kept": {"topic": _topic_out(item)}, "kept_from": "your approved script", "plan_id": pid, "restyle": look, "slug": item["slug"]}
+        options = {"kept": {"topic": _topic_out(item)}, "kept_from": "your approved script", "plan_id": pid, "restyle": look, "slug": item["slug"],
+                   **({"variant": theme} if theme else {})}
     else:
         options = {"kept": {"topic": _topic_out(item), "writer": d["writer"]}, "kept_from": "your approved script", "plan_id": pid}
 
@@ -404,9 +432,14 @@ def make(ws, pid, look=None, runner=None):
 # ---------- the Studio's view ----------
 def view(ws):
     from . import voice_desk
+    import json
     out, made = [], 0
+    waiting = {(p.get("youtube") or {}).get("episode") for p in ws.queue() if p.get("status") not in ("published", "publishing", "vetoed")}
     for i in load(ws)["items"]:
-        if i.get("state") in ("made", "published"):
+        # a made video stays on the list until it is uploaded, so it can still be edited (owner, 2026-11-24: "how to update once the
+        # video is made?")
+        editable = bool(i.get("slug")) and (voice_desk._root(ws) / "episodes" / i["slug"] / "explainer.js").exists()
+        if i.get("state") == "published" or (i.get("state") == "made" and not (editable and i.get("slug") in waiting)):
             made += 1
             continue
         row = dict(i, job=_jobs.get(i["id"]))
@@ -415,8 +448,15 @@ def view(ws):
                 row["episode"] = voice_desk.episode(ws, i["slug"])
                 cur = look_of(voice_desk.desk(voice_desk._root(ws) / "episodes" / i["slug"]), voice_desk._root(ws) / "episodes" / i["slug"])
                 row["want"] = (ticked_look(ws) if cur in LOOKS else None) or cur
+                ep = voice_desk._root(ws) / "episodes" / i["slug"]
+                if cur == "iso" or (row["want"] == "iso"):
+                    try:
+                        row["theme"] = json.loads((ep / "script.json").read_text()).get("variant") or "pastel"
+                    except (OSError, ValueError):
+                        row["theme"] = "pastel"
+                row["editable"] = (ep / "explainer.js").exists() and i.get("state") in ("editing", "made")
             except ValueError:
                 row["episode"] = None
         out.append(row)
     out.sort(key=lambda r: r.get("created_at") or "", reverse=True)
-    return {"plans": out, "made": made, "planning": _jobs.get("plan")}
+    return {"plans": out, "made": made, "planning": _jobs.get("plan"), "themes": themes()}

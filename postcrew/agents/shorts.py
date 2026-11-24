@@ -427,7 +427,9 @@ class ShortsWriter(Agent):
         (explainer.js) in the style of the owner's reference prompt (shorts-factory/styles/iso-pastel), then runs the storyboard check
         (free: key frames + automatic checks) and looks at the storyboard until it is clean. make-iso.mjs then voices and records it."""
         kit = root / "styles" / ("tech-glow" if look == "blue" else "iso-pastel")
-        variant = factory_styles.variant(ctx.ws) if look == "iso" else ""   # the Isometric variation (owner, 2026-11-21)
+        # the Isometric variation (owner, 2026-11-21); the theme picked at Make video wins (owner, 2026-11-24)
+        picked = ctx.options.get("variant") if isinstance(ctx.options, dict) else None
+        variant = (picked if isinstance(picked, str) and picked else factory_styles.variant(ctx.ws)) if look == "iso" else ""
         name = "Signal (blue), Tech Glow" if look == "blue" else "Isometric Pastel"
         if not (kit / "STYLE.md").exists():
             raise AgentError(f"the Isometric Pastel kit is not at {kit}: update the Shorts factory", fatal=True)

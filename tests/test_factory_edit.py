@@ -150,5 +150,37 @@ class EditorTests(unittest.TestCase):
             self.assertFalse(publisher._editable(ctx))   # no animation to edit frame by frame
 
 
+    def test_the_theme_is_changed_for_the_whole_video_and_must_be_rendered(self):
+        with TempWorkspace() as ws:
+            root, ep = self._setup(ws)
+            with mock.patch.object(factory_edit, "_check", lambda ws_, ep_: []):
+                v = factory_edit.theme(ws, SLUG, "night")
+                _wait(SLUG)
+            self.assertEqual(json.loads((ep / "script.json").read_text())["variant"], "night")
+            self.assertTrue(v["changed"])
+            self.assertIn("night", [t["id"] for t in v["themes"]])
+            self.assertNotIn("auto", [t["id"] for t in v["themes"]])
+            with self.assertRaises(ValueError):
+                factory_edit.theme(ws, SLUG, "neon-pink")
+
+    def test_an_approved_video_stays_on_the_plans_list_until_it_is_uploaded(self):
+        with TempWorkspace() as ws:
+            root, ep = self._setup(ws)
+            q = ws.queue(); q[0]["status"] = "approved"; ws.save_queue(q)
+            factory_plans._update(ws, "pl1", state="made")
+            row = next(r for r in factory_plans.view(ws)["plans"] if r["id"] == "pl1")
+            self.assertTrue(row["editable"])
+            q[0]["status"] = "published"; ws.save_queue(q)
+            self.assertEqual([r["id"] for r in factory_plans.view(ws)["plans"]], [])
+
+    def test_make_video_uses_the_theme_picked_for_it(self):
+        with TempWorkspace() as ws:
+            root, ep = self._setup(ws)
+            factory_plans.set_theme(ep, "cream")
+            self.assertEqual(json.loads((ep / "script.json").read_text())["variant"], "cream")
+            with self.assertRaises(ValueError):
+                factory_plans.set_theme(ep, "auto")
+
+
 if __name__ == "__main__":
     unittest.main()

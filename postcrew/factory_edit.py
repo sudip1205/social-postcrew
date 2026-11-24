@@ -142,6 +142,8 @@ def view(ws, slug):
     for i, b in enumerate((T or {}).get("beats") or []):
         sections.append({"i": i, "t0": b["t0"], "t1": b["t1"], "say": b.get("say", "")})
     job = _jobs.get(slug)
+    from . import factory_plans
+    script = _read(ep / "script.json", {})
     return {
         "slug": slug, "title": item.get("title") or (post or {}).get("topic") or slug, "plan_id": item.get("id"), "plan_state": item.get("state"),
         "ready": bool(T), "width": (T or {}).get("W"), "height": (T or {}).get("H"), "duration": (T or {}).get("duration"),
@@ -149,6 +151,8 @@ def view(ws, slug):
         "page": f"/factory-edit/{slug}/page.html?v={int((ep / 'explainer.js').stat().st_mtime)}",
         "video": f"/factory-out/{slug}-hyperframes.mp4?v={int(video.stat().st_mtime)}" if video else None,
         "edits": _read(ep / "edits.json", {}),
+        "theme": script.get("variant") or "pastel" if script.get("style", "iso") == "iso" else None,
+        "themes": factory_plans.themes() if script.get("style", "iso") == "iso" else [],
         "history": [dict({k: h.get(k) for k in ("n", "at", "command", "frames", "sections", "result", "undone", "cost_usd")},
                          problems=[_plain(x) for x in h.get("problems") or []]) for h in hist][::-1][:30],
         "changed": bool(st.get("changed")), "rendered_at": st.get("rendered_at"), "approved_at": st.get("approved_at"),
@@ -208,6 +212,21 @@ def save_edits(ws, slug, edits):
     if out != _read(ep / "edits.json", {}):
         _write(ep / "edits.json", out)
         _set_state(ep, changed=True)
+    return view(ws, slug)
+
+
+def theme(ws, slug, name):
+    """Another theme for the whole video (owner, 2026-11-24): the drawing stays, its colours and set change. The editor's page is
+    drawn again in it; Render the video records it."""
+    from . import factory_plans
+    ep = _ep(ws, slug)
+    if (_jobs.get(slug) or {}).get("done", 1) is None:
+        raise ValueError("the editor is still working on this video: wait for it to finish")
+    before = _read(ep / "script.json", {}).get("variant")
+    factory_plans.set_theme(ep, name)
+    if name != before:
+        _set_state(ep, changed=True)
+        _job(slug, "prepare", lambda: _check(ws, ep) and None)
     return view(ws, slug)
 
 
