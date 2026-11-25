@@ -226,7 +226,7 @@ def theme(ws, slug, name):
     factory_plans.set_theme(ep, name)
     if name != before:
         _set_state(ep, changed=True)
-        _job(slug, "prepare", lambda: _check(ws, ep) and None)
+        _job(slug, "ai", lambda: _fix_look(ws, ep) or (_check(ws, ep) and None))
     return view(ws, slug)
 
 
@@ -371,6 +371,38 @@ Rules
 - Answer with one or two plain sentences for the owner saying what you changed (no code)."""
 
 
+LOOK_FIX = ("Redraw the whole video in its theme (script.json \"variant\"). It is drawn dark with its own colours: draw the background "
+            "with THEME.backdrop only when the theme has it, otherwise the theme's light paper like the house examples "
+            "(styles/iso-pastel/examples database-scaling and how-llms-work); take every colour from THEME and objects.js, no hard-coded "
+            "dark hex colours. Keep it moving like those examples: the camera glides between sections, objects pop in, build up and travel.")
+
+
+def _fix_look(ws, ep):
+    """A light theme drawn dark (owner, 2026-11-25: "trying to create in pastel look but it is generating in black, no movement"):
+    the AI redraws it in the theme before it is recorded. Kept in the change history, so Undo works."""
+    from . import factory_plans
+    if not factory_plans.dark_drawing(ws, ep):
+        return None
+    T = timing(ep) or {"beats": []}
+    hist = _history(ep)
+    n = max((h.get("n", 0) for h in hist), default=0) + 1
+    entry = {"n": n, "at": _now(), "command": "Redraw it in the theme's colours (it was drawn dark)", "frames": [], "sections": [],
+             "before": f"edit/history/{n:03d}.js"}
+    (ep / "edit" / "history").mkdir(parents=True, exist_ok=True)
+    shutil.copy2(ep / "explainer.js", ep / entry["before"])
+    keep = {f: (ep / f).read_bytes() for f in ("script.json", "edits.json") if (ep / f).exists()}
+    result, cost = _claude(ws, _prompt(ep, T, LOOK_FIX, [], []), _root(ws))
+    for f, b in keep.items():
+        if (ep / f).read_bytes() != b:
+            (ep / f).write_bytes(b)
+    problems = _check(ws, ep)
+    entry.update(result=result[:600], cost_usd=round(cost, 4), problems=problems[:6])
+    _write(ep / "edit" / "history.json", _history(ep) + [entry])
+    if any("frames are dark" in x for x in problems):
+        raise ValueError("the AI redraw is still dark: undo it or ask the AI again in Edit with AI")
+    return result
+
+
 def undo(ws, slug):
     """Put back the drawing from before the last AI change that is still in place."""
     ep = _ep(ws, slug)
@@ -395,6 +427,7 @@ def render(ws, slug):
     root = _root(ws)
 
     def go():
+        _fix_look(ws, ep)   # never record a light theme drawn dark
         try:
             r = subprocess.run(["npm", "run", "make", "--", f"episodes/{slug}"], cwd=str(root), capture_output=True, text=True, timeout=3600)
         except subprocess.TimeoutExpired:
