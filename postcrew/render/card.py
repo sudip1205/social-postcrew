@@ -292,10 +292,10 @@ def page(spec, handle="", source=""):
             f'<script>document.fonts.ready.then(function(){{{FIT_JS}}});</script></body></html>')
 
 
-def _run(binary, args, timeout=90):
+def _run(binary, args, timeout=90, size=(W, H)):
     r = subprocess.run([binary, "--headless=new", "--disable-gpu", "--no-sandbox", "--hide-scrollbars", "--force-device-scale-factor=1",
                         "--allow-file-access-from-files", "--run-all-compositor-stages-before-draw", "--virtual-time-budget=6000",
-                        f"--window-size={W},{H}", *args], capture_output=True, text=True, timeout=timeout)
+                        f"--window-size={size[0]},{size[1]}", *args], capture_output=True, text=True, timeout=timeout)
     return r
 
 
