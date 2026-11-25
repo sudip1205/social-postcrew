@@ -533,6 +533,11 @@ class ShortsWriter(Agent):
             notes.append("WHY THIS REDRAW: the old explainer.js was drawn before the owner's label rules. Follow STYLE.md rule 6 exactly: "
                          "every object that has a name gets it printed on itself with nameOn(...) on a face the viewer sees (no floating "
                          "name chips, no arrows to names); only states and values float with label(...); no two texts ever overlap.")
+            notes.append("THE LOOK (owner, 2026-11-25: \"trying to create in pastel look but it is generating in black, no movement\"): the "
+                         "colours come from the theme in script.json \"variant\" (themes/<variant>.js). Draw the background with "
+                         "THEME.backdrop and every surface with THEME and objects.js colours, never your own dark hex colours. Keep it "
+                         "moving like the house examples database-scaling and how-llms-work: the camera glides between beats, objects pop, "
+                         "build up and travel; never a still frame.")
         topic = dict((ctx.outputs.get("topic") or {}))
         notes.append(f"The length is fixed by the approved voice (the check times it by voice/scene*.wav): never cut, merge or split beats to "
                      f"change the length. There must be exactly {len(says)} beats.")

@@ -381,6 +381,19 @@ def set_theme(ep, theme):
     return theme
 
 
+def dark_drawing(ws, ep):
+    """The storyboard check says the drawing is dark although its theme is light (make-iso.mjs, 2026-11-25)."""
+    import subprocess
+    from . import voice_desk
+    root = voice_desk._root(ws)
+    try:
+        r = subprocess.run(["node", str(root / "pipeline" / "make-iso.mjs"), str(ep), "--check"], cwd=str(root), capture_output=True,
+                           text=True, timeout=900)
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return "theme is light but the frames are dark" in (r.stderr or "")
+
+
 def make(ws, pid, look=None, runner=None, theme=None):
     from . import voice_desk
     item = get(ws, pid)
@@ -413,6 +426,10 @@ def make(ws, pid, look=None, runner=None, theme=None):
 
     def go():
         try:
+            if not options.get("restyle") and (look or cur) == "iso" and runner is None and dark_drawing(ws, ep):
+                # drawn dark in a light theme (owner, 2026-11-25: "trying to create in pastel look but it is generating in black"):
+                # draw it again in the theme, same words and voice
+                options.update(kept={"topic": _topic_out(item)}, restyle="iso", slug=item["slug"])
             res = (runner or _run)(ws, options, item.get("format", "short"))
             if res and res.get("ok"):
                 post = res.get("post") or {}
