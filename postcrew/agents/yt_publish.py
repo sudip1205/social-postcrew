@@ -107,6 +107,9 @@ def _enqueue_short(ws, cfg, run_id, day, category, outputs, editing=False):
     if video.get("thumbnail_path") and Path(video["thumbnail_path"]).exists():
         thumb = media_dir / f"{pid}{Path(video['thumbnail_path']).suffix}"
         shutil.copy2(video["thumbnail_path"], thumb)
+    designed = designed_thumbnail(ws, cfg, w, media_dir / f"{pid}-thumb.jpg")
+    if designed:
+        thumb = designed
     mode = cfg["publishing"]["approval"]
     post = {
         "id": pid, "platform": platform, "run_id": run_id, "date": day.isoformat(), "category": category,
@@ -123,6 +126,44 @@ def _enqueue_short(ws, cfg, run_id, day, category, outputs, editing=False):
     }
     ws.save_queue([p for p in ws.queue() if p["id"] != pid] + [post])
     return post
+
+
+def designed_thumbnail(ws, cfg, writer, out, llm=None):
+    """A designed thumbnail for a Short (owner, 2026-11-25: "for each video going forward make a thumbnail just like these and update
+    in youtube when uploading"): render/thumb.py, designed by the planner model from the title and the narration. None when it cannot
+    be made (no Chrome, no model, a long video): the video's own frame is used then, as before."""
+    import os
+    from ..render import card, thumb
+    if writer.get("long") or os.environ.get("POSTCREW_CARDS", "").lower() == "off" or not card.chrome():
+        return None
+    narration = writer.get("narration", "")
+    if not narration and writer.get("slug"):   # queued from the Factory chat: the words come from the episode itself
+        try:
+            from .shorts import factory_dir
+            sc = json.loads((factory_dir(cfg) / "episodes" / writer["slug"] / "script.json").read_text())
+            if sc.get("format") == "long":
+                return None
+            narration = " ".join(str(b.get("say") or b.get("narration") or "") for b in (sc.get("beats") or sc.get("scenes") or []))
+        except (OSError, ValueError):
+            pass
+    try:
+        from ..llm import make_backend
+        spec = thumb.design(llm or make_backend(cfg, ws.secrets()), writer.get("title", ""), writer.get("description", ""), narration)
+        if not spec.get("hook"):
+            return None
+        chan = ws.state("youtube_channel", {}) or {}
+        handle = ((cfg.get("publishing") or {}).get("thumbnail_handle") or chan.get("title") or "").strip()
+        png = Path(out).with_suffix(".png")
+        png.parent.mkdir(parents=True, exist_ok=True)
+        thumb.render_thumb(spec, png, handle)
+        from PIL import Image
+        Image.open(png).convert("RGB").save(out, quality=90, optimize=True)
+        png.unlink(missing_ok=True)
+        Path(out).with_suffix(".json").write_text(json.dumps(spec, ensure_ascii=False, indent=1))
+        return Path(out)
+    except Exception as e:   # a thumbnail never stops the video: the frame thumbnail stays
+        print(f"thumbnail: not made ({e})")
+        return None
 
 
 def _scenes(scenes, video):

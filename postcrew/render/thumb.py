@@ -224,3 +224,50 @@ def render_thumb(spec, path, channel=""):
         Path(path).parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(shot, path)
     return verdict
+
+
+GRAPHIC = {"type": "object", "properties": {
+    "type": {"type": "string", "enum": list(GRAPHICS)},
+    "icon": {"type": "string"}, "label": {"type": "string"}, "value": {"type": "string"}, "caption": {"type": "string"},
+    "orbit": {"type": "array", "items": {"type": "string"}, "maxItems": 6},
+    "left": {"type": "object", "properties": {"icon": {"type": "string"}, "label": {"type": "string"}, "note": {"type": "string"}, "win": {"type": "boolean"}}, "additionalProperties": False},
+    "right": {"type": "object", "properties": {"icon": {"type": "string"}, "label": {"type": "string"}, "note": {"type": "string"}, "win": {"type": "boolean"}}, "additionalProperties": False},
+    "nodes": {"type": "array", "maxItems": 4, "items": {"type": "object", "properties": {"icon": {"type": "string"}, "label": {"type": "string"}, "via": {"type": "string"}}, "additionalProperties": False}},
+    "bad": {"type": "integer"}, "good": {"type": "integer"},
+    "values": {"type": "array", "items": {"type": "number"}, "maxItems": 12}, "highlight": {"type": "array", "items": {"type": "integer"}},
+    "water": {"type": "array", "items": {"type": "number"}, "maxItems": 12},
+    "rows": {"type": "integer"}, "cols": {"type": "integer"},
+    "path": {"type": "array", "items": {"type": "array", "items": {"type": "integer"}}},
+    "walls": {"type": "array", "items": {"type": "array", "items": {"type": "integer"}}},
+    "marks": {"type": "array", "items": {"type": "array", "items": {"type": ["integer", "string"]}}},
+    "code": {"type": "string"}, "lang": {"type": "string"}}, "additionalProperties": False}
+SCHEMA = {"type": "object", "properties": {
+    "tag": {"type": "string"}, "accent": {"type": "string", "enum": list(ACCENTS)}, "hook": {"type": "string"},
+    "sticker": {"type": "string"}, "graphic": GRAPHIC}, "required": ["tag", "accent", "hook", "graphic"], "additionalProperties": False}
+
+SYSTEM = """You design the thumbnail of a YouTube Short so people stop scrolling and tap it. A program draws a 1080x1920 picture
+from your JSON: a topic tag, a huge hook at the top, one big picture of the topic in the middle, an optional sticker.
+
+- tag: the topic in 1-3 words ("System design", "Sorting in Java", "2FA").
+- hook: 2-6 words, the video's sharpest question, surprise or promise, never the full title. Wrap the 1-3 punch words in
+  [[double brackets]] (they get a bright marker). Examples: "The server [[dies.]] Now what?", "Is it [[1 or 16?]]",
+  "Stop [[double booking]]", "[[16]] cells, not 26".
+- accent: fire (failures, outages, warnings), ocean (networking, cloud, data), violet (design, architecture, AI), lime (how-tos,
+  good practice, algorithms), sun (puzzles, numbers, tips), rose (security, crypto, AI basics).
+- sticker (optional): 1-3 words that add curiosity ("No internet!", "60 sec", "Amazon Q", "We tested it").
+- graphic: the picture that SHOWS the topic. Pick the type that fits:
+  vs {left, right: {icon, label, note?, win?}} two choices compared; flow {nodes: 2-4 {icon, label, via?}, bad?, good?} steps or
+  a request path (via: the words on the arrow coming INTO that step, none on the first; bad/good: index of the failing / healthy step); big {value, label, icon?} one striking number or expression;
+  bars {values, highlight?, water?, caption} sorting, arrays, rain water; grid {rows, cols, path, walls, marks:[r,c,"S"]} paths,
+  puzzles; code {lang, code (3-5 short lines), highlight} when a snippet is the point; hero {icon, orbit: 3-5 icons, label}
+  one system and its parts.
+- Icons: only these Material Symbols names: {icons}.
+Every word and number must agree with the video; add no claims it does not make. No colons in the hook."""
+
+
+def design(llm, title, description="", narration="", icons=None):
+    """The thumbnail spec for a video, written by the planner model."""
+    names = ", ".join(sorted(set(ICONS) | set(EXTRA)))
+    prompt = (f"VIDEO TITLE: {title}\n\nDESCRIPTION:\n{(description or '')[:1500]}\n\nWHAT THE VIDEO SAYS:\n{(narration or '')[:3000]}\n\n"
+              "Design its thumbnail.")
+    return llm.call("planner", SYSTEM.replace("{icons}", names), prompt, SCHEMA, tools=()).data or {}

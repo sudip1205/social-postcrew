@@ -412,7 +412,7 @@ def render(ws, slug):
             p = next(x for x in q if x["id"] == post["id"])
             shutil.copy2(video, ws.root / p["media"])
             thumb = video.with_suffix(".jpg")
-            if thumb.exists() and p.get("poster_image"):
+            if thumb.exists() and p.get("poster_image") and not p["poster_image"].endswith("-thumb.jpg"):   # keep a designed thumbnail
                 shutil.copy2(thumb, ws.root / p["poster_image"])
             try:
                 secs = float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(video)],

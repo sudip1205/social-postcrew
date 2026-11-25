@@ -4,6 +4,11 @@
 
 ### New
 
+- **Every Short gets a designed thumbnail.** When a Short is queued, the AI designs a thumbnail in the channel's thumbnail style:
+  a topic tag, a huge hook with the punch words on a bright marker, one big picture of the topic (two choices side by side, steps,
+  a big number, bars, a grid, code, or a hero icon) and a sticker. The upload sets it as the YouTube thumbnail. If it cannot be
+  made, the video's own frame is used as before. Long videos keep their frame thumbnail for now.
+
 - **Pick the theme at Make video, change it in the editor.** An Isometric plan has a Theme list (Pastel, Night Lab, Cream
   Blueprint, Sky Toy, Studio Build, Ink, Maker Bench) next to Make the video. The video editor has the same list: the drawing stays,
   its colours and set change. An Edit video button sits on the plan row, and an approved video stays on the list until it is

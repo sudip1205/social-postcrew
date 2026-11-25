@@ -83,5 +83,26 @@ class VisualDesignerTests(unittest.TestCase):
             self.assertEqual(agent.summary(out), "image (points, Signal Board)")
 
 
+
+class ThumbnailTests(unittest.TestCase):
+    """Every Short gets a designed thumbnail when it is queued, and the upload sets it (owner, 2026-11-25)."""
+    def test_a_designed_thumbnail_replaces_the_video_frame(self):
+        from postcrew.agents import yt_publish
+        from tests.helpers import TempWorkspace
+        spec = {"tag": "Failover", "accent": "fire", "hook": "The server [[dies.]] Now what?",
+                "graphic": {"type": "flow", "nodes": [{"icon": "dns", "label": "Active"}, {"icon": "dns", "label": "Passive"}], "bad": 0, "good": 1}}
+        llm = mock.Mock(); llm.call.return_value = mock.Mock(data=spec)
+        with TempWorkspace() as ws, mock.patch.dict(os.environ, {"POSTCREW_CARDS": "on"}), \
+                mock.patch("postcrew.render.card.chrome", return_value="/bin/chrome"), \
+                mock.patch("postcrew.render.thumb.render_thumb", side_effect=lambda s, path, h: __import__("PIL.Image").Image.new("RGB", (1080, 1920)).save(path)):
+            out = yt_publish.designed_thumbnail(ws, ws.config(), {"title": "Active-Passive Failover", "narration": "a server dies"},
+                                                ws.root / "media" / "p-thumb.jpg", llm=llm)
+            self.assertTrue(out and out.exists())
+            self.assertEqual(json.loads(out.with_suffix(".json").read_text())["hook"], spec["hook"])
+            self.assertIsNone(yt_publish.designed_thumbnail(ws, ws.config(), {"title": "x", "long": True}, ws.root / "l.jpg", llm=llm))
+            llm.call.side_effect = RuntimeError("offline")
+            self.assertIsNone(yt_publish.designed_thumbnail(ws, ws.config(), {"title": "x"}, ws.root / "f.jpg", llm=llm))
+
+
 if __name__ == "__main__":
     unittest.main()
