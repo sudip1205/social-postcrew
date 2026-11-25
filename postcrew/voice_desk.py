@@ -879,7 +879,12 @@ def _generate(ws, ep, voice, feedback, prev, redo):
         allf = []
         for i, text in enumerate(texts):
             clip = staged / f"scene{i}.wav"
-            if i in redo_lines or not clip.exists():
+            outro = _root(ws) / "assets" / "voice" / "outro.wav"
+            if text == CTA_LINE and outro.exists():   # the common outro, recorded once with dip_puck (owner, 2026-11-25): never voiced again
+                shutil.copy2(outro, clip)
+                words = _read(outro.with_suffix(".words.json"), None) or _even_words(text, _secs(outro) or 1.0)
+                _write(staged / f"scene{i}.words.json", words)
+            elif i in redo_lines or not clip.exists():
                 parts, words, t = [], [], 0.0
                 for n, sent in enumerate(_sentences(speakable(text))):
                     raw = tmpd / f"l{i}s{n}.wav"
