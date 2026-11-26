@@ -193,16 +193,17 @@ class RecoveryAndLookTests(unittest.TestCase):
             self.assertIn("restarted", got["error"])
             self.assertEqual(len(notes), 1)
 
-    def test_signal_ticked_alone_makes_an_iso_script_in_blue(self):
+    def test_an_iso_script_stays_iso_when_signal_is_ticked(self):
+        """Owner, 2026-11-25: a Signal tick had turned an approved Isometric script into Tech Glow; Isometric stays Isometric."""
         from postcrew import factory_styles
         with TempWorkspace() as ws, fake_factory(ws, desk=True) as (root, calls):
             item = FactoryPlanTests._approved(self, ws, root, "iso")
             factory_styles.save(ws, ["signal"])
-            self.assertEqual(factory_plans.ready(ws)[0]["want"], "blue")
+            self.assertEqual(factory_plans.ready(ws)[0]["want"], "iso")
             seen = []
             factory_plans.make(ws, item["id"], runner=lambda ws_, options, fmt: seen.append(options) or {"ok": True, "run_id": "r"})
             wait(item["id"])
-            self.assertEqual(seen[0]["restyle"], "blue")
+            self.assertNotIn("restyle", seen[0])
 
 
 class PublishAndDeleteTests(unittest.TestCase):
