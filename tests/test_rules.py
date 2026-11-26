@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1] / "postcrew"
 class RulesFileTests(unittest.TestCase):
     def test_the_file_has_the_plan_script_and_tag_parts(self):
         self.assertEqual(set(rules.parts()), {"plan", "script", "tags"})
-        for key in ("CATCH LINE", "Technical depth", "No code unless asked", "never put a colon", "The camera", "nameOn"):
+        for key in ("CATCH LINE", "Technical depth", "No code unless asked", "Never put a colon", "The camera", "nameOn"):
             self.assertIn(key, rules.script())
         self.assertIn("Technical depth", rules.plan())
         self.assertIn("15-25 tags", rules.plan())
