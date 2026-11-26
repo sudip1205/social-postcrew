@@ -322,4 +322,4 @@ class HookTests(unittest.TestCase):
         self.assertTrue(shorts.hook_problems({"beats": [{"say": "You hit Back. How?"}]}))
 
     def test_every_look_gets_the_opening_rule(self):
-        self.assertIn("CATCH LINE", shorts.HOOK_RULE)
+        self.assertIn("CATCH LINE", shorts.rules.script())

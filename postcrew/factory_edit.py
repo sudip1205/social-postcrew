@@ -14,6 +14,7 @@ seek(t)), so every frame can be looked at, and changed:
             timing stay), the check runs, the editor shows the result; every change keeps the drawing before it, so Undo puts it back
 Then Render the video again (the approved voice is kept) and Approve the video: only then is it "approved" in the Queue, ready for upload.
 """
+from . import rules
 import base64
 import json
 import re
@@ -410,15 +411,13 @@ Rules
 - Smaller still means readable: no text the story needs under 40 px (headlines 66, key numbers 96), names printed on objects 26 px.
 - When done run  node pipeline/make-iso.mjs episodes/{slug} --check  and look at episodes/{slug}/build-iso/storyboard.png. Fix every
   problem your change caused. A problem in a section you did not touch you may leave; say so.
-- Answer with one or two plain sentences for the owner saying what you changed (no code)."""
+- Answer with one or two plain sentences for the owner saying what you changed (no code).
+
+""" + rules.script()
 
 
-CAMERA_RULE = 'THE CAMERA (owner, 2026-11-26: "my previous isometric videos ... have camera movement in one direction and smooth transition from one screen to another"): copy the camera of the owner\'s own Shorts episodes/2026-11-22-active-active-explained-two-live-servers-zero-id, episodes/2026-11-18-build-a-music-playlist-singly-doubly-and-circula and episodes/2026-11-24-kubernetes-explained-follow-one-request-through (read their explainer.js). One world, framed wide so every object of the section stays fully on screen; the camera moves slowly in ONE direction through the whole video (a steady drift or push along the world), and each section eases smoothly into the next. Never cut, never jump back and forth between zones, never zoom so close that objects leave the frame.'
-LOOK_FIX = ("Redraw the whole video in its theme (script.json \"variant\"). It is drawn dark with its own colours: draw the background "
-            "with THEME.backdrop only when the theme has it, otherwise the theme's light paper like the house examples "
-            "(styles/iso-pastel/examples database-scaling and how-llms-work); take every colour from THEME and objects.js, no hard-coded "
-            "dark hex colours.")
-LOOK_FIX += " " + CAMERA_RULE
+LOOK_FIX = ("Redraw the whole video in its theme (script.json \"variant\"): it is drawn dark with its own colours. Follow THE OWNER'S "
+            "RULES below, above all S6 (colours from the theme) and S8 (the camera).")
 
 
 def _fix_look(ws, ep):

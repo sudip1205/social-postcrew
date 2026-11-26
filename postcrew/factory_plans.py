@@ -16,6 +16,7 @@ The steps of one plan (state):
   made     -> approved: the video is in the Queue, ready for upload; only now does the plan leave the list
 Nothing else removes a plan, except your own Remove.
 """
+from . import rules
 import json
 from pathlib import Path
 import threading
@@ -158,7 +159,7 @@ def set_tags(ws, pid, tags=None, llm=None):
             f"Example: {item.get('example', '')}", f"Broad topic: {item.get('topic', '')}",
             ("Top videos on it: " + "; ".join(v.get("title", "") for v in r.get("videos") or [])) if r.get("videos") else "",
             ("Search phrases: " + ", ".join(item.get("search_queries") or [])) if item.get("search_queries") else "",
-            "", yt_tags.TAG_RULE] if x is not None)
+            "", rules.text("tags")] if x is not None)
         schema = {"type": "object", "properties": {"tags": yt_tags.TAGS_SCHEMA}, "required": ["tags"], "additionalProperties": False}
         data = (llm or make_backend(_cfg(ws), ws.secrets())).call("planner", TAGS_SYSTEM, prompt, schema, tools=()).data or {}
         tags = data.get("tags")

@@ -11,14 +11,6 @@ from collections import Counter
 MAX_CHARS = 480   # YouTube allows 500 characters of tags (a tag with a space counts its quotes too); keep a margin
 MIN_TAGS = 10
 
-TAG_RULE = (
-    "YOUTUBE TAGS (owner rule, 2026-11-21: tags decide who the video reaches). Write 15-25 tags, most important first, all about THIS video's "
-    "topic: 1) the exact topic as people search it ('egg drop problem', 'how wifi works'); 2) its other names, abbreviations and spellings "
-    "('2 eggs 100 floors', 'egg dropping puzzle'); 3) long-tail questions and phrases viewers type ('egg drop puzzle explained', 'minimum "
-    "drops 2 eggs'); 4) the wider field ('dynamic programming', 'algorithms', 'computer science'); 5) the audience's goal ('coding interview "
-    "question', 'learn algorithms') and the format ('animated explanation', 'shorts'). Use the tags the top videos use where they fit. "
-    "Lower case, no '#', no channel name, no tags about other topics, no single generic words alone ('video', 'tech', 'learn'), each at most "
-    "30 characters, all together under 480 characters.")
 
 TAGS_SCHEMA = {"type": "array", "items": {"type": "string"}, "minItems": MIN_TAGS, "maxItems": 30,
                "description": "15-25 YouTube tags for this video, most important first (see YOUTUBE TAGS)"}

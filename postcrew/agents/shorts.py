@@ -19,65 +19,15 @@ from pathlib import Path
 from .base import Agent, AgentError, AgentWait
 from .. import factory_styles
 from ..llm import agent_settings
-from ..yt_tags import TAG_RULE, merge as merge_tags, problems as tag_problems
+from .. import rules
+from ..yt_tags import merge as merge_tags, problems as tag_problems
 
 SLUG = re.compile(r"^[a-z0-9][a-z0-9-]{1,60}$")
 WRITER_TOOLS = ["Read", "Write", "Edit", "Glob", "Grep", "WebSearch", "WebFetch", "Skill", "Bash(npm run variety:*)", "Bash(python3 algo/*)", "Bash(python3 -I algo/*)"]
 SKILL = ".claude/skills/explainer-short-style"
-# Said to Claude on every run, so a scheduled video always follows the skill as it is NOW (changed from the Studio's Factory chat or by hand):
-# the skill is read from disk at the start of each run, never remembered from an earlier one.
-# Owner, 2026-11-17: "Start the script with some catch line to grab attention of the viewer. Then start describing. Come to the solution, but
-# make it interesting. Try to build a connection with the viewer so that they watch the full video. My video retention is bad."
-HOOK_RULE = (
-    "OPENING AND RETENTION (owner rule, 2026-11-17, every look): the owner's retention is bad, so the script must grab and keep attention.\n"
-    "1. Beat 1 is a CATCH LINE of at most 14 words: a moment the viewer has seen or felt themselves (or a surprising number, or a mistake they "
-    "make) plus a question or surprise they now want answered. It must make sense to someone who has never heard the topic's name. Never start "
-    "with the topic's name, a definition, 'In this video', 'Today' or 'Have you ever wondered'. Good: 'You hit Back and the last page comes right "
-    "back. How does your browser remember?' Bad: 'Your browser's Back button just worked. A plain linked list could not do that.' (a claim "
-    "nobody asked about, which needs the answer to make sense).\n"
-    "2. Beat 2 connects: talk to the viewer ('you', 'your'), why it matters to them and where they will meet it, and open a loop (what they will "
-    "know by the end) that stays open until near the end.\n"
-    "3. Then build up: the problem shown happening, the obvious first attempt and why it fails, then the idea, one step per beat. Re-hook every "
-    "15-20 s with a turn ('But here's the problem…', 'Now watch what happens when…', 'This is the part most people get wrong'); never three "
-    "plain explaining beats in a row.\n"
-    "4. Pay off: answer the hook's question explicitly, calling back to its words. End with the takeaway and an easy comment question (a choice of two).\n"
-    "5. Write 3 different catch lines of different kinds and put them in script.json as \"hook_options\" (the chosen one first). Read beat 1 as "
-    "a stranger scrolling past: would you stop, and would you understand it? If not, rewrite it."
-)
 
-NO_CODE_RULE = (
-    "NO CODE UNLESS ASKED (owner rule, 2026-11-22: 'stop doing things automatically in python if not asked ... only need explanatory script; "
-    "if I need I'll ask to do with python or java'): unless the owner's plan or instructions explicitly ask for code or name a language, the "
-    "video shows NO code, names no programming language, and runs no simulation or program: explain what the thing is and how it works with "
-    "pictures, tables and a little math. Ignore 'Python' in old titles and examples.")
-# Owner, 2026-11-26: "Script is not covering technical details of the topic. I want the script to cover more technical details."
-DEPTH_RULE = (
-    "TECHNICAL DEPTH (owner rule, 2026-11-26: the scripts were too shallow). The viewer is a developer or CS student: teach the real "
-    "mechanism, not only the idea. Every script must (1) name the real parts and terms the topic uses (e.g. SYN, ACK, sequence number, "
-    "TTL, kube-proxy, iptables rule, ClusterIP, B-tree page, quorum) and define each one in a few words the first time it is said, with "
-    "its picture on screen; (2) walk through what actually happens inside, step by step in the right order, each step a beat; (3) give "
-    "concrete numbers where the topic has them (sizes, ports, timeouts, latencies, counts, Big-O, defaults) and keep them correct; (4) "
-    "show at least one real limit, cost, failure case or trade-off and when to pick the alternative. An analogy may open a beat but "
-    "never replaces the mechanism. Spend the words on technical content: no filler beats (no 'stay for the catch', no 'every app you "
-    "trust works this way', no recap of what was just said). Facts must be accurate; when unsure, leave a detail out rather than guess. "
-    "The hook, the plain speech, and no-code rules still apply: technical does not mean code.")
-# Owner, 2026-11-21: "during script writing never use :, use ; instead or fullstop. Because : is not stopping on voice."
-LABEL_RULE = (
-    "LABELS (owner rule, 2026-11-22: texts were blocking each other while big parts of the screen stayed empty). EVERY object that has a name "
-    "(server, load balancer, database, queue, cache, person, phone...) has it printed ON itself: nameOn(ctx, P, [x, y, z, w, d, h], 'Server 1', "
-    "{face: 'side'|'front'|'top'|'round'}) right after drawing it, on a face the viewer sees, the object big enough for 26 px text; an inset "
-    "plate in the face's perspective, no arrow, it never floats. Only states and values (down, 100% load, a counter) float, with "
-    "label(ctx, P(x, y, z), text, {k, dot, bg, col, sub, fs}), the point ON the object: the shell puts the label in free space and draws an "
-    "arrow to the object, and the label keeps that place for its whole life; so never draw a later card where a label sits. Never place two chips, pills or cards on the same spot, never a chip on the header or the captions, never a card "
-    "over a chip; use the empty floor, sky and margins. The storyboard check fails when texts overlap.")
 
-CAMERA_RULE = 'THE CAMERA (owner, 2026-11-26: "my previous isometric videos ... have camera movement in one direction and smooth transition from one screen to another"): copy the camera of the owner\'s own Shorts episodes/2026-11-22-active-active-explained-two-live-servers-zero-id, episodes/2026-11-18-build-a-music-playlist-singly-doubly-and-circula and episodes/2026-11-24-kubernetes-explained-follow-one-request-through (read their explainer.js). One world, framed wide so every object of the section stays fully on screen; the camera moves slowly in ONE direction through the whole video (a steady drift or push along the world), and each section eases smoothly into the next. Never cut, never jump back and forth between zones, never zoom so close that objects leave the frame.'
 
-SPEECH_RULE = (
-    "NARRATION PUNCTUATION (owner rule, 2026-11-21, every look): never put a colon (:) in anything the voice reads (beats' \"say\", scene "
-    "text). The voice runs straight through a colon without stopping. Use a full stop, or a semicolon, instead: 'Worst case: 100 drops' -> "
-    "'Worst case. 100 drops.'; 'Strategy one: walk up' -> 'Strategy one. Walk up.'. Clock times and ratios are written in words ('ten thirty', "
-    "'two to one').")
 
 
 def colon_problems(script):
@@ -92,15 +42,10 @@ def colon_problems(script):
 
 SKILL_RULE = (f"BEFORE writing anything, read the current skill from disk: {SKILL}/SKILL.md in full (including its Owner rules log at the "
               f"bottom), then every file in {SKILL}/references/ that SKILL.md points to for this kind of video, and CLAUDE.md. These files "
-              f"change often: their newest rules win over anything in the example episodes. "
+              f"show how videos are built; where they disagree with THE OWNER'S RULES below, the rules file wins. "
               f"Every video must differ from the recent ones (the owner will monetise the channel; YouTube refuses template look-alikes): "
               f"run `npm run variety` in shorts-factory/ first and follow {SKILL}/references/variety.md (shape, hook, voice, speed, scene "
-              f"order, opening, title, sign-off), then run `npm run variety -- episodes/<slug>` and fix the script until it prints ok. "
-              f"Owner rules (2026-11-15): a Short runs 50 TO 90 SECONDS, 105-185 words of narration (count them), one idea explained properly "
-              f"(what it is, why it matters, how it works, an example); and it is a "
-              f"VISUAL explainer of what the thing is and how it works, never a coding build: code scenes only in an algorithm problem, "
-              f"which sets \"kind\": \"algorithm\" in script.json. The look follows the LOOKS line below: Signal (blue) is the default; the Story "
-              f"look (the cast, {SKILL}/references/story-style.md) is used only when it is ticked, and then only for explainer Shorts.")
+              f"order, opening, title, sign-off), then run `npm run variety -- episodes/<slug>` and fix the script until it prints ok.")
 
 
 def skill_version(root):
@@ -317,11 +262,7 @@ class ShortsWriter(Agent):
             ("Recent videos (do not repeat): " + "; ".join(_recent(ctx))) if _recent(ctx) else "",
             "",
             SKILL_RULE,
-            HOOK_RULE,
-            SPEECH_RULE,
-            TAG_RULE,
-            NO_CODE_RULE,
-            DEPTH_RULE,
+            rules.script(),
             factory_styles.instruction(factory_styles.ticked(ctx.ws), factory_styles.variant(ctx.ws)),
             "Follow CLAUDE.md and the explainer-short-style skill exactly, as for any video in this workspace. Use the existing episodes as",
             "examples of the files. Write ONLY these two files:",
@@ -401,11 +342,7 @@ class ShortsWriter(Agent):
             ("Owner's plan for this video:\n" + json.dumps(topic["owner_plan"], ensure_ascii=False, indent=1)) if topic.get("owner_plan") else "",
             ("Recent videos (do not repeat): " + "; ".join(_recent(ctx))) if _recent(ctx) else "",
             "",
-            HOOK_RULE,
-            SPEECH_RULE,
-            TAG_RULE,
-            NO_CODE_RULE,
-            DEPTH_RULE,
+            rules.script(),
             f"Format: {'16:9 long video' if long else '9:16 Short (vertical)'}, target {seconds} s. Word budget (hard): at most {budget} spoken words"
             + (f" and at least {int(budget * .85)}" if long else "")
             + (f" and at least {int(budget * .85)}" if long else f" and at least {SHORT_MIN_WORDS_3D}") + ("" if long else ", one idea explained properly (what it is, why it matters, how it works, a worked example), 12-18 beats; the Short must run 50-90 s with the channel voice") + ". "
@@ -478,13 +415,7 @@ class ShortsWriter(Agent):
                "Most beats show a 3D object; no beat is an empty frame. "
                f"{kit}/kit.js has the 2D helpers (card, tile, pill, eyebrow, gtext, connector, background, bloom)."
                if look == "blue" else f"{kit}/kit.js has the drawing helpers you may call (box, cylinder, tag, numberTag, arrow, shade, poly)."),
-            (f"THE OWNER'S CHANNEL STYLE (owner, 2026-11-21: 'bring back my old isometric style, follow these videos from my channel'): "
-             f"read at least two of the published Shorts in {kit}/examples/channel/ (frames.jpg AND explainer.js: monty-hall, double-booking, "
-             f"rain-water, saga, linked-lists, chatbot) and build this one the same way: big hand-drawn hero objects for the topic (box/cylinder/"
-             f"shade) filling 60-75% of the width, makeIso scale 90-130 while explaining, 2-4 areas on one diagonal slab with trees, the camera "
-             f"moving slowly in ONE direction through the whole video (never hopping between zones, see THE CAMERA below), big "
-             f"2D cards in the top third. One fixed angle, never a cut. objects.js is optional background detail only. "
-             + factory_styles.variant_line(variant)) if look == "iso" else "",
+            factory_styles.variant_line(variant) if look == "iso" else "",
             "Write ONLY these files in this folder:",
             '  script.json   {"style": "' + look + '"' + (', "variant": "' + (variant if variant != "auto" else "<from VARIANTS.md>") + '"' if look == "iso" else "") + ', "topic": "...", "format": "' + ("long" if long else "short") + '", "beats": [{"say": "..."}, ...]}',
             "  explainer.js  function explainer(ctx, W, H_, t) { ... }  and  function scoreSound(k) { ... }",
@@ -497,13 +428,7 @@ class ShortsWriter(Agent):
             ("\nThe files are already written. Do NOT start over: edit them only where needed to fix these problems, then check again:\n- "
              + "\n- ".join(guidance)) if fixing else "",
             "",
-            HOOK_RULE,
-            SPEECH_RULE,
-            TAG_RULE,
-            NO_CODE_RULE,
-            DEPTH_RULE,
-            LABEL_RULE,
-            CAMERA_RULE,
+            rules.script(),
             "",
             f"=== STYLE.md (styles/{kit.name}) ===",
             (kit / "STYLE.md").read_text(),
@@ -552,7 +477,7 @@ class ShortsWriter(Agent):
                          "name chips, no arrows to names); only states and values float with label(...); no two texts ever overlap.")
             notes.append("THE LOOK (owner, 2026-11-25: \"trying to create in pastel look but it is generating in black, no movement\"): the "
                          "colours come from the theme in script.json \"variant\" (themes/<variant>.js). Draw the background with "
-                         "THEME.backdrop and every surface with THEME and objects.js colours, never your own dark hex colours. " + CAMERA_RULE)
+                         "THEME.backdrop and every surface with THEME and objects.js colours, never your own dark hex colours (rules S6 and S8).")
         topic = dict((ctx.outputs.get("topic") or {}))
         notes.append(f"The length is fixed by the approved voice (the check times it by voice/scene*.wav): never cut, merge or split beats to "
                      f"change the length. There must be exactly {len(says)} beats.")

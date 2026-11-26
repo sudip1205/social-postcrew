@@ -17,6 +17,7 @@ from pathlib import Path
 
 from . import factory_styles
 from . import factory_refs, skill_hook
+from . import rules
 from .agents.shorts import SKILL, SKILL_RULE, factory_dir, skill_version
 
 STATE = "factory-chat"
@@ -38,7 +39,7 @@ SYSTEM = ("You are working for the channel owner through the postcrew Studio's F
           "changed. Run commands from shorts-factory/ with relative paths (`cd shorts-factory && python3 algo/<name>.py`, "
           "`npx hyperframes check ...`, ffmpeg for frame grabs): only those forms are allowed, and nobody can approve anything else "
           "while you run, so never ask for approval. Never upload to YouTube yourself: the owner queues finished videos from the Studio. Keep replies short. "
-          "When making a video: " + SKILL_RULE + SKILL_EDIT_RULE)
+          "When making a video: " + SKILL_RULE + "\n\n" + rules.script() + SKILL_EDIT_RULE)
 PLAN_SLUG = re.compile(r"^plan-([a-z0-9]{6,32})-")
 MAX_MESSAGES = 200
 _lock = threading.Lock()
@@ -221,7 +222,7 @@ def _turn(ws, text, root, runner):
     st = load(ws)
     binary = cfg["llm"].get("claude_path") or "claude"
     cmd = [binary, "-p", "--output-format", "stream-json", "--verbose", "--model", "sonnet", "--max-budget-usd", "5",
-           "--permission-mode", "acceptEdits", "--allowedTools", ",".join(TOOLS), "--append-system-prompt", SYSTEM,
+           "--permission-mode", "acceptEdits", "--allowedTools", ",".join(TOOLS), "--append-system-prompt", SYSTEM + "\n\n" + rules.script(),
            "--settings", json.dumps(hook_settings(root))]
     if st.get("session_id"):
         cmd += ["--resume", st["session_id"]]

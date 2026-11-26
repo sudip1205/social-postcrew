@@ -10,6 +10,7 @@ An item: {id, topic (the owner's line), title, angle, context, example, takeaway
 Assigning writes the day into the app's schedule (schedule.dates) and its plan entry (agents/planner.py), which is what the crew
 and the scheduler already read, so nothing else changes in how a post is made.
 """
+from . import rules
 import copy
 import random
 import re
@@ -64,15 +65,6 @@ CODING_BUILD = re.compile(r"\b(build|implement|write|code|coding|create)\b[^.?!]
 # to do with python or java." A YouTube plan never brings in code, a programming language, a simulation or a demo unless the owner asked.
 CODE_WORDS = re.compile(r"\b(python|java|javascript|typescript|golang|rust|c\+\+|c#|kotlin|swift|node\.?js|sql query|code|coding|coded|"
                         r"script(ed|ing)?|program(med|ming)?|simulat\w*|demo|implement\w*|lines of|run it|load-tested|built and tested)\b", re.I)
-DEPTH_PLAN_RULE = ("TECHNICAL DEPTH (owner rule, 2026-11-26: \"I want the script to cover more technical details\"): every plan's angle, "
-                   "example and takeaway name the real mechanism, the real terms and the numbers the video will teach (the steps inside, "
-                   "the parts by name, one limit or trade-off), not only the big idea. A takeaway like 'understands why X matters' is too "
-                   "shallow; write what the viewer will be able to explain step by step.")
-NO_CODE_RULE = ("NO CODE UNLESS ASKED (owner rule, 2026-11-22): the owner wants visual explanatory videos. Unless THE OWNER'S TOPIC or WHAT "
-                "THE OWNER ASKED FOR names a programming language or asks for code, a plan must not mention or use any programming language "
-                "(Python, Java, ...), code, a simulation, a demo, an implementation or running anything: the title, angle, context, example and "
-                "takeaway explain what the thing is and how it works with pictures, step by step. Ignore 'in Python' in the trending videos "
-                "and in the already-published titles.")
 
 
 def code_problem(p, asked):
@@ -227,11 +219,6 @@ def _research_block(research):
                f"{m.get('engagement_pct')}% of viewers like, trend {m.get('trend_score')}/100 ({m.get('label')}).\n" if m else ""))
 
 
-def _tag_rule():
-    from .yt_tags import TAG_RULE
-    return TAG_RULE
-
-
 def _competitor_tags(videos):
     from .yt_tags import competitors
     return competitors(videos)
@@ -276,9 +263,7 @@ class MonthPlanner(Agent):
             prompt = (f"THE OWNER'S TOPIC: {topic}\n\nWrite {min(left, 8)} plan(s) about it."
                       + (_research_block(research) if videos else "")
                       + (f"\n\nWHAT THE OWNER ASKED FOR: {hint}" if hint else "")
-                      + ("\n\n" + _tag_rule() if ctx.platform != LINKEDIN else "")
-                      + ("\n\n" + NO_CODE_RULE if ctx.platform != LINKEDIN else "")
-                      + ("\n\n" + DEPTH_PLAN_RULE if ctx.platform != LINKEDIN else "")
+                      + ("\n\n" + rules.plan() if ctx.platform != LINKEDIN else "")
                       + ("\n\nAlready planned or published (never repeat these or the same idea in other words):\n"
                          + "\n".join(f"- {t}" for t in taken[-120:]) if taken else "")
                       + guidance_block(guidance))
@@ -507,14 +492,8 @@ def _item(pool, item_id):
     raise ValueError("that plan no longer exists")
 
 
-BRIEF_SHORT = ("A vertical explainer Short of 50 to 90 seconds (105-180 words): what ONE thing is and how it works, in the look ticked in the Factory "
-               "(the blue Signal look by default: diagrams with ONE concrete example moving through them; the Story look with the cast only when it is "
-               "ticked). Hook with a real problem in one breath, name and define the term with its picture, show the mechanism, the common mistake, then "
-               "a specific question for the comments. No code, except an algorithm problem (one trace and one short code scene). Never interview advice.")
-BRIEF_LONG = ("A 16:9 visual class by a calm, caring professor for students: what ONE system or idea is and how it works, from the problem it solves to every part of it. "
-              "Begin with the problem the student has, then build the picture step by step (a growing diagram, one request or value moving through it), explaining what, why "
-              "and how for every part, show what breaks and the fix, check in with the class, and finish with a short recap. No code, except an algorithm problem. Never "
-              "interview advice.")
+BRIEF_SHORT = "A vertical explainer Short: rule P3 of the owner's rules file."
+BRIEF_LONG = "A 16:9 visual class: rule P4 of the owner's rules file."
 
 
 def short_fmt(fmt):
