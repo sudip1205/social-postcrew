@@ -177,6 +177,8 @@ class Supervisor:
                 run.artifact(f"{step}.rejected.{attempts[step]}", {k: v for k, v in out.items()
                                                                    if not k.startswith("_")})
             reason = self._limit_reason(ctx, step, attempts, total, fatal)
+            if reason and fatal and problems:   # the owner sees why, not only that it stopped (owner, 2026-11-25: "why getting this error?")
+                reason = f"{problems[0][:300]} ({reason})"
             if reason:
                 return self._fail(ctx, step, reason, problems)
             decision = self._diagnose(ctx, step, problems, out, attempts)
