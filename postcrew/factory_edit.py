@@ -371,10 +371,12 @@ Rules
 - Answer with one or two plain sentences for the owner saying what you changed (no code)."""
 
 
+CAMERA_RULE = 'THE CAMERA (owner, 2026-11-26: "my previous isometric videos ... have camera movement in one direction and smooth transition from one screen to another"): copy the camera of the owner\'s own Shorts episodes/2026-11-22-active-active-explained-two-live-servers-zero-id, episodes/2026-11-18-build-a-music-playlist-singly-doubly-and-circula and episodes/2026-11-24-kubernetes-explained-follow-one-request-through (read their explainer.js). One world, framed wide so every object of the section stays fully on screen; the camera moves slowly in ONE direction through the whole video (a steady drift or push along the world), and each section eases smoothly into the next. Never cut, never jump back and forth between zones, never zoom so close that objects leave the frame.'
 LOOK_FIX = ("Redraw the whole video in its theme (script.json \"variant\"). It is drawn dark with its own colours: draw the background "
             "with THEME.backdrop only when the theme has it, otherwise the theme's light paper like the house examples "
             "(styles/iso-pastel/examples database-scaling and how-llms-work); take every colour from THEME and objects.js, no hard-coded "
-            "dark hex colours. Keep it moving like those examples: the camera glides between sections, objects pop in, build up and travel.")
+            "dark hex colours.")
+LOOK_FIX += " " + CAMERA_RULE
 
 
 def _fix_look(ws, ep):

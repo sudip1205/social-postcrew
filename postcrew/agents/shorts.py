@@ -60,6 +60,8 @@ LABEL_RULE = (
     "arrow to the object, and the label keeps that place for its whole life; so never draw a later card where a label sits. Never place two chips, pills or cards on the same spot, never a chip on the header or the captions, never a card "
     "over a chip; use the empty floor, sky and margins. The storyboard check fails when texts overlap.")
 
+CAMERA_RULE = 'THE CAMERA (owner, 2026-11-26: "my previous isometric videos ... have camera movement in one direction and smooth transition from one screen to another"): copy the camera of the owner\'s own Shorts episodes/2026-11-22-active-active-explained-two-live-servers-zero-id, episodes/2026-11-18-build-a-music-playlist-singly-doubly-and-circula and episodes/2026-11-24-kubernetes-explained-follow-one-request-through (read their explainer.js). One world, framed wide so every object of the section stays fully on screen; the camera moves slowly in ONE direction through the whole video (a steady drift or push along the world), and each section eases smoothly into the next. Never cut, never jump back and forth between zones, never zoom so close that objects leave the frame.'
+
 SPEECH_RULE = (
     "NARRATION PUNCTUATION (owner rule, 2026-11-21, every look): never put a colon (:) in anything the voice reads (beats' \"say\", scene "
     "text). The voice runs straight through a colon without stopping. Use a full stop, or a semicolon, instead: 'Worst case: 100 drops' -> "
@@ -487,6 +489,7 @@ class ShortsWriter(Agent):
             TAG_RULE,
             NO_CODE_RULE,
             LABEL_RULE,
+            CAMERA_RULE,
             "",
             f"=== STYLE.md (styles/{kit.name}) ===",
             (kit / "STYLE.md").read_text(),
@@ -535,9 +538,7 @@ class ShortsWriter(Agent):
                          "name chips, no arrows to names); only states and values float with label(...); no two texts ever overlap.")
             notes.append("THE LOOK (owner, 2026-11-25: \"trying to create in pastel look but it is generating in black, no movement\"): the "
                          "colours come from the theme in script.json \"variant\" (themes/<variant>.js). Draw the background with "
-                         "THEME.backdrop and every surface with THEME and objects.js colours, never your own dark hex colours. Keep it "
-                         "moving like the house examples database-scaling and how-llms-work: the camera glides between beats, objects pop, "
-                         "build up and travel; never a still frame.")
+                         "THEME.backdrop and every surface with THEME and objects.js colours, never your own dark hex colours. " + CAMERA_RULE)
         topic = dict((ctx.outputs.get("topic") or {}))
         notes.append(f"The length is fixed by the approved voice (the check times it by voice/scene*.wav): never cut, merge or split beats to "
                      f"change the length. There must be exactly {len(says)} beats.")
