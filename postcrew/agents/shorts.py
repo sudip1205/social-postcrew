@@ -50,6 +50,17 @@ NO_CODE_RULE = (
     "if I need I'll ask to do with python or java'): unless the owner's plan or instructions explicitly ask for code or name a language, the "
     "video shows NO code, names no programming language, and runs no simulation or program: explain what the thing is and how it works with "
     "pictures, tables and a little math. Ignore 'Python' in old titles and examples.")
+# Owner, 2026-11-26: "Script is not covering technical details of the topic. I want the script to cover more technical details."
+DEPTH_RULE = (
+    "TECHNICAL DEPTH (owner rule, 2026-11-26: the scripts were too shallow). The viewer is a developer or CS student: teach the real "
+    "mechanism, not only the idea. Every script must (1) name the real parts and terms the topic uses (e.g. SYN, ACK, sequence number, "
+    "TTL, kube-proxy, iptables rule, ClusterIP, B-tree page, quorum) and define each one in a few words the first time it is said, with "
+    "its picture on screen; (2) walk through what actually happens inside, step by step in the right order, each step a beat; (3) give "
+    "concrete numbers where the topic has them (sizes, ports, timeouts, latencies, counts, Big-O, defaults) and keep them correct; (4) "
+    "show at least one real limit, cost, failure case or trade-off and when to pick the alternative. An analogy may open a beat but "
+    "never replaces the mechanism. Spend the words on technical content: no filler beats (no 'stay for the catch', no 'every app you "
+    "trust works this way', no recap of what was just said). Facts must be accurate; when unsure, leave a detail out rather than guess. "
+    "The hook, the plain speech, and no-code rules still apply: technical does not mean code.")
 # Owner, 2026-11-21: "during script writing never use :, use ; instead or fullstop. Because : is not stopping on voice."
 LABEL_RULE = (
     "LABELS (owner rule, 2026-11-22: texts were blocking each other while big parts of the screen stayed empty). EVERY object that has a name "
@@ -310,6 +321,7 @@ class ShortsWriter(Agent):
             SPEECH_RULE,
             TAG_RULE,
             NO_CODE_RULE,
+            DEPTH_RULE,
             factory_styles.instruction(factory_styles.ticked(ctx.ws), factory_styles.variant(ctx.ws)),
             "Follow CLAUDE.md and the explainer-short-style skill exactly, as for any video in this workspace. Use the existing episodes as",
             "examples of the files. Write ONLY these two files:",
@@ -393,6 +405,7 @@ class ShortsWriter(Agent):
             SPEECH_RULE,
             TAG_RULE,
             NO_CODE_RULE,
+            DEPTH_RULE,
             f"Format: {'16:9 long video' if long else '9:16 Short (vertical)'}, target {seconds} s. Word budget (hard): at most {budget} spoken words"
             + (f" and at least {int(budget * .85)}" if long else "")
             + (f" and at least {int(budget * .85)}" if long else f" and at least {SHORT_MIN_WORDS_3D}") + ("" if long else ", one idea explained properly (what it is, why it matters, how it works, a worked example), 12-18 beats; the Short must run 50-90 s with the channel voice") + ". "
@@ -488,6 +501,7 @@ class ShortsWriter(Agent):
             SPEECH_RULE,
             TAG_RULE,
             NO_CODE_RULE,
+            DEPTH_RULE,
             LABEL_RULE,
             CAMERA_RULE,
             "",

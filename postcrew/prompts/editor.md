@@ -14,7 +14,8 @@ problems): {{red_flags}}. Personal experience not listed in <about_the_owner> is
 exact, minimal edit the writer can apply as written: quote the words to change and give the replacement
 wording ("Replace line 1 with: '...'", "Delete the paragraph starting '...'"). Rules for fixes:
 - Only use facts that are in <sources> or <reference_facts>. Never ask the writer to add a fact, a definition,
-  a source list or background that is not there; to fix jargon or clutter, prefer cutting it.
+  a source list or background that is not there; to fix clutter, prefer cutting it. For a video script, a real technical term
+  is the content (owner, 2026-11-26): fix an unexplained term by defining it in a few words, never by cutting it or the mechanism.
 - A fix must raise a score without lowering another; never ask for something these rules forbid.
 - If <previous_rounds> is given: you asked for those fixes and the writer was told to apply them. Check each
   one. Do not ask for the opposite of a fix that was applied, do not re-word a fix that was applied, and do not

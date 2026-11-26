@@ -64,6 +64,10 @@ CODING_BUILD = re.compile(r"\b(build|implement|write|code|coding|create)\b[^.?!]
 # to do with python or java." A YouTube plan never brings in code, a programming language, a simulation or a demo unless the owner asked.
 CODE_WORDS = re.compile(r"\b(python|java|javascript|typescript|golang|rust|c\+\+|c#|kotlin|swift|node\.?js|sql query|code|coding|coded|"
                         r"script(ed|ing)?|program(med|ming)?|simulat\w*|demo|implement\w*|lines of|run it|load-tested|built and tested)\b", re.I)
+DEPTH_PLAN_RULE = ("TECHNICAL DEPTH (owner rule, 2026-11-26: \"I want the script to cover more technical details\"): every plan's angle, "
+                   "example and takeaway name the real mechanism, the real terms and the numbers the video will teach (the steps inside, "
+                   "the parts by name, one limit or trade-off), not only the big idea. A takeaway like 'understands why X matters' is too "
+                   "shallow; write what the viewer will be able to explain step by step.")
 NO_CODE_RULE = ("NO CODE UNLESS ASKED (owner rule, 2026-11-22): the owner wants visual explanatory videos. Unless THE OWNER'S TOPIC or WHAT "
                 "THE OWNER ASKED FOR names a programming language or asks for code, a plan must not mention or use any programming language "
                 "(Python, Java, ...), code, a simulation, a demo, an implementation or running anything: the title, angle, context, example and "
@@ -274,6 +278,7 @@ class MonthPlanner(Agent):
                       + (f"\n\nWHAT THE OWNER ASKED FOR: {hint}" if hint else "")
                       + ("\n\n" + _tag_rule() if ctx.platform != LINKEDIN else "")
                       + ("\n\n" + NO_CODE_RULE if ctx.platform != LINKEDIN else "")
+                      + ("\n\n" + DEPTH_PLAN_RULE if ctx.platform != LINKEDIN else "")
                       + ("\n\nAlready planned or published (never repeat these or the same idea in other words):\n"
                          + "\n".join(f"- {t}" for t in taken[-120:]) if taken else "")
                       + guidance_block(guidance))

@@ -18,7 +18,7 @@ value
 
 clarity
   90+   one read is enough for a mid-level professional; one idea per paragraph; a term the audience may not
-        know is either dropped or explained in a few plain words that are common knowledge.
+        know is explained in a few plain words the first time (video scripts keep the real terms and mechanism: owner, 2026-11-26).
   70-89 one confusing passage, or jargon that a reader has to guess.
   <70   a list of terms, out of order, or needs re-reading.
 
