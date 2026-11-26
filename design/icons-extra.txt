@@ -181,3 +181,4 @@ language
 http
 scatter_plot
 view_column
+download

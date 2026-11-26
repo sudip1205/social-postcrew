@@ -155,7 +155,10 @@ def videos(ws, n=24):
         rows.append({"file": f.name, "slug": slug, "title": meta.get("title") or slug, "mb": round(f.stat().st_size / 1e6, 1),
                      "yt_title": meta.get("title") or "", "description": meta.get("description") or "", "tags": meta.get("tags") or [],
                      "made": datetime.fromtimestamp(f.stat().st_mtime, timezone.utc).isoformat(timespec="seconds"),
-                     "has_meta": bool(meta), "own_voice": _own(out.parent / "episodes" / slug), "thumb": f.with_suffix(".jpg").name if f.with_suffix(".jpg").exists() else None})
+                     "has_meta": bool(meta), "own_voice": _own(out.parent / "episodes" / slug), "thumb": f.with_suffix(".jpg").name if f.with_suffix(".jpg").exists() else None,
+                     # the designed YouTube thumbnail, to download and set by hand (owner, 2026-11-26)
+                     "designed": (f"/factory-thumb/{slug}.jpg?v={int((out.parent / 'episodes' / slug / 'thumbnail.jpg').stat().st_mtime)}"
+                                  if (out.parent / "episodes" / slug / "thumbnail.jpg").exists() else None)})
     return rows
 
 

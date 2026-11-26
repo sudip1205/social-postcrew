@@ -380,6 +380,7 @@ function edDrawFoot() {
   const thumbBox = d.thumbnail || d.post ? `<div class="flex items-center gap-2">
       ${d.thumbnail ? `<a href="${esc(d.thumbnail)}" target="_blank" title="The thumbnail set on YouTube with this video"><img src="${esc(d.thumbnail)}" alt="Thumbnail" class="h-16 w-9 rounded object-cover border border-slate-200"></a>` : ""}
       ${tip(d.thumbnail ? "Thumbnail" : "No thumbnail yet", "Designed from the title and the narration; it is set on YouTube when the video uploads.")}
+      ${d.thumbnail ? `<a href="${esc(d.thumbnail)}" download="${esc(ED.slug)}-thumbnail.jpg" class="${BTN.secondary}">${icon("download")}<span>Download thumbnail</span></a>` : ""}
       ${approved ? "" : button("secondary", "image", d.thumbnail ? "Make it again" : "Make the thumbnail", `id="ed-thumb" ${busy ? "disabled" : ""}`)}</div>` : "";
   f.innerHTML = `<div class="flex items-center gap-3 flex-wrap">
     ${theme}

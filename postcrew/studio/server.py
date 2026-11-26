@@ -922,6 +922,11 @@ def make_handler(studio):
                 if method == "GET" and p.startswith("/factory-ref/"):   # reference videos and their frames (Factory page)
                     root = factory_refs.folder(ws)
                     return self.media(root / p[len("/factory-ref/"):], root)
+                m = re.match(r"^/factory-thumb/([A-Za-z0-9._-]+)\.jpg$", p) if method == "GET" else None
+                if m:   # an episode's designed YouTube thumbnail, to download (owner, 2026-11-26: "make it downloadable")
+                    from ..agents.shorts import factory_dir
+                    eps = factory_dir(platforms.view(ws.config(), "youtube")) / "episodes"
+                    return self.media(eps / m.group(1) / "thumbnail.jpg", eps)
                 if method == "GET" and p.startswith("/factory-out/"):   # the Shorts factory's rendered videos (Factory page)
                     from ..agents.shorts import factory_dir
                     out = factory_dir(platforms.view(ws.config(), "youtube")) / "out"
