@@ -377,13 +377,19 @@ function edDrawFoot() {
     : `${icon("movie", "text-slate-500 align-middle")} The video${d.rendered_at ? ` was rendered ${esc(ago(d.rendered_at))}` : " is rendered"}. Nothing is uploaded until you approve it.`;
   const theme = (d.themes || []).length && !approved ? `<label class="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600">${icon("palette", "text-sm text-slate-400")}<span>${tip("Theme", "The look of the whole video: colours, set and captions. The drawing stays; render the video to record it.")}</span>
       <select id="ed-theme" class="rounded-lg border-slate-300 text-sm py-1.5" ${busy ? "disabled" : ""}>${d.themes.map(t => `<option value="${t.id}" title="${esc(t.what)}" ${d.theme === t.id ? "selected" : ""}>${esc(t.label)}</option>`).join("")}</select></label>` : "";
+  const thumbBox = d.thumbnail || d.post ? `<div class="flex items-center gap-2">
+      ${d.thumbnail ? `<a href="${esc(d.thumbnail)}" target="_blank" title="The thumbnail set on YouTube with this video"><img src="${esc(d.thumbnail)}" alt="Thumbnail" class="h-16 w-9 rounded object-cover border border-slate-200"></a>` : ""}
+      ${tip(d.thumbnail ? "Thumbnail" : "No thumbnail yet", "Designed from the title and the narration; it is set on YouTube when the video uploads.")}
+      ${approved ? "" : button("secondary", "image", d.thumbnail ? "Make it again" : "Make the thumbnail", `id="ed-thumb" ${busy ? "disabled" : ""}`)}</div>` : "";
   f.innerHTML = `<div class="flex items-center gap-3 flex-wrap">
     ${theme}
+    ${thumbBox}
     <p class="text-sm text-slate-700 flex-1 min-w-[16rem]">${where}${d.job?.error && d.job.done ? ` <span class="text-rose-700">${esc(d.job.error)}</span>` : ""}</p>
     ${d.video ? `<a href="${esc(d.video)}" target="_blank" class="${BTN.secondary}">${icon("play_circle")}<span>Watch the rendered video</span></a>` : ""}
     ${approved ? button("secondary", "undo", "Take it back to edit", 'id="ed-reopen"')
       : `${button(changed ? "primary" : "secondary", "movie", rendering ? "Rendering…" : "Render the video", `id="ed-render" ${busy ? "disabled" : ""}`)}
          <button id="ed-approve" class="${BTN.approve} disabled:opacity-40 disabled:cursor-not-allowed" ${busy || changed ? "disabled" : ""} title="${changed ? "Render the video first, watch it, then approve" : "Approve: ready for upload"}">${icon("check")}<span>Approve video</span></button>`}</div>`;
+  f.querySelector("#ed-thumb")?.addEventListener("click", () => edDo("/api/factory-edit/thumbnail", {}, "Designing the thumbnail (about a minute)"));
   f.querySelector("#ed-theme")?.addEventListener("change", async e => {
     if (!(await edSave(true))) return;
     edDo("/api/factory-edit/theme", { theme: e.target.value }, "Theme changed: drawing the video in it (a minute or two)");

@@ -134,6 +134,23 @@ class EditorTests(unittest.TestCase):
             self.assertEqual(ws.queue()[0]["status"], "editing")
             self.assertEqual(factory_plans.get(ws, "pl1")["state"], "editing")
 
+    def test_the_editor_shows_and_remakes_the_thumbnail_and_keeps_a_copy_in_the_episode(self):
+        """Owner, 2026-11-26: "Make video should generate the thumbnail also"."""
+        with TempWorkspace() as ws:
+            root, ep = self._setup(ws)
+            self.assertIsNone(factory_edit.view(ws, SLUG)["thumbnail"])
+
+            def fake_design(ws_, cfg, writer, out, llm=None):
+                self.assertEqual(writer["slug"], SLUG)
+                Path(out).write_bytes(b"jpg")
+                return Path(out)
+            with mock.patch("postcrew.agents.yt_publish.designed_thumbnail", fake_design):
+                factory_edit.thumbnail(ws, SLUG)
+                self.assertIsNone(_wait(SLUG)["error"])
+            self.assertEqual(ws.queue()[0]["poster_image"], "media/p1-thumb.jpg")
+            self.assertEqual((ep / "thumbnail.jpg").read_bytes(), b"jpg")
+            self.assertTrue(factory_edit.view(ws, SLUG)["thumbnail"].startswith("/media/p1-thumb.jpg?v="))
+
     def test_a_video_in_the_editor_is_never_due_for_upload(self):
         from postcrew.agents import publisher
         self.assertNotIn("editing", publisher.DUE)

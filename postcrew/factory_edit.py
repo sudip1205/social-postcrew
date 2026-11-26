@@ -131,6 +131,47 @@ def _plan(ws, slug):
     return factory_plans._by_slug(ws, slug)
 
 
+def _thumb_url(ws, post):
+    """The designed thumbnail that goes to YouTube with the video (owner, 2026-11-26: "Make video should generate the thumbnail also")."""
+    f = ws.root / post["poster_image"] if post and post.get("poster_image") else None
+    return f"/media/{Path(post['poster_image']).name}?v={int(f.stat().st_mtime)}" if f and f.exists() else None
+
+
+def keep_thumbnail(ws, slug, post):
+    """A copy of the thumbnail in the episode folder on the AI lab (episodes/<slug>/thumbnail.jpg), next to its video."""
+    try:
+        if post and post.get("poster_image") and (ws.root / post["poster_image"]).exists():
+            shutil.copy2(ws.root / post["poster_image"], _ep(ws, slug) / "thumbnail.jpg")
+    except (OSError, ValueError):
+        pass
+
+
+def thumbnail(ws, slug):
+    """Design the thumbnail again (render/thumb.py): it replaces the Queue's poster, so the upload sets it on YouTube."""
+    from .agents.yt_publish import designed_thumbnail
+    ep = _ep(ws, slug)
+    post = _post(ws, slug, _plan(ws, slug))
+    if not post:
+        raise ValueError("this video is not in the Queue")
+
+    def go():
+        from . import platforms
+        yt = post.get("youtube") or {}
+        out = ws.root / "media" / f"{post['id']}-thumb.jpg"
+        made = designed_thumbnail(ws, platforms.view(ws.config(), "youtube"), {"title": yt.get("title") or post.get("topic", ""),
+                                  "description": yt.get("description") or post.get("text", ""), "slug": slug}, out)
+        if not made:
+            raise ValueError("the thumbnail could not be made (see the Studio log)")
+        q = ws.queue()
+        p = next(x for x in q if x["id"] == post["id"])
+        p["poster_image"] = str(made.relative_to(ws.root))
+        ws.save_queue(q)
+        keep_thumbnail(ws, slug, p)
+        return "thumbnail made"
+    _job(slug, "thumbnail", go)
+    return view(ws, slug)
+
+
 def view(ws, slug):
     ep = _ep(ws, slug)
     T = timing(ep)
@@ -157,6 +198,7 @@ def view(ws, slug):
                          problems=[_plain(x) for x in h.get("problems") or []]) for h in hist][::-1][:30],
         "changed": bool(st.get("changed")), "rendered_at": st.get("rendered_at"), "approved_at": st.get("approved_at"),
         "post": {"id": post["id"], "status": post["status"]} if post else None,
+        "thumbnail": _thumb_url(ws, post),
         "job": job,
     }
 
@@ -457,6 +499,7 @@ def render(ws, slug):
                 pass
             p["edited_at"] = _now()
             ws.save_queue(q)
+            keep_thumbnail(ws, slug, p)
         _set_state(ep, changed=False, rendered_at=_now())
         return "rendered"
     _job(slug, "render", go)

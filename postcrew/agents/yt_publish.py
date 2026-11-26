@@ -110,6 +110,13 @@ def _enqueue_short(ws, cfg, run_id, day, category, outputs, editing=False):
     designed = designed_thumbnail(ws, cfg, w, media_dir / f"{pid}-thumb.jpg")
     if designed:
         thumb = designed
+        try:   # a copy next to the video in the AI lab's episode folder (owner, 2026-11-26: "Make video should generate the thumbnail also")
+            from .shorts import factory_dir
+            ep = factory_dir(cfg) / "episodes" / str(w.get("slug") or "")
+            if w.get("slug") and ep.is_dir():
+                shutil.copy2(designed, ep / "thumbnail.jpg")
+        except OSError:
+            pass
     mode = cfg["publishing"]["approval"]
     post = {
         "id": pid, "platform": platform, "run_id": run_id, "date": day.isoformat(), "category": category,
