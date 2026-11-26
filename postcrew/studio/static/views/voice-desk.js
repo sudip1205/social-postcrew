@@ -107,6 +107,11 @@ function vdDraw() {
     ${!VD.converter ? `<p class="px-5 py-2 text-sm text-amber-800 bg-amber-50 border-b border-amber-200">Seed-VC is not found (~/voicelab/seed-vc): your recording cannot be matched to dip_puck on this computer. Skipping to dip_puck or am_puck still works.</p>` : ""}
     <div class="divide-y divide-slate-100">${VD.plans.map(vdRow).join("") || `<p class="p-5 text-sm text-slate-500">No plans yet. Type a topic above and press Plan.</p>`}</div>
     ${VD.made ? `<p class="px-5 py-3 text-xs text-slate-500 border-t border-slate-100">${VD.made} plan(s) made into videos: they are in the Queue.</p>` : ""}
+    ${(VD.thumbnails || []).length ? `<div class="px-5 py-3 border-t border-slate-100"><p class="text-xs font-semibold text-slate-600 mb-2">${tip("Thumbnails", "The designed thumbnail of each made video (1080x1920). Download it and set it on YouTube yourself.")}</p>
+      <div class="flex gap-3 overflow-x-auto pb-1">${VD.thumbnails.map(t => `<a href="${esc(t.url)}" download="${esc(t.slug)}-thumbnail.jpg" title="Download: ${esc(t.title)}" class="shrink-0 w-24 group">
+        <img src="${esc(t.url)}" alt="" class="w-24 h-[10.66rem] rounded-lg object-cover border border-slate-200 group-hover:ring-2 group-hover:ring-violet-400">
+        <span class="mt-1 flex items-center gap-1 text-[11px] font-semibold text-slate-600">${icon("download", "text-sm")}Download</span>
+        <span class="block text-[11px] text-slate-500 line-clamp-2">${esc(t.title)}</span></a>`).join("")}</div></div>` : ""}
     ${VD.others?.length ? `<p class="px-5 pt-4 pb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 border-t border-slate-200">Other scripts waiting for your voice (Factory chat, manual runs)</p>
       <div class="divide-y divide-slate-100 border-t border-slate-100">${VD.others.map(ep => vdRow({ id: "", title: ep.title, topic: "", state: "script", slug: ep.slug, episode: ep, other: true })).join("")}</div>` : ""}`;
   vdWire(root);

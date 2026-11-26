@@ -452,7 +452,7 @@ def make(ws, pid, look=None, runner=None, theme=None):
 def view(ws):
     from . import voice_desk
     import json
-    out, made = [], 0
+    out, made, thumbs = [], 0, []
     waiting = {(p.get("youtube") or {}).get("episode") for p in ws.queue() if p.get("status") not in ("published", "publishing", "vetoed")}
     for i in load(ws)["items"]:
         # a made video stays on the list until it is uploaded, so it can still be edited (owner, 2026-11-24: "how to update once the
@@ -460,6 +460,10 @@ def view(ws):
         editable = bool(i.get("slug")) and (voice_desk._root(ws) / "episodes" / i["slug"] / "explainer.js").exists()
         if i.get("state") == "published" or (i.get("state") == "made" and not (editable and i.get("slug") in waiting)):
             made += 1
+            th = voice_desk._root(ws) / "episodes" / i["slug"] / "thumbnail.jpg" if i.get("slug") else None
+            if th and th.exists():   # its designed thumbnail stays downloadable (owner, 2026-11-26: "I'll add it manually")
+                thumbs.append({"title": i.get("title") or i["slug"], "slug": i["slug"], "at": th.stat().st_mtime,
+                               "url": f"/factory-thumb/{i['slug']}.jpg?v={int(th.stat().st_mtime)}"})
             continue
         row = dict(i, job=_jobs.get(i["id"]))
         if i.get("slug"):
@@ -478,4 +482,9 @@ def view(ws):
                 row["episode"] = None
         out.append(row)
     out.sort(key=lambda r: r.get("created_at") or "", reverse=True)
-    return {"plans": out, "made": made, "planning": _jobs.get("plan"), "themes": themes()}
+    for row in out:
+        th = voice_desk._root(ws) / "episodes" / row["slug"] / "thumbnail.jpg" if row.get("slug") else None
+        if th and th.exists():
+            row["thumbnail"] = f"/factory-thumb/{row['slug']}.jpg?v={int(th.stat().st_mtime)}"
+    thumbs.sort(key=lambda t: t["at"], reverse=True)
+    return {"plans": out, "made": made, "planning": _jobs.get("plan"), "themes": themes(), "thumbnails": thumbs[:12]}
