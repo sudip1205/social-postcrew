@@ -481,8 +481,8 @@ class ShortsWriter(Agent):
             (f"THE OWNER'S CHANNEL STYLE (owner, 2026-11-21: 'bring back my old isometric style, follow these videos from my channel'): "
              f"read at least two of the published Shorts in {kit}/examples/channel/ (frames.jpg AND explainer.js: monty-hall, double-booking, "
              f"rain-water, saga, linked-lists, chatbot) and build this one the same way: big hand-drawn hero objects for the topic (box/cylinder/"
-             f"shade) filling 60-75% of the width, makeIso scale 90-130 while explaining, 2-4 zones on one diagonal slab with trees, the camera "
-             f"holding a zone for several beats and gliding ~1 s (H.ease.inOut) to the next, a wide pull-out only at the start and the end, big "
+             f"shade) filling 60-75% of the width, makeIso scale 90-130 while explaining, 2-4 areas on one diagonal slab with trees, the camera "
+             f"moving slowly in ONE direction through the whole video (never hopping between zones, see THE CAMERA below), big "
              f"2D cards in the top third. One fixed angle, never a cut. objects.js is optional background detail only. "
              + factory_styles.variant_line(variant)) if look == "iso" else "",
             "Write ONLY these files in this folder:",
