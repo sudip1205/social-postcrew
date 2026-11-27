@@ -252,7 +252,7 @@ def _slug_of(ws, res):
 # The looks a video can be made in from the Factory's "Use a plan" list (owner, 2026-11-18: "select approved plan script from the drop
 # down to create a video and select style also"). Isometric and Signal (blue) are both canvas looks with the same narration beats, so an
 # approved script and voice made for one can be drawn again in the other; the other looks write a different kind of script.
-LOOKS = {"iso": "Isometric Pastel", "blue": "Signal (blue)"}
+LOOKS = {"iso": "Isometric Pastel", "blue": "Signal (blue)", "sketch": "Sketch Screens"}
 
 
 def look_of(d, ep=None):
@@ -325,7 +325,7 @@ def mark_published(ws, slug, post):
 def ticked_look(ws):
     """The canvas look the ticked Looks ask for: Signal ticked alone = "blue", Isometric = "iso"; None for any other choice."""
     t = factory_styles.ticked(ws)
-    return {("signal",): "blue", ("iso",): "iso"}.get(tuple(t))
+    return {("signal",): "blue", ("iso",): "iso", ("sketch",): "sketch"}.get(tuple(t))
 
 
 def ready(ws):
@@ -341,7 +341,7 @@ def ready(ws):
             continue
         cur = look_of(d, ep)
         out.append({"id": i["id"], "title": i.get("title") or d.get("title") or i["slug"], "format": i.get("format", "short"), "look": cur,
-                    "want": (ticked_look(ws) if cur in LOOKS and cur != "iso" else None) or cur,
+                    "want": (ticked_look(ws) if cur in LOOKS and cur not in ("iso", "sketch") else None) or cur,
                     "voice": (d.get("voice") or {}).get("mode") or "", "looks": looks_for(cur)})
     return out
 
@@ -407,7 +407,7 @@ def make(ws, pid, look=None, runner=None, theme=None):
     if item.get("state") == "making":
         raise ValueError("the video is already being made")
     cur, look = look_of(d, ep), str(look or "").strip()
-    if not look and cur in LOOKS and cur != "iso":
+    if not look and cur in LOOKS and cur not in ("iso", "sketch"):
         # no look picked: the Looks ticked in the Factory (owner, 2026-11-18: "single blue" made it isometric). An Isometric script
         # stays Isometric (owner, 2026-11-25: "my isometric is not coming as before": a Signal tick redrew it in Tech Glow)
         look = ticked_look(ws) or ""
@@ -471,7 +471,7 @@ def view(ws):
             try:
                 row["episode"] = voice_desk.episode(ws, i["slug"])
                 cur = look_of(voice_desk.desk(voice_desk._root(ws) / "episodes" / i["slug"]), voice_desk._root(ws) / "episodes" / i["slug"])
-                row["want"] = (ticked_look(ws) if cur in LOOKS and cur != "iso" else None) or cur
+                row["want"] = (ticked_look(ws) if cur in LOOKS and cur not in ("iso", "sketch") else None) or cur
                 ep = voice_desk._root(ws) / "episodes" / i["slug"]
                 if cur == "iso" or (row["want"] == "iso"):
                     try:

@@ -140,7 +140,7 @@ class FactoryPlanTests(unittest.TestCase):
         with TempWorkspace() as ws, fake_factory(ws, desk=True) as (root, calls):
             item = self._approved(ws, root, "signal")
             looks = {l["id"]: l["ok"] for l in factory_plans.ready(ws)[0]["looks"]}
-            self.assertEqual(looks, {"signal": True, "iso": False, "blue": False})
+            self.assertEqual(looks, {"signal": True, "iso": False, "blue": False, "sketch": False})
             with self.assertRaises(ValueError):
                 factory_plans.make(ws, item["id"], "iso")
 

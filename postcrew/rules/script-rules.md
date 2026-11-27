@@ -102,6 +102,14 @@ One world, framed wide so every object of the section stays fully on screen; the
 video (a steady drift or push along the world), and each section eases smoothly into the next. One fixed angle. Never cut, never jump
 back and forth between zones, never zoom so close that objects leave the frame.
 
+## S10. Sketch Screens look (owner, 2026-11-26: "I want realism ... create characters, like handdrawn ... also some real screenshots")
+Only when the look is Sketch Screens (script.json "style": "sketch"); its kit guide is styles/sketch-screens/STYLE.md.
+- Show the topic through the people and devices it involves: hand-drawn people react (point, cheer, shrug, get hit), and phones,
+  laptops and monitors show REAL screens (VS Code, a terminal, a browser, a game, a chat, a notification, an upload bar).
+- Every key word of the narration is also on screen in the story's own text (40 px or more), never only inside a device's screen.
+- Data moves as packets along wires with a tag ("seq 5", "50 MS"); a state change lands as a stamp ("MISSED", "HIT", "JAMMED").
+- One tall world, sections stacked down it; the camera only moves down (S8).
+
 ## S9. Check before done
 Run the storyboard check, fix every problem it lists, then look at the storyboard and fix every panel that is empty, cramped, unreadable,
 off-screen or not clearly about its line. Repeat until both are clean.

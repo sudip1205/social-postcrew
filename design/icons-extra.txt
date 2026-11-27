@@ -182,3 +182,4 @@ http
 scatter_plot
 view_column
 download
+draw

@@ -22,6 +22,8 @@ from ..llm import agent_settings
 from .. import rules
 from ..yt_tags import merge as merge_tags, problems as tag_problems
 
+KITS = {"iso": "iso-pastel", "blue": "tech-glow", "sketch": "sketch-screens"}   # look -> shorts-factory/styles/<kit>
+LOOK_NAMES = {"iso": "Isometric Pastel", "blue": "Signal (blue), Tech Glow", "sketch": "Sketch Screens"}
 SLUG = re.compile(r"^[a-z0-9][a-z0-9-]{1,60}$")
 WRITER_TOOLS = ["Read", "Write", "Edit", "Glob", "Grep", "WebSearch", "WebFetch", "Skill", "Bash(npm run variety:*)", "Bash(python3 algo/*)", "Bash(python3 -I algo/*)"]
 SKILL = ".claude/skills/explainer-short-style"
@@ -249,6 +251,8 @@ class ShortsWriter(Agent):
                 (ep / f).unlink(missing_ok=True)
         if factory_styles.is_iso(factory_styles.ticked(ctx.ws)):   # Isometric Pastel: Claude writes the animation (owner, 2026-11-14)
             return self._plan_iso(ctx, root, ep, slug, subject, topic, guidance)
+        if factory_styles.is_sketch(factory_styles.ticked(ctx.ws)):   # Sketch Screens (owner, 2026-11-26: realism, hand-drawn, real screens)
+            return self._plan_iso(ctx, root, ep, slug, subject, topic, guidance, look="sketch")
         if factory_styles.ticked(ctx.ws) == ["signal"]:   # Signal alone: the Tech Glow canvas engine (owner, 2026-11-15)
             return self._plan_iso(ctx, root, ep, slug, subject, topic, guidance, look="blue")
         if factory_styles.is_3d(factory_styles.ticked(ctx.ws)):   # the 3D look: its own pipeline plans the video (owner, 2026-11-13)
@@ -378,13 +382,13 @@ class ShortsWriter(Agent):
         """The Isometric Pastel look (owner, 2026-11-14): one Claude Code session writes the narration beats and the 2D-canvas animation
         (explainer.js) in the style of the owner's reference prompt (shorts-factory/styles/iso-pastel), then runs the storyboard check
         (free: key frames + automatic checks) and looks at the storyboard until it is clean. make-iso.mjs then voices and records it."""
-        kit = root / "styles" / ("tech-glow" if look == "blue" else "iso-pastel")
+        kit = root / "styles" / KITS.get(look, "iso-pastel")
         # the Isometric variation (owner, 2026-11-21); the theme picked at Make video wins (owner, 2026-11-24)
         picked = ctx.options.get("variant") if isinstance(ctx.options, dict) else None
         variant = (picked if isinstance(picked, str) and picked else factory_styles.variant(ctx.ws)) if look == "iso" else ""
-        name = "Signal (blue), Tech Glow" if look == "blue" else "Isometric Pastel"
+        name = LOOK_NAMES.get(look, "Isometric Pastel")
         if not (kit / "STYLE.md").exists():
-            raise AgentError(f"the Isometric Pastel kit is not at {kit}: update the Shorts factory", fatal=True)
+            raise AgentError(f"the {name} kit is not at {kit}: update the Shorts factory", fatal=True)
         fmt = (ctx.cat.get("format") or (ctx.video or {}).get("format") or "short") if hasattr(ctx, "cat") else "short"
         long = fmt == "long"
         seconds = int((ctx.video or {}).get("target_seconds") or (480 if long else 50))
@@ -406,7 +410,11 @@ class ShortsWriter(Agent):
             f"Format: {'16:9 long video (1920x1080)' if long else '9:16 Short (1080x1920, vertical)'}. Word budget (hard): at most {budget} spoken words"
             + ("" if long else f" and at least {SHORT_MIN_WORDS_ISO}; aim for 130-155 words in 12-15 beats (about 65-75 s, the owner's house standard), one idea explained properly (what it is, why it matters, how it works, a worked example)") + ". "
             "The like / comment / share / subscribe outro is added after your last beat automatically: do not write one.",
-            f"Read {kit}/STYLE.md (the rules, below), then the owner's published Shorts in {root}/styles/iso-pastel/examples/channel/ and examples/database-scaling/ ("
+            (f"Read {kit}/STYLE.md (the kit and how to use it, below), then the sample episode {kit}/example/ (script.json, explainer.js, "
+             f"storyboard.png): match its look, motion and camera; change only the topic. {kit}/kit.js has every drawing helper "
+             f"(SKETCH.person, phone, laptop, monitor, server, vscode, terminal, browser, game, chat, notif, panel, wire, packet, stamp, camera)."
+             if look == "sketch" else
+             (            f"Read {kit}/STYLE.md (the rules, below), then the owner's published Shorts in {root}/styles/iso-pastel/examples/channel/ and examples/database-scaling/ ("
             f"match their structure and timing exactly{', in the Tech Glow look instead of pastel' if look == 'blue' else ', and their look'}; change only the topic) "
             f"and {kit}/reference.js (the style itself). "
             + (f"THE BLUE LOOK'S REFERENCE is the owner's published Short in {kit}/examples/binary-search/ (README.md, frames.png, explainer.js): match its look, "
@@ -414,7 +422,7 @@ class ShortsWriter(Agent):
                "whenever the subject has anything countable, stackable, stored or connected (owner, 2026-11-17: 'add 3D bars or objects when possible'). "
                "Most beats show a 3D object; no beat is an empty frame. "
                f"{kit}/kit.js has the 2D helpers (card, tile, pill, eyebrow, gtext, connector, background, bloom)."
-               if look == "blue" else f"{kit}/kit.js has the drawing helpers you may call (box, cylinder, tag, numberTag, arrow, shade, poly)."),
+               if look == "blue" else f"{kit}/kit.js has the drawing helpers you may call (box, cylinder, tag, numberTag, arrow, shade, poly)."))),
             factory_styles.variant_line(variant) if look == "iso" else "",
             "Write ONLY these files in this folder:",
             '  script.json   {"style": "' + look + '"' + (', "variant": "' + (variant if variant != "auto" else "<from VARIANTS.md>") + '"' if look == "iso" else "") + ', "topic": "...", "format": "' + ("long" if long else "short") + '", "beats": [{"say": "..."}, ...]}',
@@ -444,7 +452,7 @@ class ShortsWriter(Agent):
         said = " ".join(str(b.get("say")) for b in beats)
         return {"slug": slug, "episode": str(ep), "skill": skill_version(root), "title": meta.get("title", ""), "description": meta.get("description", ""),
                 "tags": meta.get("tags") or [], "scene_count": len(beats), "narration": said[:4000], "words": len(said.split()), "long": long,
-                "kind": "iso", "style": "iso", "look": look, "code_scenes": 0, "story_problems": [], "ticked": ["signal"] if look == "blue" else ["iso"],
+                "kind": "iso", "style": "iso", "look": look, "code_scenes": 0, "story_problems": [], "ticked": ["signal"] if look == "blue" else [look],
                 "storyboard_errors": problems, "word_budget": budget, "storyboard": str(ep / "build-iso" / "storyboard.png")}
 
     def _restyle(self, ctx, root, slug, look, guidance=None):
@@ -467,7 +475,7 @@ class ShortsWriter(Agent):
             d0["approved_beats"] = says
             voice_desk._save_desk(ep, d0)
         keep = {k: before[k] for k in ("hook_options", "topic", "format") if k in before}
-        name = "Signal (blue), Tech Glow" if look == "blue" else "Isometric Pastel"
+        name = LOOK_NAMES.get(look, "Isometric Pastel")
         notes = [f"REDRAW IN THE {name.upper()} LOOK. script.json and its {len(says)} beats are APPROVED by the owner and already voiced: do not "
                  f"change, add, remove or reorder any beat or any word of \"say\". Only set \"style\" in script.json to \"{look}\", and rewrite "
                  f"explainer.js (and scoreSound) from scratch in the {name} look, one panel per beat, following the STYLE.md and examples below."]

@@ -35,7 +35,7 @@ function vdAiVoice(ep, v) {   // dip_puck / am_puck, generated at once: listen, 
   </div>`;
 }
 
-const VD_LOOK = { iso: "Isometric", signal: "Signal (blue)", story: "Story", code: "VS Code", "3d": "3D" };
+const VD_LOOK = { iso: "Isometric", sketch: "Sketch Screens", signal: "Signal (blue)", story: "Story", code: "VS Code", "3d": "3D" };
 
 async function vdOpen() {
   clearInterval(vdTimer);

@@ -11,6 +11,11 @@ STYLES = {   # owner, 2026-11-21: "on factory only keep single blue and isometri
     "iso": {"label": "Isometric (pastel)", "icon": "deployed_code",
             "what": "the owner's Isometric Pastel style: a hand-drawn 2D-canvas isometric world filmed by a moving, turning camera, built from "
                     "the object library, with synced sound effects (styles/iso-pastel); pick a variation for the kind of video"},
+    # owner, 2026-11-26: "I want realism ... create characters, like handdrawn ... also some real screenshots, like vscode or phone screen"
+    "sketch": {"label": "Sketch Screens", "icon": "draw",
+               "what": "hand-drawn people and real devices on a dark board: phones, laptops and monitors with live screens (VS Code, terminal, "
+                       "browser, a game, chat, notifications), neon line art and a pixel title (styles/sketch-screens); for topics about "
+                       "people and devices, such as multiplayer games, notifications and uploads"},
 }
 # The Isometric variations (owner, 2026-11-21): the same kit, camera and object library in a different stage and materials, each taken
 # from a Short the owner picked (shorts-factory/styles/iso-pastel/VARIANTS.md). "auto" lets the Script Writer choose by topic.
@@ -26,7 +31,7 @@ VARIANTS = {
 }
 DEFAULT_VARIANT = "pastel"
 SOLO = "3d"   # the retired 3D look (video-engine): no longer offered, kept so old episodes still read
-SOLOS = ("signal", "iso")   # every look makes the whole video by itself: one is ticked at a time
+SOLOS = ("signal", "iso", "sketch")   # every look makes the whole video by itself: one is ticked at a time
 DEFAULT = ["iso"]   # owner, 2026-11-15: "this video style is perfect and the timing of shorts are perfect. keep it consistent"
 STATE = "factory-styles"
 
@@ -51,7 +56,7 @@ def save(ws, styles, variant_id=None):
     if not got:
         raise ValueError("tick a look")
     if len(got) > 1:
-        raise ValueError("Signal (blue) and Isometric each make the whole video: tick one of them")
+        raise ValueError("each look makes the whole video: tick one of them")
     v = str(variant_id or "").strip() or variant(ws)
     if v not in VARIANTS:
         raise ValueError(f"unknown Isometric variation: {v}")
@@ -78,6 +83,10 @@ def is_iso(styles):
     return list(styles) == ["iso"]
 
 
+def is_sketch(styles):
+    return list(styles) == ["sketch"]
+
+
 def variant_line(v):
     """What the Script Writer is told about the Isometric variation."""
     if v == "auto":
@@ -90,6 +99,9 @@ def variant_line(v):
 
 def instruction(styles, variant_id=None):
     """The line the Script Writer (and the Factory chat) gets about the looks."""
+    if is_sketch(styles):
+        return ("LOOK ticked in the Factory: Sketch Screens (shorts-factory/styles/sketch-screens): hand-drawn people, real devices with "
+                "live screens, neon line art on a dark board. script.json \"style\": \"sketch\".")
     if is_3d(styles):
         return ("LOOK ticked in the Factory: 3D (isometric, video-engine). Do NOT write scenes: write the storyboard program "
                 "shorts-factory/episodes/<slug>/scene.js (function build(sb) {...}) following ~/video-engine/RULES.md, plus "

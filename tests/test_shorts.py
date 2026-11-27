@@ -170,7 +170,7 @@ class FactoryStylesTests(unittest.TestCase):
         from postcrew import factory_styles as fs
         with TempWorkspace() as ws:
             self.assertEqual(fs.ticked(ws), ["iso"])   # Isometric Pastel by default (owner, 2026-11-15; was the blue look)
-            self.assertEqual([o["id"] for o in fs.options(ws)], ["signal", "iso"])
+            self.assertEqual([o["id"] for o in fs.options(ws)], ["signal", "iso", "sketch"])
             self.assertEqual(fs.save(ws, ["code", "signal", "nope"]), ["signal"])   # the retired looks are not saved
             self.assertEqual([o["id"] for o in fs.options(ws) if o["on"]], ["signal"])
             for bad in ([], ["3d"], ["signal", "iso"]):
