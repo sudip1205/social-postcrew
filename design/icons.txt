@@ -70,6 +70,7 @@ done_all
 donut_large
 download
 drag_indicator
+draw
 drive_folder_upload
 edit
 edit_calendar
